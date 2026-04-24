@@ -31,7 +31,8 @@ from Modules.ui_components import (
 )
 from Modules.custom_menu_bar import CustomMenuBar
 from Modules.ui_tk_style import apply_dark_titlebar, enable_global_dark_titlebar
-from Modules.settings_manager import SettingsManager, init_settings, safe_save_json
+from Modules.settings_manager import SettingsManager, init_settings
+from Modules import profile_io
 from Modules.window_position import restore_window_position, bind_window_position_save
 from Modules.build_loading import BuildLoadingScreen, show_welcome_popup, show_close_game_required_dialog, show_about_popup
 from Modules.live_tracker_panel import LiveTrackerPanel
@@ -102,6 +103,7 @@ class KzGridsApp(ttkb.Window):
                 logger.warning("Database not found: %s", db_path)
 
         # State
+        self.app_version = APP_VERSION
         self.current_profile = None
         self.reference_resolution = None
         self.modified = False
@@ -652,128 +654,28 @@ class KzGridsApp(ttkb.Window):
         self.title(f"{APP_NAME} — {name}{suffix}")
 
     def _new_profile(self):
-        """Start a new empty profile."""
-        if not self._check_unsaved_changes():
-            return
-        self.grids_panel.load_profile_data([])
-        self.current_profile = None
-        self.reference_resolution = None
-        self.modified = False
-        self._update_title()
+        return profile_io.new_profile(self)
 
     def _open_profile(self):
-        """Open a profile from file."""
-        if not self._check_unsaved_changes():
-            return
-        path = filedialog.askopenfilename(
-            title="Open Profile",
-            initialdir=str(self.profiles_path),
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
-        )
-        if path:
-            self._load_profile(Path(path))
+        return profile_io.open_profile(self)
 
     def _load_profile(self, path):
-        """Load a profile from a JSON file."""
-        corrupt = False
-        try:
-            raw = json.loads(Path(path).read_text(encoding='utf-8'))
-            data = raw if isinstance(raw, dict) else {}
-            if not isinstance(raw, dict):
-                corrupt = True
-        except (json.JSONDecodeError, UnicodeDecodeError, OSError):
-            corrupt = True
-            data = {}
-
-        if corrupt:
-            Messagebox.show_warning(
-                f"Profile appears corrupt — starting with empty grids.\n\n{Path(path).name}",
-                title="Profile Warning"
-            )
-
-        grids = data.get('grids', [])
-        missing_by_grid = self.grids_panel.load_profile_data(grids)
-        if missing_by_grid:
-            self._warn_missing_buffs(missing_by_grid)
-
-        if bt := self._boss_timer_if_alive():
-            bt.load_profile_data(data.get('boss_timer', {}))
-
-        ref = data.get('reference_resolution')
-        self.reference_resolution = list(ref) if isinstance(ref, list) and len(ref) == 2 else None
-
-        self.current_profile = str(path)
-        self.modified = False
-        self.settings.set('last_profile', str(path))
-        self.settings.save()
-        self._update_title()
+        return profile_io.load_profile(self, path)
 
     def _warn_missing_buffs(self, missing_by_grid):
-        """Show the missing-buff warning, deferring if the main window isn't viewable yet."""
-        lines = [f"• {name}: {', '.join(refs)}" for name, refs in missing_by_grid.items()]
-        message = (
-            "Some tracked buffs weren't found in the database and were removed:\n\n"
-            + "\n".join(lines) +
-            "\n\nRe-add them via Tracked Buffs or Slot Assignments if needed."
-        )
-        def _show():
-            Messagebox.show_warning(message, title="Missing Buff References")
-        # During startup _load_profile runs while the main window is still
-        # withdrawn; show sync otherwise so the dialog blocks further code
-        # (e.g. first-launch welcome popup) instead of stacking on top of it.
-        if self.winfo_viewable():
-            _show()
-        else:
-            self.after(200, _show)
+        return profile_io.warn_missing_buffs(self, missing_by_grid)
 
     def _save_profile(self):
-        """Save current profile (or Save As if no path). Returns True if saved."""
-        if self.current_profile:
-            return self._do_save_profile(Path(self.current_profile))
-        return self._save_profile_as()
+        return profile_io.save_profile(self)
 
     def _save_profile_as(self):
-        """Save profile to a new file. Returns True if saved, False if cancelled."""
-        path = filedialog.asksaveasfilename(
-            title="Save Profile As",
-            defaultextension=".json",
-            initialdir=str(self.profiles_path),
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
-        )
-        if path:
-            return self._do_save_profile(Path(path))
-        return False
+        return profile_io.save_profile_as(self)
 
     def _do_save_profile(self, path):
-        """Write profile data to disk. Returns True on success, False on error."""
-        try:
-            data = {
-                'version': APP_VERSION,
-                'grids': self.grids_panel.get_profile_data(),
-            }
-            if self.reference_resolution:
-                data['reference_resolution'] = self.reference_resolution
-            if bt := self._boss_timer_if_alive():
-                data['boss_timer'] = bt.get_profile_data()
-            safe_save_json(path, data)
-
-            self.current_profile = str(path)
-            self.modified = False
-            self.settings.set('last_profile', str(path))
-            self.settings.save()
-            self._update_title()
-            self.toast.show(f"Saved: {path.name}", 'success')
-            self._flash_status_bar()
-            return True
-        except (IOError, OSError) as e:
-            Messagebox.show_error(f"Failed to save profile.\n\nCheck that the file isn't read-only or in use by another program.\n\n({e})", title="Save Error")
-            return False
+        return profile_io.do_save_profile(self, path)
 
     def _get_profile_name(self):
-        """Return the current profile display name."""
-        if self.current_profile:
-            return Path(self.current_profile).stem
-        return "Untitled"
+        return profile_io.get_profile_name(self)
 
     def _check_for_updates(self):
         """Fire-and-forget background check for a newer GitHub release."""
