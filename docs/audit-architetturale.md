@@ -183,3 +183,31 @@ All dependency chains terminate without cycles.
 ---
 
 **Analysis complete.** No recommendations phase - observations only per requirements.
+
+---
+
+## 5. Resolution (2026-04-24)
+
+Issues #3 (fat interface), #4 (business logic in UI module), and #5 (mixed import conventions) from Section 4 have been addressed. Issue #2 (high fan-in on `ui_helpers.py`) is mitigated — most consumers now depend on a narrower, focused module instead of the 1,497-line god-module.
+
+### What changed
+
+`Modules/ui_helpers.py` (previously 1,497 lines, 69 public symbols, 8 responsibilities) was split into six focused modules:
+
+| Module | Lines | Responsibility |
+|---|---|---|
+| `Modules/ui_helpers.py` | 129 | Design tokens only (FONT_*, PAD_*, BTN_*, THEME_COLORS, TK_COLORS, MODULE_COLORS, GRID_TYPE_COLORS, OVERLAY_COLORS, _RETRO_COLORS, SCANLINE_ALPHA) + `setup_custom_styles` |
+| `Modules/ui_widgets.py` | 497 | Widget-builder helpers, tooltips, event bindings, debounce, `blend_alpha`, `CollapsibleSection` |
+| `Modules/ui_components.py` | 739 | `DragReorderManager`, `ToastManager`, `CustomMenuBar`, `create_scrollable_frame`, mousewheel routing |
+| `Modules/ui_tk_style.py` | 57 | Raw-tk widget styling + `apply_dark_titlebar` |
+| `Modules/window_position.py` | 91 | `save_window_position`, `restore_window_position`, `bind_window_position_save`, `clamp_to_screen` |
+| `Modules/settings_manager.py` | 29 | `init_settings`, `get_setting`, `set_setting`, `_settings` module reference — no longer lives in the UI layer |
+
+All splits verified step-by-step via `python -c "import kzgrids; from Modules import ..."` (full import-graph traversal), committed as six atomic commits so any regression is bisectable.
+
+Import style (Section 4, Issue #3) was normalized as part of the same pass: all files under `Modules/` now use relative imports (`from .X import`); absolute imports (`from Modules.X import`) are used only from `kzgrids.py` (the top-level entry).
+
+### What was explicitly left as-is
+
+- **`build.py`'s defensive `--hidden-import` block.** Section 3 hypothesized it may be unnecessary. Testing that hypothesis is a separate experiment; for now the block gained five new entries (one per new module).
+- **Naming.** `ui_helpers.py` kept its name despite now holding only tokens — renaming would be accurate but adds diff churn across every consumer for no runtime benefit.

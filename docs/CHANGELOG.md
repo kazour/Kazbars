@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- Internal: split `Modules/ui_helpers.py` (1,497 lines, 8 responsibilities) into six focused modules: `ui_helpers` (design tokens), `ui_widgets`, `ui_components`, `ui_tk_style`, `window_position`, `settings_manager`. Imports inside `Modules/` are now consistently relative. No user-facing changes.
+
 ## [1.1.0] — 2026-04-22
 
 ### Added
