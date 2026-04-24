@@ -32,12 +32,10 @@ from Modules.ui_components import (
 from Modules.custom_menu_bar import CustomMenuBar
 from Modules.ui_tk_style import apply_dark_titlebar, enable_global_dark_titlebar
 from Modules.settings_manager import SettingsManager, init_settings
-from Modules import profile_io, game_folder
+from Modules import profile_io, game_folder, build_action
 from Modules.window_position import restore_window_position, bind_window_position_save
-from Modules.build_loading import BuildLoadingScreen, show_welcome_popup, show_close_game_required_dialog, show_about_popup
+from Modules.build_loading import show_welcome_popup, show_about_popup
 from Modules.live_tracker_panel import LiveTrackerPanel
-from Modules.build_utils import find_compiler
-from Modules.grids_generator import MAX_TOTAL_SLOTS
 from Modules.database_editor import BuffDatabase, DatabaseEditorTab
 from Modules.grids_panel import GridsPanel
 from Modules.instructions_panel import InstructionsPanel
@@ -595,147 +593,7 @@ class KzGridsApp(ttkb.Window):
     # BUILD PIPELINE
     # ========================================================================
     def _build(self):
-        """Build and install KazGrids.swf to the configured game folder."""
-        if self._building:
-            return
-
-        valid = (
-            bool(self.game_path)
-            and Path(self.game_path).is_dir()
-            and (Path(self.game_path) / "Data" / "Gui" / "Default").exists()
-        )
-
-        compiler = find_compiler(self.assets_path, self.app_path)
-        grids = self.grids_panel.get_profile_data()
-        total_slots = self.grids_panel.get_total_slots()
-
-        validations = [
-            (not valid,
-             "No valid game folder configured.\n\n"
-             "Set your Age of Conan folder from the bottom bar."),
-            (compiler is None,
-             "A required build file is missing.\n\n"
-             "Re-download Kaz Grids to restore it."),
-            (not grids,
-             "No grids to build.\n\nAdd at least one grid first."),
-            (total_slots > MAX_TOTAL_SLOTS,
-             f"Total slots ({total_slots}) exceeds maximum ({MAX_TOTAL_SLOTS}).\n\n"
-             "Remove some grids or reduce grid sizes."),
-        ]
-        for k, (failed, msg) in enumerate(validations):
-            if failed:
-                if k == 0:
-                    self._pulse_game_hint()
-                Messagebox.show_error(msg, title="Build Error")
-                return
-
-        empty = []
-        for g in grids:
-            if not g.get('enabled', True):
-                continue
-            if g.get('slotMode') == 'static':
-                sa = g.get('slotAssignments', {})
-                if not any(v for v in sa.values()):
-                    empty.append(g['id'])
-            else:
-                if not g.get('whitelist'):
-                    empty.append(g['id'])
-
-        if empty:
-            names = ', '.join(f"'{n}'" for n in empty)
-            Messagebox.show_error(
-                f"These grids have no tracked buffs and would appear empty in-game:\n\n{names}\n\n"
-                "Add tracked buffs (or slot assignments for static grids), or disable the grid.",
-                title="Empty Grids"
-            )
-            return
-
-        # Aoc.exe users only: block while the game is running
-        if self.use_aoc_bypass:
-            from Modules.build_executor import get_running_game_process
-            running = get_running_game_process()
-            if running:
-                show_close_game_required_dialog(self, process_name=running)
-                return
-
-        # Auto-save profile before building
-        profile_name = None
-        if self.current_profile:
-            try:
-                self._do_save_profile(Path(self.current_profile))
-                profile_name = Path(self.current_profile).stem
-            except Exception as e:
-                logger.warning("Could not save profile before build: %s", e)
-
-        # Lock build — disable all build triggers
-        self._building = True
-        self.build_btn.configure(state='disabled')
-        self.unbind_all('<Control-b>')
-
-        from Modules.build_executor import compile_to_staging, install_to_client, is_aoc_running
-
-        loading = BuildLoadingScreen(self)
-        staging_dir = None
-        try:
-            loading.advance_step("Compiling KzGrids...")
-            self.update()
-
-            staging_dir, compile_result = compile_to_staging(
-                grids, self.database, self.assets_path, compiler, APP_VERSION
-            )
-
-            if not compile_result[0]:
-                loading.show_summary(
-                    [], compile_result, profile_name=profile_name)
-                self.toast.show("Build failed", 'error', 10)
-                self._flash_status_bar(THEME_COLORS['danger'])
-                return
-
-            loading.advance_step("Installing...")
-            self.update()
-
-            staging_swf = staging_dir / "KazGrids.swf"
-            ok, err = install_to_client(staging_swf, self.game_path, self.use_aoc_bypass)
-            client_results = [(self._format_game_path(self.game_path), ok, err)]
-
-            aoc_running = self.use_aoc_bypass and is_aoc_running()
-
-            if ok:
-                if self.use_aoc_bypass and aoc_running:
-                    self.toast.show("Built — /reloadui in-game", 'success', 8)
-                elif self.use_aoc_bypass:
-                    self.toast.show("Built — launch via Aoc.exe", 'success', 8)
-                else:
-                    self.toast.show("Built — /reloadui + /reloadgrids", 'success', 8)
-                self._flash_status_bar()
-                self.grids_panel.notify_build_done(self.use_aoc_bypass)
-                if not self.settings.get('has_built_before'):
-                    self.settings.set('has_built_before', True)
-                    self.settings.save()
-            else:
-                self.toast.show("Build failed", 'error', 10)
-                self._flash_status_bar(THEME_COLORS['danger'])
-
-            loading.show_summary(
-                client_results, compile_result, profile_name=profile_name,
-                aoc_installed=self.use_aoc_bypass, aoc_running=aoc_running)
-
-        except Exception as e:
-            logger.exception("Unexpected build error")
-            loading.destroy()
-            Messagebox.show_error(
-                "Something went wrong during the build.\n\n"
-                "Your game files may not have been updated.\n\n"
-                f"({e})",
-                title="Build Error"
-            )
-            self.toast.show("Build failed", 'error', 10)
-        finally:
-            if staging_dir:
-                shutil.rmtree(staging_dir, ignore_errors=True)
-            self._building = False
-            self.bind_all('<Control-b>', lambda e: self._build())
-            self._update_build_state()
+        return build_action.build(self)
 
     # ========================================================================
     # EDIT MENU ACTIONS
