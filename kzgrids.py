@@ -20,11 +20,12 @@ from Modules.ui_helpers import (
     THEME_COLORS, TK_COLORS, MODULE_COLORS,
     PAD_TAB, PAD_XS, PAD_SMALL,
     BTN_LARGE,
-    setup_custom_styles, apply_dark_titlebar, enable_global_dark_titlebar,
+    setup_custom_styles,
     disable_mousewheel_on_inputs, add_tooltip, bind_button_press_effect,
     create_app_header, update_app_header_color, ToastManager,
     CustomMenuBar,
 )
+from Modules.ui_tk_style import apply_dark_titlebar, enable_global_dark_titlebar
 from Modules.settings_manager import init_settings
 from Modules.window_position import restore_window_position, bind_window_position_save
 from Modules.build_loading import BuildLoadingScreen, show_welcome_popup, show_close_game_required_dialog, show_about_popup

@@ -92,6 +92,7 @@ def build_executable():
         "--hidden-import", "Modules.ui_helpers",
         "--hidden-import", "Modules.settings_manager",
         "--hidden-import", "Modules.window_position",
+        "--hidden-import", "Modules.ui_tk_style",
         "--hidden-import", "Modules.grid_dialogs",
         "--hidden-import", "Modules.grid_model",
         "--hidden-import", "Modules.first_launch",
