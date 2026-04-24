@@ -13,9 +13,9 @@ from .ui_helpers import (
     PAD_TAB, PAD_SMALL, PAD_TINY, PAD_XS, PAD_LF,
     BTN_SMALL,
     create_dialog_header,
-    restore_window_position,
     bind_label_press_effect,
 )
+from .window_position import restore_window_position
 from .build_executor import detect_aoc_launcher
 
 

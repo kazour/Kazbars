@@ -24,8 +24,8 @@ from .ui_helpers import (
     add_tooltip, debounced_callback,
     create_dialog_header, MODULE_COLORS, PAD_INNER,
     PAD_SMALL, PAD_TAB, PAD_XS, PAD_BUTTON_GAP, PAD_SECTION_GAP,
-    restore_window_position, bind_window_position_save,
 )
+from .window_position import restore_window_position, bind_window_position_save
 import json
 import re
 

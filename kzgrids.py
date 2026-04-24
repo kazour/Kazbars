@@ -22,11 +22,11 @@ from Modules.ui_helpers import (
     BTN_LARGE,
     setup_custom_styles, apply_dark_titlebar, enable_global_dark_titlebar,
     disable_mousewheel_on_inputs, add_tooltip, bind_button_press_effect,
-    restore_window_position, bind_window_position_save,
     create_app_header, update_app_header_color, ToastManager,
     CustomMenuBar,
 )
 from Modules.settings_manager import init_settings
+from Modules.window_position import restore_window_position, bind_window_position_save
 from Modules.build_loading import BuildLoadingScreen, show_welcome_popup, show_close_game_required_dialog, show_about_popup
 from Modules.live_tracker_panel import LiveTrackerPanel
 from Modules.build_utils import find_compiler

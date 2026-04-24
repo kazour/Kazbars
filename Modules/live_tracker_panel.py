@@ -22,8 +22,8 @@ from .ui_helpers import (
     THEME_COLORS, FONT_SMALL, FONT_SMALL_BOLD, MODULE_COLORS,
     create_tip_bar, create_dialog_header, BTN_SMALL, add_tooltip,
     PAD_TAB, PAD_XS, PAD_SMALL, PAD_LF, PAD_BUTTON_GAP, PAD_MID,
-    restore_window_position,
 )
+from .window_position import restore_window_position
 
 
 class LiveTrackerPanel(tk.Toplevel):
