@@ -9,7 +9,7 @@ import shutil
 import sys
 import tkinter as tk
 import webbrowser
-from tkinter import filedialog, ttk
+from tkinter import ttk
 from pathlib import Path
 
 import ttkbootstrap as ttkb
@@ -32,7 +32,7 @@ from Modules.ui_components import (
 from Modules.custom_menu_bar import CustomMenuBar
 from Modules.ui_tk_style import apply_dark_titlebar, enable_global_dark_titlebar
 from Modules.settings_manager import SettingsManager, init_settings
-from Modules import profile_io
+from Modules import profile_io, game_folder
 from Modules.window_position import restore_window_position, bind_window_position_save
 from Modules.build_loading import BuildLoadingScreen, show_welcome_popup, show_close_game_required_dialog, show_about_popup
 from Modules.live_tracker_panel import LiveTrackerPanel
@@ -453,162 +453,41 @@ class KzGridsApp(ttkb.Window):
     # GAME FOLDER MANAGEMENT
     # ========================================================================
     def _migrate_legacy_clients(self):
-        """One-time migration: collapse old multi-client settings to single game_path."""
-        legacy = self.settings.get('game_clients')
-        if not legacy:
-            return
-        idx = int(self.settings.get('active_game_idx') or 0)
-        if not (0 <= idx < len(legacy)):
-            idx = 0
-        try:
-            self.settings.set('game_path', legacy[idx]['path'])
-        except (KeyError, TypeError, IndexError):
-            pass
-        self.settings.data.pop('game_clients', None)
-        self.settings.data.pop('active_game_idx', None)
-        self.settings.save()
+        return game_folder.migrate_legacy_clients(self)
 
     def _refresh_game_path_label(self):
-        """Update the game-folder label and tooltip from self.game_path."""
-        if not self.game_path:
-            self._game_path_label.configure(
-                text="(not set)", foreground=THEME_COLORS['muted'])
-            add_tooltip(self._game_path_label, "Click to choose your Age of Conan folder")
-        else:
-            display = self._format_game_path(self.game_path)
-            exists = Path(self.game_path).is_dir()
-            text = display if exists else f"{display} ⚠"
-            self._game_path_label.configure(
-                text=text,
-                foreground=THEME_COLORS['body'] if exists else THEME_COLORS['warning'])
-            tip = self.game_path if exists else f"Folder not found: {self.game_path}"
-            add_tooltip(self._game_path_label, tip)
-        self._update_build_state()
+        return game_folder.refresh_game_path_label(self)
 
     @staticmethod
     def _format_game_path(path):
-        """Compact display: 'F:\\...\\Age of Conan' for long paths."""
-        resolved = Path(path)
-        parts = resolved.parts
-        if len(parts) <= 3:
-            return str(resolved)
-        return f"{parts[0]}\\...\\{parts[-1]}"
+        return game_folder.format_game_path(path)
 
     def _change_game_folder(self):
-        """Browse for a game folder and persist it."""
-        path = filedialog.askdirectory(title="Select Age of Conan Folder")
-        if not path:
-            return
-
-        if not (Path(path) / "Data" / "Gui" / "Default").exists():
-            Messagebox.show_warning(
-                "This doesn't look like an Age of Conan install.\n\n"
-                "The expected game folders weren't found. The folder will be set anyway.",
-                title="Unexpected Folder"
-            )
-
-        test_path = str(Path(path) / "Data" / "Gui" / "Default" / "Flash" / "KazGrids.swf")
-        if len(test_path) > 240:
-            Messagebox.show_info(
-                "This path is very long — Windows may have trouble with it.\n\n"
-                "Consider a shorter install path.",
-                title="Long Path"
-            )
-
-        resolved = str(Path(path).resolve())
-        previous = self.game_path
-        self.game_path = resolved
-        self._save_game_path()
-
-        from Modules.build_executor import detect_aoc_launcher
-        if detect_aoc_launcher(resolved) and resolved != previous:
-            self._prompt_aoc_bypass()
-
-        self._refresh_game_path_label()
+        return game_folder.change_game_folder(self)
 
     def _clear_game_path(self):
-        """Forget the current game folder."""
-        if not self.game_path:
-            return
-        if Messagebox.yesno(
-            "Clear the configured game folder?\n\nThis won't delete any game files.",
-            title="Clear Game Folder",
-        ) != "Yes":
-            return
-        self.game_path = None
-        self._save_game_path()
-        self._refresh_game_path_label()
+        return game_folder.clear_game_path(self)
 
     def _show_game_context_menu(self, event):
-        """Show the change/clear menu for the game-folder label."""
-        self._game_context_menu.tk_popup(event.x_root, event.y_root)
+        return game_folder.show_game_context_menu(self, event)
 
     def _save_game_path(self):
-        """Persist game_path to settings and notify observers."""
-        if self.game_path:
-            self.settings.set('game_path', self.game_path)
-        else:
-            self.settings.data.pop('game_path', None)
-        self.settings.save()
-        self.grids_panel.notify_game_path_changed()
+        return game_folder.save_game_path(self)
 
     def _save_aoc_bypass(self, value):
-        """Persist the Aoc.exe bypass preference."""
-        self.use_aoc_bypass = bool(value)
-        self.settings.set('use_aoc_bypass', self.use_aoc_bypass)
-        self.settings.save()
+        return game_folder.save_aoc_bypass(self, value)
 
     def _prompt_aoc_bypass(self):
-        """Ask the user whether they use Aoc.exe (launcher bypass)."""
-        result = Messagebox.yesno(
-            "Aoc.exe (third-party launcher bypass) was detected in this game folder.\n\n"
-            "Is Aoc.exe enabled on your PC?",
-            title="Aoc.exe Detected",
-        )
-        self._save_aoc_bypass(result == "Yes")
+        return game_folder.prompt_aoc_bypass(self)
 
     def _uninstall_game(self):
-        """Remove Kaz Grids files from the configured game folder."""
-        if not self.game_path:
-            Messagebox.show_warning(
-                "No game folder set. Configure one in the bottom bar first.",
-                title="No Game Folder"
-            )
-            return
-        if Messagebox.yesno(
-            "Remove Kaz Grids files from your game folder?\n\n"
-            "This deletes KazGrids.swf, auto-load entries, and reload scripts.",
-            title="Uninstall from Game Folder"
-        ) != "Yes":
-            return
-        from Modules.build_executor import uninstall_from_client
-        ok, msg = uninstall_from_client(self.game_path)
-        if ok:
-            self.toast.show(msg, 'success', 8)
-        else:
-            Messagebox.show_error(msg, title="Uninstall Failed")
+        return game_folder.uninstall_game(self)
 
     def _update_build_state(self):
-        """Enable/disable build button and update game hint."""
-        valid = bool(self.game_path) and Path(self.game_path).is_dir()
-        if not valid:
-            self.build_btn.configure(state='disabled', bootstyle='success')
-            self._game_hint.configure(
-                text="Set your game folder to build",
-                foreground=THEME_COLORS['warning'])
-            self._game_hint.pack(side='left', padx=(PAD_XS, 0))
-        else:
-            self.build_btn.configure(state='normal', bootstyle='success')
-            self._game_hint.pack_forget()
+        return game_folder.update_build_state(self)
 
     def _pulse_game_hint(self):
-        """Briefly pulse the game hint label to draw attention."""
-        original = THEME_COLORS['warning']
-        bright = THEME_COLORS['heading']
-        self._game_hint.configure(foreground=bright)
-        self.after(150, lambda: self._game_hint.configure(foreground=original))
-        self.after(300, lambda: self._game_hint.configure(foreground=bright))
-        self.after(450, lambda: self._game_hint.configure(foreground=original))
+        return game_folder.pulse_game_hint(self)
 
     # ========================================================================
     # PROFILE SYSTEM
