@@ -1005,7 +1005,12 @@ class GridsPanel(ttk.Frame):
         return grid
 
     def load_profile_data(self, grids):
-        """Load grid configs, validate/clamp values, and rebuild panels."""
+        """Load grid configs, validate/clamp values, and rebuild panels.
+
+        Returns dict of {grid_name: [missing_refs]} for any buffs that couldn't
+        be resolved during migration. Caller decides when/how to surface it,
+        so the warning doesn't race other startup/first-launch dialogs.
+        """
         self._tip_active = False
         self._from_empty_state = False
         missing_by_grid = {}
@@ -1022,14 +1027,7 @@ class GridsPanel(ttk.Frame):
             validated.append(validate_grid(g))
         self.grids = validated
         self.refresh_panels()
-        if missing_by_grid:
-            lines = [f"\u2022 {name}: {', '.join(refs)}" for name, refs in missing_by_grid.items()]
-            message = (
-                "Some tracked buffs weren't found in the database and were removed:\n\n"
-                + "\n".join(lines) +
-                "\n\nRe-add them via Tracked Buffs or Slot Assignments if needed."
-            )
-            self.after(0, lambda: Messagebox.show_warning(message, title="Missing Buff References"))
+        return missing_by_grid
 
     def clear_all_grids(self):
         """Remove all grids with confirmation."""

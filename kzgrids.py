@@ -742,7 +742,9 @@ class KzGridsApp(ttkb.Window):
             )
 
         grids = data.get('grids', [])
-        self.grids_panel.load_profile_data(grids)
+        missing_by_grid = self.grids_panel.load_profile_data(grids)
+        if missing_by_grid:
+            self._warn_missing_buffs(missing_by_grid)
 
         if bt := self._boss_timer_if_alive():
             bt.load_profile_data(data.get('boss_timer', {}))
@@ -755,6 +757,24 @@ class KzGridsApp(ttkb.Window):
         self.settings.set('last_profile', str(path))
         self.settings.save()
         self._update_title()
+
+    def _warn_missing_buffs(self, missing_by_grid):
+        """Show the missing-buff warning, deferring if the main window isn't viewable yet."""
+        lines = [f"• {name}: {', '.join(refs)}" for name, refs in missing_by_grid.items()]
+        message = (
+            "Some tracked buffs weren't found in the database and were removed:\n\n"
+            + "\n".join(lines) +
+            "\n\nRe-add them via Tracked Buffs or Slot Assignments if needed."
+        )
+        def _show():
+            Messagebox.show_warning(message, title="Missing Buff References")
+        # During startup _load_profile runs while the main window is still
+        # withdrawn; show sync otherwise so the dialog blocks further code
+        # (e.g. first-launch welcome popup) instead of stacking on top of it.
+        if self.winfo_viewable():
+            _show()
+        else:
+            self.after(200, _show)
 
     def _save_profile(self):
         """Save current profile (or Save As if no path). Returns True if saved."""
