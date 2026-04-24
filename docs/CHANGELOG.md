@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 - Internal: split `Modules/ui_helpers.py` (1,497 lines, 8 responsibilities) into six focused modules: `ui_helpers` (design tokens), `ui_widgets`, `ui_components`, `ui_tk_style`, `window_position`, `settings_manager`. Imports inside `Modules/` are now consistently relative. No user-facing changes.
+- Internal: shrank `kzgrids.py` from 1,152 to 741 lines by extracting profile I/O → `Modules/profile_io.py`, game-folder UI → `Modules/game_folder.py`, Build & Install action → `Modules/build_action.py`, and consolidating settings plumbing + JSON helpers into `Modules/settings_manager.py`. `CustomMenuBar` moved out of `ui_components.py` into its own `Modules/custom_menu_bar.py`. Pruned the defensive PyInstaller `--hidden-import` block in `build.py` (PyInstaller discovers all modules via static analysis). No user-facing changes.
+
+### Added
+- Smoke tests: `tests/test_imports.py` (full import-graph check) and `tests/test_data_integrity.py` (buff-ref resolution in `Default.json` + bundled-DB sync check). Run both before every commit.
 
 ## [1.1.0] — 2026-04-22
 
