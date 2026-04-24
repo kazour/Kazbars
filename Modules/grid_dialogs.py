@@ -17,11 +17,12 @@ from .ui_helpers import (
     PAD_INNER, PAD_ROW, PAD_RADIO_INDENT,
     PAD_XS, PAD_MICRO, PAD_TINY, PAD_SMALL, PAD_TAB, PAD_LF, PAD_LIST_ITEM,
     PAD_SECTION_GAP, PAD_BUTTON_GAP,
-    create_scrollable_frame, MODULE_COLORS,
+    MODULE_COLORS,
 )
 from .ui_widgets import (
     debounced_callback, blend_alpha, add_tooltip, create_dialog_header,
 )
+from .ui_components import create_scrollable_frame
 from .ui_tk_style import style_tk_listbox
 from .settings_manager import get_setting, set_setting
 from .window_position import restore_window_position, bind_window_position_save
