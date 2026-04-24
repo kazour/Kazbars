@@ -27,8 +27,9 @@ from Modules.ui_widgets import (
     create_app_header, update_app_header_color,
 )
 from Modules.ui_components import (
-    disable_mousewheel_on_inputs, ToastManager, CustomMenuBar,
+    disable_mousewheel_on_inputs, ToastManager,
 )
+from Modules.custom_menu_bar import CustomMenuBar
 from Modules.ui_tk_style import apply_dark_titlebar, enable_global_dark_titlebar
 from Modules.settings_manager import SettingsManager, init_settings, safe_save_json
 from Modules.window_position import restore_window_position, bind_window_position_save
