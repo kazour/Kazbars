@@ -2,13 +2,13 @@ import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import ttk
 
-from Modules.ui_helpers import (
+from .ui_helpers import (
     THEME_COLORS, GRID_TYPE_COLORS, TK_COLORS,
     FONT_BODY, FONT_SECTION,
     PAD_TAB, PAD_SMALL, PAD_XS, PAD_ROW, PAD_INNER,
 )
-from Modules.ui_widgets import CollapsibleSection
-from Modules.ui_components import create_scrollable_frame
+from .ui_widgets import CollapsibleSection
+from .ui_components import create_scrollable_frame
 
 
 class InstructionsPanel(ttk.Frame):
