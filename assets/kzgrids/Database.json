@@ -134,7 +134,7 @@
     {
       "name": "Veil of the Unliving (Zaal)",
       "ids": [
-        5064067
+        4752520
       ],
       "category": "#T3.5",
       "type": "debuff"
@@ -3202,6 +3202,14 @@
       ],
       "category": "#T6",
       "type": "misc"
+    },
+    {
+      "name": "Zaal's Wrack (Zaal)",
+      "ids": [
+        4836737
+      ],
+      "category": "#T3.5",
+      "type": "debuff"
     }
   ]
 }
