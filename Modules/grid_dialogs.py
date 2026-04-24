@@ -12,14 +12,15 @@ from collections import Counter
 logger = logging.getLogger(__name__)
 
 from .ui_helpers import (
-    debounced_callback,
     FONT_HEADING, FONT_SECTION, FONT_BODY, FONT_SMALL, FONT_TINY, FONT_FORM_LABEL,
-    THEME_COLORS, TK_COLORS, GRID_TYPE_COLORS, _RETRO_COLORS, blend_alpha,
+    THEME_COLORS, TK_COLORS, GRID_TYPE_COLORS, _RETRO_COLORS,
     PAD_INNER, PAD_ROW, PAD_RADIO_INDENT,
     PAD_XS, PAD_MICRO, PAD_TINY, PAD_SMALL, PAD_TAB, PAD_LF, PAD_LIST_ITEM,
     PAD_SECTION_GAP, PAD_BUTTON_GAP,
-    add_tooltip, create_scrollable_frame,
-    create_dialog_header, MODULE_COLORS,
+    create_scrollable_frame, MODULE_COLORS,
+)
+from .ui_widgets import (
+    debounced_callback, blend_alpha, add_tooltip, create_dialog_header,
 )
 from .ui_tk_style import style_tk_listbox
 from .settings_manager import get_setting, set_setting

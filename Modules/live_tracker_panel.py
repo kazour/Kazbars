@@ -20,9 +20,10 @@ from .combat_monitor import CombatLogMonitor
 from .timer_overlay import TimerOverlay
 from .ui_helpers import (
     THEME_COLORS, FONT_SMALL, FONT_SMALL_BOLD, MODULE_COLORS,
-    create_tip_bar, create_dialog_header, BTN_SMALL, add_tooltip,
+    BTN_SMALL,
     PAD_TAB, PAD_XS, PAD_SMALL, PAD_LF, PAD_BUTTON_GAP, PAD_MID,
 )
+from .ui_widgets import create_tip_bar, create_dialog_header, add_tooltip
 from .window_position import restore_window_position
 
 

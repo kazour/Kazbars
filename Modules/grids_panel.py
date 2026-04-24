@@ -18,12 +18,14 @@ from .grid_model import (
 from .ui_helpers import (
     FONT_HEADING, FONT_BODY, FONT_BODY_LG, FONT_SMALL, FONT_SMALL_BOLD, FONT_FORM_LABEL, FONT_SYMBOL,
     THEME_COLORS, TK_COLORS, _RETRO_COLORS, GRID_TYPE_COLORS,
-    blend_alpha, SCANLINE_ALPHA,
+    SCANLINE_ALPHA,
     BTN_MEDIUM,
     PAD_TAB, PAD_ROW, PAD_XS, PAD_MICRO, PAD_SMALL, PAD_MID, PAD_LF,
     PAD_LIST_ITEM, PAD_SECTION_GAP, PAD_BUTTON_GAP,
-    CollapsibleSection, add_tooltip, bind_card_events,
     create_scrollable_frame, DragReorderManager,
+)
+from .ui_widgets import (
+    blend_alpha, CollapsibleSection, add_tooltip, bind_card_events,
     bind_label_press_effect,
 )
 from .settings_manager import get_setting

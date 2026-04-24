@@ -12,9 +12,8 @@ from .ui_helpers import (
     THEME_COLORS, TK_COLORS, MODULE_COLORS,
     PAD_TAB, PAD_SMALL, PAD_TINY, PAD_XS, PAD_LF,
     BTN_SMALL,
-    create_dialog_header,
-    bind_label_press_effect,
 )
+from .ui_widgets import create_dialog_header, bind_label_press_effect
 from .window_position import restore_window_position
 from .build_executor import detect_aoc_launcher
 

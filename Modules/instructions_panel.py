@@ -6,8 +6,9 @@ from Modules.ui_helpers import (
     THEME_COLORS, GRID_TYPE_COLORS, TK_COLORS,
     FONT_BODY, FONT_SECTION,
     PAD_TAB, PAD_SMALL, PAD_XS, PAD_ROW, PAD_INNER,
-    CollapsibleSection, create_scrollable_frame,
+    create_scrollable_frame,
 )
+from Modules.ui_widgets import CollapsibleSection
 
 
 class InstructionsPanel(ttk.Frame):

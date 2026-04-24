@@ -15,11 +15,11 @@ import webbrowser
 logger = logging.getLogger(__name__)
 
 from Modules.ui_helpers import (
-    blend_alpha,
     TK_COLORS, THEME_COLORS, MODULE_COLORS,
     FONT_HEADING, FONT_BODY, FONT_SMALL, FONT_SECTION,
     FONT_STATUS_ICON, FONT_STATUS_ICON_LG,
 )
+from Modules.ui_widgets import blend_alpha
 
 # Layout
 WIDTH = 420

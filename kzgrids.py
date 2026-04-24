@@ -16,14 +16,17 @@ import ttkbootstrap as ttkb
 from ttkbootstrap.dialogs import Messagebox
 
 from Modules.ui_helpers import (
-    FONT_SMALL, blend_alpha,
+    FONT_SMALL,
     THEME_COLORS, TK_COLORS, MODULE_COLORS,
     PAD_TAB, PAD_XS, PAD_SMALL,
     BTN_LARGE,
     setup_custom_styles,
-    disable_mousewheel_on_inputs, add_tooltip, bind_button_press_effect,
-    create_app_header, update_app_header_color, ToastManager,
+    disable_mousewheel_on_inputs, ToastManager,
     CustomMenuBar,
+)
+from Modules.ui_widgets import (
+    blend_alpha, add_tooltip, bind_button_press_effect,
+    create_app_header, update_app_header_color,
 )
 from Modules.ui_tk_style import apply_dark_titlebar, enable_global_dark_titlebar
 from Modules.settings_manager import init_settings

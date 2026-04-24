@@ -21,10 +21,10 @@ from tkinter import ttk, filedialog
 from ttkbootstrap.dialogs import Messagebox, Querybox
 from .ui_helpers import (
     THEME_COLORS, TK_COLORS, FONT_SMALL, BTN_SMALL, BTN_MEDIUM,
-    add_tooltip, debounced_callback,
-    create_dialog_header, MODULE_COLORS, PAD_INNER,
+    MODULE_COLORS, PAD_INNER,
     PAD_SMALL, PAD_TAB, PAD_XS, PAD_BUTTON_GAP, PAD_SECTION_GAP,
 )
+from .ui_widgets import add_tooltip, debounced_callback, create_dialog_header
 from .ui_tk_style import style_tk_text
 from .window_position import restore_window_position, bind_window_position_save
 import json
