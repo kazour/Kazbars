@@ -30,7 +30,7 @@ from Modules.ui_components import (
     disable_mousewheel_on_inputs, ToastManager, CustomMenuBar,
 )
 from Modules.ui_tk_style import apply_dark_titlebar, enable_global_dark_titlebar
-from Modules.settings_manager import init_settings
+from Modules.settings_manager import SettingsManager, init_settings, safe_save_json
 from Modules.window_position import restore_window_position, bind_window_position_save
 from Modules.build_loading import BuildLoadingScreen, show_welcome_popup, show_close_game_required_dialog, show_about_popup
 from Modules.live_tracker_panel import LiveTrackerPanel
@@ -55,57 +55,6 @@ def resolve_assets_path():
     if getattr(sys, 'frozen', False):
         return Path(sys.executable).parent
     return Path(__file__).parent
-
-
-# ============================================================================
-# SAFE JSON UTILITIES
-# ============================================================================
-def _safe_load_json(path, fallback=None):
-    """Load JSON with fallback on any corruption."""
-    if fallback is None:
-        fallback = {}
-    try:
-        p = Path(path)
-        if p.exists():
-            data = json.loads(p.read_text(encoding='utf-8'))
-            if isinstance(data, dict):
-                return data
-        return dict(fallback)
-    except (json.JSONDecodeError, UnicodeDecodeError, OSError) as e:
-        logger.warning("%s corrupt or unreadable — using defaults: %s", Path(path).name, e)
-        return dict(fallback)
-
-
-def _safe_save_json(path, data):
-    """Write JSON atomically — temp file + rename."""
-    p = Path(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_suffix('.tmp')
-    tmp.write_text(json.dumps(data, indent=2), encoding='utf-8')
-    tmp.replace(p)
-
-
-# ============================================================================
-# SETTINGS MANAGER
-# ============================================================================
-class SettingsManager:
-    """Persistent application settings stored as JSON."""
-
-    def __init__(self, filepath):
-        self.filepath = Path(filepath)
-        self.data = _safe_load_json(self.filepath)
-
-    def save(self):
-        try:
-            _safe_save_json(self.filepath, self.data)
-        except Exception as e:
-            logger.error("Error saving settings: %s", e)
-
-    def get(self, key, default=None):
-        return self.data.get(key, default)
-
-    def set(self, key, value):
-        self.data[key] = value
 
 
 # ============================================================================
@@ -805,7 +754,7 @@ class KzGridsApp(ttkb.Window):
                 data['reference_resolution'] = self.reference_resolution
             if bt := self._boss_timer_if_alive():
                 data['boss_timer'] = bt.get_profile_data()
-            _safe_save_json(path, data)
+            safe_save_json(path, data)
 
             self.current_profile = str(path)
             self.modified = False
