@@ -22,11 +22,11 @@ from .ui_helpers import (
     BTN_MEDIUM,
     PAD_TAB, PAD_ROW, PAD_XS, PAD_MICRO, PAD_SMALL, PAD_MID, PAD_LF,
     PAD_LIST_ITEM, PAD_SECTION_GAP, PAD_BUTTON_GAP,
-    get_setting,
     CollapsibleSection, add_tooltip, bind_card_events,
     create_scrollable_frame, DragReorderManager,
     bind_label_press_effect,
 )
+from .settings_manager import get_setting
 from ttkbootstrap.dialogs import Messagebox
 
 

@@ -648,20 +648,10 @@ def enable_global_dark_titlebar():
 
 
 # ============================================================================
-# SETTINGS REFERENCE (set once at startup via init_settings)
-# ============================================================================
-_settings = None
-
-
-def init_settings(settings):
-    """Store the app settings reference. Call once from KzGrids.__init__."""
-    global _settings
-    _settings = settings
-
-
-# ============================================================================
 # WINDOW POSITION HELPERS
 # ============================================================================
+from .settings_manager import get_setting, set_setting
+
 def clamp_to_screen(x, y, width, height):
     """Clamp window coordinates so the window stays within screen bounds."""
     try:
@@ -680,19 +670,17 @@ def clamp_to_screen(x, y, width, height):
 
 def save_window_position(window_name, x, y, width=None, height=None):
     """Persist a window's position and optional size to settings."""
-    if _settings:
-        pos_data = {'x': x, 'y': y}
-        if width is not None:
-            pos_data['width'] = width
-        if height is not None:
-            pos_data['height'] = height
-        _settings.set(f'window_pos_{window_name}', pos_data)
-        _settings.save()
+    pos_data = {'x': x, 'y': y}
+    if width is not None:
+        pos_data['width'] = width
+    if height is not None:
+        pos_data['height'] = height
+    set_setting(f'window_pos_{window_name}', pos_data)
 
 
 def restore_window_position(window, window_name, default_width, default_height, parent=None, resizable=True):
     """Restore a window's saved position and size, or center it as a fallback."""
-    pos_data = _settings.get(f'window_pos_{window_name}') if _settings else None
+    pos_data = get_setting(f'window_pos_{window_name}')
 
     if pos_data:
         x = pos_data.get('x', 0)
@@ -743,20 +731,6 @@ def bind_window_position_save(window, window_name, save_size=True):
     window._pos_initialized = False
     window.after(500, lambda: setattr(window, '_pos_initialized', True))
     window.bind('<Configure>', on_configure)
-
-
-def get_setting(key, default=None):
-    """Read a single setting value. For use by dialogs that need to persist UI state."""
-    if _settings:
-        return _settings.get(key, default)
-    return default
-
-
-def set_setting(key, value):
-    """Write a single setting value and save."""
-    if _settings:
-        _settings.set(key, value)
-        _settings.save()
 
 
 # ============================================================================

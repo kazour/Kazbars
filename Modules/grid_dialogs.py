@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 from .ui_helpers import (
     restore_window_position, bind_window_position_save,
-    get_setting, set_setting, debounced_callback,
+    debounced_callback,
     FONT_HEADING, FONT_SECTION, FONT_BODY, FONT_SMALL, FONT_TINY, FONT_FORM_LABEL,
     THEME_COLORS, TK_COLORS, GRID_TYPE_COLORS, _RETRO_COLORS, blend_alpha, style_tk_listbox,
     PAD_INNER, PAD_ROW, PAD_RADIO_INDENT,
@@ -22,6 +22,7 @@ from .ui_helpers import (
     add_tooltip, create_scrollable_frame,
     create_dialog_header, MODULE_COLORS,
 )
+from .settings_manager import get_setting, set_setting
 from ttkbootstrap.dialogs import Messagebox
 from .grid_model import create_default_grid, MAX_TOTAL_SLOTS
 
