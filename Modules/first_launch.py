@@ -1,6 +1,6 @@
 """
 Kaz Grids — First Launch Dialog
-Modal setup dialog shown when no game folders are configured.
+Modal setup dialog shown when no game folder is configured.
 """
 
 import tkinter as tk
@@ -16,19 +16,28 @@ from .ui_helpers import (
     restore_window_position,
     bind_label_press_effect,
 )
+from .build_executor import detect_aoc_launcher
 
 
-def show_first_launch_dialog(parent, app_name, on_game_added, on_load_default,
+def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
                              on_resolution_set=None, default_profile_exists=True,
-                             on_dialog_closed=None):
-    """Modal first-launch setup. Returns when dialog closes."""
+                             on_dialog_closed=None, on_aoc_bypass_set=None):
+    """Modal first-launch setup. Returns when dialog closes.
+
+    Callbacks:
+      on_game_set(path)           — user picked a game folder
+      on_load_default(res_str)    — user chose "Load Defaults" (after on_game_set)
+      on_resolution_set(res_str)  — user picked a resolution (Start Empty path)
+      on_aoc_bypass_set(bool)     — user answered the Aoc.exe Yes/No prompt
+      on_dialog_closed()          — dialog destroyed
+    """
     dialog = tk.Toplevel(parent)
     dialog.title(f"Welcome to {app_name}")
     dialog.resizable(False, False)
     dialog.transient(parent)
     dialog.grab_set()
 
-    restore_window_position(dialog, 'first_launch', 520, 440, parent, resizable=False)
+    restore_window_position(dialog, 'first_launch', 520, 480, parent, resizable=False)
 
     # Header
     create_dialog_header(dialog, f"Welcome to {app_name}",
@@ -38,7 +47,7 @@ def show_first_launch_dialog(parent, app_name, on_game_added, on_load_default,
     content.pack(fill='both', expand=True, padx=PAD_TAB * 2, pady=(PAD_TAB, PAD_LF))
 
     # --- Section 1: Game path ---
-    ttk.Label(content, text="Game Client",
+    ttk.Label(content, text="Game Folder",
               font=FONT_SECTION, foreground=THEME_COLORS['heading']
               ).pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
 
@@ -60,7 +69,7 @@ def show_first_launch_dialog(parent, app_name, on_game_added, on_load_default,
             path_var.set(p)
             if not (Path(p) / "Data" / "Gui" / "Default").exists():
                 warn_label.configure(
-                    text="This doesn't look like an AoC install \u2014 missing Data/Gui/Default/",
+                    text="This doesn't look like an AoC install — missing Data/Gui/Default/",
                     foreground=THEME_COLORS['warning']
                 )
             else:
@@ -97,8 +106,41 @@ def show_first_launch_dialog(parent, app_name, on_game_added, on_load_default,
                 foreground=THEME_COLORS['body']))
             bind_label_press_effect(lbl)
 
+    # --- Aoc.exe section (revealed only when fingerprint detected) ---
+    aoc_frame = ttk.Frame(content)
+    aoc_use_var = tk.StringVar(value='no')
+
+    ttk.Label(aoc_frame, text="Aoc.exe detected",
+              font=FONT_SECTION, foreground=THEME_COLORS['heading']
+              ).pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
+    ttk.Label(
+        aoc_frame,
+        text="Aoc.exe is a third-party launcher bypass. Is it enabled on your PC?",
+        font=FONT_SMALL, foreground=THEME_COLORS['muted'],
+        wraplength=440, justify='left',
+    ).pack(anchor='w', pady=(0, PAD_TINY))
+
+    radio_row = ttk.Frame(aoc_frame)
+    radio_row.pack(anchor='w', pady=(0, PAD_TINY))
+    ttk.Radiobutton(radio_row, text="Yes — I use Aoc.exe",
+                    variable=aoc_use_var, value='yes'
+                    ).pack(side='left', padx=(0, PAD_SMALL))
+    ttk.Radiobutton(radio_row, text="No — standard launcher",
+                    variable=aoc_use_var, value='no'
+                    ).pack(side='left')
+
+    def _refresh_aoc_section(*_):
+        p = path_var.get().strip()
+        if p and detect_aoc_launcher(p):
+            if not aoc_frame.winfo_ismapped():
+                aoc_frame.pack(fill='x', before=sep, pady=(PAD_TINY, 0))
+        else:
+            if aoc_frame.winfo_ismapped():
+                aoc_frame.pack_forget()
+
     # Separator
-    ttk.Separator(content, orient='horizontal').pack(fill='x', pady=(PAD_TAB, PAD_SMALL))
+    sep = ttk.Separator(content, orient='horizontal')
+    sep.pack(fill='x', pady=(PAD_TAB, PAD_SMALL))
 
     # --- Section 2: How to start ---
     ttk.Label(content, text="How do you want to start?",
@@ -117,16 +159,12 @@ def show_first_launch_dialog(parent, app_name, on_game_added, on_load_default,
     res_var = tk.StringVar(value=detected)
 
     # --- Shared actions ---
-    def _add_game_if_set():
+    def _set_game_if_provided():
         p = path_var.get().strip()
         if p:
-            resolved = Path(p).resolve()
-            parts = resolved.parts
-            if len(parts) <= 3:
-                name = str(resolved)
-            else:
-                name = f"{parts[0]}\\...\\{parts[-1]}"
-            on_game_added(name, str(resolved))
+            on_game_set(str(Path(p).resolve()))
+            if on_aoc_bypass_set:
+                on_aoc_bypass_set(aoc_use_var.get() == 'yes')
         if on_resolution_set:
             on_resolution_set(res_var.get())
 
@@ -136,12 +174,12 @@ def show_first_launch_dialog(parent, app_name, on_game_added, on_load_default,
             on_dialog_closed()
 
     def load_default():
-        _add_game_if_set()
+        _set_game_if_provided()
         on_load_default(res_var.get())
         _close()
 
     def start_empty():
-        _add_game_if_set()
+        _set_game_if_provided()
         _close()
 
     def skip():
@@ -216,13 +254,14 @@ def show_first_launch_dialog(parent, app_name, on_game_added, on_load_default,
                            state='disabled')
     btn_empty.pack(anchor='w')
 
-    # Enable/disable action buttons based on game path
+    # Enable/disable action buttons based on game path; also reveal aoc section
     def _on_path_changed(*_):
         has_path = bool(path_var.get().strip())
         state = 'normal' if has_path else 'disabled'
         if btn_defaults:
             btn_defaults.configure(state=state)
         btn_empty.configure(state=state)
+        _refresh_aoc_section()
 
     path_var.trace_add('write', _on_path_changed)
 

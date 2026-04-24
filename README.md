@@ -11,7 +11,7 @@ Buff/debuff grid overlay editor for **Age of Conan**. Design icon grids that sho
 
 ## Quick start
 
-1. **Add a game client** — click `+` next to the Clients dropdown at the bottom and pick your Age of Conan install folder. You can register more than one.
+1. **Set your game folder** — click the `Game:` label in the bottom bar and pick your Age of Conan install folder.
 2. **Create a grid** — on the Grids tab, click `+ Add Grid`. A 1×10 horizontal bar is a good starting point.
 3. **Choose buffs to track** — click `Tracked Buffs` and pick entries from the database.
 4. **Build & Install** — click the green button. Close the game for your first build; after that, rebuild anytime and type `/reloadui` in chat to apply changes.
@@ -26,7 +26,6 @@ Up to **64 slots total** across all your grids.
 - **Buff database** — map numeric spell IDs to readable names and classify them as Buff (grey), Debuff (red), or Misc (golden)
 - **Stacking** — show stack counts over icons for multi-stack effects
 - **Timers and flash warnings** — optional remaining-duration text and pulse-on-low-time
-- **Multi-client** — register multiple AoC installs; one build updates all of them
 - **Ethram-Fal Seed Timer** — always-on-top overlay for the Viscous Seed / Lotus Fixation / Syphon cycle
 
 ## Requirements

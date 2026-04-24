@@ -659,7 +659,7 @@ class GridsPanel(ttk.Frame):
         _muted = THEME_COLORS['muted']
         self._step_badges = []
         self._step_labels = []
-        for i, step_text in enumerate(["Add client below", "Add Grid", "Choose Tracked Buffs", "Build"]):
+        for i, step_text in enumerate(["Set game folder below", "Add Grid", "Choose Tracked Buffs", "Build"]):
             if i > 0:
                 ttk.Label(tip_inner, text="\u2192", font=FONT_BODY,
                           foreground=_muted).pack(side='left', padx=PAD_XS)
@@ -902,8 +902,8 @@ class GridsPanel(ttk.Frame):
         self._tip_dismissed = False
         self._update_tip()
 
-    def notify_clients_changed(self):
-        """Called when the game client list changes."""
+    def notify_game_path_changed(self):
+        """Called when the active game folder changes."""
         self._update_tip()
 
     def _update_tip(self):
@@ -912,7 +912,7 @@ class GridsPanel(ttk.Frame):
             self._tip_frame.pack_forget()
             return
 
-        has_clients = bool(get_setting('game_clients', []))
+        has_game_path = bool(get_setting('game_path'))
         has_grids = bool(self.grids)
 
         needs_setup = False
@@ -927,9 +927,9 @@ class GridsPanel(ttk.Frame):
                     break
 
         buffs_done = has_grids and not needs_setup
-        self._update_step_guide([has_clients, has_grids, buffs_done, self._build_done])
+        self._update_step_guide([has_game_path, has_grids, buffs_done, self._build_done])
 
-        ready = has_clients and buffs_done
+        ready = has_game_path and buffs_done
         self._tip_accent.configure(
             bg=THEME_COLORS['success'] if ready else THEME_COLORS['accent'])
 

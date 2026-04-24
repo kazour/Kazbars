@@ -9,6 +9,7 @@ import logging
 import math
 import time
 import tkinter as tk
+import tkinter.font as tkfont
 import webbrowser
 
 logger = logging.getLogger(__name__)
@@ -37,21 +38,26 @@ SCANLINE_STEP = 3
 _ACCENT = MODULE_COLORS['grids']
 
 
-def show_close_game_dialog(parent):
-    """Show a styled warning dialog asking the user to close AoC before first build.
+def show_close_game_required_dialog(parent, process_name="the game"):
+    """Show a close-only modal: the running game process must be closed before build.
 
-    Returns True if the user confirms, False if they cancel.
+    No return value — caller always aborts the build. The user closes the
+    popup, closes the game, and clicks Build & Install again.
+
+    process_name is the actual running exe (Aoc.exe / AgeOfConan.exe /
+    AgeOfConanDX10.exe) detected by build_executor.get_running_game_process.
     """
-    result = [False]
-
     popup = tk.Toplevel(parent)
     popup.withdraw()
     popup.overrideredirect(True)
     popup.transient(parent)
     popup.resizable(False, False)
     popup.configure(bg=BG)
+    # overrideredirect popups can sink behind the parent on alt-tab;
+    # -topmost keeps this modal reliably above the main window
+    popup.attributes('-topmost', True)
 
-    h = 220
+    h = 250
     canvas = tk.Canvas(popup, width=WIDTH, height=h, bg=BG, highlightthickness=0)
     canvas.pack(fill='both', expand=True)
 
@@ -77,70 +83,50 @@ def show_close_game_dialog(parent):
 
     # Message
     canvas.create_text(WIDTH // 2, icon_y + 34,
-                       text="Close Age of Conan before your first build",
+                       text=f"Close {process_name} to build",
                        font=FONT_BODY, fill=THEME_COLORS['heading'])
     canvas.create_text(WIDTH // 2, icon_y + 56,
-                       text="One-time only \u2014 future builds work while the game is running",
+                       text="Close the game, then click Build & Install again",
                        font=FONT_SMALL, fill=THEME_COLORS['muted'])
+    canvas.create_text(WIDTH // 2, icon_y + 82,
+                       text="One-time only — future builds work with the game open",
+                       font=FONT_SMALL, fill=THEME_COLORS['success'])
 
-    # Buttons — Continue (primary) and Cancel
-    btn_y = icon_y + 82
+    # Single Close button (centered)
+    btn_y = icon_y + 112
     btn_w, btn_h = 100, 32
-    gap = 12
-    total = btn_w * 2 + gap
-    left_x = (WIDTH - total) // 2
-    right_x = left_x + btn_w + gap
+    btn_x = (WIDTH - btn_w) // 2
 
-    # Cancel button (left, subtle)
-    cancel_rect = canvas.create_rectangle(
-        left_x, btn_y, left_x + btn_w, btn_y + btn_h,
-        fill=BG, outline=THEME_COLORS['muted'], width=1, tags='cancel')
-    cancel_text = canvas.create_text(
-        left_x + btn_w // 2, btn_y + btn_h // 2,
-        text="Cancel", font=FONT_SECTION, fill=THEME_COLORS['muted'], tags='cancel')
-
-    # Continue button (right, accent)
     glow_color = blend_alpha(THEME_COLORS['accent'], BG, 30)
     canvas.create_rectangle(
-        right_x - 2, btn_y - 2, right_x + btn_w + 2, btn_y + btn_h + 2,
-        fill=glow_color, outline='', tags='confirm')
-    confirm_rect = canvas.create_rectangle(
-        right_x, btn_y, right_x + btn_w, btn_y + btn_h,
-        fill=BG, outline=THEME_COLORS['accent'], width=1, tags='confirm')
-    confirm_text = canvas.create_text(
-        right_x + btn_w // 2, btn_y + btn_h // 2,
-        text="Continue", font=FONT_SECTION, fill=THEME_COLORS['accent'], tags='confirm')
+        btn_x - 2, btn_y - 2, btn_x + btn_w + 2, btn_y + btn_h + 2,
+        fill=glow_color, outline='', tags='close')
+    btn_rect = canvas.create_rectangle(
+        btn_x, btn_y, btn_x + btn_w, btn_y + btn_h,
+        fill=BG, outline=THEME_COLORS['accent'], width=1, tags='close')
+    btn_text = canvas.create_text(
+        btn_x + btn_w // 2, btn_y + btn_h // 2,
+        text="Close", font=FONT_SECTION, fill=THEME_COLORS['accent'], tags='close')
 
-    def _in_rect(x, y, rx, ry):
-        return rx <= x <= rx + btn_w and ry <= y <= ry + btn_h
+    def _in_btn(x, y):
+        return btn_x <= x <= btn_x + btn_w and btn_y <= y <= btn_y + btn_h
 
     def on_motion(e):
-        if _in_rect(e.x, e.y, right_x, btn_y):
-            canvas.itemconfig(confirm_rect, fill=THEME_COLORS['accent'])
-            canvas.itemconfig(confirm_text, fill=BG)
+        if _in_btn(e.x, e.y):
+            canvas.itemconfig(btn_rect, fill=THEME_COLORS['accent'])
+            canvas.itemconfig(btn_text, fill=BG)
         else:
-            canvas.itemconfig(confirm_rect, fill=BG)
-            canvas.itemconfig(confirm_text, fill=THEME_COLORS['accent'])
-        if _in_rect(e.x, e.y, left_x, btn_y):
-            canvas.itemconfig(cancel_rect, fill=THEME_COLORS['muted'],
-                              outline=THEME_COLORS['muted'])
-            canvas.itemconfig(cancel_text, fill=BG)
-        else:
-            canvas.itemconfig(cancel_rect, fill=BG,
-                              outline=THEME_COLORS['muted'])
-            canvas.itemconfig(cancel_text, fill=THEME_COLORS['muted'])
+            canvas.itemconfig(btn_rect, fill=BG)
+            canvas.itemconfig(btn_text, fill=THEME_COLORS['accent'])
 
     def on_click(e):
-        if _in_rect(e.x, e.y, right_x, btn_y):
-            result[0] = True
-            popup.destroy()
-        elif _in_rect(e.x, e.y, left_x, btn_y):
+        if _in_btn(e.x, e.y):
             popup.destroy()
 
     canvas.bind('<Motion>', on_motion)
     canvas.bind('<Button-1>', on_click)
     popup.bind('<Escape>', lambda e: popup.destroy())
-    popup.bind('<Return>', lambda e: (result.__setitem__(0, True), popup.destroy()))
+    popup.bind('<Return>', lambda e: popup.destroy())
 
     # Center on parent
     popup.update_idletasks()
@@ -151,7 +137,6 @@ def show_close_game_dialog(parent):
     popup.grab_set()
     popup.focus_set()
     parent.wait_window(popup)
-    return result[0]
 
 
 def show_welcome_popup(parent, grid_count, enabled_count,
@@ -186,6 +171,9 @@ def show_welcome_popup(parent, grid_count, enabled_count,
     popup.transient(parent)
     popup.resizable(False, False)
     popup.configure(bg=BG)
+    # overrideredirect popups can sink behind the parent on alt-tab;
+    # -topmost keeps this modal reliably above the main window
+    popup.attributes('-topmost', True)
 
     canvas = tk.Canvas(popup, width=WIDTH, height=h, bg=BG, highlightthickness=0)
     canvas.pack(fill='both', expand=True)
@@ -208,7 +196,7 @@ def show_welcome_popup(parent, grid_count, enabled_count,
                            font=FONT_STATUS_ICON_LG, fill=glow)
     canvas.create_text(WIDTH // 2, status_y, text='\u2713',
                        font=FONT_STATUS_ICON, fill=status_color)
-    canvas.create_text(WIDTH // 2, status_y + 30, text="You're all set!",
+    canvas.create_text(WIDTH // 2, status_y + 30, text="You're almost done",
                        font=FONT_HEADING, fill=status_color)
 
     # Separator
@@ -234,9 +222,16 @@ def show_welcome_popup(parent, grid_count, enabled_count,
         canvas.create_text(WIDTH // 2, y, text=f"Saved as {profile_name}",
                            font=FONT_SMALL, fill=THEME_COLORS['muted'])
         y += line_spacing
-    canvas.create_text(WIDTH // 2, y,
-                       text="Switch to the Grids tab to customize",
+    # Split into two text items so "Build & Install" can be green like in the help tab
+    _font = tkfont.Font(font=FONT_SMALL)
+    _prefix = "Customize the grids and press "
+    _accent = "Build & Install"
+    _total_w = _font.measure(_prefix + _accent)
+    _x0 = WIDTH // 2 - _total_w // 2
+    canvas.create_text(_x0, y, text=_prefix, anchor='w',
                        font=FONT_SMALL, fill=THEME_COLORS['muted'])
+    canvas.create_text(_x0 + _font.measure(_prefix), y, text=_accent, anchor='w',
+                       font=FONT_SMALL, fill=THEME_COLORS['success'])
 
     # Close button — use hit-test on canvas click for reliable detection
     btn_w = 100
@@ -280,7 +275,7 @@ def show_welcome_popup(parent, grid_count, enabled_count,
     popup.focus_set()
 
 
-DISCORD_URL = "https://discord.gg/JKcmUKpP"
+DISCORD_URL = "https://discord.gg/ubK5Guryfa"
 GITHUB_URL = "https://github.com/kazour/Kaz-Grids"
 
 
@@ -296,6 +291,9 @@ def show_about_popup(parent, app_name, app_version):
     popup.transient(parent)
     popup.resizable(False, False)
     popup.configure(bg=BG)
+    # overrideredirect popups can sink behind the parent on alt-tab;
+    # -topmost keeps this modal reliably above the main window
+    popup.attributes('-topmost', True)
 
     canvas = tk.Canvas(popup, width=WIDTH, height=h, bg=BG, highlightthickness=0)
     canvas.pack(fill='both', expand=True)
@@ -321,9 +319,20 @@ def show_about_popup(parent, app_name, app_version):
                        text="Flash buff & debuff tracker for Age of Conan",
                        font=FONT_BODY, fill=THEME_COLORS['heading'])
     y += 22
-    canvas.create_text(WIDTH // 2, y,
-                       text="Created by Kazour  \u00b7  I-Spartans-I",
-                       font=FONT_SMALL, fill=THEME_COLORS['muted'])
+    # Credit line \u2014 colored segments for Kazour (green) and I-Spartans-I (golden)
+    _font_sm = tkfont.Font(font=FONT_SMALL)
+    _credit = [
+        ("Created by ", THEME_COLORS['muted']),
+        ("Kazour", THEME_COLORS['success']),
+        ("  \u00b7  ", THEME_COLORS['muted']),
+        ("I-Spartans-I", THEME_COLORS['warning']),
+    ]
+    _total_w = sum(_font_sm.measure(t) for t, _ in _credit)
+    _cx = WIDTH // 2 - _total_w // 2
+    for _text, _fill in _credit:
+        canvas.create_text(_cx, y, text=_text, anchor='w',
+                           font=FONT_SMALL, fill=_fill)
+        _cx += _font_sm.measure(_text)
     y += 26
 
     # Clickable links
@@ -477,6 +486,9 @@ class BuildLoadingScreen(tk.Toplevel):
         self.transient(parent)
         self.resizable(False, False)
         self.configure(bg=BG)
+        # overrideredirect windows can sink behind the parent on alt-tab;
+        # -topmost keeps this modal reliably above the main window
+        self.attributes('-topmost', True)
         self.protocol("WM_DELETE_WINDOW", self.destroy)
         self.bind('<FocusIn>', lambda e: self.lift())
 

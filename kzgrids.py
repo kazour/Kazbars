@@ -26,7 +26,7 @@ from Modules.ui_helpers import (
     create_app_header, update_app_header_color, ToastManager,
     CustomMenuBar,
 )
-from Modules.build_loading import BuildLoadingScreen, show_welcome_popup, show_close_game_dialog, show_about_popup
+from Modules.build_loading import BuildLoadingScreen, show_welcome_popup, show_close_game_required_dialog, show_about_popup
 from Modules.live_tracker_panel import LiveTrackerPanel
 from Modules.build_utils import find_compiler
 from Modules.grids_generator import MAX_TOTAL_SLOTS
@@ -153,11 +153,10 @@ class KzGridsApp(ttkb.Window):
         self._building = False
         self.boss_timer_panel = None
 
-        # Game clients: [{name: str, path: str}, ...]
-        self.game_clients = self.settings.get('game_clients') or []
-        self.active_game_idx = int(self.settings.get('active_game_idx') or 0)
-        if self.active_game_idx >= len(self.game_clients):
-            self.active_game_idx = 0
+        # Single game folder + Aoc.exe preference (set via first-launch prompt)
+        self._migrate_legacy_clients()
+        self.game_path = self.settings.get('game_path') or None
+        self.use_aoc_bypass = bool(self.settings.get('use_aoc_bypass', False))
 
         # Setup
         setup_custom_styles(self)
@@ -186,7 +185,7 @@ class KzGridsApp(ttkb.Window):
         self.deiconify()
 
         # First launch check
-        if not self.game_clients:
+        if not self.game_path:
             self.after(100, self._show_first_launch_dialog)
 
         self._check_for_updates()
@@ -304,36 +303,29 @@ class KzGridsApp(ttkb.Window):
         self.bottom_bar = tk.Frame(self, bg=TK_COLORS['status_bg'])
         self.bottom_bar.pack(fill='x', side='bottom')
 
-        # Game selector (left)
+        # Game folder indicator (left) — single path, right-click to change/clear
         game_frame = ttk.Frame(self.bottom_bar)
         game_frame.pack(side='left', padx=(PAD_TAB, 0), pady=PAD_SMALL)
 
-        ttk.Label(game_frame, text="Clients:", font=FONT_SMALL,
+        ttk.Label(game_frame, text="Game:", font=FONT_SMALL,
                   foreground=THEME_COLORS['muted']).pack(side='left', padx=(0, PAD_XS))
 
-        self.game_var = tk.StringVar()
-        self.game_dropdown = ttk.Combobox(
-            game_frame, textvariable=self.game_var, state='readonly',
-            width=35, font=FONT_SMALL
+        self._game_path_label = ttk.Label(
+            game_frame, text="", font=FONT_SMALL,
+            foreground=THEME_COLORS['body'], cursor='hand2',
         )
-        self.game_dropdown.pack(side='left')
-        self.game_dropdown.bind('<<ComboboxSelected>>', self._on_game_selected)
+        self._game_path_label.pack(side='left')
+        self._game_path_label.bind('<Button-1>', self._show_game_context_menu)
+        self._game_path_label.bind('<Button-3>', self._show_game_context_menu)
 
-        # Right-click menu for game dropdown
-        self.game_context_menu = tk.Menu(self, tearoff=0)
-        self.game_context_menu.add_command(label="Rename Client", command=self._rename_game)
-        self.game_context_menu.add_command(label="Remove Client", command=self._remove_game)
-        self.game_dropdown.bind('<Button-3>', self._show_game_context_menu)
-
-        # Add game button
-        add_game_btn = ttk.Button(game_frame, text="+", width=2,
-                                   bootstyle="outline",
-                                   command=self._add_game_folder)
-        add_game_btn.pack(side='left', padx=(PAD_XS, 0))
-        add_tooltip(add_game_btn, "Add a game client")
+        self._game_context_menu = tk.Menu(self, tearoff=0)
+        self._game_context_menu.add_command(
+            label="Change game folder…", command=self._change_game_folder)
+        self._game_context_menu.add_command(
+            label="Clear", command=self._clear_game_path)
 
         # Inline hint — visibility managed by _update_build_state
-        self._game_hint = ttk.Label(game_frame, text="Add a game client to build",
+        self._game_hint = ttk.Label(game_frame, text="Set your game folder to build",
                                      font=FONT_SMALL, foreground=THEME_COLORS['warning'])
 
         # Build button (right side of bottom bar)
@@ -343,7 +335,7 @@ class KzGridsApp(ttkb.Window):
         )
         self.build_btn.pack(side='right', padx=(0, PAD_TAB), pady=PAD_SMALL)
         bind_button_press_effect(self.build_btn, bootstyle='success')
-        add_tooltip(self.build_btn, "Install to all game clients (Ctrl+B)")
+        add_tooltip(self.build_btn, "Build & Install (Ctrl+B)")
 
         ttk.Separator(self.bottom_bar, orient='vertical').pack(
             side='right', fill='y', padx=PAD_SMALL, pady=PAD_XS)
@@ -355,7 +347,7 @@ class KzGridsApp(ttkb.Window):
         tracker_btn.pack(side='right', pady=PAD_SMALL)
         add_tooltip(tracker_btn, "Open the live combat log tracker")
 
-        self._refresh_game_dropdown()
+        self._refresh_game_path_label()
 
 
     def _create_menu_bar(self):
@@ -378,7 +370,7 @@ class KzGridsApp(ttkb.Window):
              'command': self._save_profile_as},
             {'type': 'separator'},
             {'type': 'command', 'label': 'Uninstall from game client...',
-             'command': self._uninstall_current_client},
+             'command': self._uninstall_game},
             {'type': 'separator'},
             {'type': 'command', 'label': 'About Kaz Grids',
              'command': self._show_about},
@@ -496,63 +488,67 @@ class KzGridsApp(ttkb.Window):
             bt.restore_overlay()
             return
         self.boss_timer_panel = LiveTrackerPanel(
-            self, self.settings_path, self._get_active_game_path
+            self, self.settings_path, lambda: self.game_path
         )
 
     # ========================================================================
     # GAME FOLDER MANAGEMENT
     # ========================================================================
-    def _refresh_game_dropdown(self):
-        """Update the game dropdown with current game_clients list."""
-        if not self.game_clients:
-            self.game_dropdown['values'] = ['(none)']
-            self.game_var.set('(none)')
-            self._update_build_state()
+    def _migrate_legacy_clients(self):
+        """One-time migration: collapse old multi-client settings to single game_path."""
+        legacy = self.settings.get('game_clients')
+        if not legacy:
             return
+        idx = int(self.settings.get('active_game_idx') or 0)
+        if not (0 <= idx < len(legacy)):
+            idx = 0
+        try:
+            self.settings.set('game_path', legacy[idx]['path'])
+        except (KeyError, TypeError, IndexError):
+            pass
+        self.settings.data.pop('game_clients', None)
+        self.settings.data.pop('active_game_idx', None)
+        self.settings.save()
 
-        names = []
-        for c in self.game_clients:
-            if not Path(c['path']).is_dir():
-                names.append(f"{c['name']} \u26A0")
-            else:
-                names.append(c['name'])
-        self.game_dropdown['values'] = names
-        if 0 <= self.active_game_idx < len(self.game_clients):
-            self.game_var.set(names[self.active_game_idx])
-            path = self.game_clients[self.active_game_idx]['path']
-            if not Path(path).is_dir():
-                add_tooltip(self.game_dropdown, f"Folder not found: {path}")
-            else:
-                add_tooltip(self.game_dropdown, path)
+    def _refresh_game_path_label(self):
+        """Update the game-folder label and tooltip from self.game_path."""
+        if not self.game_path:
+            self._game_path_label.configure(
+                text="(not set)", foreground=THEME_COLORS['muted'])
+            add_tooltip(self._game_path_label, "Click to choose your Age of Conan folder")
+        else:
+            display = self._format_game_path(self.game_path)
+            exists = Path(self.game_path).is_dir()
+            text = display if exists else f"{display} ⚠"
+            self._game_path_label.configure(
+                text=text,
+                foreground=THEME_COLORS['body'] if exists else THEME_COLORS['warning'])
+            tip = self.game_path if exists else f"Folder not found: {self.game_path}"
+            add_tooltip(self._game_path_label, tip)
         self._update_build_state()
 
-    def _on_game_selected(self, event=None):
-        """Handle game dropdown selection."""
-        idx = self.game_dropdown.current()
-        if idx >= 0:
-            self.active_game_idx = idx
-            self.settings.set('active_game_idx', idx)
-            self.settings.save()
-            path = self.game_clients[idx]['path']
-            add_tooltip(self.game_dropdown, path)
-            self._update_build_state()
+    @staticmethod
+    def _format_game_path(path):
+        """Compact display: 'F:\\...\\Age of Conan' for long paths."""
+        resolved = Path(path)
+        parts = resolved.parts
+        if len(parts) <= 3:
+            return str(resolved)
+        return f"{parts[0]}\\...\\{parts[-1]}"
 
-    def _add_game_folder(self):
-        """Add a new game folder via browse dialog."""
+    def _change_game_folder(self):
+        """Browse for a game folder and persist it."""
         path = filedialog.askdirectory(title="Select Age of Conan Folder")
         if not path:
             return
 
-        # Validate
-        gui_default = Path(path) / "Data" / "Gui" / "Default"
-        if not gui_default.exists():
+        if not (Path(path) / "Data" / "Gui" / "Default").exists():
             Messagebox.show_warning(
                 "This doesn't look like an Age of Conan install.\n\n"
-                "The expected game folders weren't found. The folder will be added anyway.",
+                "The expected game folders weren't found. The folder will be set anyway.",
                 title="Unexpected Folder"
             )
 
-        # Long path warning
         test_path = str(Path(path) / "Data" / "Gui" / "Default" / "Flash" / "KazGrids.swf")
         if len(test_path) > 240:
             Messagebox.show_info(
@@ -561,104 +557,74 @@ class KzGridsApp(ttkb.Window):
                 title="Long Path"
             )
 
-        # Generate name from path — e.g. "F:\...\Age of Conan"
-        resolved = Path(path).resolve()
-        parts = resolved.parts
-        if len(parts) <= 3:
-            name = str(resolved)
-        else:
-            name = f"{parts[0]}\\...\\{parts[-1]}"
+        resolved = str(Path(path).resolve())
+        previous = self.game_path
+        self.game_path = resolved
+        self._save_game_path()
 
-        # Deduplicate
-        existing_names = {c['name'] for c in self.game_clients}
-        if name in existing_names:
-            i = 2
-            while f"{name} ({i})" in existing_names:
-                i += 1
-            name = f"{name} ({i})"
+        from Modules.build_executor import detect_aoc_launcher
+        if detect_aoc_launcher(resolved) and resolved != previous:
+            self._prompt_aoc_bypass()
 
-        self.game_clients.append({'name': name, 'path': str(Path(path).resolve())})
-        self.active_game_idx = len(self.game_clients) - 1
-        self._save_game_clients()
-        self._refresh_game_dropdown()
+        self._refresh_game_path_label()
 
-    def _rename_game(self):
-        """Rename the currently selected game entry."""
-        if not self.game_clients:
+    def _clear_game_path(self):
+        """Forget the current game folder."""
+        if not self.game_path:
             return
-        idx = self.active_game_idx
-        old_name = self.game_clients[idx]['name']
-
-        from ttkbootstrap.dialogs import Querybox
-        new_name = Querybox.get_string(
-            prompt=f"Rename '{old_name}' to:",
-            title="Rename Client",
-            initialvalue=old_name,
-            parent=self
-        )
-        if new_name and new_name.strip():
-            self.game_clients[idx]['name'] = new_name.strip()
-            self._save_game_clients()
-            self._refresh_game_dropdown()
-
-    def _remove_game(self):
-        """Remove the currently selected game entry."""
-        if not self.game_clients:
+        if Messagebox.yesno(
+            "Clear the configured game folder?\n\nThis won't delete any game files.",
+            title="Clear Game Folder",
+        ) != "Yes":
             return
-        idx = self.active_game_idx
-        name = self.game_clients[idx]['name']
-
-        result = Messagebox.yesno(
-            f"Remove '{name}' from the client list?\n\nThis won't delete any game files.",
-            title="Remove Client"
-        )
-        if result == "Yes":
-            self.game_clients.pop(idx)
-            if self.active_game_idx >= len(self.game_clients):
-                self.active_game_idx = max(0, len(self.game_clients) - 1)
-            self._save_game_clients()
-            self._refresh_game_dropdown()
+        self.game_path = None
+        self._save_game_path()
+        self._refresh_game_path_label()
 
     def _show_game_context_menu(self, event):
-        """Show right-click context menu for game dropdown."""
-        if self.game_clients:
-            self.game_context_menu.tk_popup(event.x_root, event.y_root)
+        """Show the change/clear menu for the game-folder label."""
+        self._game_context_menu.tk_popup(event.x_root, event.y_root)
 
-    def _save_game_clients(self):
-        """Persist game_clients list to settings."""
-        self.settings.set('game_clients', self.game_clients)
-        self.settings.set('active_game_idx', self.active_game_idx)
+    def _save_game_path(self):
+        """Persist game_path to settings and notify observers."""
+        if self.game_path:
+            self.settings.set('game_path', self.game_path)
+        else:
+            self.settings.data.pop('game_path', None)
         self.settings.save()
-        self.grids_panel.notify_clients_changed()
+        self.grids_panel.notify_game_path_changed()
 
-    def _get_active_game_path(self):
-        """Return the active game folder path, or None."""
-        if not self.game_clients:
-            return None
-        if 0 <= self.active_game_idx < len(self.game_clients):
-            return self.game_clients[self.active_game_idx]['path']
-        return None
+    def _save_aoc_bypass(self, value):
+        """Persist the Aoc.exe bypass preference."""
+        self.use_aoc_bypass = bool(value)
+        self.settings.set('use_aoc_bypass', self.use_aoc_bypass)
+        self.settings.save()
 
-    def _uninstall_current_client(self):
-        """Remove Kaz Grids files from the currently selected game client."""
-        game_path = self._get_active_game_path()
-        if not game_path:
+    def _prompt_aoc_bypass(self):
+        """Ask the user whether they use Aoc.exe (launcher bypass)."""
+        result = Messagebox.yesno(
+            "Aoc.exe (third-party launcher bypass) was detected in this game folder.\n\n"
+            "Is Aoc.exe enabled on your PC?",
+            title="Aoc.exe Detected",
+        )
+        self._save_aoc_bypass(result == "Yes")
+
+    def _uninstall_game(self):
+        """Remove Kaz Grids files from the configured game folder."""
+        if not self.game_path:
             Messagebox.show_warning(
-                "No game client selected. Add one from the bottom bar first.",
-                title="No Client"
+                "No game folder set. Configure one in the bottom bar first.",
+                title="No Game Folder"
             )
             return
-        client_name = self.game_clients[self.active_game_idx]['name']
         if Messagebox.yesno(
-            f"Remove Kaz Grids files from '{client_name}'?\n\n"
-            "This deletes KazGrids.swf, auto-load entries, and reload scripts "
-            "from that game folder. The client stays in your Clients list \u2014 "
-            "remove it separately if you want.",
-            title="Uninstall from Game Client"
+            "Remove Kaz Grids files from your game folder?\n\n"
+            "This deletes KazGrids.swf, auto-load entries, and reload scripts.",
+            title="Uninstall from Game Folder"
         ) != "Yes":
             return
         from Modules.build_executor import uninstall_from_client
-        ok, msg = uninstall_from_client(game_path)
+        ok, msg = uninstall_from_client(self.game_path)
         if ok:
             self.toast.show(msg, 'success', 8)
         else:
@@ -666,18 +632,12 @@ class KzGridsApp(ttkb.Window):
 
     def _update_build_state(self):
         """Enable/disable build button and update game hint."""
-        valid_count = sum(1 for c in self.game_clients if Path(c['path']).is_dir())
-        if valid_count == 0:
+        valid = bool(self.game_path) and Path(self.game_path).is_dir()
+        if not valid:
             self.build_btn.configure(state='disabled', bootstyle='success')
             self._game_hint.configure(
-                text="Add a game client to build",
+                text="Set your game folder to build",
                 foreground=THEME_COLORS['warning'])
-            self._game_hint.pack(side='left', padx=(PAD_XS, 0))
-        elif valid_count > 1:
-            self.build_btn.configure(state='normal', bootstyle='success')
-            self._game_hint.configure(
-                text=f"Build installs to all {valid_count} clients",
-                foreground=THEME_COLORS['muted'])
             self._game_hint.pack(side='left', padx=(PAD_XS, 0))
         else:
             self.build_btn.configure(state='normal', bootstyle='success')
@@ -878,25 +838,24 @@ class KzGridsApp(ttkb.Window):
     # BUILD PIPELINE
     # ========================================================================
     def _build(self):
-        """Build and install KazGrids.swf to all configured game folders."""
+        """Build and install KazGrids.swf to the configured game folder."""
         if self._building:
             return
 
-        # Gather all valid game clients
-        valid_clients = []
-        for c in self.game_clients:
-            p = Path(c['path']).resolve()
-            if p.is_dir() and (p / "Data" / "Gui" / "Default").exists():
-                valid_clients.append({'name': c['name'], 'path': str(p)})
+        valid = (
+            bool(self.game_path)
+            and Path(self.game_path).is_dir()
+            and (Path(self.game_path) / "Data" / "Gui" / "Default").exists()
+        )
 
         compiler = find_compiler(self.assets_path, self.app_path)
         grids = self.grids_panel.get_profile_data()
         total_slots = self.grids_panel.get_total_slots()
 
         validations = [
-            (not valid_clients,
-             "No valid game clients configured.\n\n"
-             "Add a game client via Build menu or the [+] button in the bottom bar."),
+            (not valid,
+             "No valid game folder configured.\n\n"
+             "Set your Age of Conan folder from the bottom bar."),
             (compiler is None,
              "A required build file is missing.\n\n"
              "Re-download Kaz Grids to restore it."),
@@ -906,9 +865,9 @@ class KzGridsApp(ttkb.Window):
              f"Total slots ({total_slots}) exceeds maximum ({MAX_TOTAL_SLOTS}).\n\n"
              "Remove some grids or reduce grid sizes."),
         ]
-        for i, (failed, msg) in enumerate(validations):
+        for k, (failed, msg) in enumerate(validations):
             if failed:
-                if i == 0:
+                if k == 0:
                     self._pulse_game_hint()
                 Messagebox.show_error(msg, title="Build Error")
                 return
@@ -934,14 +893,13 @@ class KzGridsApp(ttkb.Window):
             )
             return
 
-        # First build with Aoc.exe: warn user to close the game
-        if not self.settings.get('has_built_before'):
-            from Modules.build_executor import detect_aoc_any
-            all_paths = [c['path'] for c in valid_clients]
-            aoc_installed, aoc_running = detect_aoc_any(all_paths)
-            if aoc_installed and aoc_running:
-                if not show_close_game_dialog(self):
-                    return
+        # Aoc.exe users only: block while the game is running
+        if self.use_aoc_bypass:
+            from Modules.build_executor import get_running_game_process
+            running = get_running_game_process()
+            if running:
+                show_close_game_required_dialog(self, process_name=running)
+                return
 
         # Auto-save profile before building
         profile_name = None
@@ -957,12 +915,11 @@ class KzGridsApp(ttkb.Window):
         self.build_btn.configure(state='disabled')
         self.unbind_all('<Control-b>')
 
-        from Modules.build_executor import compile_to_staging, install_to_client, detect_aoc_any
+        from Modules.build_executor import compile_to_staging, install_to_client, is_aoc_running
 
         loading = BuildLoadingScreen(self)
         staging_dir = None
         try:
-            # Step 1: Compile
             loading.advance_step("Compiling KzGrids...")
             self.update()
 
@@ -977,58 +934,34 @@ class KzGridsApp(ttkb.Window):
                 self._flash_status_bar(THEME_COLORS['danger'])
                 return
 
-            # Global aoc.exe detection across all clients
-            all_paths = [c['path'] for c in valid_clients]
-            aoc_installed, aoc_running = detect_aoc_any(all_paths)
-
-            # Step 2: Install to each client
             loading.advance_step("Installing...")
             self.update()
 
             staging_swf = staging_dir / "KazGrids.swf"
-            client_results = []
-            for client in valid_clients:
-                loading.update_step_name(f"Installing to {client['name']}...")
-                self.update()
-                ok, err = install_to_client(staging_swf, client['path'], aoc_installed)
-                client_results.append((client['name'], ok, err))
+            ok, err = install_to_client(staging_swf, self.game_path, self.use_aoc_bypass)
+            client_results = [(self._format_game_path(self.game_path), ok, err)]
 
-            # Add skipped clients (configured but invalid path)
-            valid_paths = {c['path'] for c in valid_clients}
-            for c in self.game_clients:
-                if str(Path(c['path']).resolve()) not in valid_paths:
-                    client_results.append((c['name'], False, "Folder not found"))
+            aoc_running = self.use_aoc_bypass and is_aoc_running()
 
-            # Toast
-            succeeded = sum(1 for _, s, _ in client_results if s)
-            total = len(client_results)
-            if succeeded == total:
-                suffix = f" ({succeeded} clients)" if total > 1 else ""
-                if aoc_running:
-                    self.toast.show(f"Built \u2014 /reloadui in-game{suffix}", 'success', 8)
-                elif aoc_installed:
-                    self.toast.show(f"Built \u2014 launch via Aoc.exe{suffix}", 'success', 8)
+            if ok:
+                if self.use_aoc_bypass and aoc_running:
+                    self.toast.show("Built — /reloadui in-game", 'success', 8)
+                elif self.use_aoc_bypass:
+                    self.toast.show("Built — launch via Aoc.exe", 'success', 8)
                 else:
-                    self.toast.show(f"Built \u2014 /reloadui + /reloadgrids{suffix}", 'success', 8)
+                    self.toast.show("Built — /reloadui + /reloadgrids", 'success', 8)
                 self._flash_status_bar()
-                self.grids_panel.notify_build_done(aoc_installed)
-                if not self.settings.get('has_built_before'):
-                    self.settings.set('has_built_before', True)
-                    self.settings.save()
-            elif succeeded > 0:
-                self.toast.show(f"Built \u2014 installed to {succeeded}/{total} clients", 'warning', 10)
-                self._flash_status_bar()
-                self.grids_panel.notify_build_done(aoc_installed)
+                self.grids_panel.notify_build_done(self.use_aoc_bypass)
                 if not self.settings.get('has_built_before'):
                     self.settings.set('has_built_before', True)
                     self.settings.save()
             else:
-                self.toast.show("Build failed \u2014 no clients installed", 'error', 10)
+                self.toast.show("Build failed", 'error', 10)
                 self._flash_status_bar(THEME_COLORS['danger'])
 
             loading.show_summary(
                 client_results, compile_result, profile_name=profile_name,
-                aoc_installed=aoc_installed, aoc_running=aoc_running)
+                aoc_installed=self.use_aoc_bypass, aoc_running=aoc_running)
 
         except Exception as e:
             logger.exception("Unexpected build error")
@@ -1071,11 +1004,13 @@ class KzGridsApp(ttkb.Window):
         """Show the first-launch dialog for setting up game path."""
         from Modules.first_launch import show_first_launch_dialog
 
-        def on_game_added(name, path):
-            self.game_clients.append({'name': name, 'path': path})
-            self.active_game_idx = 0
-            self._save_game_clients()
-            self._refresh_game_dropdown()
+        def on_game_set(path):
+            self.game_path = path
+            self._save_game_path()
+            self._refresh_game_path_label()
+
+        def on_aoc_bypass_set(value):
+            self._save_aoc_bypass(value)
 
         welcome_data = {}
 
@@ -1117,8 +1052,9 @@ class KzGridsApp(ttkb.Window):
                     profile_name=welcome_data['profile_name']))
 
         default_exists = (self.assets_path / "kzgrids" / "Default.json").exists()
-        show_first_launch_dialog(self, APP_NAME, on_game_added, on_load_default,
-                                 on_resolution_set, default_exists, on_dialog_closed)
+        show_first_launch_dialog(self, APP_NAME, on_game_set, on_load_default,
+                                 on_resolution_set, default_exists, on_dialog_closed,
+                                 on_aoc_bypass_set=on_aoc_bypass_set)
 
     def _parse_resolution(self, resolution_str):
         """Parse 'WxH' string into (width, height) or None."""
