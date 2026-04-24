@@ -14,7 +14,7 @@ Before this routine can work, these must be true. Check them on first run; if an
    - `cache: 'pip'` on setup-python
    - `if: startsWith(github.ref, 'refs/tags/')` guard on the gh-release step so manual dispatches don't create releases
 2. **`.github/release-notes.md` exists** and holds evergreen install/highlights content. The workflow reads release notes from this file. The routine below **prepends** a "What's New" section each release — the evergreen body stays intact. If the file doesn't exist, bootstrap it with Highlights / Install / Requirements content before running the routine.
-3. **`CHANGELOG.md` exists at repo root.** The routine prepends to it. If missing, create with a single header line.
+3. **`docs/CHANGELOG.md` exists.** The routine prepends to it. If missing, create with a single header line.
 
 ---
 
@@ -152,7 +152,7 @@ Write `/mnt/user-data/outputs/CHANGELOG_DRAFT.md` grouping the commits:
 
 **APPROVAL GATE #2.** Present the draft to Kaz. Wait for edits or approval. Do not proceed.
 
-Once approved, the routine must also **prepend** the approved notes to `.github/release-notes.md` as a `## What's New in vX.Y.Z` section, followed by a `---` separator, then the existing Highlights / Install / Requirements body. Do not overwrite — the evergreen install content carries forward every release. The workflow uses this file as the release body. The `---` separator in CHANGELOG.md separates versions there; in release-notes.md it separates "What's New" from the evergreen body.
+Once approved, the routine must also **prepend** the approved notes to `.github/release-notes.md` as a `## What's New in vX.Y.Z` section, followed by a `---` separator, then the existing Highlights / Install / Requirements body. Do not overwrite — the evergreen install content carries forward every release. The workflow uses this file as the release body. The `---` separator in `docs/CHANGELOG.md` separates versions there; in release-notes.md it separates "What's New" from the evergreen body.
 
 ---
 
@@ -169,23 +169,23 @@ grep -E '^APP_VERSION\s*=' kzgrids.py
 
 Update `VERSION` in `build.py` the same way.
 
-Prepend the approved changelog entry to `CHANGELOG.md`. Keep the existing file header (if any) at the top:
+Prepend the approved changelog entry to `docs/CHANGELOG.md`. Keep the existing file header (if any) at the top:
 
 ```bash
 # Read existing CHANGELOG, prepend new entry after any top-level header
 # Simplest approach: use a temp file
-cat CHANGELOG_DRAFT.md CHANGELOG.md > CHANGELOG.new
-mv CHANGELOG.new CHANGELOG.md
+cat CHANGELOG_DRAFT.md docs/CHANGELOG.md > docs/CHANGELOG.new
+mv docs/CHANGELOG.new docs/CHANGELOG.md
 ```
 
-If `CHANGELOG.md` has a `# Changelog` header that should stay at the top, adjust — handle this case by reading the file first and inserting the draft after line 1.
+If `docs/CHANGELOG.md` has a `# Changelog` header that should stay at the top, adjust — handle this case by reading the file first and inserting the draft after line 1.
 
 Prepend the approved notes to `.github/release-notes.md` as a `## What's New in vX.Y.Z` section followed by a `---` separator — do not touch the evergreen Highlights / Install / Requirements body below (see Step 2 above).
 
 Stage and commit:
 
 ```bash
-git add kzgrids.py build.py CHANGELOG.md .github/release-notes.md
+git add kzgrids.py build.py docs/CHANGELOG.md .github/release-notes.md
 git status
 # Confirm only these 4 files are staged. If anything else shows up, stop.
 
