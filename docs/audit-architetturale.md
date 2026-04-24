@@ -1,213 +1,107 @@
-# Architectural Audit: KzGrids-Editor
+# Architectural Map
 
-**Date:** 2026-04-24  
-**Scope:** Internal module dependencies and coupling analysis  
-**Files analyzed:** 19 Python files
+**Current as of:** 2026-04-24
+**Purpose:** Module topology, dependencies, and coupling hotspots. Updated alongside code changes — if you edit this file, commit it with the code. `CLAUDE.md` has the short version; this file has the detail that doesn't fit there.
 
-## 1. Star Topology Hypothesis Analysis
+## Dependency clusters
 
-**Hypothesis:** PARTIALLY CONFIRMED
+All arrows point in the "imports from" direction. Every chain terminates — **no cycles**.
 
-Command used: `grep -E "^from \.\|^from Modules\|^import \." /home/s/code/KzGrids-Editor/**/*.py`
+### UI primitives (tokens at the root)
+```
+ui_helpers  ← ui_tk_style
+ui_helpers  ← ui_widgets          ← ui_components
+                                    (also imports ui_tk_style)
+```
+- `ui_helpers` holds design tokens only (fonts, colors, padding, BTN_*, SCANLINE_ALPHA) + `setup_custom_styles`. It is leaf — imports nothing internal.
+- `ui_widgets` adds the builder layer: `blend_alpha`, `CollapsibleSection`, tooltips, dialog/app headers, event bindings, `debounced_callback`.
+- `ui_components` adds stateful composites: `ToastManager`, `DragReorderManager`, `CustomMenuBar`, `create_scrollable_frame`, global mousewheel routing.
+- `ui_tk_style` handles raw-tk widget styling + dark-titlebar monkey-patch.
 
-### Internal Import Matrix
+### App state
+```
+settings_manager  ← window_position
+```
+Window-position helpers reach settings via the public `get_setting`/`set_setting` API, not the `_settings` global directly.
 
-**Files importing from ui_helpers:** 9 files
-
-Command used: `grep -l "from.*ui_helpers import\|from Modules.ui_helpers import" /home/s/code/KzGrids-Editor/*.py /home/s/code/KzGrids-Editor/Modules/*.py 2>/dev/null`
-
-- kzgrids.py (lines 18-28)
-- Modules/grids_panel.py (lines 18-30)
-- Modules/grid_dialogs.py (lines 14-25)
-- Modules/database_editor.py (lines 22-29)
-- Modules/instructions_panel.py (lines 5-11)
-- Modules/live_tracker_panel.py (lines 21-27)
-- Modules/build_loading.py (lines 16-21)
-- Modules/first_launch.py (lines 10-19)
-- Modules/timer_overlay.py (line 9)
-
-**Direct module-to-module dependencies (bypassing ui_helpers):**
-
-Command used: `grep -E "from \.(grid_|build_|live_tracker|boss_|timer_|combat_|first_|database_|instructions_)" /home/s/code/KzGrids-Editor/Modules/*.py`
-
-- `build_executor.py → build_utils.py` (line 12)
-- `first_launch.py → build_executor.py` (line 19)  
-- `grid_dialogs.py → grid_model.py` (line 26)
-- `grids_generator.py → build_utils.py` (line 13)
-- `grids_panel.py → grid_dialogs.py` (line 12)
-- `grids_panel.py → grid_model.py` (lines 13-17)
-- `live_tracker_panel.py → live_tracker_settings.py` (lines 14-17)
-- `live_tracker_panel.py → boss_timer.py` (line 18)
-- `live_tracker_panel.py → combat_monitor.py` (line 19)
-- `live_tracker_panel.py → timer_overlay.py` (line 20)
-- `boss_timer.py → live_tracker_settings.py` (line 11)
-- `timer_overlay.py → live_tracker_settings.py` (line 8)
-
-**Import style analysis:**
-
-Relative imports (command: `grep -c "from \.*ui_helpers import" /home/s/code/KzGrids-Editor/*.py /home/s/code/KzGrids-Editor/Modules/*.py 2>/dev/null`): 6 files
-- Modules/database_editor.py, grid_dialogs.py, live_tracker_panel.py, first_launch.py, timer_overlay.py, grids_panel.py
-
-Absolute imports (command: `grep -c "from Modules.ui_helpers import" /home/s/code/KzGrids-Editor/*.py /home/s/code/KzGrids-Editor/Modules/*.py 2>/dev/null`): 3 files  
-- kzgrids.py, Modules/build_loading.py, instructions_panel.py
-
-**Topology:** Hub-and-spoke with local clusters. ui_helpers.py serves as the primary hub (9/19 files depend on it), but significant module-to-module dependencies exist in two domains:
-1. **Grid editing cluster:** grids_panel ↔ grid_dialogs ↔ grid_model
-2. **Live tracker cluster:** live_tracker_panel → [boss_timer, combat_monitor, timer_overlay] → live_tracker_settings
-3. **Build utilities cluster:** [build_executor, grids_generator] → build_utils
-
-## 2. Contents of ui_helpers.py by Responsibility
-
-**File size:** 1,497 lines  
-**Public symbols count:** 69 (command: `grep -E "^(def|class|[A-Z][A-Z0-9_]*\s*=)" /home/s/code/KzGrids-Editor/Modules/ui_helpers.py | wc -l`)
-
-### Categorization Analysis
-
-Command used: `grep -A1 "^# ===.*===.*$" /home/s/code/KzGrids-Editor/Modules/ui_helpers.py`
-
-#### UI Constants (Lines 12-116, ~104 lines)  
-**Public symbols: 38** (command: `grep -c "^FONT_" && grep -c "^PAD_\|^BTN_\|^OVERLAY_\|^MODULE_\|^GRID_TYPE_\|^SCANLINE_" && grep -c "^THEME_COLORS\|^TK_COLORS\|^_RETRO_COLORS"`)
-- **Font constants:** 13 symbols (FONT_FAMILY, FONT_HEADING, etc.)
-- **Layout constants:** 22 symbols (PAD_*, BTN_*, OVERLAY_*, etc.)  
-- **Color dictionaries:** 3 symbols (THEME_COLORS, TK_COLORS, _RETRO_COLORS)
-- **Consumed by:** All 9 files that import from ui_helpers
-
-#### UI Helper Widgets (Lines 117-282, ~165 lines)  
-**Public symbols: 5** (command: `sed -n '117,282p' ui_helpers.py | grep -c "^def "`)
-- **Functions:** 5 (debounced_callback, blend_alpha, create_dialog_header, etc.)
-- **Consumed by:** 7/9 files (excluding timer_overlay, build_loading)
-
-#### Interaction Helpers (Lines 283-599, ~316 lines)  
-**Public symbols: 7** (command: `sed -n '283,599p' ui_helpers.py | grep -E "^def |^class " | wc -l`)
-- **Functions:** 5 (create_tip_bar, bind_card_events, add_tooltip, etc.)
-- **Classes:** 2 (_InAppToolTip, CollapsibleSection)
-- **Consumed by:** 6/9 files
-
-#### Raw TK Widget Styling (Lines 600-649, ~49 lines)  
-**Public symbols: 5** (command: `sed -n '600,649p' ui_helpers.py | grep -c "^def "`)
-- **Functions:** 5 (style_tk_listbox, style_tk_text, apply_dark_titlebar, etc.)
-- **Consumed by:** 3/9 files (grid_dialogs, database_editor, instructions_panel)
-
-#### Settings Management (Lines 650-661, ~11 lines)  
-**Public symbols: 3** (part of command: `sed -n '650,761p' ui_helpers.py | grep -c "^def "`)
-- **Functions:** 3 (init_settings, get_setting, set_setting)
-- **Global state:** 1 module-level `_settings` variable  
-- **Consumed by:** 4/9 files (kzgrids, grid_dialogs, database_editor, grids_panel)
-
-#### Window Position Persistence (Lines 662-761, ~99 lines)  
-**Public symbols: 4** (part of command: `sed -n '650,761p' ui_helpers.py | grep -c "^def "`)  
-- **Functions:** 4 (clamp_to_screen, save/restore_window_position, bind_window_position_save)
-- **Consumed by:** 7/9 files
-
-#### Custom TTK Styles (Lines 762-776, ~14 lines)  
-**Public symbols: 1** (command: `sed -n '762,776p' ui_helpers.py | grep -c "^def "`)
-- **Functions:** 1 (setup_custom_styles)
-- **Consumed by:** 1/9 files (kzgrids.py only)
-
-#### Complex Widget Classes (Lines 777-1497, ~720 lines)  
-**Public symbols: 7** (command: `sed -n '777,1497p' ui_helpers.py | grep -E "^def |^class " | wc -l`)
-- **Classes:** 3 (DragReorderManager, ToastManager, CustomMenuBar)
-- **Supporting functions:** 4 (create_scrollable_frame, mousewheel handlers, etc.)
-- **Consumed by:** 5/9 files
-
-### Responsibility Spread Analysis
-
-**Qualitative impression:** ui_helpers.py violates single responsibility principle by mixing:
-- Design tokens (appropriate centralization)
-- Business logic (settings persistence - should be separate module)
-- Complex widget implementations (should be individual modules)
-- Utility functions (appropriate shared location)
-
-## 3. PyInstaller Hidden Import Analysis
-
-**Investigation target:** Why `--hidden-import Modules.ui_helpers` is required in build.py:92
-
-Command used: `grep -n "hidden-import" /home/s/code/KzGrids-Editor/build.py`
-
-**Evidence in build.py lines 81-96:**
-```python
---hidden-import", "Modules.ui_helpers",
+### Grid editing
+```
+grid_model  ← grid_dialogs  ← grids_panel
+            (also pulls settings_manager, window_position, ui_*)
 ```
 
-**Code-based justification:** NO EXPLICIT JUSTIFICATION FOUND
+### Build pipeline
+```
+build_utils  ← grids_generator
+             ← build_executor  ← first_launch
+build_loading  (independent, just consumes UI primitives)
+```
 
-**Analysis of import patterns:**
-1. ui_helpers.py contains no dynamic imports or `__import__()` calls (verified by reading file)
-2. All imports of ui_helpers use explicit `from .ui_helpers import` or `from Modules.ui_helpers import` syntax
-3. No conditional imports or plugin-style loading detected
-4. No `importlib` usage found in codebase
+### Live Tracker (isolated — no other panel imports from it)
+```
+live_tracker_settings  ← boss_timer
+                       ← timer_overlay
+                       ← combat_monitor
+                       ← live_tracker_panel  (orchestrator)
+```
 
-**Hypothesis:** The hidden-import directive appears to be defensive rather than necessary. PyInstaller's static analysis should detect all ui_helpers imports since they use explicit import statements. The directive may be legacy from a previous version or added as a precautionary measure.
+## Fan-in (modules that would churn many files if touched)
 
-**Additional context:** build.py declares hidden imports for ALL 17 modules (lines 81-96), suggesting a blanket approach rather than selective inclusion based on analysis failures.
+| Fan-in | Module | Notes |
+|---:|---|---|
+| 12 | `ui_helpers` | Pure tokens — high fan-in is expected and acceptable for shared constants. Keep the surface small. |
+| 9 | `ui_widgets` | Widest builder surface. Keep new helpers focused; don't expand it unchecked. |
+| 5 | `window_position` | Stable API — 4 functions. |
+| 4 | `settings_manager` | 3 public functions. |
+| 4 | `ui_tk_style` | Small, stable. |
+| 4 | `ui_components` | Heavy but narrow — touching `CustomMenuBar` barely ripples. |
+| 3 | `grid_model`, `build_utils`, `live_tracker_settings` | Cluster leaves — low blast radius. |
 
-## 4. Dependency Cycles and Coupling Hotspots
+Post-split, fan-in is spread across six focused modules instead of concentrated in one 1,497-line file. A color/padding token tweak still hits many files (because tokens are *meant* to be shared), but a change to `ToastManager` or `CustomMenuBar` rebuilds only four.
 
-**Analysis method:** Manual trace of import chains from dependency matrix above.
+## Conventions
 
-### Identified Issues
+- **Import style:** relative (`from .other import X`) inside `Modules/`; absolute (`from Modules.X import`) only from `kzgrids.py` (top-level entry).
+- **Where new code goes:**
+  - Design token → `ui_helpers`
+  - Reusable widget builder / event binding / small helper → `ui_widgets`
+  - Stateful widget class or window-scope helper → `ui_components`
+  - Raw-tk (Listbox/Text/Canvas) styling → `ui_tk_style`
+  - Window geometry → `window_position`
+  - Settings read/write → `settings_manager` (don't re-introduce UI-layer state)
+- **Cluster isolation:** the Live Tracker cluster must not be imported from outside itself. Enforced by convention, not code.
 
-#### 1. No Import Cycles Detected
-**Status:** NO CIRCULAR DEPENDENCIES FOUND  
-All dependency chains terminate without cycles.
+## Known trade-offs / deferred work
 
-#### 2. High Fan-In Coupling: ui_helpers.py  
-**Severity:** HIGH  
-**Evidence:** 9 of 19 files (47.4%) depend on ui_helpers.py
-**Files affected:** All major UI modules
-**Risk:** Changes to ui_helpers require rebuilding 47.4% of the application
+- **`build.py` has a defensive `--hidden-import` block** listing every `Modules/*` file. PyInstaller's static analysis should discover them (all imports are explicit), but the block stays until there's time to test removing it.
+- **`ui_components.py` is 739 lines** — `CustomMenuBar` alone is ~300. Could be split further into `menu_bar.py`, but no concrete driver forces it yet.
+- **`kzgrids.py` is 1,152 lines** holding both `SettingsManager` (dataclass-ish) and `KzGridsApp` (the whole root window). Candidate for a future split, not urgent.
+- **Test coverage: none.** Refactors verify via `python -c "import kzgrids; from Modules import ..."` (walks the full import graph — any missing symbol / wrong module / cycle surfaces here). Runtime correctness still relies on manual smoke-testing.
 
-#### 3. Mixed Import Conventions
-**Severity:** MEDIUM  
-**Evidence:** Two import styles coexist without pattern:
-- Relative: `from .ui_helpers import` (6 files)
-- Absolute: `from Modules.ui_helpers import` (3 files: kzgrids.py, build_loading.py, instructions_panel.py)
-**Risk:** Inconsistent module resolution, potential refactoring errors
+## File inventory (current)
 
-#### 4. Fat Interface: ui_helpers Exports
-**Severity:** MEDIUM  
-**Evidence:** 69 public symbols exported from single module
-**Breakdown:** Most files import 15-25 symbols each from ui_helpers
-**Risk:** Interface bloat, difficult to reason about dependencies
-
-#### 5. Business Logic in UI Module
-**Severity:** MEDIUM  
-**Evidence:** Settings persistence functions in ui_helpers.py (lines 650-761)
-- `init_settings()`, `get_setting()`, `set_setting()`  
-- Module-level `_settings` global state
-**Risk:** Architectural layer violation, business logic coupled to UI concerns
-
-### No Critical Hotspots
-**Cluster isolation:** Grid editing and Live tracker clusters remain appropriately isolated. No cross-cluster dependencies detected beyond ui_helpers.
-
----
-
-**Analysis complete.** No recommendations phase - observations only per requirements.
-
----
-
-## 5. Resolution (2026-04-24)
-
-Issues #3 (fat interface), #4 (business logic in UI module), and #5 (mixed import conventions) from Section 4 have been addressed. Issue #2 (high fan-in on `ui_helpers.py`) is mitigated — most consumers now depend on a narrower, focused module instead of the 1,497-line god-module.
-
-### What changed
-
-`Modules/ui_helpers.py` (previously 1,497 lines, 69 public symbols, 8 responsibilities) was split into six focused modules:
-
-| Module | Lines | Responsibility |
-|---|---|---|
-| `Modules/ui_helpers.py` | 129 | Design tokens only (FONT_*, PAD_*, BTN_*, THEME_COLORS, TK_COLORS, MODULE_COLORS, GRID_TYPE_COLORS, OVERLAY_COLORS, _RETRO_COLORS, SCANLINE_ALPHA) + `setup_custom_styles` |
-| `Modules/ui_widgets.py` | 497 | Widget-builder helpers, tooltips, event bindings, debounce, `blend_alpha`, `CollapsibleSection` |
-| `Modules/ui_components.py` | 739 | `DragReorderManager`, `ToastManager`, `CustomMenuBar`, `create_scrollable_frame`, mousewheel routing |
-| `Modules/ui_tk_style.py` | 57 | Raw-tk widget styling + `apply_dark_titlebar` |
-| `Modules/window_position.py` | 91 | `save_window_position`, `restore_window_position`, `bind_window_position_save`, `clamp_to_screen` |
-| `Modules/settings_manager.py` | 29 | `init_settings`, `get_setting`, `set_setting`, `_settings` module reference — no longer lives in the UI layer |
-
-All splits verified step-by-step via `python -c "import kzgrids; from Modules import ..."` (full import-graph traversal), committed as six atomic commits so any regression is bisectable.
-
-Import style (Section 4, Issue #3) was normalized as part of the same pass: all files under `Modules/` now use relative imports (`from .X import`); absolute imports (`from Modules.X import`) are used only from `kzgrids.py` (the top-level entry).
-
-### What was explicitly left as-is
-
-- **`build.py`'s defensive `--hidden-import` block.** Section 3 hypothesized it may be unnecessary. Testing that hypothesis is a separate experiment; for now the block gained five new entries (one per new module).
-- **Naming.** `ui_helpers.py` kept its name despite now holding only tokens — renaming would be accurate but adds diff churn across every consumer for no runtime benefit.
+| File | Lines | Role |
+|---|---:|---|
+| `kzgrids.py` | 1152 | Entry point, `SettingsManager`, `KzGridsApp` root window |
+| `build.py` | 246 | PyInstaller build driver |
+| `Modules/grids_panel.py` | 1155 | Grid list UI, grid management |
+| `Modules/build_loading.py` | 914 | Build-progress screen + welcome/about popups |
+| `Modules/database_editor.py` | 904 | Buff DB CRUD, search, filtering |
+| `Modules/grid_dialogs.py` | 742 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
+| `Modules/ui_components.py` | 739 | `ToastManager`, `DragReorderManager`, `CustomMenuBar`, scrollable frame |
+| `Modules/ui_widgets.py` | 497 | Widget builders, tooltips, bindings, `CollapsibleSection`, `blend_alpha` |
+| `Modules/live_tracker_panel.py` | 489 | Live Tracker Toplevel orchestrator |
+| `Modules/boss_timer.py` | 441 | Boss timer state + UI |
+| `Modules/timer_overlay.py` | 440 | In-game transparent timer overlay |
+| `Modules/grids_generator.py` | 424 | AS2 code generation from grid configs |
+| `Modules/instructions_panel.py` | 372 | Help/instructions view |
+| `Modules/combat_monitor.py` | 313 | Combat log parser feeding the tracker |
+| `Modules/first_launch.py` | 284 | One-time game-folder setup flow |
+| `Modules/build_executor.py` | 227 | MTASC compile + deploy |
+| `Modules/live_tracker_settings.py` | 145 | Tracker persistence |
+| `Modules/ui_helpers.py` | 129 | Design tokens + `setup_custom_styles` |
+| `Modules/grid_model.py` | 108 | Grid dataclasses with `to_dict`/`from_dict` |
+| `Modules/build_utils.py` | 98 | Compiler discovery + path helpers |
+| `Modules/window_position.py` | 91 | Window geometry save/restore |
+| `Modules/ui_tk_style.py` | 57 | Raw-tk widget styling + dark titlebar |
+| `Modules/settings_manager.py` | 29 | Settings proxy (`init_settings`, `get/set_setting`) |
