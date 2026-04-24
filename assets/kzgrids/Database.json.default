@@ -34,7 +34,7 @@
       "stacking": true
     },
     {
-      "name": "Incinerate T3 1-5",
+      "name": "Incinerate 1-5 (Kharon)",
       "ids": [
         4259934,
         4260179,
@@ -47,7 +47,7 @@
       "stacking": true
     },
     {
-      "name": "Miasma",
+      "name": "Miasma (HathorKa)",
       "ids": [
         4281812
       ],
@@ -55,7 +55,7 @@
       "type": "debuff"
     },
     {
-      "name": "Crimson Coating",
+      "name": "Crimson Coating (Archfiend)",
       "ids": [
         4836698
       ],
@@ -63,7 +63,7 @@
       "type": "debuff"
     },
     {
-      "name": "Host",
+      "name": "Host (Nergal)",
       "ids": [
         4757361
       ],
@@ -71,7 +71,7 @@
       "type": "debuff"
     },
     {
-      "name": "Ire of the Archfiend",
+      "name": "Ire of the Archfiend (Archfiend)",
       "ids": [
         4752750
       ],
@@ -79,7 +79,7 @@
       "type": "debuff"
     },
     {
-      "name": "Nauseating Backlash",
+      "name": "Nauseating Backlash (Zaal)",
       "ids": [
         4752518
       ],
@@ -87,7 +87,7 @@
       "type": "debuff"
     },
     {
-      "name": "Nergal's Parasite 1-5",
+      "name": "Nergal's Parasite 1-5 (Nergal)",
       "ids": [
         4757309,
         4757310,
@@ -96,11 +96,11 @@
         4757329
       ],
       "category": "#T3.5",
-      "type": "buff",
+      "type": "misc",
       "stacking": true
     },
     {
-      "name": "Nergal's Protection",
+      "name": "Nergal's Protection (Nergal)",
       "ids": [
         4757285
       ],
@@ -108,7 +108,7 @@
       "type": "buff"
     },
     {
-      "name": "Nergal's Ruin",
+      "name": "Nergal's Ruin (Nergal)",
       "ids": [
         4836609
       ],
@@ -116,15 +116,15 @@
       "type": "debuff"
     },
     {
-      "name": "Supercharged Parasite",
+      "name": "Supercharged Parasite (Nergal)",
       "ids": [
         4757336
       ],
       "category": "#T3.5",
-      "type": "buff"
+      "type": "misc"
     },
     {
-      "name": "Unholy Reversal",
+      "name": "Unholy Reversal (Zaal)",
       "ids": [
         4836424
       ],
@@ -132,15 +132,15 @@
       "type": "debuff"
     },
     {
-      "name": "Veil of the Unliving",
+      "name": "Veil of the Unliving (Zaal)",
       "ids": [
-        4752520
+        5064067
       ],
       "category": "#T3.5",
       "type": "debuff"
     },
     {
-      "name": "Zaal's Ruin",
+      "name": "Zaal's Ruin (Zaal)",
       "ids": [
         4836738
       ],
@@ -148,7 +148,7 @@
       "type": "debuff"
     },
     {
-      "name": "Zaal's Torment",
+      "name": "Zaal's Torment (Zaal)",
       "ids": [
         4836739
       ],
@@ -156,7 +156,7 @@
       "type": "debuff"
     },
     {
-      "name": "Acid Decay",
+      "name": "Acid Decay (Basilisk)",
       "ids": [
         4383191
       ],
@@ -164,7 +164,7 @@
       "type": "debuff"
     },
     {
-      "name": "Aflame",
+      "name": "Aflame (Sheng)",
       "ids": [
         4357732
       ],
@@ -172,7 +172,7 @@
       "type": "debuff"
     },
     {
-      "name": "Broken Armor Ruin",
+      "name": "Broken Armor Ruin (T4 adds)",
       "ids": [
         4552633
       ],
@@ -180,7 +180,7 @@
       "type": "debuff"
     },
     {
-      "name": "Crushed Armor Wrack",
+      "name": "Crushed Armor Wrack (T4 adds)",
       "ids": [
         4553214
       ],
@@ -196,7 +196,7 @@
       "type": "debuff"
     },
     {
-      "name": "Open Wound Wrack",
+      "name": "Open Wound Wrack (T4 adds)",
       "ids": [
         4552666
       ],
@@ -204,7 +204,7 @@
       "type": "debuff"
     },
     {
-      "name": "Petrify",
+      "name": "Petrify (Basilisk)",
       "ids": [
         5064063
       ],
@@ -212,7 +212,7 @@
       "type": "debuff"
     },
     {
-      "name": "Predatory Torment",
+      "name": "Predatory Torment (T4 adds)",
       "ids": [
         4857503
       ],
@@ -220,7 +220,7 @@
       "type": "debuff"
     },
     {
-      "name": "Shackles",
+      "name": "Shackles (Basilisk)",
       "ids": [
         4857484
       ],
@@ -228,7 +228,7 @@
       "type": "debuff"
     },
     {
-      "name": "Shimmering Armor Shield",
+      "name": "Shimmering Armor Shield (Basilisk)",
       "ids": [
         4380771
       ],
@@ -236,7 +236,7 @@
       "type": "buff"
     },
     {
-      "name": "Tainted Blood",
+      "name": "Tainted Blood (Basilisk)",
       "ids": [
         4383111
       ],
@@ -244,7 +244,7 @@
       "type": "debuff"
     },
     {
-      "name": "Beautiful Death",
+      "name": "Beautiful Death (Kyllikki)",
       "ids": [
         5014940
       ],
@@ -252,7 +252,7 @@
       "type": "debuff"
     },
     {
-      "name": "Broodcall",
+      "name": "Broodcall (Yakhmar)",
       "ids": [
         5016429
       ],
@@ -260,7 +260,7 @@
       "type": "debuff"
     },
     {
-      "name": "Deep Freeze",
+      "name": "Deep Freeze (Kyllikki)",
       "ids": [
         5015019
       ],
@@ -268,7 +268,7 @@
       "type": "debuff"
     },
     {
-      "name": "Rake",
+      "name": "Rake (Vistrix)",
       "ids": [
         5016796
       ],
@@ -276,7 +276,7 @@
       "type": "debuff"
     },
     {
-      "name": "Snow and Sorrow",
+      "name": "Snow and Sorrow (Kyllikki)",
       "ids": [
         5014916
       ],
@@ -284,7 +284,7 @@
       "type": "debuff"
     },
     {
-      "name": "They Hunger",
+      "name": "They Hunger (Yakhmar)",
       "ids": [
         5016222
       ],
@@ -292,7 +292,7 @@
       "type": "debuff"
     },
     {
-      "name": "Time Fades Away",
+      "name": "Time Fades Away (Kyllikki)",
       "ids": [
         5015024
       ],
@@ -460,12 +460,12 @@
       "type": "debuff"
     },
     {
-      "name": "Affected by Knockback",
+      "name": "Affected by Knockback (Self Debuff)",
       "ids": [
         1094673
       ],
       "category": "#Resistances",
-      "type": "buff"
+      "type": "debuff"
     },
     {
       "name": "Celestial Boon",
@@ -529,7 +529,7 @@
       "type": "buff"
     },
     {
-      "name": "Forced Engage (dur)",
+      "name": "Forced Engage (duration)",
       "ids": [
         4325954
       ],
@@ -758,7 +758,7 @@
       "type": "misc"
     },
     {
-      "name": "Cover of Dusk",
+      "name": "Cover of Dusk (Sin)",
       "ids": [
         4484855
       ],
@@ -941,7 +941,7 @@
       "type": "misc"
     },
     {
-      "name": "Thirst For Blood 1-5",
+      "name": "Thirst For Blood 1-5 (Barb)",
       "ids": [
         1095374,
         1095375,
@@ -968,7 +968,7 @@
         154775,
         151040
       ],
-      "category": "#Group Buffs",
+      "category": "#Group HoT",
       "type": "misc"
     },
     {
@@ -996,11 +996,11 @@
       "type": "buff"
     },
     {
-      "name": "Hibernation",
+      "name": "Hibernation (Self Debuff)",
       "ids": [
         5015761
       ],
-      "category": "#Group Buffs",
+      "category": "#Resistances",
       "type": "debuff"
     },
     {
@@ -1012,14 +1012,22 @@
       "type": "debuff"
     },
     {
-      "name": "Nature's Wrath 10",
+      "name": "Nature's Wrath 1-10",
       "ids": [
+        1126047,
+        1126048,
+        1126049,
+        1126050,
+        1126051,
+        1126052,
+        1126053,
+        1126054,
+        1126055,
         1126056
       ],
       "category": "Bear Shaman",
       "type": "buff",
       "stacking": true,
-      "partialList": true,
       "stackStart": 10
     },
     {
@@ -1027,11 +1035,11 @@
       "ids": [
         143746
       ],
-      "category": "#Group Buffs",
+      "category": "#Group HoT",
       "type": "misc"
     },
     {
-      "name": "Rune of Aggression",
+      "name": "Rune of Aggression (BS)",
       "ids": [
         1126136,
         1126135
@@ -1040,7 +1048,7 @@
       "type": "buff"
     },
     {
-      "name": "Rune of Resilience",
+      "name": "Rune of Resilience (BS)",
       "ids": [
         146124,
         146091
@@ -1049,7 +1057,7 @@
       "type": "buff"
     },
     {
-      "name": "Rune of Resistance",
+      "name": "Rune of Resistance (BS)",
       "ids": [
         146103,
         145828
@@ -1108,11 +1116,10 @@
       ],
       "category": "Conqueror",
       "type": "buff",
-      "stacking": true,
-      "stackEnd": 10
+      "stacking": true
     },
     {
-      "name": "Heroic Call",
+      "name": "Heroic Call (Conq)",
       "ids": [
         3301829
       ],
@@ -1218,7 +1225,7 @@
       "ids": [
         4047227
       ],
-      "category": "#Group Buffs",
+      "category": "#Group HoT",
       "type": "misc"
     },
     {
@@ -1251,7 +1258,7 @@
       "type": "buff"
     },
     {
-      "name": "Mystic Suppression",
+      "name": "Mystic Suppression (Demo)",
       "ids": [
         145782,
         145762
@@ -1268,7 +1275,7 @@
       "type": "misc"
     },
     {
-      "name": "Unholy Hate",
+      "name": "Unholy Hate (Demo)",
       "ids": [
         1142219
       ],
@@ -1276,7 +1283,7 @@
       "type": "buff"
     },
     {
-      "name": "Battle Cry",
+      "name": "Battle Cry (Guard)",
       "ids": [
         872832
       ],
@@ -1292,7 +1299,7 @@
       "type": "buff"
     },
     {
-      "name": "Call to Arms",
+      "name": "Call to Arms (Guard)",
       "ids": [
         4720807,
         872995
@@ -1385,7 +1392,7 @@
       "stacking": true
     },
     {
-      "name": "Arcane Abatement",
+      "name": "Arcane Abatement (HoX)",
       "ids": [
         145790,
         145771
@@ -1471,7 +1478,7 @@
       "ids": [
         5015893
       ],
-      "category": "#Group Buffs",
+      "category": "#Group HoT",
       "type": "misc"
     },
     {
@@ -1492,7 +1499,7 @@
       "type": "debuff"
     },
     {
-      "name": "Ghoulish Feast",
+      "name": "Ghoulish Feast (Necro)",
       "ids": [
         222635,
         222638
@@ -1509,7 +1516,7 @@
       "type": "buff"
     },
     {
-      "name": "Quell the Ether",
+      "name": "Quell the Ether (Necro)",
       "ids": [
         145626,
         145778
@@ -1562,8 +1569,8 @@
       "ids": [
         144105
       ],
-      "category": "Priest of Mitra",
-      "type": "buff"
+      "category": "#Group HoT",
+      "type": "misc"
     },
     {
       "name": "Eye of Judgment (Fear)",
@@ -1574,7 +1581,7 @@
       "type": "misc"
     },
     {
-      "name": "Holy Cleansing",
+      "name": "Holy Cleansing (PoM)",
       "ids": [
         3202863
       ],
@@ -1599,11 +1606,11 @@
       "type": "buff"
     },
     {
-      "name": "Radiant Glow",
+      "name": "Radiant Glow (Self Debuff)",
       "ids": [
         5015755
       ],
-      "category": "#Group Buffs",
+      "category": "#Resistances",
       "type": "debuff"
     },
     {
@@ -1620,7 +1627,7 @@
         154750,
         150672
       ],
-      "category": "#Group Buffs",
+      "category": "#Group HoT",
       "type": "misc"
     },
     {
@@ -1688,7 +1695,7 @@
       "type": "debuff"
     },
     {
-      "name": "Marked Target 1-5",
+      "name": "Marked Target 1-5 (Ranger)",
       "ids": [
         3181396,
         3181401,
@@ -1745,7 +1752,7 @@
       "type": "debuff"
     },
     {
-      "name": "Damnation of Set",
+      "name": "Damnation of Set (ToS)",
       "ids": [
         146099,
         145802
@@ -1754,11 +1761,11 @@
       "type": "buff"
     },
     {
-      "name": "Energized Soul",
+      "name": "Energized Soul (Self Debuff)",
       "ids": [
         5015762
       ],
-      "category": "#Group Buffs",
+      "category": "#Resistances",
       "type": "debuff"
     },
     {
@@ -1770,7 +1777,7 @@
       "type": "misc"
     },
     {
-      "name": "Force of Lightning",
+      "name": "Force of Lightning (ToS)",
       "ids": [
         4053112,
         3105976
@@ -1779,7 +1786,7 @@
       "type": "buff"
     },
     {
-      "name": "Glorification of Set",
+      "name": "Glorification of Set (ToS)",
       "ids": [
         146122,
         146089
@@ -1792,7 +1799,7 @@
       "ids": [
         143948
       ],
-      "category": "#Group Buffs",
+      "category": "#Group HoT",
       "type": "misc"
     },
     {
@@ -1801,7 +1808,7 @@
         154770,
         151030
       ],
-      "category": "#Group Buffs",
+      "category": "#Group HoT",
       "type": "misc"
     },
     {
@@ -1840,7 +1847,7 @@
       "type": "misc"
     },
     {
-      "name": "Rampaging Horde",
+      "name": "Rampaging Horde (Barb)",
       "ids": [
         4106958
       ],
@@ -1856,7 +1863,7 @@
       "type": "buff"
     },
     {
-      "name": "Thirst For Blood 1-6",
+      "name": "Thirst For Blood 1-6 (Barb)",
       "ids": [
         1095379,
         1095380,
@@ -1946,7 +1953,7 @@
       "stackEnd": 10
     },
     {
-      "name": "Vision of the Sky",
+      "name": "Vision of the Sky (BS)",
       "ids": [
         4240082
       ],
@@ -1988,7 +1995,7 @@
       "type": "buff"
     },
     {
-      "name": "Savage Fury",
+      "name": "Savage Fury (Barb)",
       "ids": [
         1093577,
         1093579
@@ -2281,7 +2288,7 @@
       "type": "buff"
     },
     {
-      "name": "A Soul for our Feast",
+      "name": "A Soul for our Feast (DT)",
       "ids": [
         3115474,
         150360,
@@ -2370,7 +2377,7 @@
       "type": "buff"
     },
     {
-      "name": "Litany of Protection",
+      "name": "Litany of Protection (PoM)",
       "ids": [
         4922964,
         4245371
@@ -2660,10 +2667,9 @@
       "type": "misc"
     },
     {
-      "name": "Spirit of Yggdrasil",
+      "name": "Spirit of Yggdrasil (BS)",
       "ids": [
-        4239993,
-        4281885
+        4239993
       ],
       "category": "#Group Buffs",
       "type": "buff"
@@ -2673,7 +2679,7 @@
       "ids": [
         143626
       ],
-      "category": "#Group Buffs",
+      "category": "#Group HoT",
       "type": "misc"
     },
     {
@@ -2784,12 +2790,12 @@
       "type": "buff"
     },
     {
-      "name": "Exhilarating Martyrdom",
+      "name": "Exhilarating Martyrdom (DT)",
       "ids": [
         792484
       ],
       "category": "#Group Buffs",
-      "type": "misc"
+      "type": "buff"
     },
     {
       "name": "Lumbering Hulk",
@@ -2800,7 +2806,7 @@
       "type": "buff"
     },
     {
-      "name": "Emissary of Elysium",
+      "name": "Emissary of Elysium (PoM)",
       "ids": [
         4244612
       ],
@@ -2808,7 +2814,7 @@
       "type": "buff"
     },
     {
-      "name": "Eyes of Set",
+      "name": "Eyes of Set (ToS)",
       "ids": [
         4471707
       ],
@@ -2816,7 +2822,7 @@
       "type": "buff"
     },
     {
-      "name": "Storm Charge",
+      "name": "Storm Charge (ToS)",
       "ids": [
         3105981
       ],
@@ -2824,7 +2830,7 @@
       "type": "buff"
     },
     {
-      "name": "Blood Mana",
+      "name": "Blood Mana (ToS)",
       "ids": [
         4053117
       ],
@@ -2832,7 +2838,7 @@
       "type": "buff"
     },
     {
-      "name": "Demonic Anger",
+      "name": "Demonic Anger (Demo)",
       "ids": [
         1136440
       ],
@@ -2840,7 +2846,7 @@
       "type": "buff"
     },
     {
-      "name": "Pollen Cloud",
+      "name": "Pollen Cloud (Imp)",
       "ids": [
         4680545
       ],
@@ -2974,6 +2980,228 @@
       ],
       "category": "#Group Buffs",
       "type": "buff"
+    },
+    {
+      "name": "Heart of Fire 1-4 (Vistrix)",
+      "ids": [
+        5016774,
+        5016775,
+        5016776,
+        5016777
+      ],
+      "category": "#T5",
+      "type": "debuff",
+      "stacking": true
+    },
+    {
+      "name": "Cleave of the Northern Wastes (Kyllikki)",
+      "ids": [
+        5014929
+      ],
+      "category": "#T5",
+      "type": "buff"
+    },
+    {
+      "name": "Blades of the Dark Sun (Kyllikki)",
+      "ids": [
+        5014930
+      ],
+      "category": "#T5",
+      "type": "buff"
+    },
+    {
+      "name": "Fury of the Sleeping Stars (Kyllikki)",
+      "ids": [
+        5014931
+      ],
+      "category": "#T5",
+      "type": "buff"
+    },
+    {
+      "name": "Wail of Madness (Cetriss)",
+      "ids": [
+        5052584
+      ],
+      "category": "#T6",
+      "type": "misc"
+    },
+    {
+      "name": "Recently healed by Shimmering Invocation (Self Debuff)",
+      "ids": [
+        4383426
+      ],
+      "category": "#Resistances",
+      "type": "debuff"
+    },
+    {
+      "name": "Blessing of the Pure (PoM)",
+      "ids": [
+        4245897,
+        4245898,
+        4245899,
+        4245900,
+        4245901,
+        4245902,
+        4245903,
+        4245904,
+        4245905,
+        4245906
+      ],
+      "category": "#Group Buffs",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Flurry of Blows",
+      "ids": [
+        3085809
+      ],
+      "category": "Assassin",
+      "type": "buff"
+    },
+    {
+      "name": "Kidney Shots 1-5",
+      "ids": [
+        3094558,
+        3094555,
+        3094556,
+        3094559,
+        3094560
+      ],
+      "category": "Assassin",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Dance of Death",
+      "ids": [
+        4485334
+      ],
+      "category": "Assassin",
+      "type": "debuff"
+    },
+    {
+      "name": "Consume (HathorKa)",
+      "ids": [
+        4206340
+      ],
+      "category": "#T3",
+      "type": "buff"
+    },
+    {
+      "name": "Blood Draw (Arbanus)",
+      "ids": [
+        4261544
+      ],
+      "category": "#T3",
+      "type": "debuff"
+    },
+    {
+      "name": "Grim Bane (Arbanus)",
+      "ids": [
+        4189297
+      ],
+      "category": "#T3",
+      "type": "debuff"
+    },
+    {
+      "name": "Tartaros Vapors (Vistrix)",
+      "ids": [
+        5016792
+      ],
+      "category": "#T5",
+      "type": "debuff"
+    },
+    {
+      "name": "Frostbite (Honorguard)",
+      "ids": [
+        5014715
+      ],
+      "category": "#T5",
+      "type": "debuff"
+    },
+    {
+      "name": "Rage Implosion (Honorguard)",
+      "ids": [
+        5014799
+      ],
+      "category": "#T5",
+      "type": "debuff"
+    },
+    {
+      "name": "Focus of the Sadist (Honorguard)",
+      "ids": [
+        5014791
+      ],
+      "category": "#T5",
+      "type": "debuff"
+    },
+    {
+      "name": "Endless Winter 1-3 (Honorguard)",
+      "ids": [
+        5014753,
+        5014754,
+        5014755
+      ],
+      "category": "#T5",
+      "type": "debuff",
+      "stacking": true
+    },
+    {
+      "name": "Sickness (Zodiac)",
+      "ids": [
+        4704427
+      ],
+      "category": "#T4",
+      "type": "debuff"
+    },
+    {
+      "name": "Withering (Zodiac)",
+      "ids": [
+        4704872
+      ],
+      "category": "#T4",
+      "type": "debuff"
+    },
+    {
+      "name": "Mortal Affliction (Emperor)",
+      "ids": [
+        4701862
+      ],
+      "category": "#T4",
+      "type": "debuff"
+    },
+    {
+      "name": "Aflame Cleanse (Sheng)",
+      "ids": [
+        4414104
+      ],
+      "category": "#T4",
+      "type": "misc"
+    },
+    {
+      "name": "Targetted Strikes (Sheng)",
+      "ids": [
+        4357818
+      ],
+      "category": "#T4",
+      "type": "debuff"
+    },
+    {
+      "name": "Acid Bite (Basilisk)",
+      "ids": [
+        4383121
+      ],
+      "category": "#T4",
+      "type": "debuff"
+    },
+    {
+      "name": "Wail of Chaos (Cetriss)",
+      "ids": [
+        5052580
+      ],
+      "category": "#T6",
+      "type": "misc"
     }
   ]
 }
