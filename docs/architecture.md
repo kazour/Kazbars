@@ -1,6 +1,6 @@
 # Architectural Map
 
-**Current as of:** 2026-04-25
+**Current as of:** 2026-04-25 (file sizes refreshed after popup-shell + spin-helper extraction)
 **Purpose:** Module topology, dependencies, and coupling hotspots. Updated alongside code changes — if you edit this file, commit it with the code. `CLAUDE.md` has the short version; this file has the detail that doesn't fit there.
 
 ## Dependency clusters
@@ -96,10 +96,10 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 
 | File | Lines | Role |
 |---|---:|---|
-| `Modules/grids_panel.py` | 1136 | Grid list UI, grid management |
-| `Modules/build_loading.py` | 914 | Build-progress screen + welcome/about popups |
-| `Modules/database_editor.py` | 891 | Buff DB CRUD, search, filtering |
-| `Modules/grid_dialogs.py` | 742 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
+| `Modules/grids_panel.py` | 1128 | Grid list UI, grid management |
+| `Modules/build_loading.py` | 796 | Build-progress screen + welcome/about popups |
+| `Modules/database_editor.py` | 888 | Buff DB CRUD, search, filtering |
+| `Modules/grid_dialogs.py` | 743 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
 | `kzgrids.py` | 621 | Entry point + `KzGridsApp` root window (widgets, menu, lifecycle) |
 | `Modules/ui_widgets.py` | 510 | Widget builders, tooltips, bindings, `CollapsibleSection`, `blend_alpha` |
 | `Modules/live_tracker_panel.py` | 489 | Live Tracker Toplevel orchestrator |

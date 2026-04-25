@@ -313,19 +313,16 @@ class BuffEditDialog(tk.Toplevel):
         return ids, rejected
 
     def _on_stacking_changed(self):
-        if self.stacking_var.get():
-            self.partial_label.grid()
-            self.partial_frame.grid()
+        on = self.stacking_var.get()
+        method = 'grid' if on else 'grid_remove'
+        for w in (self.partial_label, self.partial_frame,
+                  self.start_label, self.stack_start_frame):
+            getattr(w, method)()
+        if on:
             self.partial_frame.winfo_children()[0].configure(state='normal')
-            self.start_label.grid()
-            self.stack_start_frame.grid()
             self.stack_start_spin.configure(state='normal')
             self._on_partial_changed()
         else:
-            self.partial_label.grid_remove()
-            self.partial_frame.grid_remove()
-            self.start_label.grid_remove()
-            self.stack_start_frame.grid_remove()
             self.end_label.grid_remove()
             self.stack_end_frame.grid_remove()
 

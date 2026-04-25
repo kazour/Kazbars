@@ -38,14 +38,15 @@ SCANLINE_STEP = 3
 _ACCENT = MODULE_COLORS['grids']
 
 
-def show_close_game_required_dialog(parent, process_name="the game"):
-    """Show a close-only modal: the running game process must be closed before build.
+# ============================================================================
+# SHARED POPUP HELPERS
+# ============================================================================
 
-    No return value — caller always aborts the build. The user closes the
-    popup, closes the game, and clicks Build & Install again.
+def _make_popup_shell(parent, height):
+    """Create a frameless dark Toplevel + canvas with KAZ GRIDS chrome.
 
-    process_name is the actual running exe (Aoc.exe / AgeOfConan.exe /
-    AgeOfConanDX10.exe) detected by build_executor.get_running_game_process.
+    Returns (popup, canvas). Caller handles sizing/centering, focus, grab,
+    and showing (deiconify).
     """
     popup = tk.Toplevel(parent)
     popup.withdraw()
@@ -57,19 +58,83 @@ def show_close_game_required_dialog(parent, process_name="the game"):
     # -topmost keeps this modal reliably above the main window
     popup.attributes('-topmost', True)
 
-    h = 250
-    canvas = tk.Canvas(popup, width=WIDTH, height=h, bg=BG, highlightthickness=0)
+    canvas = tk.Canvas(popup, width=WIDTH, height=height, bg=BG, highlightthickness=0)
     canvas.pack(fill='both', expand=True)
 
     # Border + CRT scanlines
-    canvas.create_rectangle(1, 1, WIDTH - 1, h - 1, outline=BORDER_COLOR, width=1)
+    canvas.create_rectangle(1, 1, WIDTH - 1, height - 1, outline=BORDER_COLOR, width=1)
     scanline_color = blend_alpha('#000000', BG, SCANLINE_ALPHA)
-    for sy in range(0, h, SCANLINE_STEP):
+    for sy in range(0, height, SCANLINE_STEP):
         canvas.create_line(2, sy, WIDTH - 2, sy, fill=scanline_color)
 
     # Title
-    canvas.create_text(WIDTH // 2, 32, text='\u300c KAZ GRIDS \u300d',
+    canvas.create_text(WIDTH // 2, 32, text='「 KAZ GRIDS 」',
                        font=FONT_HEADING, fill=THEME_COLORS['accent'])
+
+    return popup, canvas
+
+
+def _draw_close_button(popup, canvas, btn_y, on_close=None):
+    """Draw a styled Close button at btn_y with hover/click hit-test.
+
+    Also binds Escape/Return on popup. on_close defaults to popup.destroy.
+    Returns btn_y + btn_h for layout chaining.
+    """
+    if on_close is None:
+        on_close = popup.destroy
+    btn_w, btn_h = 100, 32
+    btn_x = (WIDTH - btn_w) // 2
+
+    glow_color = blend_alpha(THEME_COLORS['accent'], BG, 30)
+    canvas.create_rectangle(btn_x - 2, btn_y - 2, btn_x + btn_w + 2, btn_y + btn_h + 2,
+                            fill=glow_color, outline='')
+    btn_rect = canvas.create_rectangle(btn_x, btn_y, btn_x + btn_w, btn_y + btn_h,
+                                       fill=BG, outline=THEME_COLORS['accent'], width=1)
+    btn_text = canvas.create_text(btn_x + btn_w // 2, btn_y + btn_h // 2,
+                                  text="Close", font=FONT_SECTION,
+                                  fill=THEME_COLORS['accent'])
+
+    def _in_btn(x, y):
+        return btn_x <= x <= btn_x + btn_w and btn_y <= y <= btn_y + btn_h
+
+    def on_motion(e):
+        if _in_btn(e.x, e.y):
+            canvas.itemconfig(btn_rect, fill=THEME_COLORS['accent'])
+            canvas.itemconfig(btn_text, fill=BG)
+        else:
+            canvas.itemconfig(btn_rect, fill=BG)
+            canvas.itemconfig(btn_text, fill=THEME_COLORS['accent'])
+
+    def on_click(e):
+        if _in_btn(e.x, e.y):
+            on_close()
+
+    canvas.bind('<Motion>', on_motion)
+    canvas.bind('<Button-1>', on_click)
+    popup.bind('<Escape>', lambda e: on_close())
+    popup.bind('<Return>', lambda e: on_close())
+    return btn_y + btn_h
+
+
+def _center_popup(popup, parent, height):
+    """Center popup at (WIDTH, height) on parent."""
+    popup.update_idletasks()
+    px, py = parent.winfo_x(), parent.winfo_y()
+    pw, ph = parent.winfo_width(), parent.winfo_height()
+    popup.geometry(f"{WIDTH}x{height}+{px + (pw - WIDTH) // 2}+{py + (ph - height) // 2}")
+
+
+def show_close_game_required_dialog(parent, process_name="the game"):
+    """Show a close-only modal: the running game process must be closed before build.
+
+    No return value — caller always aborts the build. The user closes the
+    popup, closes the game, and clicks Build & Install again.
+
+    process_name is the actual running exe (Aoc.exe / AgeOfConan.exe /
+    AgeOfConanDX10.exe) detected by build_executor.get_running_game_process.
+    """
+    h = 250
+    popup, canvas = _make_popup_shell(parent, h)
 
     # Warning icon with glow
     warn_color = THEME_COLORS['warning']
@@ -92,47 +157,8 @@ def show_close_game_required_dialog(parent, process_name="the game"):
                        text="One-time only — future builds work with the game open",
                        font=FONT_SMALL, fill=THEME_COLORS['success'])
 
-    # Single Close button (centered)
-    btn_y = icon_y + 112
-    btn_w, btn_h = 100, 32
-    btn_x = (WIDTH - btn_w) // 2
-
-    glow_color = blend_alpha(THEME_COLORS['accent'], BG, 30)
-    canvas.create_rectangle(
-        btn_x - 2, btn_y - 2, btn_x + btn_w + 2, btn_y + btn_h + 2,
-        fill=glow_color, outline='', tags='close')
-    btn_rect = canvas.create_rectangle(
-        btn_x, btn_y, btn_x + btn_w, btn_y + btn_h,
-        fill=BG, outline=THEME_COLORS['accent'], width=1, tags='close')
-    btn_text = canvas.create_text(
-        btn_x + btn_w // 2, btn_y + btn_h // 2,
-        text="Close", font=FONT_SECTION, fill=THEME_COLORS['accent'], tags='close')
-
-    def _in_btn(x, y):
-        return btn_x <= x <= btn_x + btn_w and btn_y <= y <= btn_y + btn_h
-
-    def on_motion(e):
-        if _in_btn(e.x, e.y):
-            canvas.itemconfig(btn_rect, fill=THEME_COLORS['accent'])
-            canvas.itemconfig(btn_text, fill=BG)
-        else:
-            canvas.itemconfig(btn_rect, fill=BG)
-            canvas.itemconfig(btn_text, fill=THEME_COLORS['accent'])
-
-    def on_click(e):
-        if _in_btn(e.x, e.y):
-            popup.destroy()
-
-    canvas.bind('<Motion>', on_motion)
-    canvas.bind('<Button-1>', on_click)
-    popup.bind('<Escape>', lambda e: popup.destroy())
-    popup.bind('<Return>', lambda e: popup.destroy())
-
-    # Center on parent
-    popup.update_idletasks()
-    px, py = parent.winfo_x(), parent.winfo_y()
-    pw, ph = parent.winfo_width(), parent.winfo_height()
-    popup.geometry(f"{WIDTH}x{h}+{px + (pw - WIDTH) // 2}+{py + (ph - h) // 2}")
+    _draw_close_button(popup, canvas, icon_y + 112)
+    _center_popup(popup, parent, h)
     popup.deiconify()
     popup.grab_set()
     popup.focus_set()
@@ -165,28 +191,7 @@ def show_welcome_popup(parent, grid_count, enabled_count,
     btn_h = 32
     h = btn_y + btn_h + 16
 
-    popup = tk.Toplevel(parent)
-    popup.withdraw()
-    popup.overrideredirect(True)
-    popup.transient(parent)
-    popup.resizable(False, False)
-    popup.configure(bg=BG)
-    # overrideredirect popups can sink behind the parent on alt-tab;
-    # -topmost keeps this modal reliably above the main window
-    popup.attributes('-topmost', True)
-
-    canvas = tk.Canvas(popup, width=WIDTH, height=h, bg=BG, highlightthickness=0)
-    canvas.pack(fill='both', expand=True)
-
-    # Border + CRT scanlines
-    canvas.create_rectangle(1, 1, WIDTH - 1, h - 1, outline=BORDER_COLOR, width=1)
-    scanline_color = blend_alpha('#000000', BG, SCANLINE_ALPHA)
-    for sy in range(0, h, SCANLINE_STEP):
-        canvas.create_line(2, sy, WIDTH - 2, sy, fill=scanline_color)
-
-    # Title
-    canvas.create_text(WIDTH // 2, 32, text='\u300c KAZ GRIDS \u300d',
-                       font=FONT_HEADING, fill=THEME_COLORS['accent'])
+    popup, canvas = _make_popup_shell(parent, h)
 
     # Status icon with glow
     status_color = THEME_COLORS['success']
@@ -233,44 +238,8 @@ def show_welcome_popup(parent, grid_count, enabled_count,
     canvas.create_text(_x0 + _font.measure(_prefix), y, text=_accent, anchor='w',
                        font=FONT_SMALL, fill=THEME_COLORS['success'])
 
-    # Close button — use hit-test on canvas click for reliable detection
-    btn_w = 100
-    btn_x = (WIDTH - btn_w) // 2
-    glow_color = blend_alpha(THEME_COLORS['accent'], BG, 30)
-    canvas.create_rectangle(btn_x - 2, btn_y - 2, btn_x + btn_w + 2, btn_y + btn_h + 2,
-                            fill=glow_color, outline='', tags='btn')
-    canvas.create_rectangle(btn_x, btn_y, btn_x + btn_w, btn_y + btn_h,
-                            fill=BG, outline=THEME_COLORS['accent'], width=1, tags='btn')
-    canvas.create_text(btn_x + btn_w // 2, btn_y + btn_h // 2,
-                       text="Close", font=FONT_SECTION,
-                       fill=THEME_COLORS['accent'], tags='btn')
-
-    def _in_btn(x, y):
-        return btn_x <= x <= btn_x + btn_w and btn_y <= y <= btn_y + btn_h
-
-    def on_motion(e):
-        items = canvas.find_withtag('btn')
-        if _in_btn(e.x, e.y):
-            canvas.itemconfig(items[1], fill=THEME_COLORS['accent'])
-            canvas.itemconfig(items[2], fill=BG)
-        else:
-            canvas.itemconfig(items[1], fill=BG)
-            canvas.itemconfig(items[2], fill=THEME_COLORS['accent'])
-
-    def on_click(e):
-        if _in_btn(e.x, e.y):
-            popup.destroy()
-
-    canvas.bind('<Motion>', on_motion)
-    canvas.bind('<Button-1>', on_click)
-    popup.bind('<Escape>', lambda e: popup.destroy())
-    popup.bind('<Return>', lambda e: popup.destroy())
-
-    # Center on parent
-    popup.update_idletasks()
-    px, py = parent.winfo_x(), parent.winfo_y()
-    pw, ph = parent.winfo_width(), parent.winfo_height()
-    popup.geometry(f"{WIDTH}x{h}+{px + (pw - WIDTH) // 2}+{py + (ph - h) // 2}")
+    _draw_close_button(popup, canvas, btn_y)
+    _center_popup(popup, parent, h)
     popup.deiconify()
     popup.focus_set()
 
@@ -285,28 +254,7 @@ def show_about_popup(parent, app_name, app_version):
     """
     h = 322 if GITHUB_URL else 300
 
-    popup = tk.Toplevel(parent)
-    popup.withdraw()
-    popup.overrideredirect(True)
-    popup.transient(parent)
-    popup.resizable(False, False)
-    popup.configure(bg=BG)
-    # overrideredirect popups can sink behind the parent on alt-tab;
-    # -topmost keeps this modal reliably above the main window
-    popup.attributes('-topmost', True)
-
-    canvas = tk.Canvas(popup, width=WIDTH, height=h, bg=BG, highlightthickness=0)
-    canvas.pack(fill='both', expand=True)
-
-    # Border + CRT scanlines
-    canvas.create_rectangle(1, 1, WIDTH - 1, h - 1, outline=BORDER_COLOR, width=1)
-    scanline_color = blend_alpha('#000000', BG, SCANLINE_ALPHA)
-    for sy in range(0, h, SCANLINE_STEP):
-        canvas.create_line(2, sy, WIDTH - 2, sy, fill=scanline_color)
-
-    # Title
-    canvas.create_text(WIDTH // 2, 32, text='\u300c KAZ GRIDS \u300d',
-                       font=FONT_HEADING, fill=THEME_COLORS['accent'])
+    popup, canvas = _make_popup_shell(parent, h)
 
     # Separator
     sep_y = 60
@@ -388,19 +336,6 @@ def show_about_popup(parent, app_name, app_version):
 
     scene_bottom = scene_y + rows * cell_w + (rows - 1) * cell_gap
 
-    # Close button
-    btn_y = scene_bottom + 20
-    btn_w, btn_h = 100, 32
-    btn_x = (WIDTH - btn_w) // 2
-    glow_color = blend_alpha(THEME_COLORS['accent'], BG, 30)
-    canvas.create_rectangle(btn_x - 2, btn_y - 2, btn_x + btn_w + 2, btn_y + btn_h + 2,
-                            fill=glow_color, outline='', tags='btn')
-    canvas.create_rectangle(btn_x, btn_y, btn_x + btn_w, btn_y + btn_h,
-                            fill=BG, outline=THEME_COLORS['accent'], width=1, tags='btn')
-    canvas.create_text(btn_x + btn_w // 2, btn_y + btn_h // 2,
-                       text="Close", font=FONT_SECTION,
-                       fill=THEME_COLORS['accent'], tags='btn')
-
     # Animation — traveling pulse across the grid
     state = {'running': True, 'after_id': None}
     start_time = time.time()
@@ -420,18 +355,6 @@ def show_about_popup(parent, app_name, app_version):
         except tk.TclError:
             pass
 
-    def _in_btn(x, y):
-        return btn_x <= x <= btn_x + btn_w and btn_y <= y <= btn_y + btn_h
-
-    def on_motion(e):
-        items = canvas.find_withtag('btn')
-        if _in_btn(e.x, e.y):
-            canvas.itemconfig(items[1], fill=THEME_COLORS['accent'])
-            canvas.itemconfig(items[2], fill=BG)
-        else:
-            canvas.itemconfig(items[1], fill=BG)
-            canvas.itemconfig(items[2], fill=THEME_COLORS['accent'])
-
     def close():
         state['running'] = False
         if state['after_id'] is not None:
@@ -441,21 +364,9 @@ def show_about_popup(parent, app_name, app_version):
                 pass
         popup.destroy()
 
-    def on_click(e):
-        if _in_btn(e.x, e.y):
-            close()
-
-    canvas.bind('<Motion>', on_motion)
-    canvas.bind('<Button-1>', on_click)
-    popup.bind('<Escape>', lambda e: close())
-    popup.bind('<Return>', lambda e: close())
+    _draw_close_button(popup, canvas, scene_bottom + 20, on_close=close)
     popup.protocol("WM_DELETE_WINDOW", close)
-
-    # Center on parent
-    popup.update_idletasks()
-    px, py = parent.winfo_x(), parent.winfo_y()
-    pw, ph = parent.winfo_width(), parent.winfo_height()
-    popup.geometry(f"{WIDTH}x{h}+{px + (pw - WIDTH) // 2}+{py + (ph - h) // 2}")
+    _center_popup(popup, parent, h)
     popup.deiconify()
     popup.focus_set()
     animate()
@@ -700,8 +611,6 @@ class BuildLoadingScreen(tk.Toplevel):
         self._build_summary_ui(client_results, compile_result, profile_name,
                                aoc_installed, aoc_running)
 
-        self.bind('<Escape>', lambda e: self.destroy())
-        self.bind('<Return>', lambda e: self.destroy())
         self.lift()
         self.focus_set()
 
@@ -861,37 +770,10 @@ class BuildLoadingScreen(tk.Toplevel):
             y += 16
 
         # Close button — positioned after content, then resize to fit
-        btn_y = y + 16
-        btn_w, btn_h = 100, 32
-        btn_x = (WIDTH - btn_w) // 2
-
-        glow_color = blend_alpha(THEME_COLORS['accent'], BG, 30)
-        canvas.create_rectangle(btn_x - 2, btn_y - 2, btn_x + btn_w + 2, btn_y + btn_h + 2,
-                                  fill=glow_color, outline='')
-        btn_rect = canvas.create_rectangle(btn_x, btn_y, btn_x + btn_w, btn_y + btn_h,
-                                            fill=BG, outline=THEME_COLORS['accent'], width=1)
-        btn_text = canvas.create_text(btn_x + btn_w // 2, btn_y + btn_h // 2,
-                                       text="Close", font=FONT_SECTION,
-                                       fill=THEME_COLORS['accent'])
-
-        def on_enter(e):
-            canvas.itemconfig(btn_rect, fill=THEME_COLORS['accent'])
-            canvas.itemconfig(btn_text, fill=BG)
-
-        def on_leave(e):
-            canvas.itemconfig(btn_rect, fill=BG)
-            canvas.itemconfig(btn_text, fill=THEME_COLORS['accent'])
-
-        def on_click(e):
-            self.destroy()
-
-        for tag in (btn_rect, btn_text):
-            canvas.tag_bind(tag, '<Enter>', on_enter)
-            canvas.tag_bind(tag, '<Leave>', on_leave)
-            canvas.tag_bind(tag, '<Button-1>', on_click)
+        btn_bottom = _draw_close_button(self, canvas, y + 16)
 
         # Resize canvas and window to fit actual content
-        final_height = max(btn_y + btn_h + 16, 280)
+        final_height = max(btn_bottom + 16, 280)
         canvas.config(height=final_height)
         canvas.delete('border')
         canvas.create_rectangle(1, 1, WIDTH - 1, final_height - 1,

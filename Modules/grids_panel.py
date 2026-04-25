@@ -156,11 +156,11 @@ class GridEditorPanel(ttk.Frame):
         pos_frame = ttk.Frame(header)
         pos_frame.pack(side='right', padx=(0, PAD_LF))
         self.x_var = tk.StringVar(value=str(cfg.get('x', 0)))
-        self._x_spin = self._add_pos_spin(pos_frame, "X:", self.x_var, SCREEN_MAX_X,
+        self._x_spin = self._add_str_spin(pos_frame, "X:", self.x_var, 0, SCREEN_MAX_X,
                                           "Horizontal position on screen (pixels from left edge)",
                                           padx=(PAD_MICRO, PAD_MID))
         self.y_var = tk.StringVar(value=str(cfg.get('y', 0)))
-        self._y_spin = self._add_pos_spin(pos_frame, "Y:", self.y_var, SCREEN_MAX_Y,
+        self._y_spin = self._add_str_spin(pos_frame, "Y:", self.y_var, 0, SCREEN_MAX_Y,
                                           "Vertical position on screen (pixels from top edge)",
                                           padx=(PAD_MICRO, 0))
 
@@ -169,11 +169,20 @@ class GridEditorPanel(ttk.Frame):
                                      bootstyle='info-outline')
         self._mode_btn.pack(side='right', padx=(0, PAD_LF))
 
-    def _add_pos_spin(self, parent, label, var, max_val, tooltip, padx):
+    def _add_str_spin(self, parent, label, var, lo, hi, tooltip, padx, width=5, command=None):
+        """Spinbox bound to a StringVar (vs IntVar in _add_spinbox).
+
+        If *command* is provided, also binds <FocusOut>.
+        """
         ttk.Label(parent, text=label, font=FONT_FORM_LABEL,
                   foreground=THEME_COLORS['muted']).pack(side='left')
-        spin = ttk.Spinbox(parent, from_=0, to=max_val, textvariable=var, width=5)
+        kwargs = {'from_': lo, 'to': hi, 'textvariable': var, 'width': width}
+        if command is not None:
+            kwargs['command'] = command
+        spin = ttk.Spinbox(parent, **kwargs)
         spin.pack(side='left', padx=padx)
+        if command is not None:
+            spin.bind('<FocusOut>', lambda e: command())
         add_tooltip(spin, tooltip)
         return spin
 
@@ -192,25 +201,15 @@ class GridEditorPanel(ttk.Frame):
         add_tooltip(self._name_entry, "Display name for this grid (shown in preview mode)")
 
         self._rows_var = tk.StringVar(value=str(cfg.get('rows', 1)))
-        self._rows_spin = self._add_dim_spin(top_row, "Rows:", self._rows_var, MAX_ROWS,
-                                             self._on_rows_changed,
+        self._rows_spin = self._add_str_spin(top_row, "Rows:", self._rows_var, 1, MAX_ROWS,
                                              "Grid rows (height). Total slots across all grids cannot exceed 64.",
-                                             padx=(PAD_MICRO, PAD_MID))
+                                             padx=(PAD_MICRO, PAD_MID), width=4,
+                                             command=lambda: self._on_dimension_changed('rows'))
         self._cols_var = tk.StringVar(value=str(cfg.get('cols', 5)))
-        self._cols_spin = self._add_dim_spin(top_row, "Cols:", self._cols_var, MAX_COLS,
-                                             self._on_cols_changed,
+        self._cols_spin = self._add_str_spin(top_row, "Cols:", self._cols_var, 1, MAX_COLS,
                                              "Grid columns (width). Total slots across all grids cannot exceed 64.",
-                                             padx=(PAD_MICRO, 0))
-
-    def _add_dim_spin(self, parent, label, var, max_val, command, tooltip, padx):
-        ttk.Label(parent, text=label, font=FONT_FORM_LABEL,
-                  foreground=THEME_COLORS['muted']).pack(side='left')
-        spin = ttk.Spinbox(parent, from_=1, to=max_val, textvariable=var, width=4,
-                           command=command)
-        spin.pack(side='left', padx=padx)
-        spin.bind('<FocusOut>', lambda e: command())
-        add_tooltip(spin, tooltip)
-        return spin
+                                             padx=(PAD_MICRO, 0), width=4,
+                                             command=lambda: self._on_dimension_changed('cols'))
 
     def _build_icon_row(self, parent):
         """Pack icon size, gap, stack font, and the Timers / Flash toggle groups."""
@@ -510,12 +509,6 @@ class GridEditorPanel(ttk.Frame):
             self._flash_threshold_frame.pack(side='left')
         else:
             self._flash_threshold_frame.pack_forget()
-
-    def _on_rows_changed(self):
-        self._on_dimension_changed('rows')
-
-    def _on_cols_changed(self):
-        self._on_dimension_changed('cols')
 
     def _on_dimension_changed(self, dim):
         var = self._rows_var if dim == 'rows' else self._cols_var
@@ -1072,9 +1065,6 @@ class GridsPanel(ttk.Frame):
         self.grid_panels.clear()
 
         for i, grid_config in enumerate(self.grids):
-            if i > 0:
-                tk.Frame(self.grids_frame, height=1, bg=TK_COLORS['border']).pack(
-                    fill='x', padx=PAD_LIST_ITEM, pady=PAD_ROW)
             panel = GridEditorPanel(
                 self.grids_frame, self.database, grid_config,
                 on_delete=self.delete_grid, initially_open=(i == expand_index),
@@ -1082,13 +1072,20 @@ class GridsPanel(ttk.Frame):
                 on_resize=self._on_grid_resized,
                 on_whitelist_changed=self._update_tip,
             )
-            panel.pack(fill='x', pady=(0, PAD_ROW), padx=PAD_SMALL)
             self.grid_panels.append(panel)
-            self._drag_manager.bind_handle(panel.drag_handle, i, panel_widget=panel)
-            panel.bind_reorder_keys(self._keyboard_reorder)
+            self._attach_panel(panel, i)
 
         self.slot_count_label.set(f"{self.get_total_slots()} / {MAX_TOTAL_SLOTS} slots")
         self._update_tip()
+
+    def _attach_panel(self, panel, index):
+        """Pack a grid panel at index with separator, drag handle, and reorder bindings."""
+        if index > 0:
+            tk.Frame(self.grids_frame, height=1, bg=TK_COLORS['border']).pack(
+                fill='x', padx=PAD_LIST_ITEM, pady=PAD_ROW)
+        panel.pack(fill='x', pady=(0, PAD_ROW), padx=PAD_SMALL)
+        self._drag_manager.bind_handle(panel.drag_handle, index, panel_widget=panel)
+        panel.bind_reorder_keys(self._keyboard_reorder)
 
     def _reorder_grid(self, old_index, new_index):
         """Move a grid from old_index to new_index and repack panels."""
@@ -1108,12 +1105,7 @@ class GridsPanel(ttk.Frame):
             else:
                 widget.pack_forget()
         for i, panel in enumerate(self.grid_panels):
-            if i > 0:
-                tk.Frame(self.grids_frame, height=1, bg=TK_COLORS['border']).pack(
-                    fill='x', padx=PAD_LIST_ITEM, pady=PAD_ROW)
-            panel.pack(fill='x', pady=(0, PAD_ROW), padx=PAD_SMALL)
-            self._drag_manager.bind_handle(panel.drag_handle, i, panel_widget=panel)
-            panel.bind_reorder_keys(self._keyboard_reorder)
+            self._attach_panel(panel, i)
 
     def _keyboard_reorder(self, panel, direction):
         """Move a panel up (-1) or down (+1) via Alt+Arrow keys."""

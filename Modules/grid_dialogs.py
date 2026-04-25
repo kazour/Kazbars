@@ -34,6 +34,13 @@ BUFF_SELECTOR_SIZE = (800, 600)
 SLOT_ASSIGNMENT_SIZE = (620, 520)
 
 
+def _section(parent, text):
+    """LabelFrame with standard padding/packing — used by AddGridWizard."""
+    lf = ttk.LabelFrame(parent, text=text, padding=PAD_SMALL)
+    lf.pack(fill='x', pady=PAD_SMALL)
+    return lf
+
+
 # ============================================================================
 # ADD GRID WIZARD
 # ============================================================================
@@ -84,9 +91,7 @@ class AddGridWizard(tk.Toplevel):
         self.id_var = tk.StringVar(value=self.generate_unique_name())
         ttk.Entry(name_frame, textvariable=self.id_var, width=20).pack(side='left', padx=PAD_SMALL)
 
-        source_frame = ttk.LabelFrame(frame, text="Source")
-        source_frame.configure(padding=PAD_SMALL)
-        source_frame.pack(fill='x', pady=PAD_SMALL)
+        source_frame = _section(frame, "Source")
 
         self.type_var = tk.StringVar(value="player")
         ttk.Radiobutton(source_frame, text="Player", variable=self.type_var, value="player").pack(anchor='w')
@@ -96,9 +101,7 @@ class AddGridWizard(tk.Toplevel):
         ttk.Label(source_frame, text="Track buffs/debuffs on your current target",
                  foreground=THEME_COLORS['muted'], font=FONT_SMALL).pack(anchor='w', padx=PAD_RADIO_INDENT)
 
-        mode_lf = ttk.LabelFrame(frame, text="Mode")
-        mode_lf.configure(padding=PAD_SMALL)
-        mode_lf.pack(fill='x', pady=PAD_SMALL)
+        mode_lf = _section(frame, "Mode")
 
         self.mode_var = tk.StringVar(value="dynamic")
         self.mode_dynamic = ttk.Radiobutton(mode_lf, text="Dynamic", variable=self.mode_var, value="dynamic")
@@ -111,9 +114,7 @@ class AddGridWizard(tk.Toplevel):
         ttk.Label(mode_lf, text="Fixed slots for specific buffs. Empty when buff not active",
                  foreground=THEME_COLORS['muted'], font=FONT_SMALL).pack(anchor='w', padx=PAD_RADIO_INDENT)
 
-        dim_frame = ttk.LabelFrame(frame, text="Dimensions")
-        dim_frame.configure(padding=PAD_SMALL)
-        dim_frame.pack(fill='x', pady=PAD_SMALL)
+        dim_frame = _section(frame, "Dimensions")
 
         dim_row = ttk.Frame(dim_frame)
         dim_row.pack(fill='x')
