@@ -157,7 +157,6 @@ def create_app_header(parent, title_text, accent_color):
         canvas.create_text(cx, cy, text=title_text, anchor='center',
                            fill=THEME_COLORS['heading'], font=FONT_HEADING)
 
-    _header_after = [None]
     _header_last_w = [0]
     canvas._redraw = _draw
     canvas._last_w = _header_last_w
@@ -166,12 +165,7 @@ def create_app_header(parent, title_text, accent_color):
         if e.width <= 1 or e.width == _header_last_w[0]:
             return
         _header_last_w[0] = e.width
-        if _header_after[0] is not None:
-            try:
-                canvas.after_cancel(_header_after[0])
-            except (ValueError, tk.TclError):
-                pass
-        _header_after[0] = canvas.after(33, lambda w=e.width: _draw(w))
+        _draw(e.width)
     canvas.bind('<Configure>', _on_header_configure)
 
     return canvas

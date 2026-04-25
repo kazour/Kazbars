@@ -322,7 +322,6 @@ def create_scrollable_frame(parent, resize_flag=None):
     scrollbar.pack(side='right', fill='y')
     style_tk_canvas(canvas)
 
-    _resize_after = [None]
     _last_width = [0]
 
     def _on_canvas_configure(event):
@@ -331,13 +330,7 @@ def create_scrollable_frame(parent, resize_flag=None):
         _last_width[0] = event.width
         if resize_flag and resize_flag[0]:
             return
-        if _resize_after[0] is not None:
-            try:
-                canvas.after_cancel(_resize_after[0])
-            except (ValueError, tk.TclError):
-                pass
-        _resize_after[0] = canvas.after(
-            50, lambda w=event.width: canvas.itemconfig(canvas_window, width=w))
+        canvas.itemconfig(canvas_window, width=event.width)
     canvas.bind('<Configure>', _on_canvas_configure)
 
     def _force_layout():
