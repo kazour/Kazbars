@@ -1,5 +1,11 @@
 # Flows
 
+## Conventions
+
+When a flow crosses a dialog→app boundary (any modal `Toplevel` whose buttons or `WM_DELETE_WINDOW` callbacks invoke app methods), name the dialog-side dispatcher as an explicit step. Eliding it folds dialog-internal and app-internal responsibilities into one gloss and produces caller/callee confusion. Confirmed examples in this doc: Flow 4 step 3 (`AddGridWizard.on_create`), Flow 5 step 6 (`BuffSelectorDialog.on_ok`), Flow 13 step 5 (`start_empty`).
+
+---
+
 ## 1. build and install SWF
 
 Trigger: User clicks "Build & Install" button in the bottom bar or presses Ctrl+B
@@ -35,7 +41,7 @@ Trigger: User selects File > Open Profile... (or presses Ctrl+O) and confirms a 
 Steps:
 1. `KzGridsApp._open_profile()` — kzgrids.py:536 — one-line delegator to `profile_io.open_profile(self)`
 2. `profile_io.open_profile()` — Modules/profile_io.py:33 — runs the unsaved-changes guard via `_check_unsaved_changes()`; opens `filedialog.askopenfilename`; passes chosen path to `load_profile()`
-3. `profile_io.load_profile()` — Modules/profile_io.py:46 — reads and parses JSON; on corruption shows a warning and proceeds with empty grids; extracts `grids`, `boss_timer`, `reference_resolution`
+3. `profile_io.load_profile()` — Modules/profile_io.py:46 — reads and parses JSON; on corruption shows a warning and proceeds with empty grids; extracts `grids`, `boss_timer`, `reference_resolution`. Note: also dispatches `boss_timer` to the live tracker when one is open — see step 8.
 4. `load_profile_data()` — Modules/grids_panel.py:963 — iterates raw grid dicts; migrates, validates, rebuilds panel list; returns `{grid_name: [missing_refs]}` for buffs that couldn't be resolved
 5. `_migrate_grid()` — Modules/grids_panel.py:946 — normalizes legacy `int` IDs and legacy name strings in `whitelist` and `slotAssignments` to current primary spell IDs via `database.by_id` and `database.get_entry_by_name`
 6. `validate_grid()` — Modules/grid_model.py:74 — fills missing keys from `create_default_grid()`; clamps every numeric field against `CLAMP_SPECS`; coerces enums in `ENUM_SPECS`; coerces booleans and lists/dicts
@@ -55,7 +61,7 @@ Trigger: User selects File > Save Profile (Ctrl+S) or File > Save Profile As...
 Steps:
 1. `KzGridsApp._save_profile()` — kzgrids.py:545 — one-line delegator to `profile_io.save_profile(self)`
 2. `profile_io.save_profile()` — Modules/profile_io.py:101 — routes to `do_save_profile(app, current_path)` if a path exists, or to `save_profile_as()` otherwise
-3. `profile_io.do_save_profile()` — Modules/profile_io.py:121 — assembles `{version, grids}` plus optional `reference_resolution` and `boss_timer` keys; calls `safe_save_json()`
+3. `profile_io.do_save_profile()` — Modules/profile_io.py:121 — assembles `{version, grids}` plus optional `reference_resolution` and `boss_timer` keys; calls `safe_save_json()`. Note: the `boss_timer` key is sourced from the live tracker when one is open — see step 7.
 4. `get_profile_data()` — Modules/grids_panel.py:919 — calls `save_settings()` then returns `self.grids`
 5. `save_settings()` — Modules/grids_panel.py:1002 — iterates all `GridEditorPanel` instances calling `save_to_config()`
 6. `save_to_config()` — Modules/grids_panel.py:394 — reads all widget values into the grid config dict
@@ -207,3 +213,18 @@ Steps:
 6. `TimerOverlay.update_display()` — Modules/timer_overlay.py:272 — applies message/player/timer strings and per-row colors to label widgets
 
 End state: overlay displays the active seed/fixation/syphon phase with elapsed timer text updated on the next 50ms poll
+
+---
+
+## 13. first-launch setup with empty start
+
+Trigger: User completes the first-launch dialog by clicking "Start Empty" instead of "Use Defaults"
+
+Steps 1–4 are identical to Flow 6 (delegator → `run_first_launch()` → `show_first_launch_dialog()` → `detect_aoc_launcher()`).
+
+Steps:
+5. `start_empty()` — Modules/first_launch.py:185 — closure: calls `_set_game_if_provided()`, then `_close()`. No `on_load_default` invocation, so no profile load and no scale.
+6. `_set_game_if_provided()` — Modules/first_launch.py:166 — same dispatcher used by Flow 6's `load_default()`; persists game path via `on_game_set`, Aoc.exe preference via `on_aoc_bypass_set`, resolution via `on_resolution_set`
+7. `on_dialog_closed()` — Modules/first_launch.py:339 — runs as in Flow 6 but `welcome_data` was never populated, so the welcome popup is suppressed
+
+End state: `game_path`, `use_aoc_bypass`, and `game_resolution` persisted; no profile loaded; no welcome popup; user lands on the empty `GridsPanel` empty-state

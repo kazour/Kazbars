@@ -44,7 +44,8 @@ def open_profile(app):
 
 
 def load_profile(app, path):
-    """Load a profile from a JSON file."""
+    """Load a profile from a JSON file. Also dispatches `data['boss_timer']`
+    to the live `BossTimer` panel if one is open."""
     corrupt = False
     try:
         raw = json.loads(Path(path).read_text(encoding='utf-8'))
@@ -119,7 +120,9 @@ def save_profile_as(app):
 
 
 def do_save_profile(app, path):
-    """Write profile data to disk. Returns True on success, False on error."""
+    """Write profile data to disk. If the live `BossTimer` is open, pulls its
+    state via `bt.get_profile_data()` into the saved JSON. Returns True on
+    success, False on error."""
     try:
         data = {
             'version': app.app_version,
