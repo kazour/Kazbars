@@ -78,8 +78,9 @@ def build(app):
         )
         return
 
-    # Aoc.exe users only: block while the game is running
-    if app.use_aoc_bypass:
+    # Aoc.exe users only: block while the game is running, but only on the
+    # first build. After a successful install, /reloadui handles the swap.
+    if app.use_aoc_bypass and not app.settings.get('has_built_before'):
         from .build_executor import get_running_game_process
         running = get_running_game_process()
         if running:
@@ -132,7 +133,7 @@ def build(app):
             if app.use_aoc_bypass and aoc_running:
                 app.toast.show("Built — /reloadui in-game", 'success', 8)
             elif app.use_aoc_bypass:
-                app.toast.show("Built — launch via Aoc.exe", 'success', 8)
+                app.toast.show("Built — launch the game", 'success', 8)
             else:
                 app.toast.show("Built — /reloadui + /reloadgrids", 'success', 8)
             app._flash_status_bar()

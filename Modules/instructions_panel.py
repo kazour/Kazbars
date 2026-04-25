@@ -207,7 +207,7 @@ class InstructionsPanel(ttk.Frame):
             "Aoc.exe is a third-party tool that bypasses the standard launcher. "
             "Kaz Grids asks once at first launch whether you use it; that answer "
             "drives every future build. Aoc.exe users must close the game before "
-            "each build."
+            "the first build — after that, rebuild any time and /reloadui."
         )
         self._add_subsection(build_section.content, "With Aoc.exe (launcher bypass)", [
             "Rebuild any time, then type /reloadui in chat to apply.",
