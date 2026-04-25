@@ -106,3 +106,12 @@ def validate_grid(grid):
         grid['slotAssignments'] = {}
 
     return grid
+
+
+def parse_resolution(resolution_str):
+    """Parse 'WxH' string into (width, height) or None."""
+    try:
+        w, h = resolution_str.lower().split('x')
+        return int(w), int(h)
+    except (ValueError, AttributeError):
+        return None

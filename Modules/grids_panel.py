@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 from .grid_dialogs import AddGridWizard, BuffSelectorDialog, SlotAssignmentDialog
 from .grid_model import (
-    create_default_grid, validate_grid,
+    create_default_grid, validate_grid, parse_resolution,
     MAX_TOTAL_SLOTS, MAX_ROWS, MAX_COLS, SCREEN_MAX_X, SCREEN_MAX_Y,
     CLAMP_SPECS,
 )
@@ -1010,6 +1010,24 @@ class GridsPanel(ttk.Frame):
         """Persist all panel UI values back to grid configs."""
         for panel in self.grid_panels:
             panel.save_to_config()
+
+    def scale_to_resolution(self, resolution_str, reference_resolution):
+        """Scale grid x/y from reference_resolution to the given game resolution.
+        Returns True if scaling was applied."""
+        game_res = parse_resolution(resolution_str)
+        if not game_res:
+            return False
+        if not reference_resolution or len(reference_resolution) != 2:
+            return False
+        ref_w, ref_h = reference_resolution
+        game_w, game_h = game_res
+        if ref_w == game_w and ref_h == game_h:
+            return False
+        for grid in self.grids:
+            grid['x'] = min(round(grid['x'] * game_w / ref_w), SCREEN_MAX_X)
+            grid['y'] = min(round(grid['y'] * game_h / ref_h), SCREEN_MAX_Y)
+        self.refresh_panels()
+        return True
 
     def add_grid(self):
         """Open AddGridWizard dialog."""

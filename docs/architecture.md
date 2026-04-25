@@ -1,6 +1,6 @@
 # Architectural Map
 
-**Current as of:** 2026-04-26
+**Current as of:** 2026-04-25
 **Purpose:** Module topology, dependencies, and coupling hotspots. Updated alongside code changes — if you edit this file, commit it with the code. `CLAUDE.md` has the short version; this file has the detail that doesn't fit there.
 
 ## Dependency clusters
@@ -36,7 +36,7 @@ grid_model  ← grid_dialogs  ← grids_panel
 ```
 build_utils  ← grids_generator
              ← build_executor  ← first_launch, build_action
-build_loading  ← build_action
+build_loading  ← build_action, first_launch
 ```
 
 ### Live Tracker (isolated — no other panel imports from it)
@@ -49,9 +49,9 @@ live_tracker_settings  ← boss_timer
 
 ### kzgrids-only satellites (extracted from KzGridsApp)
 ```
-kzgrids.py  → profile_io, game_folder, build_action, custom_menu_bar
+kzgrids.py  → profile_io, game_folder, build_action, first_launch, custom_menu_bar
 ```
-These four modules are consumed only by `kzgrids.py` by design — they hold logic that belongs to the root window but would otherwise bloat the entry-point file. Each takes `app` (the `KzGridsApp` instance) as first arg. `KzGridsApp` keeps thin delegator methods so internal call sites (menus, dialog callbacks) don't need rewriting when new functions get added.
+These modules are consumed only by `kzgrids.py` by design — they hold logic that belongs to the root window but would otherwise bloat the entry-point file. Each takes `app` (the `KzGridsApp` instance) as first arg. `KzGridsApp` keeps thin delegator methods so internal call sites (menus, dialog callbacks) don't need rewriting when new functions get added. `first_launch` is the only satellite that crosses cluster boundaries — its `run_first_launch(app, app_name)` orchestrator imports `game_folder`, `profile_io`, `build_loading`, and `grid_model` to drive the dialog's post-close actions (default profile load, scaling, welcome popup).
 
 ## Fan-in (modules that would churn many files if touched)
 
@@ -61,8 +61,8 @@ These four modules are consumed only by `kzgrids.py` by design — they hold log
 | 10 | `ui_widgets` | Widest builder surface. Keep new helpers focused; don't expand unchecked. |
 |  5 | `window_position`, `settings_manager` | Small stable APIs. |
 |  4 | `ui_tk_style`, `ui_components` | Narrow surface — ripple is contained. |
-|  3 | `grid_model`, `build_utils`, `build_executor`, `live_tracker_settings` | Cluster leaves. |
-|  2 | `build_loading`, `grids_generator` | |
+|  3 | `grid_model`, `build_utils`, `build_executor`, `build_loading`, `live_tracker_settings` | Cluster leaves. |
+|  2 | `grids_generator` | |
 |  1 | `grids_panel`, `custom_menu_bar`, `profile_io`, `game_folder`, `build_action`, `database_editor`, `instructions_panel`, `first_launch`, `live_tracker_panel`, `grid_dialogs`, `boss_timer`, `timer_overlay`, `combat_monitor` | Each consumed by exactly one parent — low blast radius by design. |
 
 ## Conventions
@@ -96,11 +96,11 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 
 | File | Lines | Role |
 |---|---:|---|
-| `Modules/grids_panel.py` | 1118 | Grid list UI, grid management |
+| `Modules/grids_panel.py` | 1136 | Grid list UI, grid management |
 | `Modules/build_loading.py` | 914 | Build-progress screen + welcome/about popups |
 | `Modules/database_editor.py` | 891 | Buff DB CRUD, search, filtering |
 | `Modules/grid_dialogs.py` | 742 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
-| `kzgrids.py` | 741 | Entry point + `KzGridsApp` root window (widgets, menu, lifecycle) |
+| `kzgrids.py` | 621 | Entry point + `KzGridsApp` root window (widgets, menu, lifecycle) |
 | `Modules/ui_widgets.py` | 510 | Widget builders, tooltips, bindings, `CollapsibleSection`, `blend_alpha` |
 | `Modules/live_tracker_panel.py` | 489 | Live Tracker Toplevel orchestrator |
 | `Modules/boss_timer.py` | 441 | Boss timer state + UI |
@@ -108,9 +108,9 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `Modules/ui_components.py` | 426 | `ToastManager`, `DragReorderManager`, scrollable frame |
 | `Modules/grids_generator.py` | 424 | AS2 code generation from grid configs |
 | `Modules/instructions_panel.py` | 372 | Help/instructions view |
+| `Modules/first_launch.py` | 352 | First-launch dialog + post-dialog orchestrator (`run_first_launch`) |
 | `Modules/custom_menu_bar.py` | 325 | Canvas-based dark menu bar |
 | `Modules/combat_monitor.py` | 313 | Combat log parser feeding the tracker |
-| `Modules/first_launch.py` | 284 | One-time game-folder setup flow |
 | `Modules/build_executor.py` | 227 | MTASC compile + deploy |
 | `build.py` | 225 | PyInstaller build driver |
 | `Modules/game_folder.py` | 185 | Game folder UI + Aoc.exe bypass + uninstall |
@@ -118,7 +118,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `Modules/profile_io.py` | 154 | Profile load/save/new/open + missing-buff warning |
 | `Modules/live_tracker_settings.py` | 145 | Tracker persistence |
 | `Modules/ui_helpers.py` | 129 | Design tokens + `setup_custom_styles` |
-| `Modules/grid_model.py` | 108 | Grid dataclasses with `to_dict`/`from_dict` |
+| `Modules/grid_model.py` | 117 | Grid dataclasses + `parse_resolution` helper |
 | `tests/test_data_integrity.py` | 103 | Buff-ref resolution smoke test |
 | `Modules/build_utils.py` | 98 | Compiler discovery + path helpers |
 | `Modules/window_position.py` | 91 | Window geometry save/restore |

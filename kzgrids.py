@@ -7,7 +7,10 @@ import json
 import logging
 import shutil
 import sys
+import threading
 import tkinter as tk
+import urllib.error
+import urllib.request
 import webbrowser
 from tkinter import ttk
 from pathlib import Path
@@ -34,11 +37,12 @@ from Modules.ui_tk_style import apply_dark_titlebar, enable_global_dark_titlebar
 from Modules.settings_manager import SettingsManager, init_settings
 from Modules import profile_io, game_folder, build_action
 from Modules.window_position import restore_window_position, bind_window_position_save
-from Modules.build_loading import show_welcome_popup, show_about_popup
+from Modules.build_loading import show_about_popup
 from Modules.live_tracker_panel import LiveTrackerPanel
 from Modules.database_editor import BuffDatabase, DatabaseEditorTab
 from Modules.grids_panel import GridsPanel
 from Modules.instructions_panel import InstructionsPanel
+from Modules.first_launch import run_first_launch
 
 APP_NAME = "Kaz Grids"
 APP_VERSION = "1.1.0"
@@ -228,7 +232,6 @@ class KzGridsApp(ttkb.Window):
             database=self.database,
             on_modified=self._mark_modified,
         )
-        self.grids_view = self.grids_panel
 
         # Database view
         self.db_panel = DatabaseEditorTab(
@@ -239,15 +242,12 @@ class KzGridsApp(ttkb.Window):
             get_grids=lambda: self.grids_panel.grids,
             toast=self.toast,
         )
-        self.database_view = self.db_panel
 
         # Instructions view
         self.instructions_panel = InstructionsPanel(self.content_frame)
-        self.instructions_view = self.instructions_panel
 
         # Show default view — set initial underlines directly (canvas not mapped yet)
-        self.current_view = 'grids'
-        self.grids_view.pack(fill='both', expand=True)
+        self.grids_panel.pack(fill='both', expand=True)
         for name, widgets in self.nav_buttons.items():
             if name == 'grids':
                 widgets['underline'].configure(height=2, bg=widgets['color'])
@@ -280,7 +280,7 @@ class KzGridsApp(ttkb.Window):
         self._game_context_menu.add_command(
             label="Clear", command=self._clear_game_path)
 
-        # Inline hint — visibility managed by _update_build_state
+        # Inline hint — visibility managed by game_folder.update_build_state
         self._game_hint = ttk.Label(game_frame, text="Set your game folder to build",
                                      font=FONT_SMALL, foreground=THEME_COLORS['warning'])
 
@@ -346,15 +346,15 @@ class KzGridsApp(ttkb.Window):
         self.current_view = view_name
 
         # Hide all views
-        self.grids_view.pack_forget()
-        self.database_view.pack_forget()
-        self.instructions_view.pack_forget()
+        self.grids_panel.pack_forget()
+        self.db_panel.pack_forget()
+        self.instructions_panel.pack_forget()
 
         # Show selected
         views = {
-            'grids': self.grids_view,
-            'database': self.database_view,
-            'instructions': self.instructions_view,
+            'grids': self.grids_panel,
+            'database': self.db_panel,
+            'instructions': self.instructions_panel,
         }
         views[view_name].pack(fill='both', expand=True)
 
@@ -456,10 +456,6 @@ class KzGridsApp(ttkb.Window):
     def _refresh_game_path_label(self):
         return game_folder.refresh_game_path_label(self)
 
-    @staticmethod
-    def _format_game_path(path):
-        return game_folder.format_game_path(path)
-
     def _change_game_folder(self):
         return game_folder.change_game_folder(self)
 
@@ -469,23 +465,8 @@ class KzGridsApp(ttkb.Window):
     def _show_game_context_menu(self, event):
         return game_folder.show_game_context_menu(self, event)
 
-    def _save_game_path(self):
-        return game_folder.save_game_path(self)
-
-    def _save_aoc_bypass(self, value):
-        return game_folder.save_aoc_bypass(self, value)
-
-    def _prompt_aoc_bypass(self):
-        return game_folder.prompt_aoc_bypass(self)
-
     def _uninstall_game(self):
         return game_folder.uninstall_game(self)
-
-    def _update_build_state(self):
-        return game_folder.update_build_state(self)
-
-    def _pulse_game_hint(self):
-        return game_folder.pulse_game_hint(self)
 
     # ========================================================================
     # PROFILE SYSTEM
@@ -539,27 +520,17 @@ class KzGridsApp(ttkb.Window):
     def _load_profile(self, path):
         return profile_io.load_profile(self, path)
 
-    def _warn_missing_buffs(self, missing_by_grid):
-        return profile_io.warn_missing_buffs(self, missing_by_grid)
-
     def _save_profile(self):
         return profile_io.save_profile(self)
 
     def _save_profile_as(self):
         return profile_io.save_profile_as(self)
 
-    def _do_save_profile(self, path):
-        return profile_io.do_save_profile(self, path)
-
     def _get_profile_name(self):
         return profile_io.get_profile_name(self)
 
     def _check_for_updates(self):
         """Fire-and-forget background check for a newer GitHub release."""
-        import threading
-        import urllib.request
-        import urllib.error
-
         def _worker():
             try:
                 req = urllib.request.Request(
@@ -584,7 +555,7 @@ class KzGridsApp(ttkb.Window):
                     f"Update available: v{tag} \u2014 click for release notes", 'info', 12,
                     on_click=lambda: webbrowser.open(url)
                 ))
-            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
+            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError, tk.TclError):
                 pass
 
         threading.Thread(target=_worker, daemon=True).start()
@@ -616,98 +587,7 @@ class KzGridsApp(ttkb.Window):
     # FIRST LAUNCH
     # ========================================================================
     def _show_first_launch_dialog(self):
-        """Show the first-launch dialog for setting up game path."""
-        from Modules.first_launch import show_first_launch_dialog
-
-        def on_game_set(path):
-            self.game_path = path
-            self._save_game_path()
-            self._refresh_game_path_label()
-
-        def on_aoc_bypass_set(value):
-            self._save_aoc_bypass(value)
-
-        welcome_data = {}
-
-        def on_load_default(resolution_str):
-            default_profile = self.assets_path / "kzgrids" / "Default.json"
-            if not default_profile.exists():
-                Messagebox.show_warning(
-                    "Default.json not found in assets/kzgrids folder.",
-                    title="Default Profile Missing"
-                )
-                return
-            self._save_game_resolution(resolution_str)
-            self._load_profile(default_profile)
-            scaled = self._scale_grids_to_resolution(resolution_str)
-            # Save a personal copy so the user has a real profile on next launch
-            copy_path = self.profiles_path / "MyGrids.json"
-            n = 2
-            while copy_path.exists():
-                copy_path = self.profiles_path / f"MyGrids ({n}).json"
-                n += 1
-            self._do_save_profile(copy_path)
-            # Store data for welcome popup — shown after dialog closes
-            grids = self.grids_panel.grids
-            welcome_data['grid_count'] = len(grids)
-            welcome_data['enabled_count'] = sum(1 for g in grids if g.get('enabled', True))
-            welcome_data['resolution'] = resolution_str if scaled else None
-            welcome_data['profile_name'] = copy_path.name
-
-        def on_resolution_set(resolution_str):
-            self._save_game_resolution(resolution_str)
-
-        def on_dialog_closed():
-            if welcome_data:
-                self.after(100, lambda: show_welcome_popup(
-                    self,
-                    welcome_data['grid_count'],
-                    welcome_data['enabled_count'],
-                    resolution_str=welcome_data['resolution'],
-                    profile_name=welcome_data['profile_name']))
-
-        default_exists = (self.assets_path / "kzgrids" / "Default.json").exists()
-        show_first_launch_dialog(self, APP_NAME, on_game_set, on_load_default,
-                                 on_resolution_set, default_exists, on_dialog_closed,
-                                 on_aoc_bypass_set=on_aoc_bypass_set)
-
-    def _parse_resolution(self, resolution_str):
-        """Parse 'WxH' string into (width, height) or None."""
-        try:
-            w, h = resolution_str.lower().split('x')
-            return int(w), int(h)
-        except (ValueError, AttributeError):
-            return None
-
-    def _save_game_resolution(self, resolution_str):
-        """Save game resolution to settings."""
-        parsed = self._parse_resolution(resolution_str)
-        if parsed:
-            self.settings.set('game_resolution', list(parsed))
-            self.settings.save()
-
-    def _scale_grids_to_resolution(self, resolution_str):
-        """Scale loaded grid x/y positions from profile's reference to game resolution.
-        Returns True if scaling was applied."""
-        game_res = self._parse_resolution(resolution_str)
-        if not game_res:
-            return False
-
-        if not self.reference_resolution or len(self.reference_resolution) != 2:
-            return False
-
-        ref_w, ref_h = self.reference_resolution
-        game_w, game_h = game_res
-        if ref_w == game_w and ref_h == game_h:
-            return False
-
-        from Modules.grid_model import SCREEN_MAX_X, SCREEN_MAX_Y
-        for grid in self.grids_panel.grids:
-            grid['x'] = min(round(grid['x'] * game_w / ref_w), SCREEN_MAX_X)
-            grid['y'] = min(round(grid['y'] * game_h / ref_h), SCREEN_MAX_Y)
-
-        self.grids_panel.refresh_panels()
-        return True
+        return run_first_launch(self, APP_NAME)
 
     # ========================================================================
     # WINDOW LIFECYCLE

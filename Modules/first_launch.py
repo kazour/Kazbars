@@ -7,6 +7,8 @@ import tkinter as tk
 from tkinter import filedialog, ttk
 from pathlib import Path
 
+from ttkbootstrap.dialogs import Messagebox
+
 from .ui_helpers import (
     FONT_BODY_LG, FONT_BODY, FONT_SMALL, FONT_SECTION,
     THEME_COLORS, TK_COLORS, MODULE_COLORS,
@@ -16,6 +18,9 @@ from .ui_helpers import (
 from .ui_widgets import create_dialog_header, bind_label_press_effect
 from .window_position import restore_window_position
 from .build_executor import detect_aoc_launcher
+from .build_loading import show_welcome_popup
+from .grid_model import parse_resolution
+from . import game_folder, profile_io
 
 
 def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
@@ -282,3 +287,66 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
     bind_label_press_effect(skip_lbl)
 
     dialog.protocol("WM_DELETE_WINDOW", skip)
+
+
+def run_first_launch(app, app_name):
+    """Coordinate first-launch flow: show the dialog, then handle the chosen path
+    (default-profile load + scale + welcome popup, or empty start). Owns the
+    callbacks the dialog dispatches to."""
+    default_profile = app.assets_path / "kzgrids" / "Default.json"
+    welcome_data = {}
+
+    def _save_resolution(resolution_str):
+        parsed = parse_resolution(resolution_str)
+        if parsed:
+            app.settings.set('game_resolution', list(parsed))
+            app.settings.save()
+
+    def on_game_set(path):
+        app.game_path = path
+        game_folder.save_game_path(app)
+        game_folder.refresh_game_path_label(app)
+
+    def on_aoc_bypass_set(value):
+        game_folder.save_aoc_bypass(app, value)
+
+    def on_load_default(resolution_str):
+        if not default_profile.exists():
+            Messagebox.show_warning(
+                "Default.json not found in assets/kzgrids folder.",
+                title="Default Profile Missing"
+            )
+            return
+        _save_resolution(resolution_str)
+        profile_io.load_profile(app, default_profile)
+        scaled = app.grids_panel.scale_to_resolution(
+            resolution_str, app.reference_resolution)
+        copy_path = app.profiles_path / "MyGrids.json"
+        n = 2
+        while copy_path.exists():
+            copy_path = app.profiles_path / f"MyGrids ({n}).json"
+            n += 1
+        profile_io.do_save_profile(app, copy_path)
+        grids = app.grids_panel.grids
+        welcome_data['grid_count'] = len(grids)
+        welcome_data['enabled_count'] = sum(1 for g in grids if g.get('enabled', True))
+        welcome_data['resolution'] = resolution_str if scaled else None
+        welcome_data['profile_name'] = copy_path.name
+
+    def on_resolution_set(resolution_str):
+        _save_resolution(resolution_str)
+
+    def on_dialog_closed():
+        if welcome_data:
+            app.after(100, lambda: show_welcome_popup(
+                app,
+                welcome_data['grid_count'],
+                welcome_data['enabled_count'],
+                resolution_str=welcome_data['resolution'],
+                profile_name=welcome_data['profile_name']))
+
+    show_first_launch_dialog(
+        app, app_name, on_game_set, on_load_default, on_resolution_set,
+        default_profile.exists(), on_dialog_closed,
+        on_aoc_bypass_set=on_aoc_bypass_set,
+    )
