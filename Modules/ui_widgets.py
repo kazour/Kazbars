@@ -3,8 +3,8 @@ Kaz Grids — UI widget helpers and interaction bindings.
 
 Widget-builder functions (create_dialog_header, create_app_header,
 create_tip_bar), event helpers (bind_card_events, bind_button_press_effect,
-bind_label_press_effect), the in-app tooltip, a debounce utility, the
-alpha-blend color helper, and CollapsibleSection.
+bind_label_press_effect, bind_label_hover_colors), the in-app tooltip,
+a debounce utility, the alpha-blend color helper, and CollapsibleSection.
 """
 
 import tkinter as tk
@@ -325,6 +325,19 @@ def bind_button_press_effect(button, bootstyle='primary'):
 
     button.bind('<ButtonPress-1>', _on_press, add='+')
     button.bind('<ButtonRelease-1>', _on_release, add='+')
+
+
+def bind_label_hover_colors(label, normal_color, hover_color):
+    """Toggle a label's foreground on Enter/Leave/FocusIn/FocusOut.
+
+    Centralizes the 4-line bind block used by clickable header labels
+    (delete ×, dismiss ×, etc.) so hover and keyboard-focus visuals stay
+    consistent.
+    """
+    label.bind('<Enter>',    lambda e: label.config(foreground=hover_color))
+    label.bind('<Leave>',    lambda e: label.config(foreground=normal_color))
+    label.bind('<FocusIn>',  lambda e: label.config(foreground=hover_color))
+    label.bind('<FocusOut>', lambda e: label.config(foreground=normal_color))
 
 
 def bind_label_press_effect(label, press_color=None):

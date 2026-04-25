@@ -1,6 +1,6 @@
 # Architectural Map
 
-**Current as of:** 2026-04-25
+**Current as of:** 2026-04-26
 **Purpose:** Module topology, dependencies, and coupling hotspots. Updated alongside code changes — if you edit this file, commit it with the code. `CLAUDE.md` has the short version; this file has the detail that doesn't fit there.
 
 ## Dependency clusters
@@ -96,12 +96,12 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 
 | File | Lines | Role |
 |---|---:|---|
-| `Modules/grids_panel.py` | 1155 | Grid list UI, grid management |
+| `Modules/grids_panel.py` | 1118 | Grid list UI, grid management |
 | `Modules/build_loading.py` | 914 | Build-progress screen + welcome/about popups |
-| `Modules/database_editor.py` | 904 | Buff DB CRUD, search, filtering |
+| `Modules/database_editor.py` | 891 | Buff DB CRUD, search, filtering |
 | `Modules/grid_dialogs.py` | 742 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
 | `kzgrids.py` | 741 | Entry point + `KzGridsApp` root window (widgets, menu, lifecycle) |
-| `Modules/ui_widgets.py` | 497 | Widget builders, tooltips, bindings, `CollapsibleSection`, `blend_alpha` |
+| `Modules/ui_widgets.py` | 510 | Widget builders, tooltips, bindings, `CollapsibleSection`, `blend_alpha` |
 | `Modules/live_tracker_panel.py` | 489 | Live Tracker Toplevel orchestrator |
 | `Modules/boss_timer.py` | 441 | Boss timer state + UI |
 | `Modules/timer_overlay.py` | 440 | In-game transparent timer overlay |

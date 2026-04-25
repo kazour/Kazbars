@@ -25,7 +25,7 @@ from .ui_helpers import (
 )
 from .ui_widgets import (
     blend_alpha, CollapsibleSection, add_tooltip, bind_card_events,
-    bind_label_press_effect,
+    bind_label_press_effect, bind_label_hover_colors,
 )
 from .ui_components import create_scrollable_frame, DragReorderManager
 from .settings_manager import get_setting
@@ -109,69 +109,78 @@ class GridEditorPanel(ttk.Frame):
         self.section.pack(side='left', fill='x', expand=True,
                           padx=PAD_ROW, pady=(PAD_BUTTON_GAP, PAD_ROW))
 
-        # Header right side (pack order = rightmost first): × delete, Enabled, X/Y, Whitelist
-        self.enabled_var = tk.BooleanVar(value=True)
-        delete_label = ttk.Label(self.section.header_frame, text="\u00D7",
-                                 font=FONT_SYMBOL, foreground=THEME_COLORS['muted'],
-                                 cursor='hand2', takefocus=True,
-                                 padding=(PAD_XS, PAD_MICRO))
-        delete_label.pack(side='right', padx=(PAD_XS, 0))
-        delete_label.bind('<Button-1>', lambda e: self.delete_grid())
-        delete_label.bind('<Return>', lambda e: self.delete_grid())
-        delete_label.bind('<space>', lambda e: self.delete_grid())
-        delete_label.bind('<Enter>', lambda e: delete_label.config(foreground=THEME_COLORS['danger']))
-        delete_label.bind('<Leave>', lambda e: delete_label.config(foreground=THEME_COLORS['muted']))
-        delete_label.bind('<FocusIn>', lambda e: delete_label.config(foreground=THEME_COLORS['danger']))
-        delete_label.bind('<FocusOut>', lambda e: delete_label.config(foreground=THEME_COLORS['muted']))
-        bind_label_press_effect(delete_label, THEME_COLORS['danger'])
-        add_tooltip(delete_label, "Delete this grid")
-        ttk.Checkbutton(self.section.header_frame, text="Enabled",
-                        variable=self.enabled_var,
-                        bootstyle="success-round-toggle").pack(side='right', padx=(0, PAD_XS))
+        self._build_header_widgets()
 
-        # X/Y position spinboxes in header
-        pos_frame = ttk.Frame(self.section.header_frame)
-        pos_frame.pack(side='right', padx=(0, PAD_LF))
-        ttk.Label(pos_frame, text="X:", font=FONT_FORM_LABEL,
-                  foreground=THEME_COLORS['muted']).pack(side='left')
-        self.x_var = tk.StringVar(value=str(grid_config.get('x', 0)))
-        self._x_spin = ttk.Spinbox(pos_frame, from_=0, to=SCREEN_MAX_X,
-                                    textvariable=self.x_var, width=5)
-        self._x_spin.pack(side='left', padx=(PAD_MICRO, PAD_MID))
-        add_tooltip(self._x_spin, "Horizontal position on screen (pixels from left edge)")
-
-        ttk.Label(pos_frame, text="Y:", font=FONT_FORM_LABEL,
-                  foreground=THEME_COLORS['muted']).pack(side='left')
-        self.y_var = tk.StringVar(value=str(grid_config.get('y', 0)))
-        self._y_spin = ttk.Spinbox(pos_frame, from_=0, to=SCREEN_MAX_Y,
-                                    textvariable=self.y_var, width=5)
-        self._y_spin.pack(side='left', padx=(PAD_MICRO, 0))
-        add_tooltip(self._y_spin, "Vertical position on screen (pixels from top edge)")
-
-        # Whitelist/Slot button in header
-        self._mode_btn = ttk.Button(self.section.header_frame, text="Tracked Buffs...",
-                                     command=self._on_mode_btn_click, width=12,
-                                     bootstyle='info-outline')
-        self._mode_btn.pack(side='right', padx=(0, PAD_LF))
-
-        # Content area — two-column: settings left, grid preview right
-        content = self.section.content
-        content_wrapper = ttk.Frame(content)
+        content_wrapper = ttk.Frame(self.section.content)
         content_wrapper.pack(fill='x')
         settings_col = ttk.Frame(content_wrapper)
         settings_col.pack(side='left', fill='x', expand=True)
 
-        preview_size = 70
         self._preview_canvas = tk.Canvas(
-            content_wrapper, width=preview_size, height=preview_size,
+            content_wrapper, width=70, height=70,
             bg=TK_COLORS['bg'], highlightthickness=0)
         self._preview_canvas.pack(side='right', padx=(PAD_XS, 0), pady=PAD_XS)
 
         self.type_var = tk.StringVar()
         self.mode_var = tk.StringVar()
 
-        # Top row: Name, R, C
-        top_row = ttk.Frame(settings_col)
+        self._build_top_row(settings_col)
+        self._build_icon_row(settings_col)
+        self._build_info_and_dynamic(settings_col)
+
+        self.load_from_config()
+
+        bind_card_events(card, self._accent_color)
+        self._card = card
+
+    def _build_header_widgets(self):
+        """Pack right-side header controls: × delete, Enabled toggle, X/Y, mode button."""
+        cfg = self.grid_config
+        header = self.section.header_frame
+
+        self.enabled_var = tk.BooleanVar(value=True)
+        delete_label = ttk.Label(header, text="×",
+                                 font=FONT_SYMBOL, foreground=THEME_COLORS['muted'],
+                                 cursor='hand2', takefocus=True,
+                                 padding=(PAD_XS, PAD_MICRO))
+        delete_label.pack(side='right', padx=(PAD_XS, 0))
+        for seq in ('<Button-1>', '<Return>', '<space>'):
+            delete_label.bind(seq, lambda e: self.delete_grid())
+        bind_label_hover_colors(delete_label, THEME_COLORS['muted'], THEME_COLORS['danger'])
+        bind_label_press_effect(delete_label, THEME_COLORS['danger'])
+        add_tooltip(delete_label, "Delete this grid")
+        ttk.Checkbutton(header, text="Enabled",
+                        variable=self.enabled_var,
+                        bootstyle="success-round-toggle").pack(side='right', padx=(0, PAD_XS))
+
+        pos_frame = ttk.Frame(header)
+        pos_frame.pack(side='right', padx=(0, PAD_LF))
+        self.x_var = tk.StringVar(value=str(cfg.get('x', 0)))
+        self._x_spin = self._add_pos_spin(pos_frame, "X:", self.x_var, SCREEN_MAX_X,
+                                          "Horizontal position on screen (pixels from left edge)",
+                                          padx=(PAD_MICRO, PAD_MID))
+        self.y_var = tk.StringVar(value=str(cfg.get('y', 0)))
+        self._y_spin = self._add_pos_spin(pos_frame, "Y:", self.y_var, SCREEN_MAX_Y,
+                                          "Vertical position on screen (pixels from top edge)",
+                                          padx=(PAD_MICRO, 0))
+
+        self._mode_btn = ttk.Button(header, text="Tracked Buffs...",
+                                     command=self._on_mode_btn_click, width=12,
+                                     bootstyle='info-outline')
+        self._mode_btn.pack(side='right', padx=(0, PAD_LF))
+
+    def _add_pos_spin(self, parent, label, var, max_val, tooltip, padx):
+        ttk.Label(parent, text=label, font=FONT_FORM_LABEL,
+                  foreground=THEME_COLORS['muted']).pack(side='left')
+        spin = ttk.Spinbox(parent, from_=0, to=max_val, textvariable=var, width=5)
+        spin.pack(side='left', padx=padx)
+        add_tooltip(spin, tooltip)
+        return spin
+
+    def _build_top_row(self, parent):
+        """Pack the Name + Rows + Cols controls."""
+        cfg = self.grid_config
+        top_row = ttk.Frame(parent)
         top_row.pack(fill='x', pady=(0, PAD_ROW))
 
         ttk.Label(top_row, text="Name:", font=FONT_SMALL_BOLD,
@@ -182,29 +191,30 @@ class GridEditorPanel(ttk.Frame):
         self._name_entry.pack(side='left', padx=(PAD_XS, PAD_MID))
         add_tooltip(self._name_entry, "Display name for this grid (shown in preview mode)")
 
-        # Dimension spinboxes (R / C) in content top row
-        ttk.Label(top_row, text="Rows:", font=FONT_FORM_LABEL,
-                  foreground=THEME_COLORS['muted']).pack(side='left')
-        self._rows_var = tk.StringVar(value=str(grid_config.get('rows', 1)))
-        self._rows_spin = ttk.Spinbox(top_row, from_=1, to=MAX_ROWS,
-                                      textvariable=self._rows_var, width=4,
-                                      command=self._on_rows_changed)
-        self._rows_spin.pack(side='left', padx=(PAD_MICRO, PAD_MID))
-        self._rows_spin.bind('<FocusOut>', lambda e: self._on_rows_changed())
-        add_tooltip(self._rows_spin, "Grid rows (height). Total slots across all grids cannot exceed 64.")
+        self._rows_var = tk.StringVar(value=str(cfg.get('rows', 1)))
+        self._rows_spin = self._add_dim_spin(top_row, "Rows:", self._rows_var, MAX_ROWS,
+                                             self._on_rows_changed,
+                                             "Grid rows (height). Total slots across all grids cannot exceed 64.",
+                                             padx=(PAD_MICRO, PAD_MID))
+        self._cols_var = tk.StringVar(value=str(cfg.get('cols', 5)))
+        self._cols_spin = self._add_dim_spin(top_row, "Cols:", self._cols_var, MAX_COLS,
+                                             self._on_cols_changed,
+                                             "Grid columns (width). Total slots across all grids cannot exceed 64.",
+                                             padx=(PAD_MICRO, 0))
 
-        ttk.Label(top_row, text="Cols:", font=FONT_FORM_LABEL,
+    def _add_dim_spin(self, parent, label, var, max_val, command, tooltip, padx):
+        ttk.Label(parent, text=label, font=FONT_FORM_LABEL,
                   foreground=THEME_COLORS['muted']).pack(side='left')
-        self._cols_var = tk.StringVar(value=str(grid_config.get('cols', 5)))
-        self._cols_spin = ttk.Spinbox(top_row, from_=1, to=MAX_COLS,
-                                      textvariable=self._cols_var, width=4,
-                                      command=self._on_cols_changed)
-        self._cols_spin.pack(side='left', padx=(PAD_MICRO, 0))
-        self._cols_spin.bind('<FocusOut>', lambda e: self._on_cols_changed())
-        add_tooltip(self._cols_spin, "Grid columns (width). Total slots across all grids cannot exceed 64.")
+        spin = ttk.Spinbox(parent, from_=1, to=max_val, textvariable=var, width=4,
+                           command=command)
+        spin.pack(side='left', padx=padx)
+        spin.bind('<FocusOut>', lambda e: command())
+        add_tooltip(spin, tooltip)
+        return spin
 
-        # --- Inline: Icon + Timer settings ---
-        icon_row = ttk.Frame(settings_col)
+    def _build_icon_row(self, parent):
+        """Pack icon size, gap, stack font, and the Timers / Flash toggle groups."""
+        icon_row = ttk.Frame(parent)
         icon_row.pack(fill='x', pady=(0, PAD_ROW))
         self.icon_var, _ = self._add_spinbox(icon_row, "Icon:", 24, 64, 2,
             "Size of each buff icon in pixels (24-64)")
@@ -212,18 +222,14 @@ class GridEditorPanel(ttk.Frame):
             "Space between icons (-5 = overlapping, 0 = touching, 10 = spaced out)",
             padx=(PAD_BUTTON_GAP, PAD_MID))
 
-        ttk.Separator(icon_row, orient='vertical').pack(
-            side='left', fill='y', padx=PAD_XS)
+        ttk.Separator(icon_row, orient='vertical').pack(side='left', fill='y', padx=PAD_XS)
         self.stack_font_var, _ = self._add_spinbox(icon_row,
             "Stack Font:", 8, 24, 2, "Font size for stack counter at top-right of icons (8-24)",
             padx=(PAD_BUTTON_GAP, PAD_MID))
 
-        # Timer group — outer frame stays packed, inner frame toggles
         self._timer_group = ttk.Frame(icon_row)
         self._timer_group.pack(side='left')
-
-        ttk.Separator(self._timer_group, orient='vertical').pack(
-            side='left', fill='y', padx=PAD_XS)
+        ttk.Separator(self._timer_group, orient='vertical').pack(side='left', fill='y', padx=PAD_XS)
         self.timers_var = tk.BooleanVar()
         timers_cb = ttk.Checkbutton(self._timer_group, text="Timers",
                                      variable=self.timers_var,
@@ -241,12 +247,9 @@ class GridEditorPanel(ttk.Frame):
             "Shift timer text up/down relative to the icon (-10 to 10)",
             padx=(PAD_BUTTON_GAP, PAD_MID))
 
-        # Flash group — outer frame stays packed, inner frame toggles
         self._flash_group = ttk.Frame(icon_row)
         self._flash_group.pack(side='left')
-
-        ttk.Separator(self._flash_group, orient='vertical').pack(
-            side='left', fill='y', padx=PAD_XS)
+        ttk.Separator(self._flash_group, orient='vertical').pack(side='left', fill='y', padx=PAD_XS)
         self.flashing_var = tk.BooleanVar()
         flash_cb = ttk.Checkbutton(self._flash_group, text="Flash",
                                     variable=self.flashing_var,
@@ -265,23 +268,22 @@ class GridEditorPanel(ttk.Frame):
                   foreground=THEME_COLORS['muted'],
                   font=FONT_SMALL).pack(side='left')
 
-        # --- Info row: whitelist/slot summary ---
-        self._info_row = ttk.Frame(settings_col)
+    def _build_info_and_dynamic(self, parent):
+        """Pack whitelist/slot summary row and the Fill/Sort/Group dynamic options."""
+        self._info_row = ttk.Frame(parent)
         self._info_row.pack(fill='x', pady=(0, PAD_ROW))
 
-        self.whitelist_label = tk.StringVar(value="No buffs tracked \u2014 grid will show nothing")
+        self.whitelist_label = tk.StringVar(value="No buffs tracked — grid will show nothing")
         self.slots_label = tk.StringVar(value="0 of 0 slots assigned")
         self._info_label = ttk.Label(self._info_row, textvariable=self.whitelist_label,
                   foreground=THEME_COLORS['muted'], font=FONT_SMALL)
         self._info_label.pack(side='left', padx=(0, PAD_LF))
         self.whitelist_preview_var = tk.StringVar(value="")
         self.whitelist_preview_label = ttk.Label(
-            settings_col, textvariable=self.whitelist_preview_var,
+            parent, textvariable=self.whitelist_preview_var,
             foreground=THEME_COLORS['muted'], font=FONT_SMALL)
 
-        # --- Dynamic mode options (hidden for static grids) ---
-        self.dynamic_frame = ttk.Frame(settings_col)
-
+        self.dynamic_frame = ttk.Frame(parent)
         dyn_row = ttk.Frame(self.dynamic_frame)
         dyn_row.pack(fill='x', pady=(0, PAD_ROW))
 
@@ -299,11 +301,6 @@ class GridEditorPanel(ttk.Frame):
             ['buffFirst', 'debuffFirst', 'mixed'], 10,
             "In Buff First and Debuff First modes, misc effects always lead. In Mixed, all buffs sort together by time.",
             padx=(PAD_BUTTON_GAP, 0))
-
-        self.load_from_config()
-
-        bind_card_events(card, self._accent_color)
-        self._card = card
 
     def bind_reorder_keys(self, move_callback):
         """Bind Alt+Up/Down on the card for keyboard reorder."""
@@ -425,32 +422,26 @@ class GridEditorPanel(ttk.Frame):
         self.grid_config['sortOrder'] = self.sort_var.get()
         self.grid_config['layout'] = self.layout_var.get()
 
+    def _format_buff_preview(self, ids, max_show=4):
+        """Comma-separated preview of buff names for up to *max_show* IDs."""
+        names = [
+            (self.database.by_id.get(bid) or {}).get('name', f"(missing #{bid})")
+            for bid in ids[:max_show]
+        ]
+        extra = f" + {len(ids) - max_show} more" if len(ids) > max_show else ""
+        return ", ".join(names) + extra
+
     def update_labels(self):
         """Refresh whitelist, slot assignment, and header summary labels."""
         cfg = self.grid_config
         wl = cfg.get('whitelist', [])
         rows = cfg.get('rows', 1)
         cols = cfg.get('cols', 5)
-        total_slots = rows * cols
 
-        if wl:
-            self.whitelist_label.set(f"Tracking {len(wl)} buffs")
-        else:
-            self.whitelist_label.set("No buffs tracked \u2014 grid will show nothing")
-
-        if wl:
-            names = []
-            for bid in wl[:4]:
-                entry = self.database.by_id.get(bid)
-                names.append(entry['name'] if entry else f"(missing #{bid})")
-            preview = ", ".join(names)
-            if len(wl) > 4:
-                preview += f" + {len(wl) - 4} more"
-            self.whitelist_preview_var.set(preview)
-            self.whitelist_preview_label.pack(fill='x', pady=(0, PAD_BUTTON_GAP))
-        else:
-            self.whitelist_preview_var.set("")
-            self.whitelist_preview_label.pack_forget()
+        self.whitelist_label.set(
+            f"Tracking {len(wl)} buffs" if wl
+            else "No buffs tracked \u2014 grid will show nothing"
+        )
 
         sa = cfg.get('slotAssignments', {})
         assigned_ids = []
@@ -460,27 +451,18 @@ class GridEditorPanel(ttk.Frame):
             elif v:
                 assigned_ids.append(v)
         configured = sum(1 for v in sa.values() if v)
-        self.slots_label.set(f"{configured} of {total_slots} slots assigned")
+        self.slots_label.set(f"{configured} of {rows * cols} slots assigned")
 
-        if cfg.get('slotMode') == 'static' and assigned_ids:
-            names = []
-            for bid in assigned_ids[:4]:
-                entry = self.database.by_id.get(bid)
-                names.append(entry['name'] if entry else f"(missing #{bid})")
-            preview = ", ".join(names)
-            if len(assigned_ids) > 4:
-                preview += f" + {len(assigned_ids) - 4} more"
-            self.whitelist_preview_var.set(preview)
+        preview_ids = assigned_ids if cfg.get('slotMode') == 'static' else wl
+        if preview_ids:
+            self.whitelist_preview_var.set(self._format_buff_preview(preview_ids))
             self.whitelist_preview_label.pack(fill='x', pady=(0, PAD_BUTTON_GAP))
-        elif cfg.get('slotMode') == 'static':
+        else:
             self.whitelist_preview_var.set("")
             self.whitelist_preview_label.pack_forget()
 
         self.section.set_title(cfg.get('id', 'Grid'))
-
-        size = f"{rows}x{cols}"
-        mode = cfg.get('slotMode', 'dynamic')
-        self.section.set_summary(f"  {size} \u00B7 {mode}")
+        self.section.set_summary(f"  {rows}x{cols} \u00B7 {cfg.get('slotMode', 'dynamic')}")
 
     def _on_mode_btn_click(self):
         if self.grid_config.get('slotMode') == 'static':
@@ -646,52 +628,7 @@ class GridsPanel(ttk.Frame):
         ttk.Label(toolbar, textvariable=self.slot_count_label,
                   font=FONT_SMALL, foreground=THEME_COLORS['muted']).pack(side='right')
 
-        # --- Tip bar (contextual next-step guidance, shown in both states) ---
-        self._tip_frame = tk.Frame(self, bg=TK_COLORS['status_bg'],
-                                    highlightbackground=TK_COLORS['border'],
-                                    highlightcolor=TK_COLORS['border'],
-                                    highlightthickness=1)
-        tip_inner = tk.Frame(self._tip_frame, bg=TK_COLORS['status_bg'])
-        tip_inner.pack(fill='x', padx=PAD_LF, pady=PAD_XS)
-
-        self._tip_accent = tk.Frame(self._tip_frame, bg=THEME_COLORS['accent'], width=3)
-        self._tip_accent.place(x=0, y=0, relheight=1)
-
-        _status_bg = TK_COLORS['status_bg']
-        _muted = THEME_COLORS['muted']
-        self._step_badges = []
-        self._step_labels = []
-        for i, step_text in enumerate(["Set game folder below", "Add Grid", "Choose Tracked Buffs", "Build"]):
-            if i > 0:
-                ttk.Label(tip_inner, text="\u2192", font=FONT_BODY,
-                          foreground=_muted).pack(side='left', padx=PAD_XS)
-            badge = tk.Canvas(tip_inner, width=20, height=20,
-                              bg=_status_bg, highlightthickness=0)
-            badge.pack(side='left', padx=(PAD_XS, 2))
-            badge.create_oval(1, 1, 19, 19, fill='', outline=_muted, tags='oval')
-            badge.create_text(10, 10, text=str(i + 1), fill=_muted,
-                              font=FONT_SMALL, anchor='center', tags='num')
-            lbl = ttk.Label(tip_inner, text=step_text, font=FONT_BODY, foreground=_muted)
-            lbl.pack(side='left')
-            self._step_badges.append(badge)
-            self._step_labels.append(lbl)
-
-        dismiss_label = ttk.Label(tip_inner, text="\u00D7", font=FONT_BODY_LG,
-                                   foreground=THEME_COLORS['muted'], cursor='hand2',
-                                   takefocus=True)
-        dismiss_label.pack(side='right', padx=(PAD_SMALL, 0))
-        dismiss_label.bind('<Button-1>', lambda e: self._dismiss_tip())
-        dismiss_label.bind('<Return>', lambda e: self._dismiss_tip())
-        dismiss_label.bind('<space>', lambda e: self._dismiss_tip())
-        dismiss_label.bind('<Enter>', lambda e: dismiss_label.config(
-            foreground=THEME_COLORS['heading']))
-        dismiss_label.bind('<Leave>', lambda e: dismiss_label.config(
-            foreground=THEME_COLORS['muted']))
-        dismiss_label.bind('<FocusIn>', lambda e: dismiss_label.config(
-            foreground=THEME_COLORS['heading']))
-        dismiss_label.bind('<FocusOut>', lambda e: dismiss_label.config(
-            foreground=THEME_COLORS['muted']))
-        bind_label_press_effect(dismiss_label)
+        self._build_tip_bar()
 
         content = ttk.Frame(self._normal_view)
         content.pack(fill='both', expand=True, padx=PAD_SMALL, pady=PAD_SMALL)
@@ -707,6 +644,46 @@ class GridsPanel(ttk.Frame):
 
         # --- Empty state ---
         self._empty_state = self._build_empty_state()
+
+    def _build_tip_bar(self):
+        """Build the contextual next-step guide (tip bar) shown above grids/empty state."""
+        self._tip_frame = tk.Frame(self, bg=TK_COLORS['status_bg'],
+                                    highlightbackground=TK_COLORS['border'],
+                                    highlightcolor=TK_COLORS['border'],
+                                    highlightthickness=1)
+        tip_inner = tk.Frame(self._tip_frame, bg=TK_COLORS['status_bg'])
+        tip_inner.pack(fill='x', padx=PAD_LF, pady=PAD_XS)
+
+        self._tip_accent = tk.Frame(self._tip_frame, bg=THEME_COLORS['accent'], width=3)
+        self._tip_accent.place(x=0, y=0, relheight=1)
+
+        muted = THEME_COLORS['muted']
+        bg = TK_COLORS['status_bg']
+        self._step_badges = []
+        self._step_labels = []
+        for i, step_text in enumerate(["Set game folder below", "Add Grid", "Choose Tracked Buffs", "Build"]):
+            if i > 0:
+                ttk.Label(tip_inner, text="→", font=FONT_BODY,
+                          foreground=muted).pack(side='left', padx=PAD_XS)
+            badge = tk.Canvas(tip_inner, width=20, height=20,
+                              bg=bg, highlightthickness=0)
+            badge.pack(side='left', padx=(PAD_XS, 2))
+            badge.create_oval(1, 1, 19, 19, fill='', outline=muted, tags='oval')
+            badge.create_text(10, 10, text=str(i + 1), fill=muted,
+                              font=FONT_SMALL, anchor='center', tags='num')
+            lbl = ttk.Label(tip_inner, text=step_text, font=FONT_BODY, foreground=muted)
+            lbl.pack(side='left')
+            self._step_badges.append(badge)
+            self._step_labels.append(lbl)
+
+        dismiss_label = ttk.Label(tip_inner, text="×", font=FONT_BODY_LG,
+                                   foreground=muted, cursor='hand2',
+                                   takefocus=True)
+        dismiss_label.pack(side='right', padx=(PAD_SMALL, 0))
+        for seq in ('<Button-1>', '<Return>', '<space>'):
+            dismiss_label.bind(seq, lambda e: self._dismiss_tip())
+        bind_label_hover_colors(dismiss_label, muted, THEME_COLORS['heading'])
+        bind_label_press_effect(dismiss_label)
 
     def _update_step_guide(self, done):
         """Update steps. done: list of bools per step. Done=green, first not-done=active, rest=muted."""
@@ -735,7 +712,6 @@ class GridsPanel(ttk.Frame):
     def _build_empty_state(self):
         """Create the empty state frame shown when no grids exist."""
         frame = ttk.Frame(self)
-
         center = ttk.Frame(frame)
         center.pack(expand=True)
 
@@ -743,36 +719,17 @@ class GridsPanel(ttk.Frame):
                   font=FONT_HEADING, foreground=THEME_COLORS['heading']).pack(
                       pady=(0, PAD_SECTION_GAP))
 
-        # --- Type radios (Player / Target) ---
-        _label_w = 6
-        type_frame = ttk.Frame(center)
-        type_frame.pack(pady=(0, PAD_XS))
         self._empty_type_var = tk.StringVar(value="player")
-        ttk.Label(type_frame, text="Source:", font=FONT_SMALL, width=_label_w,
-                  foreground=THEME_COLORS['muted']).pack(side='left')
-        self._radio_player = ttk.Radiobutton(
-            type_frame, text="Player", variable=self._empty_type_var,
-            value="player", command=self._redraw_empty_cards)
-        self._radio_player.pack(side='left', padx=PAD_XS)
-        self._radio_target = ttk.Radiobutton(
-            type_frame, text="Target", variable=self._empty_type_var,
-            value="target", command=self._redraw_empty_cards)
-        self._radio_target.pack(side='left', padx=PAD_XS)
+        self._radio_player, self._radio_target = self._build_radio_row(
+            center, "Source:", self._empty_type_var,
+            [("Player", "player"), ("Target", "target")],
+            command=self._redraw_empty_cards, pady=(0, PAD_XS))
 
-        # --- Mode radios (Dynamic / Static) ---
-        mode_frame = ttk.Frame(center)
-        mode_frame.pack(pady=(0, PAD_TAB))
         self._empty_mode_var = tk.StringVar(value="dynamic")
-        ttk.Label(mode_frame, text="Mode:", font=FONT_SMALL, width=_label_w,
-                  foreground=THEME_COLORS['muted']).pack(side='left')
-        self._radio_dynamic = ttk.Radiobutton(
-            mode_frame, text="Dynamic", variable=self._empty_mode_var,
-            value="dynamic")
-        self._radio_dynamic.pack(side='left', padx=PAD_XS)
-        self._radio_static = ttk.Radiobutton(
-            mode_frame, text="Static", variable=self._empty_mode_var,
-            value="static")
-        self._radio_static.pack(side='left', padx=PAD_XS)
+        self._radio_dynamic, self._radio_static = self._build_radio_row(
+            center, "Mode:", self._empty_mode_var,
+            [("Dynamic", "dynamic"), ("Static", "static")],
+            command=None, pady=(0, PAD_TAB))
 
         cards_frame = ttk.Frame(center)
         cards_frame.pack(pady=(0, PAD_SECTION_GAP))
@@ -784,58 +741,12 @@ class GridsPanel(ttk.Frame):
             ("1\u00d71 Slot", 1, 1, "static"),
             ("Custom", None, None, None),
         ]
-        _bg = TK_COLORS['bg']
-        _scanline = blend_alpha('#000000', _bg, SCANLINE_ALPHA)
-        _border = TK_COLORS['border']
-        card_w, card_h = 110, 110
         self._empty_cards = []
-
         for label, rows, cols, mode in presets:
-            card = tk.Canvas(cards_frame, width=card_w, height=card_h,
-                             highlightthickness=1, highlightbackground=_border,
-                             bg=_bg, cursor='hand2', takefocus=True)
-            card.pack(side='left', padx=PAD_LF)
-
-            card.create_rectangle(0, 0, card_w, card_h, fill=_bg, outline='')
-            for y in range(0, card_h, 3):
-                card.create_line(0, y, card_w, y, fill=_scanline)
-
-            card.create_text(card_w // 2, card_h - 14, text=label, anchor='center',
-                             fill=THEME_COLORS['muted'], font=FONT_SMALL)
-
-            self._empty_cards.append((card, rows, cols))
-
-            def _on_click(e, r=rows, c=cols, m=mode):
-                if r is not None:
-                    # 1×1 always static; otherwise use mode radio
-                    effective_mode = 'static' if (r == 1 and c == 1) else self._empty_mode_var.get()
-                    self._create_from_empty_state(r, c, effective_mode)
-                else:
-                    self._create_from_empty_state(r, c, m)
-
-            def _on_press(e, c=card):
-                c.configure(highlightbackground=THEME_COLORS['accent'])
-
-            def _on_release(e, c=card):
-                c.configure(highlightbackground=_border)
-
-            def _on_focus_in(e, c=card):
-                c.configure(highlightbackground=THEME_COLORS['accent'])
-
-            def _on_focus_out(e, c=card):
-                c.configure(highlightbackground=_border)
-
-            card.bind('<Button-1>', _on_click)
-            card.bind('<ButtonPress-1>', _on_press, add='+')
-            card.bind('<ButtonRelease-1>', _on_release, add='+')
-            card.bind('<Return>', _on_click)
-            card.bind('<space>', _on_click)
-            card.bind('<FocusIn>', _on_focus_in)
-            card.bind('<FocusOut>', _on_focus_out)
+            self._build_preset_card(cards_frame, label, rows, cols, mode)
 
         self._redraw_empty_cards()
 
-        # Tooltips for radios and cards
         add_tooltip(self._radio_player, "Track buffs/debuffs on yourself")
         add_tooltip(self._radio_target, "Track buffs/debuffs on your current target")
         add_tooltip(self._radio_dynamic,
@@ -856,6 +767,58 @@ class GridsPanel(ttk.Frame):
                 add_tooltip(card_canvas, _card_descriptions[label])
 
         return frame
+
+    def _build_radio_row(self, parent, label_text, var, options, command, pady):
+        """Pack a label + horizontal Radiobutton group; return the Radiobutton widgets."""
+        frame = ttk.Frame(parent)
+        frame.pack(pady=pady)
+        ttk.Label(frame, text=label_text, font=FONT_SMALL, width=6,
+                  foreground=THEME_COLORS['muted']).pack(side='left')
+        radios = []
+        for text, value in options:
+            rb = ttk.Radiobutton(frame, text=text, variable=var, value=value,
+                                 command=command)
+            rb.pack(side='left', padx=PAD_XS)
+            radios.append(rb)
+        return radios
+
+    def _build_preset_card(self, parent, label, rows, cols, mode):
+        """Create one preset shape card with click/focus highlight bindings."""
+        bg = TK_COLORS['bg']
+        border = TK_COLORS['border']
+        accent = THEME_COLORS['accent']
+        scanline = blend_alpha('#000000', bg, SCANLINE_ALPHA)
+        card_w, card_h = 110, 110
+
+        card = tk.Canvas(parent, width=card_w, height=card_h,
+                         highlightthickness=1, highlightbackground=border,
+                         bg=bg, cursor='hand2', takefocus=True)
+        card.pack(side='left', padx=PAD_LF)
+        card.create_rectangle(0, 0, card_w, card_h, fill=bg, outline='')
+        for y in range(0, card_h, 3):
+            card.create_line(0, y, card_w, y, fill=scanline)
+        card.create_text(card_w // 2, card_h - 14, text=label, anchor='center',
+                         fill=THEME_COLORS['muted'], font=FONT_SMALL)
+
+        self._empty_cards.append((card, rows, cols))
+
+        def _on_click(e, r=rows, c=cols, m=mode):
+            if r is None:
+                self._create_from_empty_state(r, c, m)
+                return
+            effective_mode = 'static' if (r == 1 and c == 1) else self._empty_mode_var.get()
+            self._create_from_empty_state(r, c, effective_mode)
+
+        def _highlight(e, color, c=card):
+            c.configure(highlightbackground=color)
+
+        card.bind('<Button-1>', _on_click)
+        card.bind('<Return>', _on_click)
+        card.bind('<space>', _on_click)
+        card.bind('<ButtonPress-1>', lambda e: _highlight(e, accent), add='+')
+        card.bind('<ButtonRelease-1>', lambda e: _highlight(e, border), add='+')
+        card.bind('<FocusIn>', lambda e: _highlight(e, accent))
+        card.bind('<FocusOut>', lambda e: _highlight(e, border))
 
     def _redraw_empty_cards(self):
         """Redraw grid shape previews on empty state cards using current type color."""

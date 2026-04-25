@@ -194,62 +194,68 @@ class BuffEditDialog(tk.Toplevel):
         self.deiconify()
 
     def create_widgets(self, buff):
-        header_text = f"{self._action_label.upper()} BUFF"
-        create_dialog_header(self, header_text, MODULE_COLORS['grids'])
+        create_dialog_header(self, f"{self._action_label.upper()} BUFF", MODULE_COLORS['grids'])
 
         frame = ttk.Frame(self, padding=PAD_INNER)
         frame.pack(fill='both', expand=True)
 
-        # Name
-        ttk.Label(frame, text="Name:").grid(row=0, column=0, sticky='w', pady=PAD_SMALL)
         self.name_var = tk.StringVar(value=buff['name'] if buff else "")
-        ttk.Entry(frame, textvariable=self.name_var, width=35).grid(row=0, column=1, sticky='w', pady=PAD_SMALL)
+        self._add_grid_row(frame, 0, "Name:",
+                           ttk.Entry(frame, textvariable=self.name_var, width=35))
 
-        # IDs
         ttk.Label(frame, text="ID(s):").grid(row=1, column=0, sticky='nw', pady=PAD_SMALL)
         id_frame = ttk.Frame(frame)
         id_frame.grid(row=1, column=1, sticky='w', pady=PAD_SMALL)
-
         self.ids_text = tk.Text(id_frame, width=25, height=10)
         style_tk_text(self.ids_text)
         self.ids_text.pack(side='left')
-
         if buff:
-            ids = buff.get('ids', [])
-            self.ids_text.insert('1.0', '\n'.join(str(i) for i in ids))
-
+            self.ids_text.insert('1.0', '\n'.join(str(i) for i in buff.get('ids', [])))
         ttk.Label(id_frame, text="One per line or\ncomma-separated",
                  foreground=THEME_COLORS['muted'], font=FONT_SMALL).pack(side='left', padx=PAD_TAB)
 
-        # Category
-        ttk.Label(frame, text="Category:").grid(row=2, column=0, sticky='w', pady=PAD_SMALL)
         self.category_var = tk.StringVar(value=buff.get('category', '') if buff else "")
-        ttk.Combobox(frame, textvariable=self.category_var, values=self.categories, width=32).grid(row=2, column=1, sticky='w', pady=PAD_SMALL)
+        self._add_grid_row(frame, 2, "Category:",
+                           ttk.Combobox(frame, textvariable=self.category_var,
+                                        values=self.categories, width=32))
 
-        # Type
-        ttk.Label(frame, text="Type:").grid(row=3, column=0, sticky='w', pady=PAD_SMALL)
-        initial_type = buff.get('type', 'buff') if buff else 'buff'
-        self.type_var = tk.StringVar(value=initial_type)
-
+        self.type_var = tk.StringVar(value=buff.get('type', 'buff') if buff else 'buff')
         type_frame = ttk.Frame(frame)
-        type_frame.grid(row=3, column=1, sticky='w', pady=PAD_SMALL)
-        ttk.Radiobutton(type_frame, text="Buff", variable=self.type_var, value='buff').pack(side='left')
-        ttk.Radiobutton(type_frame, text="Debuff", variable=self.type_var, value='debuff').pack(side='left', padx=PAD_TAB)
-        ttk.Radiobutton(type_frame, text="Misc", variable=self.type_var, value='misc').pack(side='left', padx=PAD_TAB)
+        for i, (text, val) in enumerate([("Buff", 'buff'), ("Debuff", 'debuff'), ("Misc", 'misc')]):
+            ttk.Radiobutton(type_frame, text=text, variable=self.type_var, value=val).pack(
+                side='left', padx=(0 if i == 0 else PAD_TAB, 0))
+        self._add_grid_row(frame, 3, "Type:", type_frame)
 
-        # Stacking
-        ttk.Label(frame, text="Stacking:").grid(row=4, column=0, sticky='w', pady=PAD_SMALL)
+        self._build_stacking_section(frame, buff)
+
+        btn_frame = ttk.Frame(frame)
+        btn_frame.grid(row=8, column=0, columnspan=2, pady=PAD_SECTION_GAP)
+        ttk.Button(btn_frame, text="Cancel", command=self.on_cancel,
+                   width=10, bootstyle='secondary').pack(side='left', padx=PAD_SMALL)
+        ttk.Button(btn_frame, text=self._action_label, command=self.on_ok,
+                   width=10, bootstyle='success').pack(side='left', padx=PAD_SMALL)
+
+        self.bind('<Return>', self._on_return)
+        self.bind('<Escape>', lambda e: self.on_cancel())
+
+    def _add_grid_row(self, parent, row, label_text, widget):
+        """Place label in column 0, widget in column 1, both sticky west."""
+        ttk.Label(parent, text=label_text).grid(row=row, column=0, sticky='w', pady=PAD_SMALL)
+        widget.grid(row=row, column=1, sticky='w', pady=PAD_SMALL)
+
+    def _build_stacking_section(self, frame, buff):
+        """Pack the stacking checkbox + partial + start/end spinboxes (rows 4-7)."""
         self.stacking_var = tk.BooleanVar(value=buff.get('stacking', False) if buff else False)
         stack_frame = ttk.Frame(frame)
-        stack_frame.grid(row=4, column=1, sticky='w', pady=PAD_SMALL)
         ttk.Checkbutton(stack_frame, text="This buff has stack levels",
                        variable=self.stacking_var,
                        command=self._on_stacking_changed,
                        bootstyle="success-round-toggle").pack(side='left')
         ttk.Label(stack_frame, text="(IDs ordered by stack)",
                  foreground=THEME_COLORS['muted'], font=FONT_SMALL).pack(side='left', padx=PAD_TAB)
+        self._add_grid_row(frame, 4, "Stacking:", stack_frame)
 
-        # Partial list
+        # Partial list — label is empty (acts as spacer that grid_remove can hide)
         self.partial_label = ttk.Label(frame, text="")
         self.partial_label.grid(row=5, column=0, sticky='w', pady=PAD_SMALL)
         self.partial_frame = ttk.Frame(frame)
@@ -262,49 +268,30 @@ class BuffEditDialog(tk.Toplevel):
         ttk.Label(self.partial_frame, text="(IDs don't start from stack 1)",
                  foreground=THEME_COLORS['muted'], font=FONT_SMALL).pack(side='left', padx=PAD_TAB)
 
-        # Stack Start
         self.start_label = ttk.Label(frame, text="Start at:")
         self.start_label.grid(row=6, column=0, sticky='w', pady=PAD_SMALL)
         self.stack_start_frame = ttk.Frame(frame)
         self.stack_start_frame.grid(row=6, column=1, sticky='w', pady=PAD_SMALL)
-
         self.stack_start_var = tk.IntVar(value=buff.get('stackStart', 1) if buff else 1)
-        self.stack_start_spin = ttk.Spinbox(
-            self.stack_start_frame, textvariable=self.stack_start_var,
-            from_=1, to=99, width=5
-        )
+        self.stack_start_spin = ttk.Spinbox(self.stack_start_frame,
+            textvariable=self.stack_start_var, from_=1, to=99, width=5)
         self.stack_start_spin.pack(side='left')
         self.start_hint = ttk.Label(self.stack_start_frame, text="",
                  foreground=THEME_COLORS['muted'], font=FONT_SMALL)
         self.start_hint.pack(side='left', padx=PAD_TAB)
 
-        # Stack End
         self.end_label = ttk.Label(frame, text="End at:")
         self.end_label.grid(row=7, column=0, sticky='w', pady=PAD_SMALL)
         self.stack_end_frame = ttk.Frame(frame)
         self.stack_end_frame.grid(row=7, column=1, sticky='w', pady=PAD_SMALL)
-
-        default_end = buff.get('stackEnd', 0) if buff else 0
-        self.stack_end_var = tk.IntVar(value=default_end)
-        self.stack_end_spin = ttk.Spinbox(
-            self.stack_end_frame, textvariable=self.stack_end_var,
-            from_=0, to=99, width=5
-        )
+        self.stack_end_var = tk.IntVar(value=buff.get('stackEnd', 0) if buff else 0)
+        self.stack_end_spin = ttk.Spinbox(self.stack_end_frame,
+            textvariable=self.stack_end_var, from_=0, to=99, width=5)
         self.stack_end_spin.pack(side='left')
         ttk.Label(self.stack_end_frame, text="Last stack level to show (0 = show all)",
                  foreground=THEME_COLORS['muted'], font=FONT_SMALL).pack(side='left', padx=PAD_TAB)
 
         self._on_stacking_changed()
-
-        btn_frame = ttk.Frame(frame)
-        btn_frame.grid(row=8, column=0, columnspan=2, pady=PAD_SECTION_GAP)
-        ttk.Button(btn_frame, text="Cancel", command=self.on_cancel,
-                   width=10, bootstyle='secondary').pack(side='left', padx=PAD_SMALL)
-        ttk.Button(btn_frame, text=self._action_label, command=self.on_ok,
-                   width=10, bootstyle='success').pack(side='left', padx=PAD_SMALL)
-
-        self.bind('<Return>', self._on_return)
-        self.bind('<Escape>', lambda e: self.on_cancel())
 
     def _on_return(self, event):
         if event.widget == self.ids_text:
@@ -355,6 +342,23 @@ class BuffEditDialog(tk.Toplevel):
             self.stack_end_frame.grid()
 
     def on_ok(self):
+        result = self._collect_inputs()
+        if result is None:
+            return
+        if self.stacking_var.get():
+            self._apply_stacking_fields(result)
+
+        if self._validate:
+            error = self._validate(result)
+            if error:
+                Messagebox.show_error(error, title="Can't Save")
+                return
+
+        self.result = result
+        self.destroy()
+
+    def _collect_inputs(self):
+        """Validate name, IDs, category. Return base result dict or None on failure."""
         ids, rejected = self.parse_ids()
         if rejected:
             preview = ', '.join(rejected[:5]) + ('...' if len(rejected) > 5 else '')
@@ -363,57 +367,45 @@ class BuffEditDialog(tk.Toplevel):
                 f"{preview}\n\nSave anyway?",
                 title="Invalid IDs"
             ) != "Yes":
-                return
+                return None
         if not ids:
             Messagebox.show_error("Enter at least one buff ID — find IDs on AoC database sites.",
                                   title="Missing Buff ID")
-            return
+            return None
 
         name = self.name_var.get().strip()
         if not name:
             Messagebox.show_error("Give this buff a name so you can find it later.",
                                   title="Missing Name")
-            return
+            return None
 
         category = self.category_var.get().strip()
         if not category:
             Messagebox.show_error("Pick a category to keep the database organized.",
                                   title="Missing Category")
-            return
+            return None
 
-        buff_type = self.type_var.get()
-        is_stacking = self.stacking_var.get()
-
-        self.result = {
+        return {
             'name': name,
             'ids': ids,
             'category': category,
-            'type': buff_type
+            'type': self.type_var.get(),
         }
 
-        if is_stacking:
-            self.result['stacking'] = True
-            is_partial = self.partial_var.get()
-            stack_start = self.stack_start_var.get()
-            if is_partial:
-                self.result['partialList'] = True
-                if stack_start != 1:
-                    self.result['stackStart'] = stack_start
-            else:
-                if stack_start != 1:
-                    self.result['stackStart'] = stack_start
-                stack_end = self.stack_end_var.get()
-                if stack_end > 0:
-                    self.result['stackEnd'] = stack_end
-
-        if self._validate:
-            error = self._validate(self.result)
-            if error:
-                Messagebox.show_error(error, title="Can't Save")
-                self.result = None
-                return
-
-        self.destroy()
+    def _apply_stacking_fields(self, result):
+        """Add stacking-related keys onto *result* based on current widget state."""
+        result['stacking'] = True
+        stack_start = self.stack_start_var.get()
+        if self.partial_var.get():
+            result['partialList'] = True
+            if stack_start != 1:
+                result['stackStart'] = stack_start
+            return
+        if stack_start != 1:
+            result['stackStart'] = stack_start
+        stack_end = self.stack_end_var.get()
+        if stack_end > 0:
+            result['stackEnd'] = stack_end
 
     def on_cancel(self):
         self.result = None
@@ -428,6 +420,27 @@ def format_ids_display(ids, max_show=3):
     if len(ids) <= max_show:
         return ','.join(str(i) for i in ids)
     return ','.join(str(i) for i in ids[:max_show]) + f"...+{len(ids)-max_show}"
+
+
+def format_stack_indicator(buff):
+    """Return the short label shown in the Stack column ('', 'Yes', 'P', 'x3+', 'P:2+', etc.)."""
+    if not buff.get('stacking', False):
+        return ""
+    start = buff.get('stackStart', 1)
+    if buff.get('partialList', False):
+        return f"P:{start}+" if start != 1 else "P"
+    return f"x{start}+" if start != 1 else "Yes"
+
+
+def migrate_legacy_buff_fields(buff):
+    """Convert legacy v1 fields ('id', 'isDebuff') to current v2 schema in-place."""
+    if 'id' in buff and 'ids' not in buff:
+        buff['ids'] = [buff.pop('id')]
+    if 'isDebuff' in buff:
+        buff.setdefault('type', 'debuff' if buff['isDebuff'] else 'buff')
+        del buff['isDebuff']
+    buff.setdefault('type', 'buff')
+    return buff
 
 
 # ============================================================================
@@ -456,7 +469,11 @@ class DatabaseEditorTab(ttk.Frame):
         self.refresh_list()
 
     def create_widgets(self):
-        # Filter frame
+        self._build_filter_bar()
+        self._build_tree()
+        self._build_button_bar()
+
+    def _build_filter_bar(self):
         filter_frame = ttk.Frame(self, padding=PAD_SMALL)
         filter_frame.pack(fill='x')
 
@@ -475,20 +492,29 @@ class DatabaseEditorTab(ttk.Frame):
 
         ttk.Label(filter_frame, text="Type:").pack(side='left', padx=(PAD_TAB, 0))
         self.type_var = tk.StringVar(value="All")
-        type_combo = ttk.Combobox(filter_frame, textvariable=self.type_var,
-                                  values=["All", "Buff", "Debuff", "Misc"], width=10, state='readonly')
-        type_combo.pack(side='left', padx=PAD_SMALL)
+        ttk.Combobox(filter_frame, textvariable=self.type_var,
+                     values=["All", "Buff", "Debuff", "Misc"],
+                     width=10, state='readonly').pack(side='left', padx=PAD_SMALL)
         self.type_var.trace_add('write', lambda *a: self.refresh_list())
 
         self.count_var = tk.StringVar(value="0 entries")
         ttk.Label(filter_frame, textvariable=self.count_var).pack(side='right', padx=PAD_TAB)
 
-        # Tree view
+    def _build_tree(self):
         list_frame = ttk.Frame(self, padding=PAD_SMALL)
         list_frame.pack(fill='both', expand=True)
 
-        columns = ('name', 'ids', 'category', 'type', 'stacking', 'grids')
-        self.tree = ttk.Treeview(list_frame, columns=columns, show='headings', selectmode='browse')
+        # (key, label, width, minwidth, stretch, anchor)
+        column_specs = [
+            ('name',     'Name',     220, 100, True,  'w'),
+            ('ids',      'ID(s)',    180,  80, True,  'w'),
+            ('category', 'Category', 120,  80, True,  'w'),
+            ('type',     'Type',      60,  50, False, 'center'),
+            ('stacking', 'Stack',     50,  40, False, 'center'),
+            ('grids',    'Grids',     45,  35, False, 'center'),
+        ]
+        keys = [c[0] for c in column_specs]
+        self.tree = ttk.Treeview(list_frame, columns=keys, show='headings', selectmode='browse')
         # Force dark bg on empty area below entries — must use after_idle
         # so it applies after ttkbootstrap finishes its theme configuration
         def _fix_tree_bg():
@@ -497,19 +523,9 @@ class DatabaseEditorTab(ttk.Frame):
             s.configure('Treeview', fieldbackground=bg, background=bg)
         self.tree.after_idle(_fix_tree_bg)
 
-        self.tree.heading('name', text='Name', command=lambda: self.sort_by('name'))
-        self.tree.heading('ids', text='ID(s)', command=lambda: self.sort_by('ids'))
-        self.tree.heading('category', text='Category', command=lambda: self.sort_by('category'))
-        self.tree.heading('type', text='Type', command=lambda: self.sort_by('type'))
-        self.tree.heading('stacking', text='Stack', command=lambda: self.sort_by('stacking'))
-        self.tree.heading('grids', text='Grids', command=lambda: self.sort_by('grids'))
-
-        self.tree.column('name', width=220, minwidth=100, stretch=True, anchor='w')
-        self.tree.column('ids', width=180, minwidth=80, stretch=True, anchor='w')
-        self.tree.column('category', width=120, minwidth=80, stretch=True, anchor='w')
-        self.tree.column('type', width=60, minwidth=50, stretch=False, anchor='center')
-        self.tree.column('stacking', width=50, minwidth=40, stretch=False, anchor='center')
-        self.tree.column('grids', width=45, minwidth=35, stretch=False, anchor='center')
+        for key, label, width, minw, stretch, anchor in column_specs:
+            self.tree.heading(key, text=label, command=lambda k=key: self.sort_by(k))
+            self.tree.column(key, width=width, minwidth=minw, stretch=stretch, anchor=anchor)
 
         scrollbar = ttk.Scrollbar(list_frame, orient='vertical', command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
@@ -523,31 +539,28 @@ class DatabaseEditorTab(ttk.Frame):
         self.tree.bind('<Return>', lambda e: self.edit_buff())
         self.tree.bind('<Delete>', lambda e: self.delete_buff())
 
-        # Button frame
+    def _build_button_bar(self):
         btn_frame = ttk.Frame(self, padding=PAD_SMALL)
         btn_frame.pack(fill='x')
 
-        save_btn = ttk.Button(btn_frame, text="Save Database", command=self.save)
-        save_btn.pack(side='left', padx=PAD_XS)
-        add_tooltip(save_btn, "Save all buff entries to database file")
-        ttk.Separator(btn_frame, orient='vertical').pack(side='left', fill='y', padx=PAD_TAB)
-
-        add_btn = ttk.Button(btn_frame, text="Add", command=self.add_buff, width=BTN_SMALL)
-        add_btn.pack(side='left', padx=PAD_XS)
-        add_tooltip(add_btn, "Create a new buff entry")
-        edit_btn = ttk.Button(btn_frame, text="Edit", command=self.edit_buff, width=BTN_SMALL)
-        edit_btn.pack(side='left', padx=PAD_XS)
-        add_tooltip(edit_btn, "Edit the selected buff entry")
-        del_btn = ttk.Button(btn_frame, text="Delete", command=self.delete_buff, width=BTN_SMALL)
-        del_btn.pack(side='left', padx=PAD_XS)
-        add_tooltip(del_btn, "Delete the selected buff entry")
-        ttk.Separator(btn_frame, orient='vertical').pack(side='left', fill='y', padx=PAD_TAB)
-        imp_btn = ttk.Button(btn_frame, text="Import...", command=self.import_buffs, width=BTN_MEDIUM)
-        imp_btn.pack(side='left', padx=PAD_XS)
-        add_tooltip(imp_btn, "Import buff entries from a JSON file")
-        exp_btn = ttk.Button(btn_frame, text="Export...", command=self.export_buffs, width=BTN_MEDIUM)
-        exp_btn.pack(side='left', padx=PAD_XS)
-        add_tooltip(exp_btn, "Export selected buffs to a JSON file")
+        # (label, command, width, tooltip, separator_after)
+        button_specs = [
+            ("Save Database", self.save,          None,       "Save all buff entries to database file",       True),
+            ("Add",           self.add_buff,      BTN_SMALL,  "Create a new buff entry",                       False),
+            ("Edit",          self.edit_buff,     BTN_SMALL,  "Edit the selected buff entry",                  False),
+            ("Delete",        self.delete_buff,   BTN_SMALL,  "Delete the selected buff entry",                True),
+            ("Import...",     self.import_buffs,  BTN_MEDIUM, "Import buff entries from a JSON file",          False),
+            ("Export...",     self.export_buffs,  BTN_MEDIUM, "Export selected buffs to a JSON file",          False),
+        ]
+        for text, cmd, width, tooltip, separator in button_specs:
+            kwargs = {'text': text, 'command': cmd}
+            if width is not None:
+                kwargs['width'] = width
+            btn = ttk.Button(btn_frame, **kwargs)
+            btn.pack(side='left', padx=PAD_XS)
+            add_tooltip(btn, tooltip)
+            if separator:
+                ttk.Separator(btn_frame, orient='vertical').pack(side='left', fill='y', padx=PAD_TAB)
 
 
     def update_categories(self):
@@ -595,32 +608,16 @@ class DatabaseEditorTab(ttk.Frame):
         filtered.sort(key=lambda b: self._get_sort_key(b, grid_usage), reverse=self.sort_reverse)
 
         for i, buff in enumerate(filtered):
-            ids = buff.get('ids', [])
-            ids_str = format_ids_display(ids)
-
-            type_str = buff.get('type', 'buff').capitalize()
-            if buff.get('stacking', False):
-                stack_start = buff.get('stackStart', 1)
-                if buff.get('partialList', False):
-                    stack_str = f"P:{stack_start}+" if stack_start != 1 else "P"
-                else:
-                    stack_str = f"x{stack_start}+" if stack_start != 1 else "Yes"
-            else:
-                stack_str = ""
-
             name = buff.get('name', '')
             count = grid_usage.get(name, 0)
-            grids_str = str(count) if count > 0 else ""
-
-            row_tag = 'oddrow' if i % 2 else 'evenrow'
             self.tree.insert('', 'end', values=(
                 name,
-                ids_str,
+                format_ids_display(buff.get('ids', [])),
                 buff.get('category', ''),
-                type_str,
-                stack_str,
-                grids_str
-            ), tags=(row_tag,))
+                buff.get('type', 'buff').capitalize(),
+                format_stack_indicator(buff),
+                str(count) if count > 0 else "",
+            ), tags=('oddrow' if i % 2 else 'evenrow',))
 
         has_filters = search or category != "All" or type_filter != "All"
         if len(filtered) == 0 and has_filters:
@@ -779,21 +776,11 @@ class DatabaseEditorTab(ttk.Frame):
                 buff_ids = buff.get('ids', [buff.get('id')] if 'id' in buff else [])
                 if any(bid in existing_ids for bid in buff_ids):
                     skipped += 1
-                else:
-                    if 'id' in buff and 'ids' not in buff:
-                        buff['ids'] = [buff['id']]
-                        del buff['id']
-                    if 'isDebuff' in buff:
-                        if 'type' not in buff:
-                            buff['type'] = 'debuff' if buff['isDebuff'] else 'buff'
-                        del buff['isDebuff']
-                    if 'type' not in buff:
-                        buff['type'] = 'buff'
-
-                    self.database.add_buff(buff)
-                    for bid in buff_ids:
-                        existing_ids.add(bid)
-                    added += 1
+                    continue
+                migrate_legacy_buff_fields(buff)
+                self.database.add_buff(buff)
+                existing_ids.update(buff_ids)
+                added += 1
 
             self._set_modified()
             self.update_categories()
