@@ -250,19 +250,5 @@
         ]
       }
     }
-  ],
-  "boss_timer": {
-    "overlay": {
-      "x": 1094,
-      "y": 527,
-      "width": 305,
-      "height": 115,
-      "locked": false,
-      "transparent_bg": false,
-      "opacity": 0.9,
-      "font_size": 12,
-      "visible": false,
-      "positioned": true
-    }
-  }
+  ]
 }
