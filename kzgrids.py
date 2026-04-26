@@ -311,15 +311,13 @@ class KzGridsApp(ttkb.Window):
         self._menubar = CustomMenuBar(self)
         self._menubar.pack(fill='x', before=self._header_canvas)
 
-        self.bind_all('<Alt_L>', lambda e: self._menubar.activate())
-        self.bind_all('<Alt_R>', lambda e: self._menubar.activate())
-
-        # File menu (the only menu)
         self._menubar.add_cascade(label="File", menu_def=[
             {'type': 'command', 'label': 'New Profile', 'accelerator': 'Ctrl+N',
              'command': self._new_profile},
             {'type': 'command', 'label': 'Open Profile...', 'accelerator': 'Ctrl+O',
              'command': self._open_profile},
+            {'type': 'command', 'label': 'Load Default Profile',
+             'command': self._load_default_profile},
             {'type': 'command', 'label': 'Save Profile', 'accelerator': 'Ctrl+S',
              'command': self._save_profile},
             {'type': 'command', 'label': 'Save Profile As...',
@@ -327,10 +325,8 @@ class KzGridsApp(ttkb.Window):
             {'type': 'separator'},
             {'type': 'command', 'label': 'Uninstall from game client...',
              'command': self._uninstall_game},
-            {'type': 'separator'},
-            {'type': 'command', 'label': 'About Kaz Grids',
-             'command': self._show_about},
         ])
+        self._menubar.add_command(label="About", command=self._show_about)
 
         # Keyboard shortcuts
         self.bind_all('<Control-n>', lambda e: self._new_profile())
@@ -516,6 +512,9 @@ class KzGridsApp(ttkb.Window):
 
     def _open_profile(self):
         return profile_io.open_profile(self)
+
+    def _load_default_profile(self):
+        return profile_io.load_default_profile(self)
 
     def _load_profile(self, path):
         return profile_io.load_profile(self, path)

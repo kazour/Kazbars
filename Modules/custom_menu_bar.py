@@ -14,8 +14,8 @@ from .ui_helpers import FONT_BODY, FONT_SMALL, THEME_COLORS, TK_COLORS
 # ============================================================================
 # CUSTOM DARK MENU BAR
 # ============================================================================
-_DD_MIN_WIDTH = 200
-_DD_BORDER_COLOR = '#444444'
+_DD_MIN_WIDTH = 220
+_DD_BORDER_COLOR = '#3a3a3a'
 
 
 class CustomMenuBar(tk.Canvas):
@@ -58,6 +58,14 @@ class CustomMenuBar(tk.Canvas):
 
     def add_cascade(self, label, menu_def):
         """Add a top-level menu. Returns the menu_def list for later mutation."""
+        self._add_top_item(label, menu_def, None)
+        return menu_def
+
+    def add_command(self, label, command):
+        """Add a top-level clickable command (no dropdown)."""
+        self._add_top_item(label, None, command)
+
+    def _add_top_item(self, label, menu_def, command):
         text = f"  {label}  "
         tag = f"cascade_{len(self._cascades)}"
         tid = self.create_text(
@@ -68,21 +76,12 @@ class CustomMenuBar(tk.Canvas):
         bbox = self.bbox(tid)
         x1, x2 = bbox[0], bbox[2]
         self._cursor_x = x2
-        idx = len(self._cascades)
-        self._cascades.append((tag, x1, x2, menu_def))
-        return menu_def
-
-    def activate(self):
-        """Standard Windows Alt behavior: open/close the first cascade."""
-        if self._open_index >= 0:
-            self._close_dropdown()
-        else:
-            self._open_at(0)
+        self._cascades.append((tag, x1, x2, menu_def, command))
 
     # --- Canvas bar events ---
 
     def _hit_cascade(self, x):
-        for i, (_, x1, x2, _) in enumerate(self._cascades):
+        for i, (_, x1, x2, _, _) in enumerate(self._cascades):
             if x1 <= x <= x2:
                 return i
         return -1
@@ -90,6 +89,10 @@ class CustomMenuBar(tk.Canvas):
     def _bar_click(self, event):
         idx = self._hit_cascade(event.x)
         if idx < 0:
+            return
+        menu_def, command = self._cascades[idx][3], self._cascades[idx][4]
+        if command is not None:
+            self._invoke(command)
             return
         if self._open_index == idx:
             self._close_dropdown()
@@ -105,8 +108,9 @@ class CustomMenuBar(tk.Canvas):
             self._hover_index = idx
             if idx >= 0 and idx != self._open_index:
                 self._draw_cascade_bg(idx, self._MENU_HOVER_BG)
-        # Hover-to-switch when a menu is open
-        if self._hover_mode and self._open_index >= 0 and idx >= 0 and idx != self._open_index:
+        # Hover-to-switch when a menu is open (only to other cascades, not commands)
+        if (self._hover_mode and self._open_index >= 0 and idx >= 0
+                and idx != self._open_index and self._cascades[idx][3] is not None):
             self._open_at(idx)
 
     def _bar_leave(self, event):
@@ -118,7 +122,7 @@ class CustomMenuBar(tk.Canvas):
         tag = f"cascade_bg_{idx}"
         self.delete(tag)
         if color != self._MENU_BG:
-            _, x1, x2, _ = self._cascades[idx]
+            _, x1, x2, _, _ = self._cascades[idx]
             self.create_rectangle(
                 x1, 0, x2, self._BAR_HEIGHT,
                 fill=color, outline='', tags=(tag,),
@@ -134,6 +138,8 @@ class CustomMenuBar(tk.Canvas):
             return
         root = self.winfo_toplevel()
         self._dd_frame = tk.Frame(root, bg=_DD_BORDER_COLOR)
+        # Unhighlight focused row when cursor exits the dropdown entirely
+        self._dd_frame.bind('<Leave>', self._on_dropdown_leave)
 
     def _open_at(self, idx):
         self._ensure_dropdown()
@@ -142,7 +148,7 @@ class CustomMenuBar(tk.Canvas):
         if self._open_index >= 0:
             self._draw_cascade_bg(self._open_index, self._MENU_BG)
 
-        _, x1, x2, menu_def = self._cascades[idx]
+        _, x1, x2, menu_def, _ = self._cascades[idx]
         self._open_index = idx
         self._hover_mode = True
         self._draw_cascade_bg(idx, self._MENU_ACTIVE_BG)
@@ -154,57 +160,63 @@ class CustomMenuBar(tk.Canvas):
         inner.pack(padx=1, pady=1)
         self._dd_inner = inner
 
+        # Vertical breathing room above the first row and below the last
+        content = tk.Frame(inner, bg=self._MENU_BG)
+        content.pack(fill='both', expand=True, pady=5)
+
         self._rows = []
         self._focused_row = -1
 
         for entry in menu_def:
             if entry['type'] == 'separator':
-                tk.Frame(inner, bg=self._SEP_COLOR, height=1).pack(
-                    fill='x', padx=6, pady=3)
+                tk.Frame(content, bg=self._SEP_COLOR, height=1).pack(
+                    fill='x', padx=8, pady=6)
                 continue
 
-            row = tk.Frame(inner, bg=self._MENU_BG)
-            row.pack(fill='x', ipady=2)
+            row = tk.Frame(content, bg=self._MENU_BG)
+            row.pack(fill='x', pady=1)
+
+            pill = tk.Frame(row, bg=self._MENU_BG)
+            pill.pack(fill='x', padx=5, ipady=4)
 
             state = entry.get('state', 'normal')
             fg = self._MENU_FG if state == 'normal' else self._MENU_DISABLED_FG
             accel_fg = self._ACCEL_FG if state == 'normal' else self._MENU_DISABLED_FG
 
             text_lbl = tk.Label(
-                row, text=f"  {entry['label']}", bg=self._MENU_BG, fg=fg,
+                pill, text=entry['label'], bg=self._MENU_BG, fg=fg,
                 font=self._FONT, anchor='w',
             )
-            text_lbl.pack(side='left', fill='x', expand=True, padx=(2, 0))
+            text_lbl.pack(side='left', fill='x', expand=True, padx=(8, 0))
 
-            accel = entry.get('accelerator')
-            if accel:
-                accel_lbl = tk.Label(
-                    row, text=f"{accel}  ", bg=self._MENU_BG, fg=accel_fg,
-                    font=FONT_SMALL, anchor='e',
-                )
-                accel_lbl.pack(side='right', padx=(12, 2))
-            else:
-                tk.Label(row, text="  ", bg=self._MENU_BG, font=FONT_SMALL).pack(
-                    side='right', padx=(12, 2))
+            accel_lbl = tk.Label(
+                pill, text=entry.get('accelerator', ''), bg=self._MENU_BG, fg=accel_fg,
+                font=FONT_SMALL, anchor='e',
+            )
+            accel_lbl.pack(side='right', padx=(14, 8))
 
             cmd = entry.get('command') if state == 'normal' else None
-            self._rows.append({'row': row, 'cmd': cmd, 'state': state})
+            self._rows.append({
+                'row': row, 'pill': pill, 'text_lbl': text_lbl, 'accel_lbl': accel_lbl,
+                'cmd': cmd, 'state': state,
+            })
             row_idx = len(self._rows) - 1
 
             if state == 'normal':
-                for w in row.winfo_children():
-                    w.bind('<Enter>', lambda e, ri=row_idx: self._on_row_enter(ri))
-                    w.bind('<Leave>', lambda e, ri=row_idx: self._on_row_leave(ri))
+                for w in (row, pill, text_lbl, accel_lbl):
+                    w.bind('<Enter>', lambda e, ri=row_idx: self._set_focused_row(ri))
                     w.bind('<Button-1>', lambda e, c=cmd: self._invoke(c))
-                row.bind('<Enter>', lambda e, ri=row_idx: self._on_row_enter(ri))
-                row.bind('<Leave>', lambda e, ri=row_idx: self._on_row_leave(ri))
-                row.bind('<Button-1>', lambda e, c=cmd: self._invoke(c))
 
         # Enforce minimum width
         inner.update_idletasks()
         if inner.winfo_reqwidth() < _DD_MIN_WIDTH:
             inner.configure(width=_DD_MIN_WIDTH)
         self._dd_frame.update_idletasks()
+
+        # Force the unhighlighted state explicitly so initial render matches
+        # the post-hover render (avoids Tk first-paint quirk on Windows).
+        for entry in self._rows:
+            self._highlight_row(entry, False)
 
         # Position dropdown below the cascade label using place() on root
         root = self.winfo_toplevel()
@@ -273,26 +285,43 @@ class CustomMenuBar(tk.Canvas):
 
     # --- Row hover and keyboard navigation ---
 
-    def _on_row_enter(self, row_idx):
-        self._set_focused_row(row_idx)
-
-    def _on_row_leave(self, row_idx):
-        if self._focused_row == row_idx:
-            self._highlight_row(self._rows[row_idx]['row'], False)
+    def _on_dropdown_leave(self, event):
+        # NotifyInferior leaves (cursor moving onto a child of _dd_frame) shouldn't unhighlight
+        dd = self._dd_frame
+        rx, ry = dd.winfo_rootx(), dd.winfo_rooty()
+        if (rx <= event.x_root < rx + dd.winfo_width()
+                and ry <= event.y_root < ry + dd.winfo_height()):
+            return
+        if self._focused_row >= 0:
+            self._highlight_row(self._rows[self._focused_row], False)
             self._focused_row = -1
 
-    def _highlight_row(self, row, on):
-        bg = self._MENU_HOVER_BG if on else self._MENU_BG
-        row.configure(bg=bg)
-        for child in row.winfo_children():
-            child.configure(bg=bg)
+    def _highlight_row(self, row_entry, on):
+        # Only the pill changes; the surrounding gutter stays the surface color.
+        normal = row_entry['state'] == 'normal'
+        if on:
+            bg = self._MENU_FG
+            fg = self._MENU_BG
+            accel_fg = self._MENU_BG
+        else:
+            bg = self._MENU_BG
+            fg = self._MENU_FG if normal else self._MENU_DISABLED_FG
+            accel_fg = self._ACCEL_FG if normal else self._MENU_DISABLED_FG
+        row_entry['pill'].configure(bg=bg)
+        row_entry['text_lbl'].configure(bg=bg, fg=fg)
+        row_entry['accel_lbl'].configure(bg=bg, fg=accel_fg)
 
     def _set_focused_row(self, row_idx):
-        if 0 <= self._focused_row < len(self._rows):
-            self._highlight_row(self._rows[self._focused_row]['row'], False)
+        if row_idx == self._focused_row:
+            return
+        # Defensively reset every other row so nothing can stay stuck
+        # regardless of any Enter/Leave event quirks.
+        for i, entry in enumerate(self._rows):
+            if i != row_idx:
+                self._highlight_row(entry, False)
         self._focused_row = row_idx
-        if row_idx >= 0:
-            self._highlight_row(self._rows[row_idx]['row'], True)
+        if 0 <= row_idx < len(self._rows):
+            self._highlight_row(self._rows[row_idx], True)
 
     def _nav_rows(self, direction):
         if not self._rows:
@@ -310,8 +339,13 @@ class CustomMenuBar(tk.Canvas):
             self._invoke(cmd)
 
     def _nav_cascade(self, direction):
-        new_idx = (self._open_index + direction) % len(self._cascades)
-        self._open_at(new_idx)
+        n = len(self._cascades)
+        idx = self._open_index
+        for _ in range(n):
+            idx = (idx + direction) % n
+            if self._cascades[idx][3] is not None:
+                self._open_at(idx)
+                return
 
     # --- Invoke and configure ---
 

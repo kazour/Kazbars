@@ -43,6 +43,20 @@ def open_profile(app):
         load_profile(app, Path(path))
 
 
+def load_default_profile(app):
+    """Load the bundled Default.json profile from assets/kzgrids."""
+    if not app._check_unsaved_changes():
+        return
+    default_path = app.assets_path / "kzgrids" / "Default.json"
+    if not default_path.exists():
+        Messagebox.show_warning(
+            "Default.json not found in assets/kzgrids folder.",
+            title="Default Profile Missing"
+        )
+        return
+    load_profile(app, default_path)
+
+
 def load_profile(app, path):
     """Load a profile from a JSON file. Also dispatches `data['boss_timer']`
     to the live `BossTimer` panel if one is open."""
