@@ -5,6 +5,13 @@ Load, save, create, and open profile JSON files. Functions take the
 KzGridsApp instance as first arg and mutate its state (grids_panel,
 current_profile, modified, reference_resolution, settings, title). Kept out
 of kzgrids.py so the entry point file only carries root-window concerns.
+
+Load is split into a pure read step (`read_profile_file`) and a dispatch
+step (`apply_profile_data`) so the boss-timer fan-out is visible at every
+call site. Save retains `do_save_profile` as orchestrator (error-handling
+boilerplate makes caller composition awkward); its body is factored into
+`build_profile_payload` / `write_profile_file` / `_commit_saved_profile`,
+and `build_profile_payload` names the boss-timer pull explicitly.
 """
 
 import json
@@ -40,7 +47,8 @@ def open_profile(app):
         filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
     )
     if path:
-        load_profile(app, Path(path))
+        data, corrupt = read_profile_file(Path(path))
+        apply_profile_data(app, Path(path), data, corrupt=corrupt)
 
 
 def load_default_profile(app):
@@ -54,22 +62,32 @@ def load_default_profile(app):
             title="Default Profile Missing"
         )
         return
-    load_profile(app, default_path)
+    data, corrupt = read_profile_file(default_path)
+    apply_profile_data(app, default_path, data, corrupt=corrupt)
 
 
-def load_profile(app, path):
-    """Load a profile from a JSON file. Also dispatches `data['boss_timer']`
-    to the live `BossTimer` panel if one is open."""
-    corrupt = False
+def read_profile_file(path):
+    """Pure I/O: parse a profile JSON file. Returns `(data, is_corrupt)`.
+    On any decode/IO error or non-dict root, returns `({}, True)`."""
     try:
         raw = json.loads(Path(path).read_text(encoding='utf-8'))
-        data = raw if isinstance(raw, dict) else {}
-        if not isinstance(raw, dict):
-            corrupt = True
+        if isinstance(raw, dict):
+            return raw, False
+        return {}, True
     except (json.JSONDecodeError, UnicodeDecodeError, OSError):
-        corrupt = True
-        data = {}
+        return {}, True
 
+
+def apply_profile_data(app, path, data, *, corrupt=False):
+    """Dispatch parsed profile data into app state.
+
+    Side effects: grids panel, missing-buff warning, **live BossTimer
+    (if open)**, `reference_resolution`, `current_profile`, `modified`,
+    `last_profile` setting, window title.
+
+    Must run before `app.deiconify()` at startup so `warn_missing_buffs`
+    correctly defers via `app.after()` while the main window is withdrawn.
+    """
     if corrupt:
         Messagebox.show_warning(
             f"Profile appears corrupt — starting with empty grids.\n\n{Path(path).name}",
@@ -110,7 +128,7 @@ def warn_missing_buffs(app, missing_by_grid):
     )
     def _show():
         Messagebox.show_warning(message, title="Missing Buff References")
-    # During startup load_profile runs while the main window is still
+    # During startup apply_profile_data runs while the main window is still
     # withdrawn; show sync otherwise so the dialog blocks further code
     # (e.g. first-launch welcome popup) instead of stacking on top of it.
     if app.winfo_viewable():
@@ -139,35 +157,55 @@ def save_profile_as(app):
     return False
 
 
-def do_save_profile(app, path):
-    """Write profile data to disk. If the live `BossTimer` is open, pulls its
-    state via `bt.get_profile_data()` into the saved JSON. Returns True on
-    success, False on error."""
-    try:
-        data = {
-            'version': app.app_version,
-            'grids': app.grids_panel.get_profile_data(),
-        }
-        if app.reference_resolution:
-            data['reference_resolution'] = app.reference_resolution
-        if bt := app._boss_timer_if_alive():
-            data['boss_timer'] = bt.get_profile_data()
-        safe_save_json(path, data)
+def build_profile_payload(app):
+    """Assemble the profile dict for serialization: `version`, `grids`,
+    optional `reference_resolution`, **and `boss_timer` pulled from the
+    live BossTimer if one is open**. Pure data assembly — no I/O."""
+    data = {
+        'version': app.app_version,
+        'grids': app.grids_panel.get_profile_data(),
+    }
+    if app.reference_resolution:
+        data['reference_resolution'] = app.reference_resolution
+    if bt := app._boss_timer_if_alive():
+        data['boss_timer'] = bt.get_profile_data()
+    return data
 
-        app.current_profile = str(path)
-        app.modified = False
-        app.settings.set('last_profile', str(path))
-        app.settings.save()
-        app._update_title()
-        app.toast.show(f"Saved: {path.name}", 'success')
-        app._flash_status_bar()
-        return True
+
+def write_profile_file(path, data):
+    """Pure I/O: serialize `data` and write to `path` via safe_save_json.
+    Raises `OSError` (incl. `IOError`, `PermissionError`) on failure."""
+    safe_save_json(path, data)
+
+
+def _commit_saved_profile(app, path):
+    """Post-save state updates: anchor `current_profile`, clear `modified`,
+    persist `last_profile`, refresh title, toast, status flash."""
+    app.current_profile = str(path)
+    app.modified = False
+    app.settings.set('last_profile', str(path))
+    app.settings.save()
+    app._update_title()
+    app.toast.show(f"Saved: {path.name}", 'success')
+    app._flash_status_bar()
+
+
+def do_save_profile(app, path):
+    """Save profile to disk: build payload → write → commit. Returns True
+    on success, False on error. Composition wrapper kept (rather than
+    pushed to callers) because the error-handling Messagebox + bool return
+    would otherwise repeat at every save site."""
+    try:
+        data = build_profile_payload(app)
+        write_profile_file(path, data)
     except (IOError, OSError) as e:
         Messagebox.show_error(
             f"Failed to save profile.\n\nCheck that the file isn't read-only or in use by another program.\n\n({e})",
             title="Save Error"
         )
         return False
+    _commit_saved_profile(app, path)
+    return True
 
 
 def get_profile_name(app):

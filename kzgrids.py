@@ -138,7 +138,8 @@ class KzGridsApp(ttkb.Window):
         # Load last profile
         last_profile = self.settings.get('last_profile')
         if last_profile and Path(last_profile).exists():
-            self._load_profile(Path(last_profile))
+            data, corrupt = profile_io.read_profile_file(Path(last_profile))
+            profile_io.apply_profile_data(self, Path(last_profile), data, corrupt=corrupt)
         else:
             self._update_title()
 
@@ -180,7 +181,7 @@ class KzGridsApp(ttkb.Window):
             btn_frame = ttk.Frame(nav_inner)
             btn_frame.grid(row=0, column=col, sticky='ew')
 
-            btn = ttk.Button(btn_frame, text=label, bootstyle="link",
+            btn = ttk.Button(btn_frame, text=label, bootstyle="link",  # type: ignore[call-arg]
                              command=lambda v=view_name: self._switch_view(v))
             btn.pack(fill='x', pady=(PAD_XS, 0))
 
@@ -290,7 +291,7 @@ class KzGridsApp(ttkb.Window):
 
         # Build button (right side of bottom bar)
         self.build_btn = ttk.Button(
-            self.bottom_bar, text="Build & Install \u25B6", bootstyle="success",
+            self.bottom_bar, text="Build & Install \u25B6", bootstyle="success",  # type: ignore[call-arg]
             width=BTN_LARGE, command=self._build
         )
         self.build_btn.pack(side='right', padx=(0, PAD_TAB), pady=PAD_SMALL)
@@ -519,9 +520,6 @@ class KzGridsApp(ttkb.Window):
 
     def _load_default_profile(self):
         return profile_io.load_default_profile(self)
-
-    def _load_profile(self, path):
-        return profile_io.load_profile(self, path)
 
     def _save_profile(self):
         return profile_io.save_profile(self)

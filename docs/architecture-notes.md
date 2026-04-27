@@ -8,17 +8,19 @@ Knowledge that emerged from Check #2 audit cycles but doesn't fit naturally in `
 
 ## Finding 1 — `profile_io.load_profile` is a profile fan-out point, not a pure loader
 
-**Location**: `Modules/profile_io.py:46-79`, specifically lines 69-70 (the boss-timer dispatch). `kzgrids.py:520` keeps a one-line `_load_profile` delegator for back-compat with internal callers.
+**Location**: `Modules/profile_io.py` — historically the issue lived inside a single `load_profile()` function at lines 60-100, with the boss-timer dispatch at lines 84-85, mirrored by `do_save_profile()` at lines 142-170 (boss-timer pull at lines 153-154).
 
-**What the function does**: reads a JSON profile, hands `data['grids']` to `grids_panel.load_profile_data()`, sets `last_profile`. **In addition**, conditionally dispatches `data.get('boss_timer', {})` to the live `BossTimer` instance via `app._boss_timer_if_alive()`.
+**What the function did**: read a JSON profile, hand `data['grids']` to `grids_panel.load_profile_data()`, set `last_profile`. **In addition**, conditionally dispatched `data.get('boss_timer', {})` to the live `BossTimer` instance via `app._boss_timer_if_alive()`.
 
-**Implication**: `load_profile` has **multi-consumer side effects**. The boss-timer dispatch is invisible whenever the live tracker is closed (which is always the case at first launch — that's why Flow 6 step 6's gloss legitimately elides this).
+**Implication**: `load_profile` had **multi-consumer side effects**. The boss-timer dispatch was invisible whenever the live tracker was closed (which is always the case at first launch — that's why Flow 6 step 6's gloss legitimately elided this).
 
-**Risk for future flows**: if anyone narrates a flow like "open boss timer and load its previous state from a profile", that flow will partially overlap with `load_profile` already handling half of it. The flow author needs to know that `load_profile` is not just a loader.
+**Risk for future flows**: if anyone narrated a flow like "open boss timer and load its previous state from a profile", that flow would partially overlap with `load_profile` already handling half of it. The flow author needs to know that `load_profile` was not just a loader.
 
-**Symmetric concern (confirmed)**: `do_save_profile` has the mirror shape — at `Modules/profile_io.py:130-131` it pulls `bt.get_profile_data()` from the live tracker and writes it into the profile JSON. Any flow touching save-while-tracker-open must account for this round-trip.
+**Symmetric concern**: `do_save_profile` had the mirror shape — it pulled `bt.get_profile_data()` from the live tracker and wrote it into the profile JSON. Any flow touching save-while-tracker-open must account for this round-trip.
 
 **Status (2026-04-25)**: docstrings on `load_profile` / `do_save_profile` updated to flag the boss-timer side effect; Flows 2 and 3 in `docs/flows.md` cross-reference the dispatch step inline.
+
+**Status (2026-04-27)**: refactored. `load_profile` split into `read_profile_file` (`profile_io.py:69`, pure I/O, returns `(data, is_corrupt)`) and `apply_profile_data` (`profile_io.py:81`, dispatch step — boss-timer fan-out now lives at lines 102-103 in a function whose name and docstring announce it). All four call sites compose the two explicitly: `kzgrids.py:141` (startup auto-load), `profile_io.open_profile()`, `profile_io.load_default_profile()`, `first_launch.py:321`. The `_load_profile` delegator in `kzgrids.py` was removed. `do_save_profile` retained as orchestrator (`profile_io.py:193`) because the error-handling Messagebox + bool return would otherwise repeat at every save site; its body is now a 3-step compose of `build_profile_payload` (`profile_io.py:160`, names the boss-timer pull explicitly in its docstring), `write_profile_file` (`profile_io.py:175`, pure I/O), and `_commit_saved_profile` (`profile_io.py:181`, post-save state).
 
 ---
 

@@ -1,6 +1,6 @@
 # Architectural Map
 
-**Current as of:** 2026-04-27 (file sizes refreshed after database_editor polish + cleanup pass)
+**Current as of:** 2026-04-27 (file sizes refreshed after profile_io seam refactor)
 **Purpose:** Module topology, dependencies, and coupling hotspots. Updated alongside code changes — if you edit this file, commit it with the code. `CLAUDE.md` has the short version; this file has the detail that doesn't fit there.
 
 ## Dependency clusters
@@ -100,23 +100,23 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `Modules/database_editor.py` | 866 | Buff DB CRUD, search, filtering |
 | `Modules/build_loading.py` | 796 | Build-progress screen + welcome/about popups |
 | `Modules/grid_dialogs.py` | 744 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
-| `kzgrids.py` | 624 | Entry point + `KzGridsApp` root window (widgets, menu, lifecycle) |
-| `Modules/ui_widgets.py` | 510 | Widget builders, tooltips, bindings, `CollapsibleSection`, `blend_alpha` |
+| `kzgrids.py` | 622 | Entry point + `KzGridsApp` root window (widgets, menu, lifecycle) |
+| `Modules/ui_widgets.py` | 504 | Widget builders, tooltips, bindings, `CollapsibleSection`, `blend_alpha` |
 | `Modules/live_tracker_panel.py` | 489 | Live Tracker Toplevel orchestrator |
 | `Modules/boss_timer.py` | 441 | Boss timer state + UI |
 | `Modules/timer_overlay.py` | 440 | In-game transparent timer overlay |
-| `Modules/ui_components.py` | 426 | `ToastManager`, `DragReorderManager`, scrollable frame |
+| `Modules/ui_components.py` | 419 | `ToastManager`, `DragReorderManager`, scrollable frame |
 | `Modules/grids_generator.py` | 424 | AS2 code generation from grid configs |
 | `Modules/instructions_panel.py` | 372 | Help/instructions view |
-| `Modules/first_launch.py` | 352 | First-launch dialog + post-dialog orchestrator (`run_first_launch`) |
-| `Modules/custom_menu_bar.py` | 325 | Canvas-based dark menu bar |
+| `Modules/first_launch.py` | 353 | First-launch dialog + post-dialog orchestrator (`run_first_launch`) |
+| `Modules/custom_menu_bar.py` | 359 | Canvas-based dark menu bar |
 | `Modules/combat_monitor.py` | 313 | Combat log parser feeding the tracker |
 | `Modules/build_executor.py` | 227 | MTASC compile + deploy |
 | `build.py` | 225 | PyInstaller build driver |
 | `Modules/game_folder.py` | 185 | Game folder UI + Aoc.exe bypass + uninstall |
-| `Modules/build_action.py` | 166 | Build & Install flow |
+| `Modules/build_action.py` | 167 | Build & Install flow |
 | `Modules/ui_helpers.py` | 157 | Design tokens + `setup_custom_styles` |
-| `Modules/profile_io.py` | 154 | Profile load/save/new/open + missing-buff warning |
+| `Modules/profile_io.py` | 215 | Profile load (read+apply split) / save (build+write+commit) / new / open + missing-buff warning |
 | `Modules/live_tracker_settings.py` | 145 | Tracker persistence |
 | `Modules/grid_model.py` | 117 | Grid dataclasses + `parse_resolution` helper |
 | `tests/test_data_integrity.py` | 103 | Buff-ref resolution smoke test |

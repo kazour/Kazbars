@@ -227,9 +227,9 @@ class BuffEditDialog(tk.Toplevel):
         btn_frame = ttk.Frame(frame)
         btn_frame.grid(row=8, column=0, columnspan=2, pady=PAD_SECTION_GAP)
         ttk.Button(btn_frame, text="Cancel", command=self.on_cancel,
-                   width=BTN_DIALOG, bootstyle='secondary').pack(side='left', padx=PAD_SMALL)
+                   width=BTN_DIALOG, bootstyle='secondary').pack(side='left', padx=PAD_SMALL)  # type: ignore[call-arg]
         ttk.Button(btn_frame, text="Save", command=self.on_ok,
-                   width=BTN_DIALOG, bootstyle='success').pack(side='left', padx=PAD_SMALL)
+                   width=BTN_DIALOG, bootstyle='success').pack(side='left', padx=PAD_SMALL)  # type: ignore[call-arg]
 
         self.bind('<Return>', self._on_return)
         self.bind('<Escape>', lambda e: self.on_cancel())
@@ -246,7 +246,7 @@ class BuffEditDialog(tk.Toplevel):
         ttk.Checkbutton(stack_frame, text="This buff has stack levels",
                        variable=self.stacking_var,
                        command=self._on_stacking_changed,
-                       bootstyle="success-round-toggle").pack(side='left')
+                       bootstyle="success-round-toggle").pack(side='left')  # type: ignore[call-arg]
         ttk.Label(stack_frame, text="(IDs ordered by stack)",
                  foreground=THEME_COLORS['muted'], font=FONT_SMALL).pack(side='left', padx=PAD_TAB)
         self._add_grid_row(frame, 4, "Stacking:", stack_frame)
@@ -260,7 +260,7 @@ class BuffEditDialog(tk.Toplevel):
         ttk.Checkbutton(self.partial_frame, text="Partial list",
                        variable=self.partial_var,
                        command=self._on_partial_changed,
-                       bootstyle="info-round-toggle").pack(side='left')
+                       bootstyle="info-round-toggle").pack(side='left')  # type: ignore[call-arg]
         ttk.Label(self.partial_frame, text="(IDs don't start from stack 1)",
                  foreground=THEME_COLORS['muted'], font=FONT_SMALL).pack(side='left', padx=PAD_TAB)
 
@@ -437,7 +437,7 @@ def migrate_legacy_buff_fields(buff):
 class DatabaseEditorTab(ttk.Frame):
     """Database editor panel for the main application."""
 
-    def __init__(self, parent, database, assets_path, on_modified=None, get_grids=None, toast=None):
+    def __init__(self, parent, database, assets_path, on_modified=None, get_grids=None, *, toast):
         super().__init__(parent)
 
         self.database = database
@@ -507,7 +507,7 @@ class DatabaseEditorTab(ttk.Frame):
 
         for key, label, width, minw, stretch, anchor in column_specs:
             self.tree.heading(key, text=label, command=lambda k=key: self.sort_by(k))
-            self.tree.column(key, width=width, minwidth=minw, stretch=stretch, anchor=anchor)
+            self.tree.column(key, width=width, minwidth=minw, stretch=stretch, anchor=anchor)  # type: ignore[arg-type]
 
         scrollbar = ttk.Scrollbar(list_frame, orient='vertical', command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)

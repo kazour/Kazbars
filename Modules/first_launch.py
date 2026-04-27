@@ -318,7 +318,8 @@ def run_first_launch(app, app_name):
             )
             return
         _save_resolution(resolution_str)
-        profile_io.load_profile(app, default_profile)
+        data, corrupt = profile_io.read_profile_file(default_profile)
+        profile_io.apply_profile_data(app, default_profile, data, corrupt=corrupt)
         scaled = app.grids_panel.scale_to_resolution(
             resolution_str, app.reference_resolution)
         copy_path = app.profiles_path / "MyGrids.json"

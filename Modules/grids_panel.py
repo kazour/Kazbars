@@ -139,7 +139,7 @@ class GridEditorPanel(ttk.Frame):
         add_tooltip(delete_label, "Delete this grid")
         ttk.Checkbutton(header, text="Enabled",
                         variable=self.enabled_var,
-                        bootstyle="success-round-toggle").pack(side='right', padx=(0, PAD_XS))
+                        bootstyle="success-round-toggle").pack(side='right', padx=(0, PAD_XS))  # type: ignore[call-arg]
 
         pos_frame = ttk.Frame(header)
         pos_frame.pack(side='right', padx=(0, PAD_LF))
@@ -154,7 +154,7 @@ class GridEditorPanel(ttk.Frame):
 
         ttk.Button(header, text="Tracked Buffs...",
                    command=self._on_mode_btn_click, width=BTN_MEDIUM,
-                   bootstyle='info-outline').pack(side='right', padx=(0, PAD_LF))
+                   bootstyle='info-outline').pack(side='right', padx=(0, PAD_LF))  # type: ignore[call-arg]
 
     def _add_str_spin(self, parent, label, var, lo, hi, tooltip, padx, width=5, command=None):
         """Spinbox bound to a caller-owned StringVar with key-validation and FocusOut clamp."""
@@ -203,7 +203,7 @@ class GridEditorPanel(ttk.Frame):
         self._name_entry = ttk.Entry(top_row, textvariable=self.id_var, width=14)
         self._name_entry.pack(side='left', padx=(PAD_XS, PAD_MID))
         self._name_entry.bind('<FocusIn>',
-                              lambda e: self._name_entry.configure(bootstyle='default'))
+                              lambda e: self._name_entry.configure(bootstyle='default'))  # type: ignore[call-overload]
         self._name_entry.bind('<FocusOut>', lambda e: self._validate_name())
         add_tooltip(self._name_entry, "Display name for this grid (shown in preview mode)")
 
@@ -239,7 +239,7 @@ class GridEditorPanel(ttk.Frame):
         self.timers_var = tk.BooleanVar()
         timers_cb = ttk.Checkbutton(timer_group, text="Timers",
                                      variable=self.timers_var,
-                                     bootstyle="success-round-toggle",
+                                     bootstyle="success-round-toggle",  # type: ignore[call-arg]
                                      command=self._on_timers_toggled)
         timers_cb.pack(side='left', padx=(0, PAD_MID))
         add_tooltip(timers_cb, "Display remaining duration below each buff icon")
@@ -259,7 +259,7 @@ class GridEditorPanel(ttk.Frame):
         self.flashing_var = tk.BooleanVar()
         flash_cb = ttk.Checkbutton(flash_group, text="Flash",
                                     variable=self.flashing_var,
-                                    bootstyle="success-round-toggle",
+                                    bootstyle="success-round-toggle",  # type: ignore[call-arg]
                                     command=self._on_flash_toggled)
         flash_cb.pack(side='left', padx=(0, PAD_MID))
         add_tooltip(flash_cb, "Icons flash when buff timer is about to expire")
@@ -351,8 +351,8 @@ class GridEditorPanel(ttk.Frame):
         cols = cfg.get('cols', 5)
         self._rows_var.set(str(rows))
         self._cols_var.set(str(cols))
-        self.x_var.set(min(cfg.get('x', 100), SCREEN_MAX_X))
-        self.y_var.set(min(cfg.get('y', 400), SCREEN_MAX_Y))
+        self.x_var.set(str(min(cfg.get('x', 100), SCREEN_MAX_X)))
+        self.y_var.set(str(min(cfg.get('y', 400), SCREEN_MAX_Y)))
         self.icon_var.set(min(cfg.get('iconSize', 56), 64))
         self.gap_var.set(max(-5, min(cfg.get('gap', -1), 10)))
         self.timers_var.set(cfg.get('showTimers', True))
@@ -391,9 +391,9 @@ class GridEditorPanel(ttk.Frame):
         """Red on empty, commit on valid. Never rewrites the field — deleting and blurring would otherwise snap the old name back."""
         name = self.id_var.get().strip()
         if not name:
-            self._name_entry.configure(bootstyle='danger')
+            self._name_entry.configure(bootstyle='danger')  # type: ignore[call-overload]
         else:
-            self._name_entry.configure(bootstyle='default')
+            self._name_entry.configure(bootstyle='default')  # type: ignore[call-overload]
             self.grid_config['id'] = name
 
     def save_to_config(self):
@@ -1172,7 +1172,7 @@ class GridsPanel(ttk.Frame):
             if isinstance(widget, tk.Frame) and not isinstance(widget, GridEditorPanel):
                 widget.destroy()
             else:
-                widget.pack_forget()
+                widget.pack_forget()  # type: ignore[attr-defined]
         for i, panel in enumerate(self.grid_panels):
             self._attach_panel(panel, i)
 
