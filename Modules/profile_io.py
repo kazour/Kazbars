@@ -22,6 +22,7 @@ from tkinter import filedialog
 from ttkbootstrap.dialogs import Messagebox
 
 from .settings_manager import safe_save_json
+from .ui_widgets import flash_status_bar
 
 logger = logging.getLogger(__name__)
 
@@ -187,7 +188,7 @@ def _commit_saved_profile(app, path):
     app.settings.save()
     app._update_title()
     app.toast.show(f"Saved: {path.name}", 'success')
-    app._flash_status_bar()
+    flash_status_bar(app.bottom_bar)
 
 
 def do_save_profile(app, path):

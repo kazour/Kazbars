@@ -55,6 +55,29 @@ def blend_alpha(fg_hex: str, bg_hex: str, alpha: int) -> str:
     return f'#{r:02x}{g:02x}{b:02x}'
 
 
+def flash_status_bar(bar, color=None, steps=8, interval=30):
+    """Brief color pulse on a status-bar widget — subtle success/failure feedback.
+
+    Settles back to TK_COLORS['status_bg']. Defaults to the success tint when
+    no color is given. Swallows TclError if the bar is destroyed mid-fade.
+    """
+    color = color or THEME_COLORS['success']
+    bg = TK_COLORS['status_bg']
+
+    def _step(i):
+        try:
+            t = i / steps
+            blended = blend_alpha(color, bg, int(40 * (1 - t)))
+            bar.configure(bg=blended)
+            if i < steps:
+                bar.after(interval, lambda: _step(i + 1))
+            else:
+                bar.configure(bg=bg)
+        except tk.TclError:
+            pass
+
+    _step(0)
+
 
 def create_dialog_header(parent, title_text, accent_color, width=460):
     """CRT-styled header canvas strip for dialogs — matches BuildLoadingScreen aesthetic.

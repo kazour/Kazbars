@@ -11,13 +11,13 @@ When a flow crosses a dialog→app boundary (any modal `Toplevel` whose buttons 
 Trigger: User clicks "Build & Install" button in the bottom bar or presses Ctrl+B
 
 Steps:
-1. `KzGridsApp._build()` — kzgrids.py:567 — one-line delegator to `build_action.build(self)`
+1. `KzGridsApp._build()` — kzgrids.py:509 — one-line delegator to `build_action.build(self)`
 2. `build_action.build()` — Modules/build_action.py:25 — checks `_building` re-entry guard; validates game folder, compiler path, grids list, total slot count; flags grids that would render empty (no whitelist or no static slot assignments); blocks build if Aoc.exe mode and an AoC game process is running
 3. `get_profile_data()` — Modules/grids_panel.py:977 — calls `save_settings()` then returns `self.grids`
 4. `save_settings()` — Modules/grids_panel.py:1074 — iterates all `GridEditorPanel` instances, calling `save_to_config()` on each
 5. `save_to_config()` — Modules/grids_panel.py:399 — reads every spinbox/combobox/toggle value and writes it into the grid config dict
 6. `find_compiler()` — Modules/build_utils.py:24 — checks three candidate paths for `mtasc.exe`; returns `Path` or `None`
-7. `profile_io.do_save_profile()` — Modules/profile_io.py:193 — auto-saves the current profile (if one is loaded) before the build locks
+7. `profile_io.do_save_profile()` — Modules/profile_io.py:194 — auto-saves the current profile (if one is loaded) before the build locks
 8. Build is locked: `app._building = True`, build button disabled, Ctrl+B unbound
 9. `compile_to_staging()` — Modules/build_executor.py:24 — creates a `tempfile.mkdtemp` staging dir and calls `build_grids()`; returns `(staging_dir, (success, message))`
 10. `build_grids()` — Modules/grids_generator.py:350 — instantiates `CodeGenerator`, writes `KzGrids.as` and `KzGridsData.as` to a second temp dir, copies `base.swf`, calls `compile_as2()`
@@ -39,15 +39,15 @@ End state: `KazGrids.swf` installed under the game folder; `Scripts/reloadgrids`
 Trigger: User selects File > Open Profile... (or presses Ctrl+O) and confirms a `.json` path
 
 Steps:
-1. `KzGridsApp._open_profile()` — kzgrids.py:518 — one-line delegator to `profile_io.open_profile(self)`
-2. `profile_io.open_profile()` — Modules/profile_io.py:40 — runs the unsaved-changes guard via `_check_unsaved_changes()`; opens `filedialog.askopenfilename`; composes `read_profile_file()` + `apply_profile_data()`
-3. `profile_io.read_profile_file()` + `apply_profile_data()` — Modules/profile_io.py:69 + 81 — split as of 2026-04-27 to make the boss-timer fan-out visible at every call site. `read_profile_file` is pure I/O (returns `(data, is_corrupt)`); `apply_profile_data` dispatches grids, missing-buff warning, boss-timer (when alive), reference_resolution, current_profile, settings, title. See step 8 for the boss-timer dispatch detail.
+1. `KzGridsApp._open_profile()` — kzgrids.py:491 — one-line delegator to `profile_io.open_profile(self)`
+2. `profile_io.open_profile()` — Modules/profile_io.py:41 — runs the unsaved-changes guard via `_check_unsaved_changes()`; opens `filedialog.askopenfilename`; composes `read_profile_file()` + `apply_profile_data()`
+3. `profile_io.read_profile_file()` + `apply_profile_data()` — Modules/profile_io.py:70 + 82 — split as of 2026-04-27 to make the boss-timer fan-out visible at every call site. `read_profile_file` is pure I/O (returns `(data, is_corrupt)`); `apply_profile_data` dispatches grids, missing-buff warning, boss-timer (when alive), reference_resolution, current_profile, settings, title. See step 8 for the boss-timer dispatch detail.
 4. `load_profile_data()` — Modules/grids_panel.py:1021 — iterates raw grid dicts; migrates, validates, rebuilds panel list; returns `{grid_name: [missing_refs]}` for buffs that couldn't be resolved
 5. `_migrate_grid()` — Modules/grids_panel.py:1004 — normalizes legacy `int` IDs and legacy name strings in `whitelist` and `slotAssignments` to current primary spell IDs via `database.by_id` and `database.get_entry_by_name`
 6. `validate_grid()` — Modules/grid_model.py:74 — fills missing keys from `create_default_grid()`; clamps every numeric field against `CLAMP_SPECS`; coerces enums in `ENUM_SPECS`; coerces booleans and lists/dicts
 7. `refresh_panels()` — Modules/grids_panel.py:1120 — destroys existing `GridEditorPanel` widgets; creates new ones for the validated list; shows empty state if list is empty
 8. If a Boss Timer panel is alive, `LiveTrackerPanel.load_profile_data()` — Modules/live_tracker_panel.py:436 — applies the embedded `boss_timer.overlay` settings to the overlay
-9. `warn_missing_buffs()` — Modules/profile_io.py:121 — if migration dropped any references, displays them (deferred 200ms when called during startup so the dialog doesn't race the welcome popup)
+9. `warn_missing_buffs()` — Modules/profile_io.py:122 — if migration dropped any references, displays them (deferred 200ms when called during startup so the dialog doesn't race the welcome popup)
 10. `app.settings.set('last_profile', ...)` then `app.settings.save()` — persists `last_profile` path to `kzgrids_settings.json` via atomic temp-rename in `safe_save_json` (Modules/settings_manager.py:33)
 
 End state: `GridsPanel` displays validated grid cards; `app.modified` is `False`; `last_profile` updated in settings; window title reflects loaded name
@@ -59,9 +59,9 @@ End state: `GridsPanel` displays validated grid cards; `app.modified` is `False`
 Trigger: User selects File > Save Profile (Ctrl+S) or File > Save Profile As...
 
 Steps:
-1. `KzGridsApp._save_profile()` — kzgrids.py:524 — one-line delegator to `profile_io.save_profile(self)`
-2. `profile_io.save_profile()` — Modules/profile_io.py:140 — routes to `do_save_profile(app, current_path)` if a path exists, or to `save_profile_as()` otherwise
-3. `profile_io.do_save_profile()` — Modules/profile_io.py:193 — orchestrator: `build_profile_payload()` → `write_profile_file()` → `_commit_saved_profile()`, with try/except for `OSError`. Note: the `boss_timer` key is pulled from the live tracker (when one is open) inside `build_profile_payload()` (Modules/profile_io.py:160) — see step 7.
+1. `KzGridsApp._save_profile()` — kzgrids.py:497 — one-line delegator to `profile_io.save_profile(self)`
+2. `profile_io.save_profile()` — Modules/profile_io.py:141 — routes to `do_save_profile(app, current_path)` if a path exists, or to `save_profile_as()` otherwise
+3. `profile_io.do_save_profile()` — Modules/profile_io.py:194 — orchestrator: `build_profile_payload()` → `write_profile_file()` → `_commit_saved_profile()`, with try/except for `OSError`. Note: the `boss_timer` key is pulled from the live tracker (when one is open) inside `build_profile_payload()` (Modules/profile_io.py:161) — see step 7.
 4. `get_profile_data()` — Modules/grids_panel.py:977 — calls `save_settings()` then returns `self.grids`
 5. `save_settings()` — Modules/grids_panel.py:1074 — iterates all `GridEditorPanel` instances calling `save_to_config()`
 6. `save_to_config()` — Modules/grids_panel.py:399 — reads all widget values into the grid config dict
@@ -110,14 +110,14 @@ End state: `grid_config['whitelist']` updated with new primary spell ID list; pa
 Trigger: `KzGridsApp.__init__` detects no `game_path` in settings; schedules 100ms after `deiconify()`
 
 Steps:
-1. `_show_first_launch_dialog()` — kzgrids.py:590 — one-line delegator to `run_first_launch(self, APP_NAME)`
+1. `_show_first_launch_dialog()` — kzgrids.py:532 — one-line delegator to `run_first_launch(self, APP_NAME)`
 2. `run_first_launch()` — Modules/first_launch.py:292 — defines the `on_game_set`, `on_aoc_bypass_set`, `on_load_default`, `on_resolution_set`, `on_dialog_closed` closures; calls `show_first_launch_dialog()`
 3. `show_first_launch_dialog()` — Modules/first_launch.py:26 — builds modal dialog with game folder entry, common-paths shortcuts, an Aoc.exe Yes/No section (revealed on demand), resolution picker, and two option cards ("Use Defaults" / "Start Empty")
 4. `detect_aoc_launcher()` — Modules/build_executor.py:139 — called whenever the path entry changes; checks for `aoc.exe` or `Aoc.log` under `Data/Gui/Aoc/`; reveals the Aoc.exe radio group if found
 5. `on_load_default()` — Modules/first_launch.py:313 — closure: persists game path, Aoc.exe preference, and resolution; composes `profile_io.read_profile_file()` + `apply_profile_data()` against `Default.json`; calls `grids_panel.scale_to_resolution()`; saves a personal copy as `profiles/MyGrids.json` (auto-incremented on collision); stashes data for the welcome popup
-6. `profile_io.read_profile_file()` + `apply_profile_data()` — Modules/profile_io.py:69 + 81 — reads `assets/kzgrids/Default.json` (pure I/O), then dispatches grids to `grids_panel.load_profile_data()`, populates `app.reference_resolution` from the JSON, anchors `current_profile` to None for the bundled default
+6. `profile_io.read_profile_file()` + `apply_profile_data()` — Modules/profile_io.py:70 + 82 — reads `assets/kzgrids/Default.json` (pure I/O), then dispatches grids to `grids_panel.load_profile_data()`, populates `app.reference_resolution` from the JSON, anchors `current_profile` to None for the bundled default
 7. `GridsPanel.scale_to_resolution()` — Modules/grids_panel.py:1079 — proportionally adjusts each grid's `x`/`y` from `app.reference_resolution` to the selected game resolution; clamps to `SCREEN_MAX_X`/`SCREEN_MAX_Y`; calls `refresh_panels()`
-8. `profile_io.do_save_profile()` — Modules/profile_io.py:193 — writes scaled profile to `profiles/MyGrids.json`
+8. `profile_io.do_save_profile()` — Modules/profile_io.py:194 — writes scaled profile to `profiles/MyGrids.json`
 9. `on_dialog_closed()` — Modules/first_launch.py:340 — closure called when the dialog is destroyed; if the user took the defaults path, schedules `show_welcome_popup()` 100ms later
 
 End state: `game_path` and `use_aoc_bypass` persisted; default profile loaded, scaled to resolution, saved as `profiles/MyGrids.json`; welcome popup shown after the dialog closes
@@ -156,7 +156,7 @@ End state: new buff entry visible in treeview; `by_id` and `by_name` indexes upd
 Trigger: User selects File > Uninstall from game client... and confirms the dialog
 
 Steps:
-1. `KzGridsApp._uninstall_game()` — kzgrids.py:469 — one-line delegator to `game_folder.uninstall_game(self)`
+1. `KzGridsApp._uninstall_game()` — kzgrids.py:442 — one-line delegator to `game_folder.uninstall_game(self)`
 2. `game_folder.uninstall_game()` — Modules/game_folder.py:142 — guards on `app.game_path`; confirms with the user; calls `uninstall_from_client()`
 3. `uninstall_from_client()` — Modules/build_executor.py:95 — deletes `Data/Gui/Default/Flash/KazGrids.swf`, the `Data/Gui/Aoc/KazGrids/` directory (if present), and `Scripts/reloadgrids` + `Scripts/unloadgrids`; strips the auto-load marker block from `Scripts/auto_login`
 4. `strip_marker_block()` — Modules/build_utils.py:60 — removes the `# KzGrids auto-load` marker-delimited section (marker line through the next blank line) from the `auto_login` file content; the script is rewritten or, if empty after the strip, deleted
@@ -170,7 +170,7 @@ End state: `KazGrids.swf`, the Aoc xml.add module folder, the reload scripts, an
 Trigger: User clicks the "⏱ Tracker" button in the bottom bar (right side, next to Build & Install)
 
 Steps:
-1. `_open_boss_timer()` — kzgrids.py:439 — checks `_boss_timer_if_alive()`; if a panel exists, deiconifies/lifts/restores the overlay; otherwise constructs a new `LiveTrackerPanel`
+1. `_open_boss_timer()` — kzgrids.py:412 — checks `_boss_timer_if_alive()`; if a panel exists, deiconifies/lifts/restores the overlay; otherwise constructs a new `LiveTrackerPanel`
 2. `LiveTrackerPanel.__init__()` — Modules/live_tracker_panel.py:44 — restores window position; calls `load_settings()`; builds UI; creates overlay; constructs `BossTimer` and `CombatLogMonitor`; auto-detects log path
 3. `load_settings()` — Modules/live_tracker_settings.py:97 — reads `timers_settings.json` from the settings folder; returns dict validated against `TIMERS_DEFAULTS` and `TIMERS_RANGES`
 4. `BossTimer.__init__()` — Modules/boss_timer.py:52 — initializes cycle state fields; stores the `_thread_safe_update` closure (defined in `LiveTrackerPanel`) as `_update_callback`

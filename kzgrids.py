@@ -3,15 +3,10 @@ Kaz Grids — Standalone Grid Editor for Age of Conan
 Main application entry point.
 """
 
-import json
 import logging
 import shutil
 import sys
-import threading
 import tkinter as tk
-import urllib.error
-import urllib.request
-import webbrowser
 from tkinter import ttk
 from pathlib import Path
 
@@ -35,7 +30,7 @@ from Modules.ui_components import (
 from Modules.custom_menu_bar import CustomMenuBar
 from Modules.ui_tk_style import apply_dark_titlebar, enable_global_dark_titlebar
 from Modules.settings_manager import SettingsManager, init_settings
-from Modules import profile_io, game_folder, build_action
+from Modules import profile_io, game_folder, build_action, update_check
 from Modules.window_position import restore_window_position, bind_window_position_save
 from Modules.build_loading import show_about_popup
 from Modules.live_tracker_panel import LiveTrackerPanel
@@ -149,7 +144,7 @@ class KzGridsApp(ttkb.Window):
         if not self.game_path:
             self.after(100, self._show_first_launch_dialog)
 
-        self._check_for_updates()
+        update_check.check_for_updates(self, APP_VERSION)
 
     # ========================================================================
     # WIDGET CREATION
@@ -161,7 +156,7 @@ class KzGridsApp(ttkb.Window):
 
         # --- Nav bar ---
         self.nav_frame = ttk.Frame(self)
-        self.nav_frame.pack(fill='x', padx=0, pady=0)
+        self.nav_frame.pack(fill='x')
 
         nav_inner = ttk.Frame(self.nav_frame)
         nav_inner.pack(fill='x', padx=PAD_TAB, pady=(PAD_SMALL, 0))
@@ -172,12 +167,16 @@ class KzGridsApp(ttkb.Window):
             'database':     THEME_COLORS['purple'],
             'instructions': THEME_COLORS['muted'],     # neutral
         }
-        nav_views = [('grids', 'Grids'), ('database', 'Database'), ('instructions', 'Help')]
-        for col in range(len(nav_views)):
-            nav_inner.columnconfigure(col, weight=1, uniform='nav')
+        nav_views = [
+            ('grids', 'Grids', "Create and configure buff tracking grids"),
+            ('database', 'Database', "Buff names and IDs used by your grids"),
+            ('instructions', 'Help', "How to use Kaz Grids"),
+        ]
 
         self.nav_buttons = {}
-        for col, (view_name, label) in enumerate(nav_views):
+        for col, (view_name, label, tooltip) in enumerate(nav_views):
+            nav_inner.columnconfigure(col, weight=1, uniform='nav')
+
             btn_frame = ttk.Frame(nav_inner)
             btn_frame.grid(row=0, column=col, sticky='ew')
 
@@ -192,7 +191,7 @@ class KzGridsApp(ttkb.Window):
             underline.pack(fill='x')
 
             self.nav_buttons[view_name] = {'button': btn, 'underline': underline,
-                                              'color': tab_color, 'dim': dim_color}
+                                           'color': tab_color, 'dim': dim_color}
 
             # Hover: brighten inactive tab underline
             def _on_enter(e, vn=view_name):
@@ -205,19 +204,13 @@ class KzGridsApp(ttkb.Window):
                     self.nav_buttons[vn]['underline'].configure(
                         bg=self.nav_buttons[vn]['dim'])
 
-            # Clickable + hoverable on entire tab area (frame + underline)
+            # Clickable + hoverable + tooltipped on entire tab area (frame + underline)
             for w in (btn, btn_frame, underline):
                 w.bind('<Enter>', _on_enter)
                 w.bind('<Leave>', _on_leave)
+                add_tooltip(w, tooltip)
             btn_frame.bind('<Button-1>', lambda e, v=view_name: self._switch_view(v))
             underline.bind('<Button-1>', lambda e, v=view_name: self._switch_view(v))
-
-            if view_name == 'grids':
-                add_tooltip(btn, "Create and configure buff tracking grids")
-            if view_name == 'database':
-                add_tooltip(btn, "Buff names and IDs used by your grids")
-            if view_name == 'instructions':
-                add_tooltip(btn, "How to use Kaz Grids")
 
         # Nav separator
         ttk.Separator(self.nav_frame, orient='horizontal').pack(fill='x', pady=(PAD_SMALL, 0))
@@ -250,7 +243,7 @@ class KzGridsApp(ttkb.Window):
         # Show default view — set initial underlines directly (canvas not mapped yet)
         self.grids_panel.pack(fill='both', expand=True)
         for name, widgets in self.nav_buttons.items():
-            if name == 'grids':
+            if name == self.current_view:
                 widgets['underline'].configure(height=2, bg=widgets['color'])
             else:
                 widgets['underline'].configure(height=1, bg=widgets['dim'])
@@ -287,7 +280,7 @@ class KzGridsApp(ttkb.Window):
 
         # Inline hint — visibility managed by game_folder.update_build_state
         self._game_hint = ttk.Label(game_frame, text="Set your game folder to build",
-                                     font=FONT_SMALL, foreground=THEME_COLORS['warning'])
+                                    font=FONT_SMALL, foreground=THEME_COLORS['warning'])
 
         # Build button (right side of bottom bar)
         self.build_btn = ttk.Button(
@@ -309,7 +302,6 @@ class KzGridsApp(ttkb.Window):
         add_tooltip(tracker_btn, "Open the live combat log tracker")
 
         self._refresh_game_path_label()
-
 
     def _create_menu_bar(self):
         """Create the custom dark menu bar."""
@@ -401,25 +393,6 @@ class KzGridsApp(ttkb.Window):
                 pass
 
         _step(1)
-
-    def _flash_status_bar(self, color=None, steps=8, interval=30):
-        """Brief color pulse on the bottom bar — subtle success feedback."""
-        color = color or THEME_COLORS['success']
-        bg = TK_COLORS['status_bg']
-
-        def _step(i):
-            try:
-                t = i / steps
-                blended = blend_alpha(color, bg, int(40 * (1 - t)))
-                self.bottom_bar.configure(bg=blended)
-                if i < steps:
-                    self.bottom_bar.after(interval, lambda: _step(i + 1))
-                else:
-                    self.bottom_bar.configure(bg=bg)
-            except tk.TclError:
-                pass
-
-        _step(0)
 
     # ========================================================================
     # BOSS TIMER
@@ -530,37 +503,6 @@ class KzGridsApp(ttkb.Window):
     def _get_profile_name(self):
         return profile_io.get_profile_name(self)
 
-    def _check_for_updates(self):
-        """Fire-and-forget background check for a newer GitHub release."""
-        def _worker():
-            try:
-                req = urllib.request.Request(
-                    "https://api.github.com/repos/kazour/Kaz-Grids/releases/latest",
-                    headers={'Accept': 'application/vnd.github+json'}
-                )
-                with urllib.request.urlopen(req, timeout=5) as resp:
-                    data = json.loads(resp.read().decode('utf-8'))
-                tag = (data.get('tag_name') or '').lstrip('v')
-                if not tag or tag == APP_VERSION:
-                    return
-
-                def _parts(v):
-                    try:
-                        return tuple(int(p) for p in v.split('.'))
-                    except ValueError:
-                        return ()
-                if _parts(tag) <= _parts(APP_VERSION):
-                    return
-                url = data.get('html_url', 'https://github.com/kazour/Kaz-Grids/releases/latest')
-                self.after(0, lambda: self.toast.show(
-                    f"Update available: v{tag} \u2014 click for release notes", 'info', 12,
-                    on_click=lambda: webbrowser.open(url)
-                ))
-            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError, tk.TclError):
-                pass
-
-        threading.Thread(target=_worker, daemon=True).start()
-
     # ========================================================================
     # BUILD PIPELINE
     # ========================================================================
@@ -602,7 +544,6 @@ class KzGridsApp(ttkb.Window):
             bt.destroy()
 
         self.destroy()
-
 
 
 # ============================================================================

@@ -37,7 +37,7 @@ THEME_COLORS = {
     'danger':     '#e74c3c',   # Errors
     'success':    '#00bc8c',   # Success
     'info_value': '#3498db',   # Info display values
-    'purple':     '#9b59b6',   # Grids nav accent
+    'purple':     '#9b59b6',   # Database nav accent
     # Buff classification tints — paired with the type label, never standalone.
     # Buff stays at 'body'; debuff/misc carry a desaturated hue at AAA contrast on #222.
     'type_debuff': '#F0A0A0',  # Muted red (~7.6:1 AAA)

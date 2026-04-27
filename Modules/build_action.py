@@ -17,6 +17,7 @@ from .build_loading import BuildLoadingScreen, show_close_game_required_dialog
 from .build_utils import find_compiler
 from .grids_generator import MAX_TOTAL_SLOTS
 from .ui_helpers import THEME_COLORS
+from .ui_widgets import flash_status_bar
 from . import game_folder, profile_io
 
 logger = logging.getLogger(__name__)
@@ -117,7 +118,7 @@ def build(app):
             loading.show_summary(
                 [], compile_result, profile_name=profile_name)
             app.toast.show("Build failed", 'error', 10)
-            app._flash_status_bar(THEME_COLORS['danger'])
+            flash_status_bar(app.bottom_bar, THEME_COLORS['danger'])
             return
 
         loading.advance_step("Installing...")
@@ -136,14 +137,14 @@ def build(app):
                 app.toast.show("Built — launch the game", 'success', 8)
             else:
                 app.toast.show("Built — /reloadui + /reloadgrids", 'success', 8)
-            app._flash_status_bar()
+            flash_status_bar(app.bottom_bar)
             app.grids_panel.notify_build_done(app.use_aoc_bypass)
             if not app.settings.get('has_built_before'):
                 app.settings.set('has_built_before', True)
                 app.settings.save()
         else:
             app.toast.show("Build failed", 'error', 10)
-            app._flash_status_bar(THEME_COLORS['danger'])
+            flash_status_bar(app.bottom_bar, THEME_COLORS['danger'])
 
         loading.show_summary(
             client_results, compile_result, profile_name=profile_name,

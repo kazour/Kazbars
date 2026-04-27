@@ -21,7 +21,7 @@ colors:
   signal-success: "#00bc8c"
   signal-warning: "#f39c12"
   signal-danger: "#e74c3c"
-  grids-nav-purple: "#9b59b6"
+  database-nav-purple: "#9b59b6"
   player-cyan: "#3498db"
   target-orange: "#e67e22"
   phosphor-green: "#4A7A5A"
@@ -230,7 +230,7 @@ State colors. Semantic, never decorative.
 
 - **Signal Warning** (`#f39c12`): build warnings, missing-buff notices, attention-needed states.
 - **Signal Danger** (`#e74c3c`): errors, destructive confirmations, build failures.
-- **Grids Nav Purple** (`#9b59b6`): the Grids top-nav tab accent. One of the only places purple appears; reserved for that one role.
+- **Database Nav Purple** (`#9b59b6`): the Database top-nav tab accent. One of the only places purple appears; reserved for that one role.
 - **Target Orange** (`#e67e22`): the Target grid type, paired with Player Cyan to differentiate player-vs-target grids at a glance.
 
 ### Tertiary (live tracker semantics)
@@ -281,7 +281,7 @@ These live in `_RETRO_COLORS` with a leading underscore. **Off-limits for text a
 
 **The 7.2 Rule.** Body text on the dark surface (`Text Body` on `Surface Base`) measures ~7.2:1, comfortably WCAG AAA. New readable text targets the same bar. If a color cannot hit AAA on `#222`, it is decoration, not text.
 
-**The One-Purple Rule.** Purple appears in exactly one place: the Grids top-nav tab accent. Adding a second use of purple anywhere in the app is forbidden without explicit permission. Purple's value is its scarcity.
+**The One-Purple Rule.** Purple has exactly one *role*: the Database top-nav tab accent. Incidental palette uses (e.g. a 2-color cycle on the loading screen) are permitted; assigning purple a second documented role anywhere is forbidden without explicit permission. Purple's value is its scarcity.
 
 ## 3. Typography
 
@@ -425,6 +425,6 @@ ttkbootstrap-darkly handles the heavy lifting (button, entry, frame, treeview, c
 - **Don't** introduce a second typeface. Segoe UI everywhere. Hierarchy is weight + size, never family.
 - **Don't** add corner radius greater than 3px to anything. If a button or input feels "too sharp", the problem is the surrounding spacing or contrast, not the radius.
 - **Don't** wrap the Live Tracker in tooltips, hover states, or decorative animations. It is sacred. (PRODUCT.md Principle 2.)
-- **Don't** add purple anywhere outside the Grids top-nav tab. The One-Purple Rule.
+- **Don't** give purple a second role outside the Database top-nav tab. The One-Purple Rule. (Incidental palette pairs are fine.)
 - **Don't** use color alone to convey buff classification (Buff grey / Debuff red / Misc gold). Always pair with a category label, per PRODUCT.md's color-blindness commitment.
 - **Don't** write marketing-shaped microcopy ("Pro tip", "Quick win", "Did you know?"). Hobby-project candor is the voice. (PRODUCT.md Principle 5.)
