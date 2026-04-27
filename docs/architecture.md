@@ -1,6 +1,6 @@
 # Architectural Map
 
-**Current as of:** 2026-04-27 (file sizes refreshed after grids_panel cleanup + dialog-token extraction)
+**Current as of:** 2026-04-27 (file sizes refreshed after database_editor polish + cleanup pass)
 **Purpose:** Module topology, dependencies, and coupling hotspots. Updated alongside code changes — if you edit this file, commit it with the code. `CLAUDE.md` has the short version; this file has the detail that doesn't fit there.
 
 ## Dependency clusters
@@ -97,7 +97,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | File | Lines | Role |
 |---|---:|---|
 | `Modules/grids_panel.py` | 1186 | Grid list UI, grid management |
-| `Modules/database_editor.py` | 897 | Buff DB CRUD, search, filtering |
+| `Modules/database_editor.py` | 866 | Buff DB CRUD, search, filtering |
 | `Modules/build_loading.py` | 796 | Build-progress screen + welcome/about popups |
 | `Modules/grid_dialogs.py` | 744 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
 | `kzgrids.py` | 624 | Entry point + `KzGridsApp` root window (widgets, menu, lifecycle) |

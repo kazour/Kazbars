@@ -96,7 +96,7 @@ Steps:
 1. `_on_mode_btn_click()` — Modules/grids_panel.py:473 — dispatches to `edit_whitelist()` when grid is in dynamic mode (or `edit_slots()` for static)
 2. `edit_whitelist()` — Modules/grids_panel.py:479 — flushes current widget state via `save_to_config()`; opens `BuffSelectorDialog`
 3. `BuffSelectorDialog.__init__()` — Modules/grid_dialogs.py:285 — resolves initial `whitelist` primary IDs to entry names via `database.by_id`; restores last-used category/type filter from settings; calls `refresh_lists()`
-4. `BuffDatabase.search()` — Modules/database_editor.py:81 — filters `grouped_buffs` by query/category/type; sorts by type then name
+4. `BuffDatabase.search()` — Modules/database_editor.py:82 — filters `grouped_buffs` by query/category/type; sorts by type then name
 5. `BuffSelectorDialog.refresh_lists()` — Modules/grid_dialogs.py:382 — repopulates Available and Selected listboxes; selected entries sort by type when the grid `layout` is `buffFirst` or `debuffFirst`, alphabetically when `mixed`
 6. `BuffSelectorDialog.on_ok()` — Modules/grid_dialogs.py:449 — saves filter state; maps each selected name back to `entry['ids'][0]` via `database.get_entry_by_name()`; sets `self.result`
 7. `update_labels()` — Modules/grids_panel.py:438 — refreshes whitelist count and buff-name preview text in card header
@@ -129,8 +129,8 @@ End state: `game_path` and `use_aoc_bypass` persisted; default profile loaded, s
 Trigger: User clicks the "Save Database" button in the Database view's toolbar (no menu item, no keyboard shortcut — Ctrl+S is bound to profile save)
 
 Steps:
-1. `DatabaseEditorTab.save()` — Modules/database_editor.py:840 — resolves `assets_path / "Database.json"`; calls `BuffDatabase.save()`
-2. `BuffDatabase.save()` — Modules/database_editor.py:153 — serializes `self.buffs` into v2 JSON format (`{version: 2, description, buffs}`); writes to file directly (not atomic)
+1. `DatabaseEditorTab.save()` — Modules/database_editor.py:817 — resolves `assets_path / "Database.json"`; calls `BuffDatabase.save()`
+2. `BuffDatabase.save()` — Modules/database_editor.py:150 — serializes `self.buffs` into v2 JSON format (`{version: 2, description, buffs}`); writes to file directly (not atomic)
 
 End state: `assets/kzgrids/Database.json` updated; `DatabaseEditorTab.modified` set to `False`; toast `Database saved` shown
 
@@ -141,12 +141,11 @@ End state: `assets/kzgrids/Database.json` updated; `DatabaseEditorTab.modified` 
 Trigger: User clicks "Add" in the `DatabaseEditorTab` toolbar (Database view)
 
 Steps:
-1. `DatabaseEditorTab.add_buff()` — Modules/database_editor.py:690 — creates an add-validator closure (checks ID collision and name uniqueness); opens `BuffEditDialog`
-2. `BuffEditDialog.__init__()` — Modules/database_editor.py:173 — builds form with name, IDs (multi-line), category combobox, type radio group, and the stacking section (toggle + partial + start/end spinboxes); calls validator on submit
-3. `BuffDatabase.add_buff()` — Modules/database_editor.py:127 — appends the new entry dict to `self.buffs`; calls `_rebuild_indexes()`
-4. `BuffDatabase._rebuild_indexes()` — Modules/database_editor.py:67 — rebuilds `by_id`, `by_name`, `categories`, `grouped_buffs` from the full `buffs` list
-5. `DatabaseEditorTab.update_categories()` — Modules/database_editor.py:563 — refreshes the category dropdown values
-6. `DatabaseEditorTab.refresh_list()` — Modules/database_editor.py:588 — repopulates treeview rows using current search/category/type filter state; recomputes per-grid usage counts
+1. `DatabaseEditorTab.add_buff()` — Modules/database_editor.py:693 — builds the validator via `_make_buff_validator()` (no args for add: checks ID collision and name uniqueness against the full DB); opens `BuffEditDialog`
+2. `BuffEditDialog.__init__()` — Modules/database_editor.py:170 — builds form with name, IDs (multi-line), category combobox, type radio group, and the stacking section (toggle + partial + start/end spinboxes); calls validator on submit
+3. `BuffDatabase.add_buff()` — Modules/database_editor.py:124 — appends the new entry dict to `self.buffs`; calls `_rebuild_indexes()`
+4. `BuffDatabase._rebuild_indexes()` — Modules/database_editor.py:68 — rebuilds `by_id`, `by_name`, `categories`, `grouped_buffs` from the full `buffs` list
+5. `DatabaseEditorTab._after_db_change()` — Modules/database_editor.py:687 — post-mutation hook: marks the editor dirty, refreshes the category dropdown, and redraws the tree via `refresh_list()` (used uniformly by add/edit/delete/import/rename-category)
 
 End state: new buff entry visible in treeview; `by_id` and `by_name` indexes updated; toast `Added: <name>` shown; `DatabaseEditorTab.modified` set to `True`
 

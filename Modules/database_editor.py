@@ -76,7 +76,7 @@ class BuffDatabase:
             for bid in ids:
                 self.by_id[bid] = b
             self.by_name[b['name']] = b
-        self.categories = sorted(list(cats))
+        self.categories = sorted(cats)
         self.grouped_buffs = list(self.buffs)
 
     def search(self, query="", category=None, buff_type=None):
@@ -89,7 +89,7 @@ class BuffDatabase:
             buff_type: Type filter - "buff", "debuff", "misc" (None = all)
         """
         results = []
-        query_lower = query.lower() if query else ""
+        query_lower = query.lower()
 
         for buff in self.grouped_buffs:
             if category and buff.get('category') != category:
@@ -116,10 +116,6 @@ class BuffDatabase:
     def is_debuff(self, buff_id):
         """Check if buff is a debuff."""
         return self.get_type(buff_id) == 'debuff'
-
-    def find_entry_by_id(self, bid):
-        """Return entry dict for the given buff ID, or None."""
-        return self.by_id.get(bid)
 
     def get_entry_by_name(self, name):
         """Return entry dict for the given entry name, or None."""
@@ -194,12 +190,13 @@ class BuffEditDialog(tk.Toplevel):
         self.deiconify()
 
     def create_widgets(self, buff):
+        buff = buff or {}
         create_dialog_header(self, f"{self._header_verb.upper()} BUFF", MODULE_COLORS['grids'])
 
         frame = ttk.Frame(self, padding=PAD_INNER)
         frame.pack(fill='both', expand=True)
 
-        self.name_var = tk.StringVar(value=buff['name'] if buff else "")
+        self.name_var = tk.StringVar(value=buff.get('name', ''))
         self._add_grid_row(frame, 0, "Name:",
                            ttk.Entry(frame, textvariable=self.name_var, width=35))
 
@@ -209,17 +206,16 @@ class BuffEditDialog(tk.Toplevel):
         self.ids_text = tk.Text(id_frame, width=25, height=10)
         style_tk_text(self.ids_text)
         self.ids_text.pack(side='left')
-        if buff:
-            self.ids_text.insert('1.0', '\n'.join(str(i) for i in buff.get('ids', [])))
+        self.ids_text.insert('1.0', '\n'.join(str(i) for i in buff.get('ids', [])))
         ttk.Label(id_frame, text="One per line or\ncomma-separated",
                  foreground=THEME_COLORS['muted'], font=FONT_SMALL).pack(side='left', padx=PAD_TAB)
 
-        self.category_var = tk.StringVar(value=buff.get('category', '') if buff else "")
+        self.category_var = tk.StringVar(value=buff.get('category', ''))
         self._add_grid_row(frame, 2, "Category:",
                            ttk.Combobox(frame, textvariable=self.category_var,
                                         values=self.categories, width=32))
 
-        self.type_var = tk.StringVar(value=buff.get('type', 'buff') if buff else 'buff')
+        self.type_var = tk.StringVar(value=buff.get('type', 'buff'))
         type_frame = ttk.Frame(frame)
         for i, (text, val) in enumerate([("Buff", 'buff'), ("Debuff", 'debuff'), ("Misc", 'misc')]):
             ttk.Radiobutton(type_frame, text=text, variable=self.type_var, value=val).pack(
@@ -245,7 +241,7 @@ class BuffEditDialog(tk.Toplevel):
 
     def _build_stacking_section(self, frame, buff):
         """Pack the stacking checkbox + partial + start/end spinboxes (rows 4-7)."""
-        self.stacking_var = tk.BooleanVar(value=buff.get('stacking', False) if buff else False)
+        self.stacking_var = tk.BooleanVar(value=buff.get('stacking', False))
         stack_frame = ttk.Frame(frame)
         ttk.Checkbutton(stack_frame, text="This buff has stack levels",
                        variable=self.stacking_var,
@@ -260,7 +256,7 @@ class BuffEditDialog(tk.Toplevel):
         self.partial_label.grid(row=5, column=0, sticky='w', pady=PAD_SMALL)
         self.partial_frame = ttk.Frame(frame)
         self.partial_frame.grid(row=5, column=1, sticky='w', pady=PAD_SMALL)
-        self.partial_var = tk.BooleanVar(value=buff.get('partialList', False) if buff else False)
+        self.partial_var = tk.BooleanVar(value=buff.get('partialList', False))
         ttk.Checkbutton(self.partial_frame, text="Partial list",
                        variable=self.partial_var,
                        command=self._on_partial_changed,
@@ -272,7 +268,7 @@ class BuffEditDialog(tk.Toplevel):
         self.start_label.grid(row=6, column=0, sticky='w', pady=PAD_SMALL)
         self.stack_start_frame = ttk.Frame(frame)
         self.stack_start_frame.grid(row=6, column=1, sticky='w', pady=PAD_SMALL)
-        self.stack_start_var = tk.IntVar(value=buff.get('stackStart', 1) if buff else 1)
+        self.stack_start_var = tk.IntVar(value=buff.get('stackStart', 1))
         self.stack_start_spin = ttk.Spinbox(self.stack_start_frame,
             textvariable=self.stack_start_var, from_=1, to=99, width=INPUT_WIDTH_NUM)
         self.stack_start_spin.pack(side='left')
@@ -284,7 +280,7 @@ class BuffEditDialog(tk.Toplevel):
         self.end_label.grid(row=7, column=0, sticky='w', pady=PAD_SMALL)
         self.stack_end_frame = ttk.Frame(frame)
         self.stack_end_frame.grid(row=7, column=1, sticky='w', pady=PAD_SMALL)
-        self.stack_end_var = tk.IntVar(value=buff.get('stackEnd', 0) if buff else 0)
+        self.stack_end_var = tk.IntVar(value=buff.get('stackEnd', 0))
         self.stack_end_spin = ttk.Spinbox(self.stack_end_frame,
             textvariable=self.stack_end_var, from_=0, to=99, width=INPUT_WIDTH_NUM)
         self.stack_end_spin.pack(side='left')
@@ -298,7 +294,7 @@ class BuffEditDialog(tk.Toplevel):
             return
         self.on_ok()
 
-    def parse_ids(self):
+    def _parse_ids(self):
         text = self.ids_text.get('1.0', 'end').strip()
         parts = re.split(r'[\n,]+', text)
         ids, rejected = [], []
@@ -319,8 +315,6 @@ class BuffEditDialog(tk.Toplevel):
                   self.start_label, self.stack_start_frame):
             getattr(w, method)()
         if on:
-            self.partial_frame.winfo_children()[0].configure(state='normal')
-            self.stack_start_spin.configure(state='normal')
             self._on_partial_changed()
         else:
             self.end_label.grid_remove()
@@ -356,7 +350,7 @@ class BuffEditDialog(tk.Toplevel):
 
     def _collect_inputs(self):
         """Validate name, IDs, category. Return base result dict or None on failure."""
-        ids, rejected = self.parse_ids()
+        ids, rejected = self._parse_ids()
         if rejected:
             preview = ', '.join(rejected[:5]) + ('...' if len(rejected) > 5 else '')
             if Messagebox.yesno(
@@ -393,13 +387,11 @@ class BuffEditDialog(tk.Toplevel):
         """Add stacking-related keys onto *result* based on current widget state."""
         result['stacking'] = True
         stack_start = self.stack_start_var.get()
-        if self.partial_var.get():
-            result['partialList'] = True
-            if stack_start != 1:
-                result['stackStart'] = stack_start
-            return
         if stack_start != 1:
             result['stackStart'] = stack_start
+        if self.partial_var.get():
+            result['partialList'] = True
+            return
         stack_end = self.stack_end_var.get()
         if stack_end > 0:
             result['stackEnd'] = stack_end
@@ -437,7 +429,6 @@ def migrate_legacy_buff_fields(buff):
         buff.setdefault('type', 'debuff' if buff['isDebuff'] else 'buff')
         del buff['isDebuff']
     buff.setdefault('type', 'buff')
-    return buff
 
 
 # ============================================================================
@@ -585,19 +576,16 @@ class DatabaseEditorTab(ttk.Frame):
 
     def refresh_list(self):
         """Refresh the buff list based on current filters."""
-        for item in self.tree.get_children():
-            self.tree.delete(item)
+        self.tree.delete(*self.tree.get_children())
 
         search = self.search_var.get().lower()
         category = self.category_var.get()
         type_filter = self.type_var.get()
 
-        buff_type = TYPE_FILTER_MAP.get(type_filter)
-
         filtered = self.database.search(
             search,
             category if category != "All" else None,
-            buff_type=buff_type
+            buff_type=TYPE_FILTER_MAP.get(type_filter),
         )
         grid_usage = self._get_grid_usage()
         filtered.sort(key=lambda b: self._get_sort_key(b, grid_usage), reverse=self.sort_reverse)
@@ -619,7 +607,8 @@ class DatabaseEditorTab(ttk.Frame):
         has_filters = search or category != "All" or type_filter != "All"
         if not filtered and has_filters:
             self.count_var.set("0 entries. Try adjusting filters.")
-            self._empty_state_label.place(relx=0.5, rely=0.5, anchor='center')
+            # in_=self.tree centers on the tree, not list_frame (which includes the scrollbar).
+            self._empty_state_label.place(in_=self.tree, relx=0.5, rely=0.5, anchor='center')
         else:
             self.count_var.set(f"{len(filtered)} / {len(self.database.grouped_buffs)} entries")
             self._empty_state_label.place_forget()
@@ -627,10 +616,10 @@ class DatabaseEditorTab(ttk.Frame):
         self._update_sort_indicators()
 
     def _update_sort_indicators(self):
-        """Append an arrow to the active sort column heading."""
+        """Arrow on the active heading; two trailing spaces on the rest so widths stay constant."""
         arrow = ' \u25bc' if self.sort_reverse else ' \u25b2'
         for key, label in self._column_labels.items():
-            text = label + arrow if key == self.sort_column else label
+            text = label + arrow if key == self.sort_column else label + '  '
             self.tree.heading(key, text=text)
 
     def sort_by(self, column):
@@ -684,28 +673,32 @@ class DatabaseEditorTab(ttk.Frame):
                 return overlap
         return None
 
-    def _make_add_validator(self):
-        """Create validator for add/duplicate: check ID collision and name uniqueness."""
+    def _make_buff_validator(self, old_ids=None, old_name=None):
+        """Validator for the buff edit dialog (add when args are None, edit otherwise)."""
         def validate(result):
-            overlap = self._check_id_collision(set(result['ids']))
+            overlap = self._check_id_collision(set(result['ids']), exclude_ids=old_ids)
             if overlap:
                 return f"ID(s) {overlap} already used by another buff."
-            if self.database.get_entry_by_name(result['name']):
+            if result['name'] != old_name and self.database.get_entry_by_name(result['name']):
                 return f"An entry named '{result['name']}' already exists."
             return None
         return validate
 
+    def _after_db_change(self):
+        """Post-mutation refresh: mark dirty, refresh categories, redraw the list."""
+        self._set_modified()
+        self.update_categories()
+        self.refresh_list()
+
     def add_buff(self):
         """Add a new buff entry."""
         dialog = BuffEditDialog(self.winfo_toplevel(), "Add Buff", self.database.categories,
-                                validate=self._make_add_validator())
+                                validate=self._make_buff_validator())
         self.winfo_toplevel().wait_window(dialog)
 
         if dialog.result:
             self.database.add_buff(dialog.result)
-            self._set_modified()
-            self.update_categories()
-            self.refresh_list()
+            self._after_db_change()
             self.toast.show(f"Added: {dialog.result['name']}", 'success')
 
     def edit_buff(self):
@@ -715,24 +708,15 @@ class DatabaseEditorTab(ttk.Frame):
             self.toast.show("Select a buff to edit", 'warning')
             return
 
-        old_name = buff['name']
-        def validate_edit(result):
-            overlap = self._check_id_collision(set(result['ids']), exclude_ids=old_ids)
-            if overlap:
-                return f"ID(s) {overlap} already used by another buff."
-            if result['name'] != old_name and self.database.get_entry_by_name(result['name']):
-                return f"An entry named '{result['name']}' already exists."
-            return None
-
-        dialog = BuffEditDialog(self.winfo_toplevel(), "Edit Buff", self.database.categories, buff,
-                                validate=validate_edit)
+        dialog = BuffEditDialog(
+            self.winfo_toplevel(), "Edit Buff", self.database.categories, buff,
+            validate=self._make_buff_validator(old_ids=old_ids, old_name=buff['name']),
+        )
         self.winfo_toplevel().wait_window(dialog)
 
         if dialog.result:
             self.database.update_buff(old_ids, dialog.result)
-            self._set_modified()
-            self.update_categories()
-            self.refresh_list()
+            self._after_db_change()
             self.toast.show(f"Updated: {dialog.result['name']}", 'success')
 
     def delete_buff(self):
@@ -746,9 +730,7 @@ class DatabaseEditorTab(ttk.Frame):
 
         if Messagebox.yesno(f"Delete '{buff['name']}' (IDs: {ids_str})?", title="Confirm Delete") == "Yes":
             self.database.remove_buff(ids)
-            self._set_modified()
-            self.update_categories()
-            self.refresh_list()
+            self._after_db_change()
             self.toast.show(f"Deleted: {buff['name']}", 'info')
 
     def import_buffs(self):
@@ -769,27 +751,21 @@ class DatabaseEditorTab(ttk.Frame):
                 self.toast.show("No buff entries in this file", 'warning')
                 return
 
-            existing_ids = set()
-            for buff in self.database.buffs:
-                for bid in buff.get('ids', []):
-                    existing_ids.add(bid)
-
+            existing_ids = {bid for buff in self.database.buffs for bid in buff.get('ids', [])}
             added = 0
             skipped = 0
 
             for buff in import_buffs:
-                buff_ids = buff.get('ids', [buff.get('id')] if 'id' in buff else [])
+                migrate_legacy_buff_fields(buff)
+                buff_ids = buff.get('ids', [])
                 if any(bid in existing_ids for bid in buff_ids):
                     skipped += 1
                     continue
-                migrate_legacy_buff_fields(buff)
                 self.database.add_buff(buff)
                 existing_ids.update(buff_ids)
                 added += 1
 
-            self._set_modified()
-            self.update_categories()
-            self.refresh_list()
+            self._after_db_change()
 
             msg = f"Imported {added} buffs"
             if skipped > 0:
@@ -801,16 +777,11 @@ class DatabaseEditorTab(ttk.Frame):
 
     def export_buffs(self):
         """Export filtered buffs to JSON file."""
-        search = self.search_var.get().lower()
         category = self.category_var.get()
-        type_filter = self.type_var.get()
-
-        buff_type = TYPE_FILTER_MAP.get(type_filter)
-
         export_list = self.database.search(
-            search,
+            self.search_var.get().lower(),
             category if category != "All" else None,
-            buff_type=buff_type
+            buff_type=TYPE_FILTER_MAP.get(self.type_var.get()),
         )
 
         if not export_list:
@@ -887,9 +858,7 @@ class DatabaseEditorTab(ttk.Frame):
 
         self.database.rename_category(old_name, new_name)
         self.category_var.set(new_name)
-        self.update_categories()
-        self.refresh_list()
-        self._set_modified()
+        self._after_db_change()
 
     def _set_modified(self):
         self.modified = True
