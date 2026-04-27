@@ -17,14 +17,13 @@ from .grid_model import (
 )
 from .ui_helpers import (
     FONT_HEADING, FONT_BODY, FONT_BODY_LG, FONT_SMALL, FONT_SMALL_BOLD, FONT_FORM_LABEL, FONT_SYMBOL,
-    THEME_COLORS, TK_COLORS, _RETRO_COLORS, GRID_TYPE_COLORS,
-    SCANLINE_ALPHA,
+    THEME_COLORS, TK_COLORS, GRID_TYPE_COLORS,
     BTN_MEDIUM,
     PAD_TAB, PAD_ROW, PAD_XS, PAD_MICRO, PAD_SMALL, PAD_MID, PAD_LF,
     PAD_LIST_ITEM, PAD_SECTION_GAP, PAD_BUTTON_GAP,
 )
 from .ui_widgets import (
-    blend_alpha, CollapsibleSection, add_tooltip, bind_card_events,
+    CollapsibleSection, add_tooltip, bind_card_events,
     bind_label_press_effect, bind_label_hover_colors,
 )
 from .ui_components import create_scrollable_frame, DragReorderManager
@@ -39,7 +38,7 @@ from ttkbootstrap.dialogs import Messagebox
 def draw_grid_cells(canvas, rows, cols, type_color, area_w, area_h, tag='cells'):
     """Draw a miniature grid of colored rectangles on *canvas*."""
     canvas.delete(tag)
-    cell_border = _RETRO_COLORS['pixel_border']
+    cell_border = TK_COLORS['separator']
     display_rows = min(rows, 5)
     display_cols = min(cols, 5)
     cell = 7
@@ -99,6 +98,7 @@ class GridEditorPanel(ttk.Frame):
             foreground=THEME_COLORS['heading']))
         self.drag_handle.bind('<Leave>', lambda e: self.drag_handle.config(
             foreground=THEME_COLORS['muted']))
+        add_tooltip(self.drag_handle, "Drag to reorder")
 
         self.section = CollapsibleSection(
             card, title=grid_config.get('id', 'Grid'),
@@ -156,13 +156,13 @@ class GridEditorPanel(ttk.Frame):
         pos_frame = ttk.Frame(header)
         pos_frame.pack(side='right', padx=(0, PAD_LF))
         self.x_var = tk.StringVar(value=str(cfg.get('x', 0)))
-        self._x_spin = self._add_str_spin(pos_frame, "X:", self.x_var, 0, SCREEN_MAX_X,
-                                          "Horizontal position on screen (pixels from left edge)",
-                                          padx=(PAD_MICRO, PAD_MID))
+        self._x_entry = self._add_position_entry(pos_frame, "X:", self.x_var, 0, SCREEN_MAX_X,
+                                                 "Horizontal position on screen (pixels from left edge)",
+                                                 padx=(PAD_MICRO, PAD_MID))
         self.y_var = tk.StringVar(value=str(cfg.get('y', 0)))
-        self._y_spin = self._add_str_spin(pos_frame, "Y:", self.y_var, 0, SCREEN_MAX_Y,
-                                          "Vertical position on screen (pixels from top edge)",
-                                          padx=(PAD_MICRO, 0))
+        self._y_entry = self._add_position_entry(pos_frame, "Y:", self.y_var, 0, SCREEN_MAX_Y,
+                                                 "Vertical position on screen (pixels from top edge)",
+                                                 padx=(PAD_MICRO, 0))
 
         self._mode_btn = ttk.Button(header, text="Tracked Buffs...",
                                      command=self._on_mode_btn_click, width=12,
@@ -170,21 +170,47 @@ class GridEditorPanel(ttk.Frame):
         self._mode_btn.pack(side='right', padx=(0, PAD_LF))
 
     def _add_str_spin(self, parent, label, var, lo, hi, tooltip, padx, width=5, command=None):
-        """Spinbox bound to a StringVar (vs IntVar in _add_spinbox).
+        """Spinbox bound to an externally-owned var with key-validation and FocusOut clamp.
 
-        If *command* is provided, also binds <FocusOut>.
+        Same validation/clamp semantics as _add_spinbox; differs only in that the caller
+        owns the var (used when the var is a StringVar shared with other widgets).
         """
         ttk.Label(parent, text=label, font=FONT_FORM_LABEL,
                   foreground=THEME_COLORS['muted']).pack(side='left')
-        kwargs = {'from_': lo, 'to': hi, 'textvariable': var, 'width': width}
+        vcmd = (self.register(lambda P, lo=lo, hi=hi: self._validate_spinbox(P, lo, hi)), '%P')
+        kwargs = {'from_': lo, 'to': hi, 'textvariable': var, 'width': width,
+                  'validate': 'key', 'validatecommand': vcmd}
         if command is not None:
             kwargs['command'] = command
         spin = ttk.Spinbox(parent, **kwargs)
         spin.pack(side='left', padx=padx)
+        spin.bind('<FocusOut>',
+                  lambda e, v=var, l=lo, h=hi: self._clamp_str_int(v, l, h))
         if command is not None:
-            spin.bind('<FocusOut>', lambda e: command())
+            spin.bind('<FocusOut>', lambda e: command(), add='+')
         add_tooltip(spin, tooltip)
         return spin
+
+    def _add_position_entry(self, parent, label, var, lo, hi, tooltip, padx):
+        """Entry for screen-pixel coordinates: spinbox stepping doesn't fit thousands of px."""
+        ttk.Label(parent, text=label, font=FONT_FORM_LABEL,
+                  foreground=THEME_COLORS['muted']).pack(side='left')
+        vcmd = (self.register(lambda P, lo=lo, hi=hi: self._validate_spinbox(P, lo, hi)), '%P')
+        entry = ttk.Entry(parent, textvariable=var, width=5,
+                          validate='key', validatecommand=vcmd, justify='right')
+        entry.pack(side='left', padx=padx)
+        entry.bind('<FocusOut>',
+                   lambda e, v=var, l=lo, h=hi: self._clamp_str_int(v, l, h))
+        add_tooltip(entry, tooltip)
+        return entry
+
+    @staticmethod
+    def _clamp_str_int(var, lo, hi):
+        try:
+            v = int(var.get())
+        except (ValueError, tk.TclError):
+            v = lo
+        var.set(str(max(lo, min(v, hi))))
 
     def _build_top_row(self, parent):
         """Pack the Name + Rows + Cols controls."""
@@ -198,6 +224,9 @@ class GridEditorPanel(ttk.Frame):
         self.id_var.trace_add('write', lambda *_: self.section.set_title(self.id_var.get() or 'Grid'))
         self._name_entry = ttk.Entry(top_row, textvariable=self.id_var, width=14)
         self._name_entry.pack(side='left', padx=(PAD_XS, PAD_MID))
+        self._name_entry.bind('<FocusIn>',
+                              lambda e: self._name_entry.configure(bootstyle='default'))
+        self._name_entry.bind('<FocusOut>', lambda e: self._validate_name())
         add_tooltip(self._name_entry, "Display name for this grid (shown in preview mode)")
 
         self._rows_var = tk.StringVar(value=str(cfg.get('rows', 1)))
@@ -287,7 +316,7 @@ class GridEditorPanel(ttk.Frame):
         dyn_row.pack(fill='x', pady=(0, PAD_ROW))
 
         self.fill_var = tk.StringVar()
-        self.fill_combo = self._add_combobox(dyn_row, "Fill:", self.fill_var, [], 10,
+        self.fill_combo = self._add_combobox(dyn_row, "Fill:", self.fill_var, [], 22,
             lambda: _FILL_DESCRIPTIONS.get(self.fill_var.get(), "Direction buffs fill into the grid"))
 
         self.sort_var = tk.StringVar()
@@ -296,17 +325,10 @@ class GridEditorPanel(ttk.Frame):
             "How buffs are ordered (by shortest/longest remaining time, or order applied)")
 
         self.layout_var = tk.StringVar()
-        self._add_combobox(dyn_row, "Group:", self.layout_var,
-            ['buffFirst', 'debuffFirst', 'mixed'], 10,
-            "In Buff First and Debuff First modes, misc effects always lead. In Mixed, all buffs sort together by time.",
+        self._add_combobox(dyn_row, "Order:", self.layout_var,
+            [label for _, label in _LAYOUT_OPTIONS], 11,
+            "In Buffs First and Debuffs First, misc effects always lead. In Mixed, all buffs sort together by time.",
             padx=(PAD_BUTTON_GAP, 0))
-
-    def bind_reorder_keys(self, move_callback):
-        """Bind Alt+Up/Down on the card for keyboard reorder."""
-        self._card.bind('<Alt-Up>', lambda e: move_callback(self, -1))
-        self._card.bind('<Alt-Down>', lambda e: move_callback(self, 1))
-        self.section.header_frame.bind('<Alt-Up>', lambda e: move_callback(self, -1))
-        self.section.header_frame.bind('<Alt-Down>', lambda e: move_callback(self, 1))
 
     def _add_spinbox(self, parent, label, from_, to, width, tooltip, padx=(PAD_BUTTON_GAP, PAD_TAB)):
         ttk.Label(parent, text=label, font=FONT_FORM_LABEL).pack(side='left')
@@ -367,9 +389,11 @@ class GridEditorPanel(ttk.Frame):
         self.flashing_var.set(cfg.get('enableFlashing', True))
         self._on_timers_toggled()
         self._on_flash_toggled()
-        self.fill_var.set(cfg.get('fillDirection', 'LR'))
+        self.fill_var.set(_FILL_LABEL_BY_CODE.get(cfg.get('fillDirection', 'LR'),
+                                                   _FILL_LABEL_BY_CODE['LR']))
         self.sort_var.set(cfg.get('sortOrder', 'longest'))
-        self.layout_var.set(cfg.get('layout', 'buffFirst'))
+        self.layout_var.set(_LAYOUT_LABEL_BY_CODE.get(cfg.get('layout', 'buffFirst'),
+                                                       _LAYOUT_LABEL_BY_CODE['buffFirst']))
 
         self._update_fill_options(rows, cols)
 
@@ -391,16 +415,30 @@ class GridEditorPanel(ttk.Frame):
         draw_grid_cells(self._preview_canvas, rows, cols,
                         self._accent_color, 70, 70)
 
+    def _validate_name(self):
+        """FocusOut validator for the name entry: red on empty, no field rewrite.
+
+        Commits a valid name to grid_config['id'] so update_labels (called from
+        _apply_dimension_change and elsewhere) doesn't revert the section title.
+        """
+        name = self.id_var.get().strip()
+        if not name:
+            self._name_entry.configure(bootstyle='danger')
+        else:
+            self._name_entry.configure(bootstyle='default')
+            self.grid_config['id'] = name
+
     def save_to_config(self):
         """Write current widget values back into the grid configuration dict."""
         name = self.id_var.get().strip()
         if not name:
-            self.grid_config['id'] = self.grid_config.get('id', 'Grid')
-            self.id_var.set(self.grid_config['id'])
+            # Don't overwrite id_var: rewriting the field mid-edit makes the old
+            # name reappear after the user already deleted it. Just flag it red
+            # and leave grid_config['id'] at its previous valid value.
             self._name_entry.configure(bootstyle='danger')
-            self._name_entry.after(600, lambda: self._name_entry.configure(bootstyle=''))
         else:
             self.grid_config['id'] = name
+            self._name_entry.configure(bootstyle='default')
         self.grid_config['enabled'] = self.enabled_var.get()
         # Clamp numerics via shared spec
         var_map = {
@@ -417,9 +455,11 @@ class GridEditorPanel(ttk.Frame):
             self.grid_config[key] = max(lo, min(int(var.get()), hi))
         self.grid_config['showTimers'] = self.timers_var.get()
         self.grid_config['enableFlashing'] = self.flashing_var.get()
-        self.grid_config['fillDirection'] = self.fill_var.get()
+        self.grid_config['fillDirection'] = _FILL_CODE_BY_LABEL.get(
+            self.fill_var.get(), self.grid_config.get('fillDirection', 'LR'))
         self.grid_config['sortOrder'] = self.sort_var.get()
-        self.grid_config['layout'] = self.layout_var.get()
+        self.grid_config['layout'] = _LAYOUT_CODE_BY_LABEL.get(
+            self.layout_var.get(), self.grid_config.get('layout', 'buffFirst'))
 
     def _format_buff_preview(self, ids, max_show=4):
         """Comma-separated preview of buff names for up to *max_show* IDs."""
@@ -534,17 +574,11 @@ class GridEditorPanel(ttk.Frame):
         new_total = new_rows * new_cols
         self.grid_config['rows'] = new_rows
         self.grid_config['cols'] = new_cols
-        if self.grid_config.get('slotMode') == 'static' and new_total < old_total:
-            sa = self.grid_config.get('slotAssignments', {})
-            dropped = sum(len(v) for k, v in sa.items() if int(k) >= new_total and v)
-            self.grid_config['slotAssignments'] = {
-                k: v for k, v in sa.items() if int(k) < new_total
-            }
-            if dropped > 0:
-                Messagebox.show_warning(
-                    f"Grid resized: {dropped} buff(s) from removed slots were unassigned.",
-                    title="Slots Trimmed"
-                )
+        if self.grid_config.get('slotMode') == 'static':
+            if new_total < old_total:
+                self._trim_slot_assignments(new_total)
+            elif new_total > old_total:
+                self._restore_orphaned_assignments(new_total)
         if new_rows == 1 and new_cols == 1 and self.grid_config.get('slotMode') == 'dynamic':
             new_cols = 2
             self.grid_config['cols'] = new_cols
@@ -555,35 +589,102 @@ class GridEditorPanel(ttk.Frame):
         if self._on_resize:
             self._on_resize()
 
-    def _update_fill_options(self, rows, cols):
-        current = self.fill_var.get()
-        if rows == 1:
-            self.fill_combo['values'] = ['LR', 'RL']
-            if current not in ['LR', 'RL']:
-                self.fill_var.set('LR')
-                self.grid_config['fillDirection'] = 'LR'
-        elif cols == 1:
-            self.fill_combo['values'] = ['TB', 'BT']
-            if current not in ['TB', 'BT']:
-                self.fill_var.set('BT')
-                self.grid_config['fillDirection'] = 'BT'
+    def _trim_slot_assignments(self, new_total):
+        """Drop assignments past new_total; stash dropped IDs on the grid for later restore."""
+        sa = self.grid_config.get('slotAssignments', {})
+        dropped_ids = []
+        for k, v in sa.items():
+            if int(k) >= new_total and v:
+                ids = v if isinstance(v, list) else [v]
+                dropped_ids.extend(b for b in ids if b)
+        self.grid_config['slotAssignments'] = {
+            k: v for k, v in sa.items() if int(k) < new_total
+        }
+        if not dropped_ids:
+            return
+        existing = self.grid_config.get('_orphanedAssignments', [])
+        self.grid_config['_orphanedAssignments'] = list(dict.fromkeys(existing + dropped_ids))
+        # Non-blocking toast: a modal here would let the spinbox arrow's auto-repeat
+        # keep firing during the popup, recursively trimming further.
+        self._notify(
+            f"{len(dropped_ids)} buff(s) unassigned (resize back up to restore): "
+            f"{self._format_buff_preview(dropped_ids)}",
+            'warning'
+        )
+
+    def _restore_orphaned_assignments(self, new_total):
+        """Fill any empty slots in the new range with previously-orphaned assignments."""
+        orphans = list(self.grid_config.get('_orphanedAssignments', []))
+        if not orphans:
+            return
+        sa = dict(self.grid_config.get('slotAssignments', {}))
+        restored = []
+        for k in range(new_total):
+            if not orphans:
+                break
+            slot_key = str(k)
+            current = sa.get(slot_key)
+            is_empty = not current or (isinstance(current, list) and not any(current))
+            if is_empty:
+                sa[slot_key] = [orphans.pop(0)]
+                restored.append(sa[slot_key][0])
+        if not restored:
+            return
+        self.grid_config['slotAssignments'] = sa
+        self.grid_config['_orphanedAssignments'] = orphans
+        self._notify(
+            f"{len(restored)} buff(s) restored: {self._format_buff_preview(restored)}",
+            'success'
+        )
+
+    def _notify(self, message, style='info'):
+        """Dispatch a toast via the root app's ToastManager. Falls back to logging if absent."""
+        toast = getattr(self.winfo_toplevel(), 'toast', None)
+        if toast is not None:
+            toast.show(message, style=style, duration=6)
         else:
-            self.fill_combo['values'] = ['TL-BR', 'TR-BL', 'BL-TR', 'BR-TL']
-            if current not in ['TL-BR', 'TR-BL', 'BL-TR', 'BR-TL']:
-                self.fill_var.set('BL-TR')
-                self.grid_config['fillDirection'] = 'BL-TR'
+            logger.info("[%s] %s", style, message)
+
+    def _update_fill_options(self, rows, cols):
+        if rows == 1:
+            valid_codes = ['LR', 'RL']
+            default = 'LR'
+        elif cols == 1:
+            valid_codes = ['TB', 'BT']
+            default = 'BT'
+        else:
+            valid_codes = ['TL-BR', 'TR-BL', 'BL-TR', 'BR-TL']
+            default = 'BL-TR'
+        valid_labels = [_FILL_LABEL_BY_CODE[c] for c in valid_codes]
+        self.fill_combo['values'] = valid_labels
+        if self.fill_var.get() not in valid_labels:
+            self.fill_var.set(_FILL_LABEL_BY_CODE[default])
+            self.grid_config['fillDirection'] = default
 
 
-_FILL_DESCRIPTIONS = {
-    'LR':    'Left to right — new buffs appear on the right',
-    'RL':    'Right to left — new buffs appear on the left',
-    'TB':    'Top to bottom — new buffs appear at the bottom',
-    'BT':    'Bottom to top — new buffs appear at the top',
-    'TL-BR': 'Top-left to bottom-right — fills from the top-left corner',
-    'TR-BL': 'Top-right to bottom-left — fills from the top-right corner',
-    'BL-TR': 'Bottom-left to top-right — fills from the bottom-left corner',
-    'BR-TL': 'Bottom-right to top-left — fills from the bottom-right corner',
-}
+_FILL_OPTIONS = [
+    # (code, label, description) — code is the persisted value, label is what the user sees.
+    ('LR',    'Left → Right',           'New buffs appear on the right'),
+    ('RL',    'Right → Left',           'New buffs appear on the left'),
+    ('TB',    'Top → Bottom',           'New buffs appear at the bottom'),
+    ('BT',    'Bottom → Top',           'New buffs appear at the top'),
+    ('TL-BR', 'Top-left → Bottom-right', 'Fills from the top-left corner'),
+    ('TR-BL', 'Top-right → Bottom-left', 'Fills from the top-right corner'),
+    ('BL-TR', 'Bottom-left → Top-right', 'Fills from the bottom-left corner'),
+    ('BR-TL', 'Bottom-right → Top-left', 'Fills from the bottom-right corner'),
+]
+_FILL_LABEL_BY_CODE = {code: label for code, label, _ in _FILL_OPTIONS}
+_FILL_CODE_BY_LABEL = {label: code for code, label, _ in _FILL_OPTIONS}
+_FILL_DESCRIPTIONS = {label: desc for _, label, desc in _FILL_OPTIONS}
+
+_LAYOUT_OPTIONS = [
+    # (code, label) — code is the persisted value.
+    ('buffFirst',   'Buffs first'),
+    ('debuffFirst', 'Debuffs first'),
+    ('mixed',       'Mixed'),
+]
+_LAYOUT_LABEL_BY_CODE = {code: label for code, label in _LAYOUT_OPTIONS}
+_LAYOUT_CODE_BY_LABEL = {label: code for code, label in _LAYOUT_OPTIONS}
 
 # ============================================================================
 # GRIDS PANEL
@@ -618,8 +719,9 @@ class GridsPanel(ttk.Frame):
         ttk.Button(toolbar, text="+ Add Grid", command=self.add_grid,
                    width=BTN_MEDIUM).pack(side='left', padx=PAD_BUTTON_GAP)
         self.slot_count_label = tk.StringVar(value=f"0 / {MAX_TOTAL_SLOTS} slots")
-        ttk.Label(toolbar, textvariable=self.slot_count_label,
-                  font=FONT_SMALL, foreground=THEME_COLORS['muted']).pack(side='right')
+        self._slot_count_lbl = ttk.Label(toolbar, textvariable=self.slot_count_label,
+                                          font=FONT_BODY, foreground=THEME_COLORS['muted'])
+        self._slot_count_lbl.pack(side='right')
 
         self._build_tip_bar()
 
@@ -731,7 +833,7 @@ class GridsPanel(ttk.Frame):
             ("1\u00d710 Bar", 1, 10, "dynamic"),
             ("10\u00d71 Bar", 10, 1, "dynamic"),
             ("3\u00d73 Grid", 3, 3, "dynamic"),
-            ("1\u00d71 Slot", 1, 1, "static"),
+            ("1\u00d71 Slot \u00b7 static", 1, 1, "static"),
             ("Custom", None, None, None),
         ]
         self._empty_cards = []
@@ -752,7 +854,7 @@ class GridsPanel(ttk.Frame):
             "1\u00d710 Bar": "Horizontal bar \u2014 great for tracking player buffs across the top",
             "10\u00d71 Bar": "Vertical bar \u2014 stack buffs along the side of your screen",
             "3\u00d73 Grid": "Compact grid \u2014 fits many buffs in a small area",
-            "1\u00d71 Slot": "Single slot \u2014 pin one specific buff (always Static mode)",
+            "1\u00d71 Slot \u00b7 static": "Single slot \u2014 pin one specific buff. Mode is locked to Static.",
             "Custom": "Open the Add Grid wizard to set custom rows, columns, and options",
         }
         for (card_canvas, _, _), (label, _, _, _) in zip(self._empty_cards, presets):
@@ -780,16 +882,12 @@ class GridsPanel(ttk.Frame):
         bg = TK_COLORS['bg']
         border = TK_COLORS['border']
         accent = THEME_COLORS['accent']
-        scanline = blend_alpha('#000000', bg, SCANLINE_ALPHA)
         card_w, card_h = 110, 110
 
         card = tk.Canvas(parent, width=card_w, height=card_h,
                          highlightthickness=1, highlightbackground=border,
                          bg=bg, cursor='hand2', takefocus=True)
         card.pack(side='left', padx=PAD_LF)
-        card.create_rectangle(0, 0, card_w, card_h, fill=bg, outline='')
-        for y in range(0, card_h, 3):
-            card.create_line(0, y, card_w, y, fill=scanline)
         card.create_text(card_w // 2, card_h - 14, text=label, anchor='center',
                          fill=THEME_COLORS['muted'], font=FONT_SMALL)
 
@@ -827,27 +925,6 @@ class GridsPanel(ttk.Frame):
                                  font=FONT_HEADING, tags='cells')
                 continue
             draw_grid_cells(card, rows, cols, type_color, card_w, preview_h)
-
-    def _stagger_empty_cards(self):
-        """Reveal empty state cards one by one with a staggered delay."""
-        border = TK_COLORS['border']
-        for card, _, _ in self._empty_cards:
-            card.configure(highlightbackground=TK_COLORS['bg'])
-            card.itemconfigure('all', state='hidden')
-
-        def _reveal(idx):
-            if idx >= len(self._empty_cards):
-                return
-            try:
-                card = self._empty_cards[idx][0]
-                card.itemconfigure('all', state='normal')
-                card.configure(highlightbackground=border)
-            except tk.TclError:
-                return
-            card.after(60, lambda: _reveal(idx + 1))
-
-        if self._empty_cards:
-            self._empty_cards[0][0].after(100, lambda: _reveal(0))
 
     def _dismiss_tip(self):
         """Dismiss the tip bar permanently for this session."""
@@ -999,6 +1076,18 @@ class GridsPanel(ttk.Frame):
         """Return total slot count across all grids."""
         return sum(g['rows'] * g['cols'] for g in self.grids)
 
+    def _update_slot_counter(self):
+        total = self.get_total_slots()
+        self.slot_count_label.set(f"{total} / {MAX_TOTAL_SLOTS} slots")
+        pct = total / MAX_TOTAL_SLOTS
+        if pct >= 0.95:
+            color = THEME_COLORS['danger']
+        elif pct >= 0.80:
+            color = THEME_COLORS['warning']
+        else:
+            color = THEME_COLORS['muted']
+        self._slot_count_lbl.configure(foreground=color)
+
     def save_settings(self):
         """Persist all panel UI values back to grid configs."""
         for panel in self.grid_panels:
@@ -1052,7 +1141,6 @@ class GridsPanel(ttk.Frame):
         if not self.grids:
             self._normal_view.pack_forget()
             self._empty_state.pack(fill='both', expand=True)
-            self._stagger_empty_cards()
             self._from_empty_state = False
             self._update_tip()
             return
@@ -1075,17 +1163,16 @@ class GridsPanel(ttk.Frame):
             self.grid_panels.append(panel)
             self._attach_panel(panel, i)
 
-        self.slot_count_label.set(f"{self.get_total_slots()} / {MAX_TOTAL_SLOTS} slots")
+        self._update_slot_counter()
         self._update_tip()
 
     def _attach_panel(self, panel, index):
-        """Pack a grid panel at index with separator, drag handle, and reorder bindings."""
+        """Pack a grid panel at index with separator and drag handle binding."""
         if index > 0:
             tk.Frame(self.grids_frame, height=1, bg=TK_COLORS['border']).pack(
                 fill='x', padx=PAD_LIST_ITEM, pady=PAD_ROW)
         panel.pack(fill='x', pady=(0, PAD_ROW), padx=PAD_SMALL)
         self._drag_manager.bind_handle(panel.drag_handle, index, panel_widget=panel)
-        panel.bind_reorder_keys(self._keyboard_reorder)
 
     def _reorder_grid(self, old_index, new_index):
         """Move a grid from old_index to new_index and repack panels."""
@@ -1107,19 +1194,8 @@ class GridsPanel(ttk.Frame):
         for i, panel in enumerate(self.grid_panels):
             self._attach_panel(panel, i)
 
-    def _keyboard_reorder(self, panel, direction):
-        """Move a panel up (-1) or down (+1) via Alt+Arrow keys."""
-        try:
-            idx = self.grid_panels.index(panel)
-        except ValueError:
-            return
-        new_idx = idx + direction
-        if new_idx < 0 or new_idx >= len(self.grid_panels):
-            return
-        self._reorder_grid(idx, new_idx)
-
     def _on_grid_resized(self):
-        self.slot_count_label.set(f"{self.get_total_slots()} / {MAX_TOTAL_SLOTS} slots")
+        self._update_slot_counter()
         self._mark_modified()
 
     def _mark_modified(self):

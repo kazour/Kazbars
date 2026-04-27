@@ -87,7 +87,13 @@ def load_profile(app, path):
     ref = data.get('reference_resolution')
     app.reference_resolution = list(ref) if isinstance(ref, list) and len(ref) == 2 else None
 
-    app.current_profile = str(path)
+    # Don't anchor saves to the bundled Default.json: a subsequent Save would
+    # overwrite the shipped templates. Force Save As instead.
+    bundled_default = (app.assets_path / "kzgrids" / "Default.json").resolve()
+    if Path(path).resolve() == bundled_default:
+        app.current_profile = None
+    else:
+        app.current_profile = str(path)
     app.modified = False
     app.settings.set('last_profile', str(path))
     app.settings.save()

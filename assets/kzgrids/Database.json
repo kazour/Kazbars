@@ -358,7 +358,7 @@
       "stacking": true
     },
     {
-      "name": "Concentrated Lotus Miasma (Levi-Ethram)",
+      "name": "Concentrated Lotus Miasma (Zelandra)",
       "ids": [
         5052368
       ],
@@ -404,7 +404,7 @@
         5052114
       ],
       "category": "#T6",
-      "type": "debuff"
+      "type": "misc"
     },
     {
       "name": "Lotus Miasma 1-5 (Levi-Ethram)",
