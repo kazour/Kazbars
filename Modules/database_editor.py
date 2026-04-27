@@ -20,9 +20,10 @@ import tkinter as tk
 from tkinter import ttk, filedialog
 from ttkbootstrap.dialogs import Messagebox, Querybox
 from .ui_helpers import (
-    THEME_COLORS, TK_COLORS, FONT_SMALL, BTN_SMALL, BTN_MEDIUM,
+    THEME_COLORS, FONT_SMALL, BTN_DIALOG, BTN_SMALL, BTN_MEDIUM,
+    INPUT_WIDTH_NUM, INPUT_WIDTH_TYPE, INPUT_WIDTH_FILTER, INPUT_WIDTH_SEARCH,
     MODULE_COLORS, PAD_INNER,
-    PAD_SMALL, PAD_TAB, PAD_XS, PAD_BUTTON_GAP, PAD_SECTION_GAP,
+    PAD_SMALL, PAD_TAB, PAD_XS, PAD_SECTION_GAP,
 )
 from .ui_widgets import add_tooltip, debounced_callback, create_dialog_header
 from .ui_tk_style import style_tk_text
@@ -178,8 +179,7 @@ class BuffEditDialog(tk.Toplevel):
         self.grab_set()
         self.resizable(False, False)
 
-        action = title.split()[0] if title else "OK"
-        self._action_label = "Save" if action == "Edit" else action
+        self._header_verb = title.split()[0] if title else "OK"
 
         self.categories = categories
         self.result = None
@@ -194,7 +194,7 @@ class BuffEditDialog(tk.Toplevel):
         self.deiconify()
 
     def create_widgets(self, buff):
-        create_dialog_header(self, f"{self._action_label.upper()} BUFF", MODULE_COLORS['grids'])
+        create_dialog_header(self, f"{self._header_verb.upper()} BUFF", MODULE_COLORS['grids'])
 
         frame = ttk.Frame(self, padding=PAD_INNER)
         frame.pack(fill='both', expand=True)
@@ -231,9 +231,9 @@ class BuffEditDialog(tk.Toplevel):
         btn_frame = ttk.Frame(frame)
         btn_frame.grid(row=8, column=0, columnspan=2, pady=PAD_SECTION_GAP)
         ttk.Button(btn_frame, text="Cancel", command=self.on_cancel,
-                   width=10, bootstyle='secondary').pack(side='left', padx=PAD_SMALL)
-        ttk.Button(btn_frame, text=self._action_label, command=self.on_ok,
-                   width=10, bootstyle='success').pack(side='left', padx=PAD_SMALL)
+                   width=BTN_DIALOG, bootstyle='secondary').pack(side='left', padx=PAD_SMALL)
+        ttk.Button(btn_frame, text="Save", command=self.on_ok,
+                   width=BTN_DIALOG, bootstyle='success').pack(side='left', padx=PAD_SMALL)
 
         self.bind('<Return>', self._on_return)
         self.bind('<Escape>', lambda e: self.on_cancel())
@@ -274,7 +274,7 @@ class BuffEditDialog(tk.Toplevel):
         self.stack_start_frame.grid(row=6, column=1, sticky='w', pady=PAD_SMALL)
         self.stack_start_var = tk.IntVar(value=buff.get('stackStart', 1) if buff else 1)
         self.stack_start_spin = ttk.Spinbox(self.stack_start_frame,
-            textvariable=self.stack_start_var, from_=1, to=99, width=5)
+            textvariable=self.stack_start_var, from_=1, to=99, width=INPUT_WIDTH_NUM)
         self.stack_start_spin.pack(side='left')
         self.start_hint = ttk.Label(self.stack_start_frame, text="",
                  foreground=THEME_COLORS['muted'], font=FONT_SMALL)
@@ -286,7 +286,7 @@ class BuffEditDialog(tk.Toplevel):
         self.stack_end_frame.grid(row=7, column=1, sticky='w', pady=PAD_SMALL)
         self.stack_end_var = tk.IntVar(value=buff.get('stackEnd', 0) if buff else 0)
         self.stack_end_spin = ttk.Spinbox(self.stack_end_frame,
-            textvariable=self.stack_end_var, from_=0, to=99, width=5)
+            textvariable=self.stack_end_var, from_=0, to=99, width=INPUT_WIDTH_NUM)
         self.stack_end_spin.pack(side='left')
         ttk.Label(self.stack_end_frame, text="Last stack level to show (0 = show all)",
                  foreground=THEME_COLORS['muted'], font=FONT_SMALL).pack(side='left', padx=PAD_TAB)
@@ -366,7 +366,7 @@ class BuffEditDialog(tk.Toplevel):
             ) != "Yes":
                 return None
         if not ids:
-            Messagebox.show_error("Enter at least one buff ID — find IDs on AoC database sites.",
+            Messagebox.show_error("Enter at least one buff ID. Find IDs on AoC database sites.",
                                   title="Missing Buff ID")
             return None
 
@@ -477,12 +477,12 @@ class DatabaseEditorTab(ttk.Frame):
         ttk.Label(filter_frame, text="Search:").pack(side='left')
         self.search_var = tk.StringVar()
         self.search_var.trace_add('write', lambda *a: self._debounced_refresh())
-        ttk.Entry(filter_frame, textvariable=self.search_var, width=20).pack(side='left', padx=PAD_SMALL)
+        ttk.Entry(filter_frame, textvariable=self.search_var, width=INPUT_WIDTH_SEARCH).pack(side='left', padx=PAD_SMALL)
 
         ttk.Label(filter_frame, text="Category:").pack(side='left', padx=(PAD_TAB, 0))
         self.category_var = tk.StringVar(value="All")
         self.category_combo = ttk.Combobox(filter_frame, textvariable=self.category_var,
-                                           values=["All"], width=18, state='readonly')
+                                           values=["All"], width=INPUT_WIDTH_FILTER, state='readonly')
         self.category_combo.pack(side='left', padx=PAD_SMALL)
         self.category_combo.bind('<<ComboboxSelected>>', lambda e: self.refresh_list())
         self.category_combo.bind('<Button-3>', self._show_category_menu)
@@ -491,7 +491,7 @@ class DatabaseEditorTab(ttk.Frame):
         self.type_var = tk.StringVar(value="All")
         ttk.Combobox(filter_frame, textvariable=self.type_var,
                      values=["All", "Buff", "Debuff", "Misc"],
-                     width=10, state='readonly').pack(side='left', padx=PAD_SMALL)
+                     width=INPUT_WIDTH_TYPE, state='readonly').pack(side='left', padx=PAD_SMALL)
         self.type_var.trace_add('write', lambda *a: self.refresh_list())
 
         self.count_var = tk.StringVar(value="0 entries")
@@ -510,15 +510,9 @@ class DatabaseEditorTab(ttk.Frame):
             ('stacking', 'Stack',     50,  40, False, 'center'),
             ('grids',    'Grids',     45,  35, False, 'center'),
         ]
-        keys = [c[0] for c in column_specs]
+        self._column_labels = {key: label for key, label, *_ in column_specs}
+        keys = list(self._column_labels)
         self.tree = ttk.Treeview(list_frame, columns=keys, show='headings', selectmode='browse')
-        # Force dark bg on empty area below entries — must use after_idle
-        # so it applies after ttkbootstrap finishes its theme configuration
-        def _fix_tree_bg():
-            s = ttk.Style()
-            bg = TK_COLORS['bg']
-            s.configure('Treeview', fieldbackground=bg, background=bg)
-        self.tree.after_idle(_fix_tree_bg)
 
         for key, label, width, minw, stretch, anchor in column_specs:
             self.tree.heading(key, text=label, command=lambda k=key: self.sort_by(k))
@@ -529,8 +523,15 @@ class DatabaseEditorTab(ttk.Frame):
         self.tree.pack(side='left', fill='both', expand=True)
         scrollbar.pack(side='right', fill='y')
 
-        self.tree.tag_configure('evenrow', background=TK_COLORS['bg'])
-        self.tree.tag_configure('oddrow', background=TK_COLORS['bg'])
+        # Type tints — desaturated foreground per row, paired with the Type
+        # column label so classification survives without color (DESIGN.md).
+        self.tree.tag_configure('type_debuff', foreground=THEME_COLORS['type_debuff'])
+        self.tree.tag_configure('type_misc',   foreground=THEME_COLORS['type_misc'])
+
+        # Empty-state overlay — placed/forgotten in refresh_list. Lives on list_frame
+        # so it floats over the tree's empty area without polluting row data.
+        self._empty_state_label = ttk.Label(list_frame, text="No matches found",
+                                            foreground=THEME_COLORS['muted'])
 
         self.tree.bind('<Double-1>', lambda e: self.edit_buff())
         self.tree.bind('<Return>', lambda e: self.edit_buff())
@@ -542,18 +543,15 @@ class DatabaseEditorTab(ttk.Frame):
 
         # (label, command, width, tooltip, separator_after)
         button_specs = [
-            ("Save Database", self.save,          None,       "Save all buff entries to database file",       True),
+            ("Save Database", self.save,          BTN_MEDIUM, "Save all buff entries to database file",       True),
             ("Add",           self.add_buff,      BTN_SMALL,  "Create a new buff entry",                       False),
             ("Edit",          self.edit_buff,     BTN_SMALL,  "Edit the selected buff entry",                  False),
             ("Delete",        self.delete_buff,   BTN_SMALL,  "Delete the selected buff entry",                True),
             ("Import...",     self.import_buffs,  BTN_MEDIUM, "Import buff entries from a JSON file",          False),
-            ("Export...",     self.export_buffs,  BTN_MEDIUM, "Export selected buffs to a JSON file",          False),
+            ("Export...",     self.export_buffs,  BTN_MEDIUM, "Export the currently filtered buffs to a JSON file", False),
         ]
         for text, cmd, width, tooltip, separator in button_specs:
-            kwargs = {'text': text, 'command': cmd}
-            if width is not None:
-                kwargs['width'] = width
-            btn = ttk.Button(btn_frame, **kwargs)
+            btn = ttk.Button(btn_frame, text=text, command=cmd, width=width)
             btn.pack(side='left', padx=PAD_XS)
             add_tooltip(btn, tooltip)
             if separator:
@@ -604,26 +602,36 @@ class DatabaseEditorTab(ttk.Frame):
         grid_usage = self._get_grid_usage()
         filtered.sort(key=lambda b: self._get_sort_key(b, grid_usage), reverse=self.sort_reverse)
 
-        for i, buff in enumerate(filtered):
+        for buff in filtered:
             name = buff.get('name', '')
             count = grid_usage.get(name, 0)
+            buff_type = buff.get('type', 'buff')
+            tags = (f'type_{buff_type}',) if buff_type in ('debuff', 'misc') else ()
             self.tree.insert('', 'end', values=(
                 name,
                 format_ids_display(buff.get('ids', [])),
                 buff.get('category', ''),
-                buff.get('type', 'buff').capitalize(),
+                buff_type.capitalize(),
                 format_stack_indicator(buff),
                 str(count) if count > 0 else "",
-            ), tags=('oddrow' if i % 2 else 'evenrow',))
+            ), tags=tags)
 
         has_filters = search or category != "All" or type_filter != "All"
-        if len(filtered) == 0 and has_filters:
-            self.count_var.set("0 entries \u2014 try adjusting filters")
-            self.tree.insert('', 'end', values=("No matches found", "", "", "", "", ""),
-                             tags=('placeholder',))
-            self.tree.tag_configure('placeholder', foreground=THEME_COLORS['muted'])
+        if not filtered and has_filters:
+            self.count_var.set("0 entries. Try adjusting filters.")
+            self._empty_state_label.place(relx=0.5, rely=0.5, anchor='center')
         else:
             self.count_var.set(f"{len(filtered)} / {len(self.database.grouped_buffs)} entries")
+            self._empty_state_label.place_forget()
+
+        self._update_sort_indicators()
+
+    def _update_sort_indicators(self):
+        """Append an arrow to the active sort column heading."""
+        arrow = ' \u25bc' if self.sort_reverse else ' \u25b2'
+        for key, label in self._column_labels.items():
+            text = label + arrow if key == self.sort_column else label
+            self.tree.heading(key, text=text)
 
     def sort_by(self, column):
         if self.sort_column == column:
@@ -704,7 +712,7 @@ class DatabaseEditorTab(ttk.Frame):
         """Edit selected buff entry."""
         buff, old_ids = self._get_selected_buff()
         if buff is None:
-            Messagebox.show_warning("Select a buff to edit.", title="No Selection")
+            self.toast.show("Select a buff to edit", 'warning')
             return
 
         old_name = buff['name']
@@ -731,7 +739,7 @@ class DatabaseEditorTab(ttk.Frame):
         """Delete selected buff entry."""
         buff, ids = self._get_selected_buff()
         if buff is None:
-            Messagebox.show_warning("Select a buff to delete.", title="No Selection")
+            self.toast.show("Select a buff to delete", 'warning')
             return
 
         ids_str = format_ids_display(ids)
@@ -758,7 +766,7 @@ class DatabaseEditorTab(ttk.Frame):
 
             import_buffs = data if isinstance(data, list) else data.get('buffs', [])
             if not import_buffs:
-                Messagebox.show_warning("No buff entries found in this file.\n\nExpected a .json file exported from Kaz Grids.", title="Warning")
+                self.toast.show("No buff entries in this file", 'warning')
                 return
 
             existing_ids = set()
@@ -787,7 +795,6 @@ class DatabaseEditorTab(ttk.Frame):
             if skipped > 0:
                 msg += f" ({skipped} duplicates skipped)"
             self.toast.show(msg, 'success')
-            Messagebox.show_info(msg, title="Import Complete")
 
         except (IOError, OSError, json.JSONDecodeError, ValueError) as e:
             Messagebox.show_error(f"Failed to import buffs.\n\nThe file may be damaged or in an unexpected format.\n\n({e})", title="Error")
@@ -807,7 +814,7 @@ class DatabaseEditorTab(ttk.Frame):
         )
 
         if not export_list:
-            Messagebox.show_warning("No buffs match the current filters. Adjust your search or category filter and try again.", title="Nothing to Export")
+            self.toast.show("No buffs match the current filters", 'warning')
             return
 
         default_name = "Db_export"
@@ -833,7 +840,6 @@ class DatabaseEditorTab(ttk.Frame):
                 json.dump(data, f, indent=2, ensure_ascii=False)
 
             self.toast.show(f"Exported {len(export_list)} buffs", 'success')
-            Messagebox.show_info(f"Exported {len(export_list)} buffs to:\n{path}", title="Export Complete")
         except (IOError, OSError, ValueError, TypeError) as e:
             Messagebox.show_error(f"Failed to export buffs.\n\nCheck that the destination isn't read-only.\n\n({e})", title="Error")
 
@@ -859,7 +865,7 @@ class DatabaseEditorTab(ttk.Frame):
         """Rename the currently selected category."""
         old_name = self.category_var.get()
         if old_name == "All":
-            Messagebox.show_error("Select a specific category first, not 'All'.", title="No Category Selected")
+            self.toast.show("Pick a specific category, not 'All'", 'warning')
             return
 
         new_name = Querybox.get_string(
@@ -870,10 +876,13 @@ class DatabaseEditorTab(ttk.Frame):
         if not new_name:
             return
         new_name = new_name.strip()
-        if not new_name or new_name == old_name:
+        if not new_name:
+            self.toast.show("Category name can't be empty", 'warning')
+            return
+        if new_name == old_name:
             return
         if new_name in self.database.categories:
-            Messagebox.show_error(f"Category '{new_name}' already exists.", title="Name Taken")
+            self.toast.show(f"Category '{new_name}' already exists", 'warning')
             return
 
         self.database.rename_category(old_name, new_name)

@@ -128,8 +128,8 @@ class KzGridsApp(ttkb.Window):
         self._create_menu_bar()
 
         # Window position
-        self.minsize(900, 500)
-        restore_window_position(self, 'main_window', 900, 650)
+        self.minsize(950, 660)
+        restore_window_position(self, 'main_window', 950, 660)
         bind_window_position_save(self, 'main_window', save_size=True)
 
         # Protocol
@@ -255,9 +255,13 @@ class KzGridsApp(ttkb.Window):
                 widgets['underline'].configure(height=1, bg=widgets['dim'])
 
         # --- Bottom bar ---
-        ttk.Separator(self, orient='horizontal').pack(fill='x', side='bottom')
+        # before=content_frame: tk pack assigns space in list order, so the bar
+        # has to come BEFORE the expand=True content frame in the manager's
+        # list, otherwise the content frame eats its space when shrinking.
+        ttk.Separator(self, orient='horizontal').pack(
+            fill='x', side='bottom', before=self.content_frame)
         self.bottom_bar = tk.Frame(self, bg=TK_COLORS['status_bg'])
-        self.bottom_bar.pack(fill='x', side='bottom')
+        self.bottom_bar.pack(fill='x', side='bottom', before=self.content_frame)
 
         # Game folder indicator (left) — single path, right-click to change/clear
         game_frame = ttk.Frame(self.bottom_bar)

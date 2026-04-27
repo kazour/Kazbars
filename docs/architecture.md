@@ -1,6 +1,6 @@
 # Architectural Map
 
-**Current as of:** 2026-04-25 (file sizes refreshed after popup-shell + spin-helper extraction)
+**Current as of:** 2026-04-27 (file sizes refreshed after grids_panel cleanup + dialog-token extraction)
 **Purpose:** Module topology, dependencies, and coupling hotspots. Updated alongside code changes — if you edit this file, commit it with the code. `CLAUDE.md` has the short version; this file has the detail that doesn't fit there.
 
 ## Dependency clusters
@@ -14,7 +14,7 @@ ui_helpers  ← ui_widgets          ← ui_components
                                     (also imports ui_tk_style)
 ui_helpers  ← custom_menu_bar
 ```
-- `ui_helpers` holds design tokens only (fonts, colors, padding, BTN_*, SCANLINE_ALPHA) + `setup_custom_styles`. Leaf — imports nothing internal.
+- `ui_helpers` holds design tokens only (fonts, colors, padding, BTN_*, INPUT_WIDTH_*, canvas-geometry constants, SCANLINE_ALPHA) + `setup_custom_styles`. Leaf — imports nothing internal.
 - `ui_widgets` adds the builder layer: `blend_alpha`, `CollapsibleSection`, tooltips, dialog/app headers, event bindings, `debounced_callback`.
 - `ui_components` adds stateful composites: `ToastManager`, `DragReorderManager`, `create_scrollable_frame`, global mousewheel routing.
 - `ui_tk_style` handles raw-tk widget styling + dark-titlebar monkey-patch.
@@ -96,11 +96,11 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 
 | File | Lines | Role |
 |---|---:|---|
-| `Modules/grids_panel.py` | 1128 | Grid list UI, grid management |
+| `Modules/grids_panel.py` | 1186 | Grid list UI, grid management |
+| `Modules/database_editor.py` | 897 | Buff DB CRUD, search, filtering |
 | `Modules/build_loading.py` | 796 | Build-progress screen + welcome/about popups |
-| `Modules/database_editor.py` | 888 | Buff DB CRUD, search, filtering |
-| `Modules/grid_dialogs.py` | 743 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
-| `kzgrids.py` | 621 | Entry point + `KzGridsApp` root window (widgets, menu, lifecycle) |
+| `Modules/grid_dialogs.py` | 744 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
+| `kzgrids.py` | 624 | Entry point + `KzGridsApp` root window (widgets, menu, lifecycle) |
 | `Modules/ui_widgets.py` | 510 | Widget builders, tooltips, bindings, `CollapsibleSection`, `blend_alpha` |
 | `Modules/live_tracker_panel.py` | 489 | Live Tracker Toplevel orchestrator |
 | `Modules/boss_timer.py` | 441 | Boss timer state + UI |
@@ -115,9 +115,9 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `build.py` | 225 | PyInstaller build driver |
 | `Modules/game_folder.py` | 185 | Game folder UI + Aoc.exe bypass + uninstall |
 | `Modules/build_action.py` | 166 | Build & Install flow |
+| `Modules/ui_helpers.py` | 157 | Design tokens + `setup_custom_styles` |
 | `Modules/profile_io.py` | 154 | Profile load/save/new/open + missing-buff warning |
 | `Modules/live_tracker_settings.py` | 145 | Tracker persistence |
-| `Modules/ui_helpers.py` | 129 | Design tokens + `setup_custom_styles` |
 | `Modules/grid_model.py` | 117 | Grid dataclasses + `parse_resolution` helper |
 | `tests/test_data_integrity.py` | 103 | Buff-ref resolution smoke test |
 | `Modules/build_utils.py` | 98 | Compiler discovery + path helpers |

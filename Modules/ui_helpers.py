@@ -38,6 +38,10 @@ THEME_COLORS = {
     'success':    '#00bc8c',   # Success
     'info_value': '#3498db',   # Info display values
     'purple':     '#9b59b6',   # Grids nav accent
+    # Buff classification tints — paired with the type label, never standalone.
+    # Buff stays at 'body'; debuff/misc carry a desaturated hue at AAA contrast on #222.
+    'type_debuff': '#F0A0A0',  # Muted red (~7.6:1 AAA)
+    'type_misc':   '#E0C880',  # Warm gold (~9.3:1 AAA)
 }
 
 # Colors for raw tk widgets (Canvas, Listbox, Text) that ttkbootstrap can't theme
@@ -79,10 +83,30 @@ PAD_LF = 8                # LabelFrame internal padding (dialogs)
 PAD_LIST_ITEM = 15        # Section/item left indent
 PAD_SECTION_GAP = 20      # Visual separation between button groups
 
-# Button width standards
+# Canvas-drawn geometry — pixel sizes for canvases (mini-previews, step badges).
+# Distinct from PAD_*: these size canvases, not widget padding.
+GRID_PREVIEW_PX = 80           # Mini preview canvas inside each editor card
+STEP_BADGE_PX = 20             # Numbered step badge in the tip bar
+CELL_PX = 10                   # Default mini-grid cell side
+CELL_PX_LARGE = 20             # Mini-grid cell side for 1x1 grids
+CELL_GAP = 2                   # Gap between mini-grid cells
+PRESET_CARD_SQUARE = 130       # 3x3 grid, 1x1 slot, and Custom preset
+PRESET_CARD_BAR_LONG = 200     # Long axis for bar-shaped preset previews
+PRESET_CARD_BAR_SHORT = 100    # Short axis for bar-shaped preset previews
+PRESET_LABEL_AREA = 28         # Reserved label area at bottom of preset cards
+
+# Button width standards (button text in chars)
 BTN_SMALL = 7             # Add, Edit, Delete, Clear, Copy
+BTN_DIALOG = 10           # Cancel + verb pair in dialog footers
 BTN_MEDIUM = 12           # Export, Import, Reset, Browse
 BTN_LARGE = 20            # Build & Install, Generate & Install
+
+# Form input widths (input text in chars). Reserved for inputs reused 2+ places.
+# One-off widths (a name field, a stack spinbox) stay as literal numbers.
+INPUT_WIDTH_NUM    = 5    # Numeric spinboxes
+INPUT_WIDTH_TYPE   = 10   # Compact type/state dropdowns
+INPUT_WIDTH_FILTER = 18   # Filter category combobox
+INPUT_WIDTH_SEARCH = 20   # Search entries
 
 # Scanline overlay alpha (0-255). Used for CRT decorative scanline overlays.
 SCANLINE_ALPHA = 12
@@ -124,6 +148,10 @@ def setup_custom_styles(root):
     style.configure('Card.TLabelframe.Label',
                     font=FONT_SECTION,
                     foreground=THEME_COLORS['body'])
+
+    # Treeview empty-area background — match working surface so list panels
+    # don't show ttkbootstrap's lighter default below the last row.
+    style.configure('Treeview', fieldbackground=TK_COLORS['bg'], background=TK_COLORS['bg'])
 
 
 

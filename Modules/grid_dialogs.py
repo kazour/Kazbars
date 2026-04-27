@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 from .ui_helpers import (
     FONT_HEADING, FONT_SECTION, FONT_BODY, FONT_SMALL, FONT_TINY, FONT_FORM_LABEL,
     THEME_COLORS, TK_COLORS, GRID_TYPE_COLORS, _RETRO_COLORS,
+    BTN_DIALOG, INPUT_WIDTH_NUM, INPUT_WIDTH_TYPE, INPUT_WIDTH_FILTER, INPUT_WIDTH_SEARCH,
     PAD_INNER, PAD_ROW, PAD_RADIO_INDENT,
     PAD_XS, PAD_MICRO, PAD_TINY, PAD_SMALL, PAD_TAB, PAD_LF, PAD_LIST_ITEM,
     PAD_SECTION_GAP, PAD_BUTTON_GAP,
@@ -123,7 +124,7 @@ class AddGridWizard(tk.Toplevel):
                  foreground=THEME_COLORS['muted']).pack(side='left')
         self.rows_var = tk.StringVar(value="1")
         self.rows_spin = ttk.Spinbox(dim_row, from_=1, to=self.available_slots,
-                                      textvariable=self.rows_var, width=5,
+                                      textvariable=self.rows_var, width=INPUT_WIDTH_NUM,
                                       command=self.on_rows_changed)
         self.rows_spin.pack(side='left', padx=(PAD_BUTTON_GAP, PAD_LIST_ITEM))
         self.rows_spin.bind('<KeyRelease>', lambda e: self.on_rows_changed())
@@ -132,7 +133,7 @@ class AddGridWizard(tk.Toplevel):
                  foreground=THEME_COLORS['muted']).pack(side='left')
         self.cols_var = tk.StringVar(value="10")
         self.cols_spin = ttk.Spinbox(dim_row, from_=1, to=self.available_slots,
-                                      textvariable=self.cols_var, width=5,
+                                      textvariable=self.cols_var, width=INPUT_WIDTH_NUM,
                                       command=self.on_cols_changed)
         self.cols_spin.pack(side='left', padx=(PAD_BUTTON_GAP, 0))
         self.cols_spin.bind('<KeyRelease>', lambda e: self.on_cols_changed())
@@ -153,8 +154,8 @@ class AddGridWizard(tk.Toplevel):
 
         btn_frame = ttk.Frame(frame)
         btn_frame.pack(pady=PAD_TAB)
-        ttk.Button(btn_frame, text="Cancel", command=self.on_cancel, width=10, bootstyle='secondary').pack(side='left', padx=PAD_SMALL)
-        ttk.Button(btn_frame, text="Create", command=self.on_create, width=10, bootstyle='success').pack(side='left', padx=PAD_SMALL)
+        ttk.Button(btn_frame, text="Cancel", command=self.on_cancel, width=BTN_DIALOG, bootstyle='secondary').pack(side='left', padx=PAD_SMALL)
+        ttk.Button(btn_frame, text="Create", command=self.on_create, width=BTN_DIALOG, bootstyle='success').pack(side='left', padx=PAD_SMALL)
 
         self.bind('<Escape>', lambda e: self.on_cancel())
         self.bind('<Return>', lambda e: self.on_create())
@@ -327,19 +328,19 @@ class BuffSelectorDialog(tk.Toplevel):
         ttk.Label(search_frame, text="Search:").pack(side='left')
         self.search_var = tk.StringVar()
         self.search_var.trace_add('write', lambda *a: self._debounced_refresh())
-        ttk.Entry(search_frame, textvariable=self.search_var, width=20).pack(side='left', padx=PAD_SMALL)
+        ttk.Entry(search_frame, textvariable=self.search_var, width=INPUT_WIDTH_SEARCH).pack(side='left', padx=PAD_SMALL)
 
         ttk.Label(search_frame, text="Category:").pack(side='left', padx=(PAD_TAB, 0))
         self.category_var = tk.StringVar(value="All")
         cat_combo = ttk.Combobox(search_frame, textvariable=self.category_var,
-                                  values=["All"] + self.database.categories, width=18, state='readonly')
+                                  values=["All"] + self.database.categories, width=INPUT_WIDTH_FILTER, state='readonly')
         cat_combo.pack(side='left', padx=PAD_SMALL)
         cat_combo.bind('<<ComboboxSelected>>', lambda e: self.refresh_lists())
 
         ttk.Label(search_frame, text="Type:").pack(side='left', padx=(PAD_TAB, 0))
         self.type_var = tk.StringVar(value="All")
         type_combo = ttk.Combobox(search_frame, textvariable=self.type_var,
-                                   values=["All", "Buffs", "Debuffs", "Misc"], width=10, state='readonly')
+                                   values=["All", "Buffs", "Debuffs", "Misc"], width=INPUT_WIDTH_TYPE, state='readonly')
         type_combo.pack(side='left', padx=PAD_SMALL)
         type_combo.bind('<<ComboboxSelected>>', lambda e: self.refresh_lists())
 
@@ -374,8 +375,8 @@ class BuffSelectorDialog(tk.Toplevel):
         bottom_frame.pack(fill='x')
         self.status_var = tk.StringVar(value="0 buffs selected — add from the left list")
         ttk.Label(bottom_frame, textvariable=self.status_var).pack(side='left')
-        ttk.Button(bottom_frame, text="Done", command=self.on_ok, width=10, bootstyle='success').pack(side='right', padx=PAD_SMALL)
-        ttk.Button(bottom_frame, text="Cancel", command=self.on_cancel, width=10, bootstyle='secondary').pack(side='right')
+        ttk.Button(bottom_frame, text="Done", command=self.on_ok, width=BTN_DIALOG, bootstyle='success').pack(side='right', padx=PAD_SMALL)
+        ttk.Button(bottom_frame, text="Cancel", command=self.on_cancel, width=BTN_DIALOG, bootstyle='secondary').pack(side='right')
 
         self.bind('<Escape>', lambda e: self.on_cancel())
 
@@ -508,8 +509,8 @@ class SlotAssignmentDialog(tk.Toplevel):
 
         bottom = ttk.Frame(self, padding=PAD_SMALL)
         bottom.pack(fill='x')
-        ttk.Button(bottom, text="Done", command=self.on_ok, width=10, bootstyle='success').pack(side='right', padx=PAD_SMALL)
-        ttk.Button(bottom, text="Cancel", command=self.on_cancel, width=10, bootstyle='secondary').pack(side='right')
+        ttk.Button(bottom, text="Done", command=self.on_ok, width=BTN_DIALOG, bootstyle='success').pack(side='right', padx=PAD_SMALL)
+        ttk.Button(bottom, text="Cancel", command=self.on_cancel, width=BTN_DIALOG, bootstyle='secondary').pack(side='right')
 
         self.bind('<Escape>', lambda e: self.on_cancel())
         self.refresh_slot_displays()
