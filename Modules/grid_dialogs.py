@@ -12,18 +12,17 @@ from collections import Counter
 logger = logging.getLogger(__name__)
 
 from .ui_helpers import (
-    FONT_HEADING, FONT_SECTION, FONT_BODY, FONT_SMALL, FONT_TINY, FONT_FORM_LABEL,
+    FONT_SECTION, FONT_SMALL, FONT_TINY, FONT_FORM_LABEL,
     THEME_COLORS, TK_COLORS, GRID_TYPE_COLORS, _RETRO_COLORS,
     BTN_DIALOG, INPUT_WIDTH_NUM, INPUT_WIDTH_TYPE, INPUT_WIDTH_FILTER, INPUT_WIDTH_SEARCH,
-    PAD_INNER, PAD_ROW, PAD_RADIO_INDENT,
+    PAD_INNER, PAD_RADIO_INDENT,
     PAD_XS, PAD_MICRO, PAD_TINY, PAD_SMALL, PAD_TAB, PAD_LF, PAD_LIST_ITEM,
     PAD_SECTION_GAP, PAD_BUTTON_GAP,
     MODULE_COLORS,
 )
 from .ui_widgets import (
-    debounced_callback, blend_alpha, add_tooltip, create_dialog_header,
+    debounced_callback, blend_alpha, create_dialog_header,
 )
-from .ui_components import create_scrollable_frame
 from .ui_tk_style import style_tk_listbox
 from .settings_manager import get_setting, set_setting
 from .window_position import restore_window_position, bind_window_position_save
@@ -32,7 +31,18 @@ from .grid_model import create_default_grid, MAX_TOTAL_SLOTS
 
 ADD_GRID_WIZARD_SIZE = (460, 600)
 BUFF_SELECTOR_SIZE = (800, 600)
+BUFF_SELECTOR_MIN = (640, 400)
 SLOT_ASSIGNMENT_SIZE = (620, 520)
+SLOT_ASSIGNMENT_MIN = (560, 420)
+
+BUFF_LIST_WIDTH = 40
+BUFF_LIST_HEIGHT = 22
+SLOT_SUMMARY_HEIGHT = 5
+SLOT_CANVAS_VIEWPORT = (540, 340)
+SLOT_CELL_PX = 34
+SLOT_CELL_GAP = 4
+SLOT_LABEL_INSET = 4
+SLOT_COUNT_INSET = 3
 
 
 def _section(parent, text):
@@ -40,6 +50,17 @@ def _section(parent, text):
     lf = ttk.LabelFrame(parent, text=text, padding=PAD_SMALL)
     lf.pack(fill='x', pady=PAD_SMALL)
     return lf
+
+
+def _root_toast(widget):
+    """Walk up the master chain to find the app's ToastManager, or None."""
+    w = widget
+    while w is not None:
+        toast = getattr(w, 'toast', None)
+        if toast is not None:
+            return toast
+        w = getattr(w, 'master', None)
+    return None
 
 
 # ============================================================================
@@ -62,10 +83,15 @@ class AddGridWizard(tk.Toplevel):
         self.result = None
         self.parent = parent
 
+        self._mode_forced_static = False
+        self._mode_before_force = "dynamic"
+
         self.create_widgets()
         restore_window_position(self, 'add_grid_wizard', *ADD_GRID_WIZARD_SIZE, parent, resizable=False)
         bind_window_position_save(self, 'add_grid_wizard', save_size=False)
         self.deiconify()
+        self.name_entry.focus_set()
+        self.name_entry.select_range(0, 'end')
 
     def generate_unique_name(self, base="Grid"):
         counter = 1
@@ -90,7 +116,8 @@ class AddGridWizard(tk.Toplevel):
         ttk.Label(name_frame, text="Grid Name:", font=FONT_FORM_LABEL,
                  foreground=THEME_COLORS['muted']).pack(side='left')
         self.id_var = tk.StringVar(value=self.generate_unique_name())
-        ttk.Entry(name_frame, textvariable=self.id_var, width=20).pack(side='left', padx=PAD_SMALL)
+        self.name_entry = ttk.Entry(name_frame, textvariable=self.id_var, width=20)
+        self.name_entry.pack(side='left', padx=PAD_SMALL)
 
         source_frame = _section(frame, "Source")
 
@@ -168,14 +195,18 @@ class AddGridWizard(tk.Toplevel):
                 cols = self.available_slots
             elif cols == 1:
                 rows = self.available_slots
+            elif rows == cols:
+                rows = cols = max(1, int(math.sqrt(self.available_slots)))
             else:
                 scale = math.sqrt(self.available_slots / total)
                 rows = max(1, int(rows * scale))
                 cols = max(1, int(cols * scale))
+                while (rows + 1) * cols <= self.available_slots:
+                    rows += 1
+                while rows * (cols + 1) <= self.available_slots:
+                    cols += 1
         self.rows_var.set(str(rows))
         self.cols_var.set(str(cols))
-        if rows == 1 and cols == 1:
-            self.mode_var.set("static")
         self.update_display()
 
     def safe_get_int(self, var, default=1):
@@ -217,17 +248,22 @@ class AddGridWizard(tk.Toplevel):
 
         if rows == 1 and cols == 1:
             shape = "Single Slot"
+            if not self._mode_forced_static:
+                self._mode_before_force = self.mode_var.get()
+                self._mode_forced_static = True
             self.mode_var.set("static")
             self.mode_dynamic.config(state='disabled')
-        elif rows == 1:
-            shape = f"Horizontal Bar ({cols} slots)"
-            self.mode_dynamic.config(state='normal')
-        elif cols == 1:
-            shape = f"Vertical Bar ({rows} slots)"
-            self.mode_dynamic.config(state='normal')
         else:
-            shape = f"Grid ({rows}x{cols} = {total} slots)"
+            if self._mode_forced_static:
+                self.mode_var.set(self._mode_before_force)
+                self._mode_forced_static = False
             self.mode_dynamic.config(state='normal')
+            if rows == 1:
+                shape = f"Horizontal Bar ({cols} slots)"
+            elif cols == 1:
+                shape = f"Vertical Bar ({rows} slots)"
+            else:
+                shape = f"Grid ({rows}x{cols} = {total} slots)"
 
         remaining = self.available_slots - total
         if remaining >= 0:
@@ -260,7 +296,11 @@ class AddGridWizard(tk.Toplevel):
         total = rows * cols
 
         if total > self.available_slots:
-            Messagebox.show_error(f"Only {self.available_slots} slots available.\n\nReduce rows or columns, or remove another grid to free up slots.", title="Slot Limit")
+            toast = _root_toast(self.parent)
+            if toast:
+                toast.show(f"Only {self.available_slots} slots available. Reduce rows or columns.", 'warning')
+            else:
+                Messagebox.show_error(f"Only {self.available_slots} slots available.\n\nReduce rows or columns, or remove another grid to free up slots.", title="Slot Limit")
             return
 
         self.result = create_default_grid(
@@ -287,6 +327,7 @@ class BuffSelectorDialog(tk.Toplevel):
         super().__init__(parent)
         self.withdraw()
         self.title(title)
+        self._header_text = title.upper()
         self.transient(parent)
         self.grab_set()
 
@@ -298,6 +339,8 @@ class BuffSelectorDialog(tk.Toplevel):
             if entry:
                 self.selected_names.add(entry['name'])
         self.result = None
+        self._search_cache_key = None
+        self._search_cache_value = None
 
         self._debounced_refresh = debounced_callback(self, 200, self.refresh_lists)
 
@@ -313,14 +356,16 @@ class BuffSelectorDialog(tk.Toplevel):
         self.refresh_lists()
         restore_window_position(self, 'buff_selector', *BUFF_SELECTOR_SIZE, parent)
         bind_window_position_save(self, 'buff_selector')
+        self.minsize(*BUFF_SELECTOR_MIN)
         self.deiconify()
+        self.search_entry.focus_set()
 
     def save_filter_state(self):
         set_setting('buff_selector_category', self.category_var.get())
         set_setting('buff_selector_type', self.type_var.get())
 
     def create_widgets(self):
-        create_dialog_header(self, "SELECT BUFFS", MODULE_COLORS['grids'])
+        create_dialog_header(self, self._header_text, MODULE_COLORS['grids'])
 
         search_frame = ttk.Frame(self, padding=PAD_SMALL)
         search_frame.pack(fill='x')
@@ -328,7 +373,8 @@ class BuffSelectorDialog(tk.Toplevel):
         ttk.Label(search_frame, text="Search:").pack(side='left')
         self.search_var = tk.StringVar()
         self.search_var.trace_add('write', lambda *a: self._debounced_refresh())
-        ttk.Entry(search_frame, textvariable=self.search_var, width=INPUT_WIDTH_SEARCH).pack(side='left', padx=PAD_SMALL)
+        self.search_entry = ttk.Entry(search_frame, textvariable=self.search_var, width=INPUT_WIDTH_SEARCH)
+        self.search_entry.pack(side='left', padx=PAD_SMALL)
 
         ttk.Label(search_frame, text="Category:").pack(side='left', padx=(PAD_TAB, 0))
         self.category_var = tk.StringVar(value="All")
@@ -347,17 +393,23 @@ class BuffSelectorDialog(tk.Toplevel):
         lists_frame = ttk.Frame(self, padding=PAD_SMALL)
         lists_frame.pack(fill='both', expand=True)
 
-        def _make_listbox(parent, label, padx, on_double_click):
+        def _make_listbox(parent, label, padx, on_activate):
             frame = ttk.LabelFrame(parent, text=label, padding=PAD_SMALL)
             frame.pack(side='left', fill='both', expand=True, padx=padx)
             scroll = ttk.Scrollbar(frame)
             scroll.pack(side='right', fill='y')
             lb = tk.Listbox(frame, yscrollcommand=scroll.set,
-                            selectmode='extended', width=40, height=22)
+                            selectmode='extended',
+                            width=BUFF_LIST_WIDTH, height=BUFF_LIST_HEIGHT)
             style_tk_listbox(lb)
             lb.pack(side='left', fill='both', expand=True)
             scroll.config(command=lb.yview)
-            lb.bind('<Double-1>', lambda e: on_double_click())
+            lb.bind('<Double-1>', lambda e: on_activate())
+
+            def _on_return(event):
+                on_activate()
+                return 'break'
+            lb.bind('<Return>', _on_return)
             return lb
 
         self.avail_list = _make_listbox(lists_frame, "Available", (0, PAD_SMALL), self.add_selected)
@@ -373,12 +425,13 @@ class BuffSelectorDialog(tk.Toplevel):
 
         bottom_frame = ttk.Frame(self, padding=PAD_SMALL)
         bottom_frame.pack(fill='x')
-        self.status_var = tk.StringVar(value="0 buffs selected — add from the left list")
+        self.status_var = tk.StringVar(value="0 buffs selected. Add from the left list.")
         ttk.Label(bottom_frame, textvariable=self.status_var).pack(side='left')
         ttk.Button(bottom_frame, text="Done", command=self.on_ok, width=BTN_DIALOG, bootstyle='success').pack(side='right', padx=PAD_SMALL)
-        ttk.Button(bottom_frame, text="Cancel", command=self.on_cancel, width=BTN_DIALOG, bootstyle='secondary').pack(side='right')
+        ttk.Button(bottom_frame, text="Cancel", command=self.on_cancel, width=BTN_DIALOG, bootstyle='secondary').pack(side='right', padx=PAD_SMALL)
 
         self.bind('<Escape>', lambda e: self.on_cancel())
+        self.bind('<Return>', lambda e: self.on_ok())
 
     def refresh_lists(self):
         query = self.search_var.get()
@@ -389,7 +442,13 @@ class BuffSelectorDialog(tk.Toplevel):
         type_map = {"Buffs": "buff", "Debuffs": "debuff", "Misc": "misc"}
         buff_type = type_map.get(self.type_var.get())
 
-        available = self.database.search(query, category, buff_type=buff_type)
+        cache_key = (query, category, buff_type)
+        if cache_key == self._search_cache_key:
+            available = self._search_cache_value
+        else:
+            available = self.database.search(query, category, buff_type=buff_type)
+            self._search_cache_key = cache_key
+            self._search_cache_value = available
 
         self.avail_list.delete(0, tk.END)
         self.avail_data = []
@@ -424,7 +483,10 @@ class BuffSelectorDialog(tk.Toplevel):
 
         count = len(self.selected_names)
         if count == 0:
-            self.status_var.set("0 buffs selected \u2014 add from the left list")
+            if self.avail_data:
+                self.status_var.set("0 buffs selected. Add from the left list.")
+            else:
+                self.status_var.set("0 buffs selected. No buffs match the current filters.")
         else:
             self.status_var.set(f"{count} buffs selected")
 
@@ -490,10 +552,13 @@ class SlotAssignmentDialog(tk.Toplevel):
                 self.assignments[i] = list(v)
 
         self.result = None
+        self._cursor_is_hand = False
         self.create_widgets()
         restore_window_position(self, 'slot_assignment', *SLOT_ASSIGNMENT_SIZE, parent)
         bind_window_position_save(self, 'slot_assignment')
+        self.minsize(*SLOT_ASSIGNMENT_MIN)
         self.deiconify()
+        self._canvas.focus_set()
 
     def create_widgets(self):
         create_dialog_header(self, "SLOT ASSIGNMENTS", MODULE_COLORS['grids'])
@@ -510,7 +575,7 @@ class SlotAssignmentDialog(tk.Toplevel):
         bottom = ttk.Frame(self, padding=PAD_SMALL)
         bottom.pack(fill='x')
         ttk.Button(bottom, text="Done", command=self.on_ok, width=BTN_DIALOG, bootstyle='success').pack(side='right', padx=PAD_SMALL)
-        ttk.Button(bottom, text="Cancel", command=self.on_cancel, width=BTN_DIALOG, bootstyle='secondary').pack(side='right')
+        ttk.Button(bottom, text="Cancel", command=self.on_cancel, width=BTN_DIALOG, bootstyle='secondary').pack(side='right', padx=PAD_SMALL)
 
         self.bind('<Escape>', lambda e: self.on_cancel())
         self.refresh_slot_displays()
@@ -518,15 +583,13 @@ class SlotAssignmentDialog(tk.Toplevel):
     def _build_grid_canvas(self, parent):
         cols = self.grid_config['cols']
         rows = self.grid_config['rows']
-        MAX_W, MAX_H = 540, 340
-        self._cell = 34
-        self._gap = 4
-        stride = self._cell + self._gap
+        max_w, max_h = SLOT_CANVAS_VIEWPORT
+        stride = SLOT_CELL_PX + SLOT_CELL_GAP
 
         grid_w = cols * stride
         grid_h = rows * stride
-        display_w = min(grid_w, MAX_W)
-        display_h = min(grid_h, MAX_H)
+        display_w = min(grid_w, max_w)
+        display_h = min(grid_h, max_h)
 
         canvas_frame = ttk.Frame(parent)
         canvas_frame.pack(anchor='center', pady=(PAD_SMALL, PAD_TINY))
@@ -536,16 +599,18 @@ class SlotAssignmentDialog(tk.Toplevel):
             width=display_w,
             height=display_h,
             bg=TK_COLORS['bg'],
-            highlightthickness=0,
-            cursor='hand2',
+            highlightthickness=1,
+            highlightbackground=TK_COLORS['bg'],
+            highlightcolor=self._type_color,
+            takefocus=True,
         )
         self._canvas.configure(scrollregion=(0, 0, grid_w, grid_h))
 
-        if grid_w > MAX_W:
+        if grid_w > max_w:
             hbar = ttk.Scrollbar(canvas_frame, orient='horizontal', command=self._canvas.xview)
             hbar.pack(side='bottom', fill='x')
             self._canvas.configure(xscrollcommand=hbar.set)
-        if grid_h > MAX_H:
+        if grid_h > max_h:
             vbar = ttk.Scrollbar(canvas_frame, orient='vertical', command=self._canvas.yview)
             vbar.pack(side='right', fill='y')
             self._canvas.configure(yscrollcommand=vbar.set)
@@ -554,6 +619,12 @@ class SlotAssignmentDialog(tk.Toplevel):
         self._canvas.bind("<Button-1>", self._on_canvas_click)
         self._canvas.bind("<Motion>", self._on_canvas_motion)
         self._canvas.bind("<Leave>", self._on_canvas_leave)
+        self._canvas.bind("<Up>", lambda e: self._move_hover(-1, 0))
+        self._canvas.bind("<Down>", lambda e: self._move_hover(1, 0))
+        self._canvas.bind("<Left>", lambda e: self._move_hover(0, -1))
+        self._canvas.bind("<Right>", lambda e: self._move_hover(0, 1))
+        self._canvas.bind("<Return>", self._on_canvas_activate)
+        self._canvas.bind("<space>", self._on_canvas_activate)
 
         ttk.Label(parent, textvariable=self.summary_var,
                   font=FONT_SMALL, foreground=THEME_COLORS['muted']).pack(anchor='center')
@@ -563,7 +634,7 @@ class SlotAssignmentDialog(tk.Toplevel):
         frame.pack(fill='both', expand=True, pady=(PAD_SMALL, 0))
 
         self._summary_text = tk.Text(
-            frame, height=5, font=FONT_SMALL,
+            frame, height=SLOT_SUMMARY_HEIGHT, font=FONT_SMALL,
             bg=TK_COLORS['input_bg'], fg=TK_COLORS['input_fg'],
             relief='flat', bd=0, state='disabled',
             highlightthickness=1, highlightbackground=TK_COLORS['border'],
@@ -612,9 +683,8 @@ class SlotAssignmentDialog(tk.Toplevel):
 
     def _draw_grid(self):
         self._canvas.delete('all')
-        cols = self.grid_config['cols']
-        cell = self._cell
-        stride = cell + self._gap
+        cell = SLOT_CELL_PX
+        stride = cell + SLOT_CELL_GAP
         _pixel_border = _RETRO_COLORS['pixel_border']
 
         for i in range(self.total_slots):
@@ -627,10 +697,10 @@ class SlotAssignmentDialog(tk.Toplevel):
             tag = f'slot_{i}'
             self._canvas.create_rectangle(x0, y0, x1, y1,
                                           fill='', outline=_pixel_border, tags=(tag, 'rect'))
-            self._canvas.create_text(x0 + 4, y0 + 4, text=str(i),
+            self._canvas.create_text(x0 + SLOT_LABEL_INSET, y0 + SLOT_LABEL_INSET, text=str(i),
                                      anchor='nw', font=FONT_SMALL,
                                      fill='', tags=(tag, 'num'))
-            self._canvas.create_text(x1 - 3, y1 - 3, text='',
+            self._canvas.create_text(x1 - SLOT_COUNT_INSET, y1 - SLOT_COUNT_INSET, text='',
                                      anchor='se', font=FONT_TINY,
                                      fill='', tags=(tag, 'count'))
             self._update_slot_visual(i)
@@ -663,28 +733,34 @@ class SlotAssignmentDialog(tk.Toplevel):
                                    text=str(count) if count else '',
                                    fill=_bg if count else '')
 
-    def _on_canvas_click(self, event):
-        cols = self.grid_config['cols']
-        stride = self._cell + self._gap
+    def _slot_at(self, event):
+        """Return slot index under the pointer, or -1 if pointer is in a gap or outside the grid."""
+        stride = SLOT_CELL_PX + SLOT_CELL_GAP
         x = int(self._canvas.canvasx(event.x))
         y = int(self._canvas.canvasy(event.y))
-        c = x // stride
-        r = y // stride
-        if 0 <= c < cols and 0 <= r < self.grid_config['rows']:
-            idx = self._pos_to_slot(r, c)
-            if 0 <= idx < self.total_slots:
-                self.edit_slot(idx)
+        c, c_off = divmod(x, stride)
+        r, r_off = divmod(y, stride)
+        if c_off >= SLOT_CELL_PX or r_off >= SLOT_CELL_PX:
+            return -1
+        if not (0 <= c < self.grid_config['cols'] and 0 <= r < self.grid_config['rows']):
+            return -1
+        idx = self._pos_to_slot(r, c)
+        return idx if 0 <= idx < self.total_slots else -1
+
+    def _on_canvas_click(self, event):
+        self._canvas.focus_set()
+        idx = self._slot_at(event)
+        if idx != -1:
+            self.edit_slot(idx)
 
     def _on_canvas_motion(self, event):
-        cols = self.grid_config['cols']
-        stride = self._cell + self._gap
-        x = int(self._canvas.canvasx(event.x))
-        y = int(self._canvas.canvasy(event.y))
-        c = x // stride
-        r = y // stride
-        if 0 <= c < cols and 0 <= r < self.grid_config['rows']:
-            idx = self._pos_to_slot(r, c)
-            if idx < self.total_slots and idx != self._hovered:
+        idx = self._slot_at(event)
+        want_hand = idx != -1
+        if want_hand != self._cursor_is_hand:
+            self._canvas.configure(cursor='hand2' if want_hand else '')
+            self._cursor_is_hand = want_hand
+        if idx != -1:
+            if idx != self._hovered:
                 prev = self._hovered
                 self._hovered = idx
                 self._update_slot_visual(prev)
@@ -693,6 +769,27 @@ class SlotAssignmentDialog(tk.Toplevel):
             prev = self._hovered
             self._hovered = -1
             self._update_slot_visual(prev)
+
+    def _move_hover(self, dr, dc):
+        if self._hovered == -1:
+            new_idx = 0
+        else:
+            r, c = self._slot_pos(self._hovered)
+            new_r = max(0, min(self.grid_config['rows'] - 1, r + dr))
+            new_c = max(0, min(self.grid_config['cols'] - 1, c + dc))
+            new_idx = self._pos_to_slot(new_r, new_c)
+            if not (0 <= new_idx < self.total_slots):
+                return
+        if new_idx != self._hovered:
+            prev = self._hovered
+            self._hovered = new_idx
+            if prev != -1:
+                self._update_slot_visual(prev)
+            self._update_slot_visual(new_idx)
+
+    def _on_canvas_activate(self, event):
+        if self._hovered != -1:
+            self.edit_slot(self._hovered)
 
     def _on_canvas_leave(self, event):
         if self._hovered != -1:
@@ -715,12 +812,12 @@ class SlotAssignmentDialog(tk.Toplevel):
 
         self._summary_text.configure(state='normal')
         self._summary_text.delete('1.0', tk.END)
-        self._summary_text.insert(tk.END, '\n'.join(lines) if lines else "Click any cell to assign buffs.")
+        self._summary_text.insert(tk.END, '\n'.join(lines) if lines else "Click any slot to assign buffs.")
         self._summary_text.configure(state='disabled')
 
     def refresh_slot_displays(self):
         assigned_count = sum(1 for v in self.assignments.values() if v)
-        self.summary_var.set(f"{assigned_count} of {self.total_slots} slots assigned — click a slot to edit")
+        self.summary_var.set(f"{assigned_count} of {self.total_slots} slots assigned. Click a slot to edit.")
         self._draw_grid()
         self._refresh_summary()
 
@@ -734,6 +831,7 @@ class SlotAssignmentDialog(tk.Toplevel):
         if dialog.result is not None:
             self.assignments[slot_index] = dialog.result
             self.refresh_slot_displays()
+        self._canvas.focus_set()
 
     def on_ok(self):
         self.result = {str(k): v for k, v in self.assignments.items() if v}

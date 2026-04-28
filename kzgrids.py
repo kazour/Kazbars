@@ -295,11 +295,11 @@ class KzGridsApp(ttkb.Window):
             side='right', fill='y', padx=PAD_SMALL, pady=PAD_XS)
 
         tracker_btn = ttkb.Button(
-            self.bottom_bar, text="\u23F1 Tracker", bootstyle="outline",
+            self.bottom_bar, text="\u23F1 Ethram-Fal", bootstyle="outline",
             command=self._open_boss_timer
         )
         tracker_btn.pack(side='right', pady=PAD_SMALL)
-        add_tooltip(tracker_btn, "Open the live combat log tracker")
+        add_tooltip(tracker_btn, "Open the Ethram-Fal Seed Timer")
 
         self._refresh_game_path_label()
 

@@ -46,7 +46,7 @@ Steps:
 5. `_migrate_grid()` — Modules/grids_panel.py:1004 — normalizes legacy `int` IDs and legacy name strings in `whitelist` and `slotAssignments` to current primary spell IDs via `database.by_id` and `database.get_entry_by_name`
 6. `validate_grid()` — Modules/grid_model.py:74 — fills missing keys from `create_default_grid()`; clamps every numeric field against `CLAMP_SPECS`; coerces enums in `ENUM_SPECS`; coerces booleans and lists/dicts
 7. `refresh_panels()` — Modules/grids_panel.py:1120 — destroys existing `GridEditorPanel` widgets; creates new ones for the validated list; shows empty state if list is empty
-8. If a Boss Timer panel is alive, `LiveTrackerPanel.load_profile_data()` — Modules/live_tracker_panel.py:436 — applies the embedded `boss_timer.overlay` settings to the overlay
+8. If a Boss Timer panel is alive, `LiveTrackerPanel.load_profile_data()` — Modules/live_tracker_panel.py:462 — applies the embedded `boss_timer.overlay` settings to the overlay
 9. `warn_missing_buffs()` — Modules/profile_io.py:122 — if migration dropped any references, displays them (deferred 200ms when called during startup so the dialog doesn't race the welcome popup)
 10. `app.settings.set('last_profile', ...)` then `app.settings.save()` — persists `last_profile` path to `kzgrids_settings.json` via atomic temp-rename in `safe_save_json` (Modules/settings_manager.py:33)
 
@@ -65,7 +65,7 @@ Steps:
 4. `get_profile_data()` — Modules/grids_panel.py:977 — calls `save_settings()` then returns `self.grids`
 5. `save_settings()` — Modules/grids_panel.py:1074 — iterates all `GridEditorPanel` instances calling `save_to_config()`
 6. `save_to_config()` — Modules/grids_panel.py:399 — reads all widget values into the grid config dict
-7. If a Boss Timer panel is alive, `LiveTrackerPanel.get_profile_data()` — Modules/live_tracker_panel.py:431 — returns `{'overlay': {...}}` for embedding
+7. If a Boss Timer panel is alive, `LiveTrackerPanel.get_profile_data()` — Modules/live_tracker_panel.py:457 — returns `{'overlay': {...}}` for embedding
 8. `safe_save_json()` — Modules/settings_manager.py:33 — writes JSON to `path.tmp` then `Path.replace`-renames it over the target atomically
 9. `app.settings.set('last_profile', ...)` then `app.settings.save()` — persists `last_profile` to `kzgrids_settings.json`
 
@@ -79,8 +79,8 @@ Trigger: User clicks "+ Add Grid" button on the grids panel toolbar (also reacha
 
 Steps:
 1. `add_grid()` — Modules/grids_panel.py:1097 — checks the slot budget against `MAX_TOTAL_SLOTS` (64); opens `AddGridWizard` dialog
-2. `AddGridWizard.__init__()` — Modules/grid_dialogs.py:51 — builds wizard UI with name, source/mode/dimension fields and four preset shape buttons; calls `restore_window_position()`
-3. `AddGridWizard.on_create()` — Modules/grid_dialogs.py:240 — validates name (non-empty, unique, optional special-char warning), enforces slot budget; calls `create_default_grid()`
+2. `AddGridWizard.__init__()` — Modules/grid_dialogs.py:72 — builds wizard UI with name, source/mode/dimension fields and four preset shape buttons; calls `restore_window_position()`
+3. `AddGridWizard.on_create()` — Modules/grid_dialogs.py:276 — validates name (non-empty, unique, optional special-char warning), enforces slot budget; calls `create_default_grid()`
 4. `create_default_grid()` — Modules/grid_model.py:37 — returns a complete grid config dict populated with caller-specified `grid_type`, `rows`, `cols`, `mode`, `grid_id`; auto-coerces `1×1` to static mode and picks a sensible `fillDirection`
 5. `refresh_panels()` — Modules/grids_panel.py:1120 — destroys and recreates all `GridEditorPanel` cards; the newly added card is initially expanded
 
@@ -95,10 +95,10 @@ Trigger: User clicks "Tracked Buffs..." on a dynamic-mode `GridEditorPanel` (the
 Steps:
 1. `_on_mode_btn_click()` — Modules/grids_panel.py:473 — dispatches to `edit_whitelist()` when grid is in dynamic mode (or `edit_slots()` for static)
 2. `edit_whitelist()` — Modules/grids_panel.py:479 — flushes current widget state via `save_to_config()`; opens `BuffSelectorDialog`
-3. `BuffSelectorDialog.__init__()` — Modules/grid_dialogs.py:286 — resolves initial `whitelist` primary IDs to entry names via `database.by_id`; restores last-used category/type filter from settings; calls `refresh_lists()`
+3. `BuffSelectorDialog.__init__()` — Modules/grid_dialogs.py:326 — resolves initial `whitelist` primary IDs to entry names via `database.by_id`; restores last-used category/type filter from settings; calls `refresh_lists()`
 4. `BuffDatabase.search()` — Modules/database_editor.py:82 — filters `grouped_buffs` by query/category/type; sorts by type then name
-5. `BuffSelectorDialog.refresh_lists()` — Modules/grid_dialogs.py:383 — repopulates Available and Selected listboxes; selected entries sort by type when the grid `layout` is `buffFirst` or `debuffFirst`, alphabetically when `mixed`
-6. `BuffSelectorDialog.on_ok()` — Modules/grid_dialogs.py:450 — saves filter state; maps each selected name back to `entry['ids'][0]` via `database.get_entry_by_name()`; sets `self.result`
+5. `BuffSelectorDialog.refresh_lists()` — Modules/grid_dialogs.py:436 — repopulates Available and Selected listboxes; selected entries sort by type when the grid `layout` is `buffFirst` or `debuffFirst`, alphabetically when `mixed`
+6. `BuffSelectorDialog.on_ok()` — Modules/grid_dialogs.py:512 — saves filter state; maps each selected name back to `entry['ids'][0]` via `database.get_entry_by_name()`; sets `self.result`
 7. `update_labels()` — Modules/grids_panel.py:438 — refreshes whitelist count and buff-name preview text in card header
 
 End state: `grid_config['whitelist']` updated with new primary spell ID list; panel header shows new buff count and preview names
@@ -167,16 +167,16 @@ End state: `KazGrids.swf`, the Aoc xml.add module folder, the reload scripts, an
 
 ## 10. open live tracker panel
 
-Trigger: User clicks the "⏱ Tracker" button in the bottom bar (right side, next to Build & Install)
+Trigger: User clicks the "⏱ Ethram-Fal" button in the bottom bar (right side, next to Build & Install)
 
 Steps:
 1. `_open_boss_timer()` — kzgrids.py:412 — checks `_boss_timer_if_alive()`; if a panel exists, deiconifies/lifts/restores the overlay; otherwise constructs a new `LiveTrackerPanel`
-2. `LiveTrackerPanel.__init__()` — Modules/live_tracker_panel.py:44 — restores window position; calls `load_settings()`; builds UI; creates overlay; constructs `BossTimer` and `CombatLogMonitor`; auto-detects log path
+2. `LiveTrackerPanel.__init__()` — Modules/live_tracker_panel.py:43 — restores window position; calls `load_settings()`; builds UI; creates overlay; constructs `BossTimer` and `CombatLogMonitor`; auto-detects log path
 3. `load_settings()` — Modules/live_tracker_settings.py:97 — reads `timers_settings.json` from the settings folder; returns dict validated against `TIMERS_DEFAULTS` and `TIMERS_RANGES`
 4. `BossTimer.__init__()` — Modules/boss_timer.py:52 — initializes cycle state fields; stores the `_thread_safe_update` closure (defined in `LiveTrackerPanel`) as `_update_callback`
 5. `CombatLogMonitor.__init__()` — Modules/combat_monitor.py:34 — initializes daemon thread state; stores the `boss_timer` reference
 6. `TimerOverlay.__init__()` — Modules/timer_overlay.py:41 — creates always-on-top `Toplevel` with configured opacity and position; builds two-row display + cycle-timer line + lock indicator + resize handle; auto-shows on first launch regardless of saved `visible` state
-7. `LiveTrackerPanel._update_log_path()` — Modules/live_tracker_panel.py:236 — calls `combat_monitor.set_log_folder()` with the current game path
+7. `LiveTrackerPanel._update_log_path()` — Modules/live_tracker_panel.py:249 — calls `combat_monitor.set_log_folder()` with the current game path
 8. `CombatLogMonitor.set_log_folder()` — Modules/combat_monitor.py:51 — finds latest `CombatLog*.txt` in the game folder; records file end position as `last_position`
 
 End state: `LiveTrackerPanel` window visible; `TimerOverlay` shown; `CombatLogMonitor` ready with log file path set; overlay shows monitor + log status
@@ -188,12 +188,12 @@ End state: `LiveTrackerPanel` window visible; `TimerOverlay` shown; `CombatLogMo
 Trigger: User clicks "Start Monitoring" button in `LiveTrackerPanel`
 
 Steps:
-1. `LiveTrackerPanel._start_monitoring()` — Modules/live_tracker_panel.py:292 — re-runs `_update_log_path()` (which calls `combat_monitor.set_log_folder()` to refresh `log_path` and `last_position`); errors out if no log file is found
+1. `LiveTrackerPanel._start_monitoring()` — Modules/live_tracker_panel.py:308 — re-runs `_update_log_path()` (which calls `combat_monitor.set_log_folder()` to refresh `log_path` and `last_position`); toasts a warning if no log file is found
 2. `CombatLogMonitor.start_monitoring()` — Modules/combat_monitor.py:137 — sets `monitoring=True`; spawns the `CombatLogMonitor` daemon thread running `_monitor_loop()`
 3. `BossTimer._push_waiting_state()` — Modules/boss_timer.py:246 — fires `_update_callback` with "Waiting for Seed..." strings
-4. `_thread_safe_update()` — Modules/live_tracker_panel.py:77 — closure passed as `update_callback`; marshals the call to the main thread via `self.after(0, ...)`
+4. `_thread_safe_update()` — Modules/live_tracker_panel.py:72 — closure passed as `update_callback`; marshals the call to the main thread via `self.after(0, ...)`
 5. `TimerOverlay.update_display()` — Modules/timer_overlay.py:272 — applies row1/row2/cycle_timer text and color values to the label widgets
-6. `LiveTrackerPanel._start_game_loop()` — Modules/live_tracker_panel.py:349 — schedules a 50ms recurring `after()` call to `boss_timer.update_display()`
+6. `LiveTrackerPanel._start_game_loop()` — Modules/live_tracker_panel.py:356 — schedules a 50ms recurring `after()` call to `boss_timer.update_display()`
 
 End state: `CombatLogMonitor` daemon thread running; 50ms UI poll active; overlay displays "Waiting for Seed..."
 
@@ -208,7 +208,7 @@ Steps:
 2. `CombatLogMonitor._process_line()` — Modules/combat_monitor.py:264 — identifies trigger type (Syphon → `start_syphon`, Viscous Seed from Ethram-Fal → `start_cycle`, Lotus Fixation from Emerald Lotus → `update_fixation`); extracts player name (or "YOU") from the line text via `_extract_player()`
 3. `BossTimer.start_cycle()` — Modules/boss_timer.py:81 — sets `timer_active=True`; records `cycle_start_time` and `seed_player`; detects double-seed (P4) when called 5–12s after the previous seed for the same player
 4. `BossTimer.update_display()` — Modules/boss_timer.py:227 — called from the 50ms UI loop; calls `get_current_phase()`; fires `_update_callback` with the phase display dict (msg, player, timer, color per row + cycle_timer)
-5. `_thread_safe_update()` — Modules/live_tracker_panel.py:77 — closure passed as `update_callback`; marshals call to main thread via `self.after(0, ...)`
+5. `_thread_safe_update()` — Modules/live_tracker_panel.py:72 — closure passed as `update_callback`; marshals call to main thread via `self.after(0, ...)`
 6. `TimerOverlay.update_display()` — Modules/timer_overlay.py:272 — applies message/player/timer strings and per-row colors to label widgets
 
 End state: overlay displays the active seed/fixation/syphon phase with elapsed timer text updated on the next 50ms poll
