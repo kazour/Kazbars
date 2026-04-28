@@ -17,7 +17,7 @@ from .build_loading import BuildLoadingScreen, show_close_game_required_dialog
 from .build_utils import find_compiler
 from .grids_generator import MAX_TOTAL_SLOTS
 from .ui_helpers import THEME_COLORS
-from .ui_widgets import flash_status_bar
+from .ui_widgets import flash_status_bar, app_toast
 from . import game_folder, profile_io
 
 logger = logging.getLogger(__name__)
@@ -92,7 +92,7 @@ def build(app):
     profile_name = None
     if app.current_profile:
         try:
-            profile_io.do_save_profile(app, Path(app.current_profile))
+            profile_io.do_save_profile(app, Path(app.current_profile), silent=True)
             profile_name = Path(app.current_profile).stem
         except Exception as e:
             logger.warning("Could not save profile before build: %s", e)
@@ -117,7 +117,7 @@ def build(app):
         if not compile_result[0]:
             loading.show_summary(
                 [], compile_result, profile_name=profile_name)
-            app.toast.show("Build failed", 'error', 10)
+            app_toast(app, "Build failed", 'error', 10)
             flash_status_bar(app.bottom_bar, THEME_COLORS['danger'])
             return
 
@@ -132,18 +132,18 @@ def build(app):
 
         if ok:
             if app.use_aoc_bypass and aoc_running:
-                app.toast.show("Built — /reloadui in-game", 'success', 8)
+                app_toast(app, "/reloadui in-game", 'success', 8)
             elif app.use_aoc_bypass:
-                app.toast.show("Built — launch the game", 'success', 8)
+                app_toast(app, "launch the game", 'success', 8)
             else:
-                app.toast.show("Built — /reloadui + /reloadgrids", 'success', 8)
+                app_toast(app, "/reloadui + /reloadgrids", 'success', 8)
             flash_status_bar(app.bottom_bar)
             app.grids_panel.notify_build_done(app.use_aoc_bypass)
             if not app.settings.get('has_built_before'):
                 app.settings.set('has_built_before', True)
                 app.settings.save()
         else:
-            app.toast.show("Build failed", 'error', 10)
+            app_toast(app, "Build failed", 'error', 10)
             flash_status_bar(app.bottom_bar, THEME_COLORS['danger'])
 
         loading.show_summary(
@@ -159,7 +159,7 @@ def build(app):
             f"({e})",
             title="Build Error"
         )
-        app.toast.show("Build failed", 'error', 10)
+        app_toast(app, "Build failed", 'error', 10)
     finally:
         if staging_dir:
             shutil.rmtree(staging_dir, ignore_errors=True)

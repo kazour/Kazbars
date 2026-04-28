@@ -17,7 +17,7 @@ Steps:
 4. `save_settings()` — Modules/grids_panel.py:1072 — iterates all `GridEditorPanel` instances, calling `save_to_config()` on each
 5. `save_to_config()` — Modules/grids_panel.py:399 — reads every spinbox/combobox/toggle value and writes it into the grid config dict
 6. `find_compiler()` — Modules/build_utils.py:24 — checks three candidate paths for `mtasc.exe`; returns `Path` or `None`
-7. `profile_io.do_save_profile()` — Modules/profile_io.py:194 — auto-saves the current profile (if one is loaded) before the build locks
+7. `profile_io.do_save_profile(silent=True)` — Modules/profile_io.py:197 — auto-saves the current profile (if one is loaded) before the build locks. `silent=True` suppresses the post-save "Saved: …" toast + status flash so they don't pile up against the "Built — …" toast a few steps later
 8. Build is locked: `app._building = True`, build button disabled, Ctrl+B unbound
 9. `compile_to_staging()` — Modules/build_executor.py:24 — creates a `tempfile.mkdtemp` staging dir and calls `build_grids()`; returns `(staging_dir, (success, message))`
 10. `build_grids()` — Modules/grids_generator.py:350 — instantiates `CodeGenerator`, writes `KzGrids.as` and `KzGridsData.as` to a second temp dir, copies `base.swf`, calls `compile_as2()`
@@ -26,8 +26,8 @@ Steps:
 13. `install_to_client()` — Modules/build_executor.py:46 — calls `cleanup_legacy_files()`; copies SWF to `Data/Gui/Default/Flash/`; calls `write_xml_add_files()` in Aoc mode; calls `create_scripts()`
 14. `create_scripts()` — Modules/build_executor.py:198 — writes `reloadgrids` and `unloadgrids`; in non-Aoc mode calls `update_script_with_marker()` to add the auto-load entry; in Aoc mode strips any old KzGrids/KazBars markers from `auto_login` instead (Aoc.exe loads via xml.add)
 15. `update_script_with_marker()` — Modules/build_utils.py:79 — strips old KzGrids marker block (and any listed legacy markers) from `auto_login`, then appends fresh block
-16. Toast text varies by mode: "Built — /reloadui in-game" (Aoc + game running), "Built — launch via Aoc.exe" (Aoc + not running), or "Built — /reloadui + /reloadgrids" (standard launcher)
-17. `notify_build_done(use_aoc_bypass)` — Modules/grids_panel.py:914 — re-shows the in-panel tip guide with step 4 marked complete
+16. Success toast (one of three, success-styled, 8 s) — Modules/build_action.py:135-139 — `"/reloadui in-game"` (Aoc + game running), `"launch the game"` (Aoc + not running), or `"/reloadui + /reloadgrids"` (standard launcher). The success color and the build-loading screen carry the "it worked" signal; the toast is reduced to the next-action line
+17. `notify_build_done(use_aoc_bypass)` — Modules/grids_panel.py:920 — re-shows the in-panel tip guide with step 4 marked complete. Step 4 un-ticks again the moment any subsequent edit fires `_mark_modified` (grids_panel.py:1187), since the deployed SWF no longer matches the in-memory state
 18. `finally` block: cleans up staging dir via `shutil.rmtree`, releases `_building` flag, re-binds Ctrl+B, syncs build button state
 
 End state: `KazGrids.swf` installed under the game folder; `Scripts/reloadgrids` and `Scripts/unloadgrids` written; in non-Aoc mode `Scripts/auto_login` updated; in Aoc mode `Data/Gui/Aoc/KazGrids/MainPrefs.xml.add` and `Modules.xml.add` written; build loading screen shows the result summary
@@ -59,9 +59,9 @@ End state: `GridsPanel` displays validated grid cards; `app.modified` is `False`
 Trigger: User selects File > Save Profile (Ctrl+S) or File > Save Profile As...
 
 Steps:
-1. `KzGridsApp._save_profile()` — kzgrids.py:497 — one-line delegator to `profile_io.save_profile(self)`
+1. `KzGridsApp._save_profile()` — kzgrids.py:496 — one-line delegator to `profile_io.save_profile(self)`
 2. `profile_io.save_profile()` — Modules/profile_io.py:141 — routes to `do_save_profile(app, current_path)` if a path exists, or to `save_profile_as()` otherwise
-3. `profile_io.do_save_profile()` — Modules/profile_io.py:194 — orchestrator: `build_profile_payload()` → `write_profile_file()` → `_commit_saved_profile()`, with try/except for `OSError`. Note: the `boss_timer` key is pulled from the live tracker (when one is open) inside `build_profile_payload()` (Modules/profile_io.py:161) — see step 7.
+3. `profile_io.do_save_profile(silent=False)` — Modules/profile_io.py:197 — orchestrator: `build_profile_payload()` → `write_profile_file()` → `_commit_saved_profile(silent=silent)`, with try/except for `OSError`. The `silent` flag (default `False` for direct save; `True` for the pre-build piggyback save in Flow 1) suppresses the post-commit toast + status flash. Note: the `boss_timer` key is pulled from the live tracker (when one is open) inside `build_profile_payload()` (Modules/profile_io.py:161) — see step 7.
 4. `get_profile_data()` — Modules/grids_panel.py:975 — calls `save_settings()` then returns `self.grids`
 5. `save_settings()` — Modules/grids_panel.py:1072 — iterates all `GridEditorPanel` instances calling `save_to_config()`
 6. `save_to_config()` — Modules/grids_panel.py:399 — reads all widget values into the grid config dict
@@ -69,7 +69,7 @@ Steps:
 8. `safe_save_json()` — Modules/settings_manager.py:33 — writes JSON to `path.tmp` then `Path.replace`-renames it over the target atomically
 9. `app.settings.set('last_profile', ...)` then `app.settings.save()` — persists `last_profile` to `kzgrids_settings.json`
 
-End state: profile `.json` written atomically; `app.modified` is `False`; title bar reflects saved name; toast `Saved: <filename>` shown; status bar pulse
+End state: profile `.json` written atomically; `app.modified` is `False`; title bar reflects saved name; toast `Saved: <filename>` shown and status bar pulses (both suppressed when `silent=True`, e.g. the pre-build auto-save path)
 
 ---
 

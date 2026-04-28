@@ -25,7 +25,7 @@ from .ui_helpers import (
     MODULE_COLORS, PAD_INNER,
     PAD_SMALL, PAD_TAB, PAD_XS, PAD_SECTION_GAP,
 )
-from .ui_widgets import add_tooltip, debounced_callback, create_dialog_header
+from .ui_widgets import add_tooltip, debounced_callback, create_dialog_header, app_toast
 from .ui_tk_style import style_tk_text
 from .window_position import restore_window_position, bind_window_position_save
 import json
@@ -437,14 +437,13 @@ def migrate_legacy_buff_fields(buff):
 class DatabaseEditorTab(ttk.Frame):
     """Database editor panel for the main application."""
 
-    def __init__(self, parent, database, assets_path, on_modified=None, get_grids=None, *, toast):
+    def __init__(self, parent, database, assets_path, on_modified=None, get_grids=None):
         super().__init__(parent)
 
         self.database = database
         self.assets_path = assets_path
         self.on_modified = on_modified
         self._get_grids = get_grids
-        self.toast = toast
         self.modified = False
 
         self.sort_column = 'type'
@@ -699,13 +698,13 @@ class DatabaseEditorTab(ttk.Frame):
         if dialog.result:
             self.database.add_buff(dialog.result)
             self._after_db_change()
-            self.toast.show(f"Added: {dialog.result['name']}", 'success')
+            app_toast(self, f"Added: {dialog.result['name']}", 'success')
 
     def edit_buff(self):
         """Edit selected buff entry."""
         buff, old_ids = self._get_selected_buff()
         if buff is None:
-            self.toast.show("Select a buff to edit", 'warning')
+            app_toast(self, "Select a buff to edit", 'warning')
             return
 
         dialog = BuffEditDialog(
@@ -717,13 +716,13 @@ class DatabaseEditorTab(ttk.Frame):
         if dialog.result:
             self.database.update_buff(old_ids, dialog.result)
             self._after_db_change()
-            self.toast.show(f"Updated: {dialog.result['name']}", 'success')
+            app_toast(self, f"Updated: {dialog.result['name']}", 'success')
 
     def delete_buff(self):
         """Delete selected buff entry."""
         buff, ids = self._get_selected_buff()
         if buff is None:
-            self.toast.show("Select a buff to delete", 'warning')
+            app_toast(self, "Select a buff to delete", 'warning')
             return
 
         ids_str = format_ids_display(ids)
@@ -731,7 +730,7 @@ class DatabaseEditorTab(ttk.Frame):
         if Messagebox.yesno(f"Delete '{buff['name']}' (IDs: {ids_str})?", title="Confirm Delete") == "Yes":
             self.database.remove_buff(ids)
             self._after_db_change()
-            self.toast.show(f"Deleted: {buff['name']}", 'info')
+            app_toast(self, f"Deleted: {buff['name']}", 'info')
 
     def import_buffs(self):
         """Import buffs from JSON file."""
@@ -748,7 +747,7 @@ class DatabaseEditorTab(ttk.Frame):
 
             import_buffs = data if isinstance(data, list) else data.get('buffs', [])
             if not import_buffs:
-                self.toast.show("No buff entries in this file", 'warning')
+                app_toast(self, "No buff entries in this file", 'warning')
                 return
 
             existing_ids = {bid for buff in self.database.buffs for bid in buff.get('ids', [])}
@@ -770,7 +769,7 @@ class DatabaseEditorTab(ttk.Frame):
             msg = f"Imported {added} buffs"
             if skipped > 0:
                 msg += f" ({skipped} duplicates skipped)"
-            self.toast.show(msg, 'success')
+            app_toast(self, msg, 'success')
 
         except (IOError, OSError, json.JSONDecodeError, ValueError) as e:
             Messagebox.show_error(f"Failed to import buffs.\n\nThe file may be damaged or in an unexpected format.\n\n({e})", title="Error")
@@ -785,7 +784,7 @@ class DatabaseEditorTab(ttk.Frame):
         )
 
         if not export_list:
-            self.toast.show("No buffs match the current filters", 'warning')
+            app_toast(self, "No buffs match the current filters", 'warning')
             return
 
         default_name = "Db_export"
@@ -810,7 +809,7 @@ class DatabaseEditorTab(ttk.Frame):
             with open(path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
 
-            self.toast.show(f"Exported {len(export_list)} buffs", 'success')
+            app_toast(self, f"Exported {len(export_list)} buffs", 'success')
         except (IOError, OSError, ValueError, TypeError) as e:
             Messagebox.show_error(f"Failed to export buffs.\n\nCheck that the destination isn't read-only.\n\n({e})", title="Error")
 
@@ -822,7 +821,7 @@ class DatabaseEditorTab(ttk.Frame):
         try:
             self.database.save(db_path)
             self.modified = False
-            self.toast.show("Database saved", 'success')
+            app_toast(self, "Database saved", 'success')
         except (IOError, OSError) as e:
             Messagebox.show_error(f"Failed to save the buff database.\n\nCheck that the file isn't in use by another program.\n\n({e})", title="Error")
 
@@ -836,7 +835,7 @@ class DatabaseEditorTab(ttk.Frame):
         """Rename the currently selected category."""
         old_name = self.category_var.get()
         if old_name == "All":
-            self.toast.show("Pick a specific category, not 'All'", 'warning')
+            app_toast(self, "Pick a specific category, not 'All'", 'warning')
             return
 
         new_name = Querybox.get_string(
@@ -848,12 +847,12 @@ class DatabaseEditorTab(ttk.Frame):
             return
         new_name = new_name.strip()
         if not new_name:
-            self.toast.show("Category name can't be empty", 'warning')
+            app_toast(self, "Category name can't be empty", 'warning')
             return
         if new_name == old_name:
             return
         if new_name in self.database.categories:
-            self.toast.show(f"Category '{new_name}' already exists", 'warning')
+            app_toast(self, f"Category '{new_name}' already exists", 'warning')
             return
 
         self.database.rename_category(old_name, new_name)

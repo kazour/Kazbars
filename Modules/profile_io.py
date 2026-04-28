@@ -22,7 +22,7 @@ from tkinter import filedialog
 from ttkbootstrap.dialogs import Messagebox
 
 from .settings_manager import safe_save_json
-from .ui_widgets import flash_status_bar
+from .ui_widgets import flash_status_bar, app_toast
 
 logger = logging.getLogger(__name__)
 
@@ -179,19 +179,22 @@ def write_profile_file(path, data):
     safe_save_json(path, data)
 
 
-def _commit_saved_profile(app, path):
+def _commit_saved_profile(app, path, silent=False):
     """Post-save state updates: anchor `current_profile`, clear `modified`,
-    persist `last_profile`, refresh title, toast, status flash."""
+    persist `last_profile`, refresh title, toast, status flash. `silent=True`
+    suppresses the toast + status flash for piggyback saves whose surrounding
+    flow has its own success feedback (e.g. the auto-save before a build)."""
     app.current_profile = str(path)
     app.modified = False
     app.settings.set('last_profile', str(path))
     app.settings.save()
     app._update_title()
-    app.toast.show(f"Saved: {path.name}", 'success')
-    flash_status_bar(app.bottom_bar)
+    if not silent:
+        app_toast(app, f"Saved: {path.name}", 'success')
+        flash_status_bar(app.bottom_bar)
 
 
-def do_save_profile(app, path):
+def do_save_profile(app, path, silent=False):
     """Save profile to disk: build payload → write → commit. Returns True
     on success, False on error. Composition wrapper kept (rather than
     pushed to callers) because the error-handling Messagebox + bool return
@@ -205,7 +208,7 @@ def do_save_profile(app, path):
             title="Save Error"
         )
         return False
-    _commit_saved_profile(app, path)
+    _commit_saved_profile(app, path, silent=silent)
     return True
 
 

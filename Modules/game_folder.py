@@ -13,7 +13,7 @@ from tkinter import filedialog
 from ttkbootstrap.dialogs import Messagebox
 
 from .ui_helpers import THEME_COLORS, PAD_XS
-from .ui_widgets import add_tooltip
+from .ui_widgets import add_tooltip, app_toast
 
 
 def migrate_legacy_clients(app):
@@ -156,7 +156,7 @@ def uninstall_game(app):
     from .build_executor import uninstall_from_client
     ok, msg = uninstall_from_client(app.game_path)
     if ok:
-        app.toast.show(msg, 'success', 8)
+        app_toast(app, msg, 'success', 8)
     else:
         Messagebox.show_error(msg, title="Uninstall Failed")
 

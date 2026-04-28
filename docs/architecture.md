@@ -1,6 +1,6 @@
 # Architectural Map
 
-**Current as of:** 2026-04-28 (after `update_check` satellite extraction; `flash_status_bar` moved to `ui_widgets`)
+**Current as of:** 2026-04-29 (after toast system unification: coalesce-by-key, single `app_toast` API across the app, perf + brand-fit + entrance-animation fixes)
 **Purpose:** Module topology, dependencies, and coupling hotspots. Updated alongside code changes — if you edit this file, commit it with the code. `CLAUDE.md` has the short version; this file has the detail that doesn't fit there.
 
 ## Dependency clusters
@@ -16,7 +16,7 @@ ui_helpers  ← custom_menu_bar
 ```
 - `ui_helpers` holds design tokens only (fonts, colors, padding, BTN_*, INPUT_WIDTH_*, canvas-geometry constants, SCANLINE_ALPHA) + `setup_custom_styles`. Leaf — imports nothing internal.
 - `ui_widgets` adds the builder layer: `blend_alpha`, `CollapsibleSection`, tooltips, dialog/app headers, event bindings, `debounced_callback`.
-- `ui_components` adds stateful composites: `ToastManager`, `DragReorderManager`, `create_scrollable_frame`, global mousewheel routing.
+- `ui_components` adds stateful composites: `ToastManager` (coalesce-by-key for spammy emitters; single trailing `update_idletasks` in `_reposition`), `DragReorderManager`, `create_scrollable_frame`, global mousewheel routing.
 - `ui_tk_style` handles raw-tk widget styling + dark-titlebar monkey-patch.
 - `custom_menu_bar` is the dark-themed Canvas-based menu bar (was in `ui_components`; extracted for size + single-consumer isolation).
 
@@ -77,6 +77,7 @@ These modules are consumed only by `kzgrids.py` by design — they hold logic th
   - Settings read/write → `settings_manager` (don't re-introduce UI-layer state)
   - Root-window logic (new menu action, new app-state flow) → extract to a new `Modules/<concern>.py` taking `app` as first arg, add a one-line delegator on `KzGridsApp` if it has internal callers. Don't grow `kzgrids.py`.
 - **Cluster isolation:** the Live Tracker cluster must not be imported from outside itself. Enforced by convention, not code.
+- **Toasts:** every toast goes through `app_toast(widget, message, style, duration=, key=, on_click=)` in `ui_widgets`. The walker resolves `.toast` from the widget's ancestry, so callers don't need a direct `ToastManager` reference. Pass `key=` for any emitter that can fire repeatedly in a short burst (spinbox auto-repeat is the canonical case) — same key replaces the live toast in place instead of stacking. Don't reintroduce `obj.toast.show(...)` direct calls — they bypass the walker, fragment defaults, and force a `toast=` constructor seam.
 
 ## Smoke tests
 
@@ -96,16 +97,16 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 
 | File | Lines | Role |
 |---|---:|---|
-| `Modules/grids_panel.py` | 1184 | Grid list UI, grid management |
-| `Modules/database_editor.py` | 866 | Buff DB CRUD, search, filtering |
+| `Modules/grids_panel.py` | 1194 | Grid list UI, grid management |
+| `Modules/database_editor.py` | 865 | Buff DB CRUD, search, filtering |
 | `Modules/grid_dialogs.py` | 827 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
 | `Modules/build_loading.py` | 796 | Build-progress screen + welcome/about popups |
-| `kzgrids.py` | 563 | Entry point + `KzGridsApp` root window (widgets, menu, lifecycle) |
-| `Modules/ui_widgets.py` | 544 | Widget builders, tooltips, bindings, `CollapsibleSection`, `blend_alpha`, `flash_status_bar`, `app_toast` |
+| `kzgrids.py` | 562 | Entry point + `KzGridsApp` root window (widgets, menu, lifecycle) |
+| `Modules/ui_widgets.py` | 549 | Widget builders, tooltips, bindings, `CollapsibleSection`, `blend_alpha`, `flash_status_bar`, `app_toast` |
 | `Modules/live_tracker_panel.py` | 518 | Live Tracker Toplevel orchestrator |
+| `Modules/ui_components.py` | 451 | `ToastManager` (coalesce-by-key, in-place text update), `DragReorderManager`, scrollable frame |
 | `Modules/timer_overlay.py` | 440 | In-game transparent timer overlay |
 | `Modules/boss_timer.py` | 422 | Boss timer state + UI |
-| `Modules/ui_components.py` | 419 | `ToastManager`, `DragReorderManager`, scrollable frame |
 | `Modules/grids_generator.py` | 424 | AS2 code generation from grid configs |
 | `Modules/instructions_panel.py` | 372 | Help/instructions view |
 | `Modules/first_launch.py` | 353 | First-launch dialog + post-dialog orchestrator (`run_first_launch`) |
@@ -113,16 +114,16 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `Modules/combat_monitor.py` | 294 | Combat log parser feeding the tracker |
 | `Modules/build_executor.py` | 227 | MTASC compile + deploy |
 | `build.py` | 225 | PyInstaller build driver |
+| `Modules/profile_io.py` | 219 | Profile load (read+apply split) / save (build+write+commit, `silent=` for piggyback saves) / new / open + missing-buff warning |
 | `Modules/game_folder.py` | 185 | Game folder UI + Aoc.exe bypass + uninstall |
 | `Modules/build_action.py` | 168 | Build & Install flow |
 | `Modules/ui_helpers.py` | 157 | Design tokens + `setup_custom_styles` |
-| `Modules/profile_io.py` | 216 | Profile load (read+apply split) / save (build+write+commit) / new / open + missing-buff warning |
 | `Modules/live_tracker_settings.py` | 145 | Tracker persistence |
 | `Modules/grid_model.py` | 117 | Grid dataclasses + `parse_resolution` helper |
 | `tests/test_data_integrity.py` | 103 | Buff-ref resolution smoke test |
 | `Modules/build_utils.py` | 98 | Compiler discovery + path helpers |
 | `Modules/window_position.py` | 91 | Window geometry save/restore |
 | `Modules/settings_manager.py` | 82 | `SettingsManager`, JSON helpers, settings proxy |
-| `Modules/update_check.py` | 66 | Background GitHub release check + named main-thread toast dispatcher |
+| `Modules/update_check.py` | 69 | Background GitHub release check + named main-thread toast dispatcher |
 | `Modules/ui_tk_style.py` | 57 | Raw-tk widget styling + dark titlebar |
 | `tests/test_imports.py` | 47 | Import-graph smoke test |

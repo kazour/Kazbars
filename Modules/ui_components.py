@@ -164,25 +164,49 @@ class ToastManager:
 
     _SLIDE_STEPS = 6       # entrance animation frames
     _SLIDE_MS = 16          # ms between entrance frames
-    _FADE_STEPS = 8         # exit animation frames
-    _FADE_MS = 25           # ms between exit frames
+    _FADE_STEPS = 14        # exit animation frames
+    _FADE_MS = 30           # ms between exit frames (~420ms total fade)
 
     def __init__(self, parent):
         self._parent = parent
         self._toasts = []
+        self._keyed = {}   # key -> live toast Frame, removed on dismiss
 
-    def show(self, message, style='info', duration=4, on_click=None):
+    def show(self, message, style='info', duration=6, on_click=None, key=None):
+        # Coalesce: if a live toast with this key exists, update its text and
+        # reset the dismiss timer instead of spawning a new widget. Skips the
+        # entrance animation and _reposition pass — meant for spammy emitters
+        # like spinbox auto-repeat.
+        if key is not None:
+            existing = self._keyed.get(key)
+            if existing is not None and existing in self._toasts:
+                try:
+                    existing.message_label.configure(text=message)
+                    if existing.exit_after_id is not None:
+                        existing.after_cancel(existing.exit_after_id)
+                    existing.exit_after_id = existing.after(
+                        duration * 1000,
+                        lambda: self._animate_exit(existing, existing.accent_color))
+                    return
+                except tk.TclError:
+                    self._keyed.pop(key, None)
+
         color = THEME_COLORS.get(self.STYLES.get(style, 'accent'), THEME_COLORS['accent'])
 
-        toast = tk.Frame(self._parent, bg=TK_COLORS['status_bg'],
+        toast = tk.Frame(self._parent, bg=TK_COLORS['input_bg'],
                          highlightbackground=TK_COLORS['border'],
                          highlightcolor=TK_COLORS['border'], highlightthickness=1)
         accent_bar = tk.Frame(toast, bg=color, width=3)
         accent_bar.pack(side='left', fill='y')
         label = ttk.Label(toast, text=message, font=FONT_SMALL,
                           foreground=THEME_COLORS['body'],
-                          background=TK_COLORS['status_bg'])
+                          background=TK_COLORS['input_bg'],
+                          wraplength=360, justify='left')
         label.pack(side='left', padx=(PAD_LF, PAD_TAB), pady=PAD_XS)
+
+        toast.message_label = label
+        toast.accent_color = color
+        toast.coalesce_key = key
 
         if on_click:
             for w in (toast, accent_bar, label):
@@ -190,36 +214,38 @@ class ToastManager:
                 w.bind('<Button-1>', lambda _e: on_click())
 
         self._toasts.append(toast)
+        if key is not None:
+            self._keyed[key] = toast
         self._reposition()
 
         # Slide-up entrance animation
         self._animate_entrance(toast)
 
         # Schedule fade-out exit
-        toast.after(duration * 1000, lambda: self._animate_exit(toast, color))
+        toast.exit_after_id = toast.after(
+            duration * 1000, lambda: self._animate_exit(toast, color))
 
     def _animate_entrance(self, toast):
         """Slide toast up from below its final position."""
         toast.update_idletasks()
         slide_dist = toast.winfo_reqheight() + PAD_TAB
+        try:
+            target_y = int(toast.place_info().get('y', 0))
+        except tk.TclError:
+            return
 
         def _step(i):
             if toast not in self._toasts:
                 return
             try:
-                # Current position
-                info = toast.place_info()
-                if not info:
-                    return
-                final_y = int(info.get('y', 0))
-                # Ease-out: offset shrinks non-linearly
+                # Ease-out: offset shrinks non-linearly toward the captured target_y
                 t = i / self._SLIDE_STEPS
                 offset = int(slide_dist * (1 - t) ** 2)
-                toast.place_configure(y=final_y + offset)
+                toast.place_configure(y=target_y + offset)
                 if i < self._SLIDE_STEPS:
                     toast.after(self._SLIDE_MS, lambda: _step(i + 1))
                 else:
-                    toast.place_configure(y=final_y)
+                    toast.place_configure(y=target_y)
             except tk.TclError:
                 pass
 
@@ -227,7 +253,7 @@ class ToastManager:
 
     def _animate_exit(self, toast, accent_color):
         """Fade out toast by interpolating colors toward background, then remove."""
-        bg = TK_COLORS['status_bg']
+        bg = TK_COLORS['input_bg']
         body_color = THEME_COLORS['body']
 
         def _step(i):
@@ -259,6 +285,9 @@ class ToastManager:
     def _remove_toast(self, toast):
         if toast in self._toasts:
             self._toasts.remove(toast)
+        key = getattr(toast, 'coalesce_key', None)
+        if key is not None and self._keyed.get(key) is toast:
+            del self._keyed[key]
         try:
             toast.place_forget()
             toast.destroy()
@@ -272,8 +301,11 @@ class ToastManager:
             toast.place(relx=1.0, rely=1.0, anchor='se',
                         x=-PAD_TAB, y=-offset)
             toast.lift()
-            toast.update_idletasks()
             offset += toast.winfo_reqheight() + PAD_XS
+        try:
+            self._parent.update_idletasks()
+        except tk.TclError:
+            pass
 
 
 # ============================================================================

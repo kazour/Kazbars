@@ -234,7 +234,6 @@ class KzGridsApp(ttkb.Window):
             assets_path=self.assets_path / "kzgrids",
             on_modified=self._mark_modified,
             get_grids=lambda: self.grids_panel.grids,
-            toast=self.toast,
         )
 
         # Instructions view

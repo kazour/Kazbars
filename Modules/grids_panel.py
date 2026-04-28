@@ -550,7 +550,8 @@ class GridEditorPanel(ttk.Frame):
             new_cols = 2
             self.grid_config['cols'] = new_cols
             self._cols_var.set('2')
-            app_toast(self, "Dynamic grids need at least 2 slots, switched to 1×2", 'info')
+            app_toast(self, "Dynamic grids need at least 2 slots, switched to 1×2", 'info',
+                      key='grid_resize')
         self._update_fill_options(new_rows, new_cols)
         self.update_labels()
         self._update_preview()
@@ -573,12 +574,15 @@ class GridEditorPanel(ttk.Frame):
         existing = self.grid_config.get('_orphanedAssignments', [])
         self.grid_config['_orphanedAssignments'] = list(dict.fromkeys(existing + dropped_ids))
         # Non-blocking toast: a modal here would let the spinbox arrow's auto-repeat
-        # keep firing during the popup, recursively trimming further.
+        # keep firing during the popup, recursively trimming further. Coalesce-key
+        # collapses an arrow-hold burst into a single in-place-updating toast.
+        noun = "buff" if len(dropped_ids) == 1 else "buffs"
         app_toast(
             self,
-            f"{len(dropped_ids)} buff(s) unassigned (resize back up to restore): "
+            f"Unassigned {len(dropped_ids)} {noun} (resize back up to restore): "
             f"{self._format_buff_preview(dropped_ids)}",
-            'warning'
+            'warning',
+            key='grid_resize'
         )
 
     def _restore_orphaned_assignments(self, new_total):
@@ -601,10 +605,12 @@ class GridEditorPanel(ttk.Frame):
             return
         self.grid_config['slotAssignments'] = sa
         self.grid_config['_orphanedAssignments'] = orphans
+        noun = "buff" if len(restored) == 1 else "buffs"
         app_toast(
             self,
-            f"{len(restored)} buff(s) restored: {self._format_buff_preview(restored)}",
-            'success'
+            f"Restored {len(restored)} {noun}: {self._format_buff_preview(restored)}",
+            'success',
+            key='grid_resize'
         )
 
     def _update_fill_options(self, rows, cols):
@@ -1179,6 +1185,10 @@ class GridsPanel(ttk.Frame):
         self._mark_modified()
 
     def _mark_modified(self):
-        """Signal that grids have changed."""
+        """Signal that grids have changed. Any in-memory edit after a build
+        means the deployed SWF no longer matches, so the Build step un-ticks."""
+        if self._build_done:
+            self._build_done = False
+            self._update_tip()
         if self.on_modified:
             self.on_modified()

@@ -15,6 +15,8 @@ import urllib.error
 import urllib.request
 import webbrowser
 
+from .ui_widgets import app_toast
+
 logger = logging.getLogger(__name__)
 
 LATEST_RELEASE_URL = "https://api.github.com/repos/kazour/Kaz-Grids/releases/latest"
@@ -57,7 +59,8 @@ def _show_update_toast(app, tag, url):
     try:
         if not app.winfo_exists():
             return
-        app.toast.show(
+        app_toast(
+            app,
             f"Update available: v{tag} — click for release notes",
             'info', 12,
             on_click=lambda: webbrowser.open(url),

@@ -79,19 +79,24 @@ def flash_status_bar(bar, color=None, steps=8, interval=30):
     _step(0)
 
 
-def app_toast(widget, message, style='info', duration=6):
+def app_toast(widget, message, style='info', duration=6, key=None, on_click=None):
     """Show a toast via the app's runtime-attached ToastManager.
 
-    Walks `widget`.master upward looking for a `.toast` attribute (set by
-    KzGridsApp on the root window). Silently no-ops if no manager is found,
-    so callers can use this from dialogs that are sometimes parented to
-    non-app roots (tests, isolated previews).
+    Walks `widget` upward looking for a `.toast` attribute (set by
+    KzGridsApp on the root window — the walker checks `widget` itself
+    before traversing `.master`, so passing the root works). Silently
+    no-ops if no manager is found, so callers can use this from dialogs
+    that are sometimes parented to non-app roots (tests, isolated previews).
+
+    `key`, when set, makes repeat emits coalesce into the existing toast
+    rather than stacking — see ToastManager.show.
     """
     w = widget
     while w is not None:
         toast = getattr(w, 'toast', None)
         if toast is not None:
-            toast.show(message, style=style, duration=duration)
+            toast.show(message, style=style, duration=duration,
+                       key=key, on_click=on_click)
             return
         w = getattr(w, 'master', None)
 
