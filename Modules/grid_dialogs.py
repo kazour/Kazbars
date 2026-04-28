@@ -21,7 +21,7 @@ from .ui_helpers import (
     MODULE_COLORS,
 )
 from .ui_widgets import (
-    debounced_callback, blend_alpha, create_dialog_header,
+    debounced_callback, blend_alpha, create_dialog_header, app_toast,
 )
 from .ui_tk_style import style_tk_listbox
 from .settings_manager import get_setting, set_setting
@@ -50,17 +50,6 @@ def _section(parent, text):
     lf = ttk.LabelFrame(parent, text=text, padding=PAD_SMALL)
     lf.pack(fill='x', pady=PAD_SMALL)
     return lf
-
-
-def _root_toast(widget):
-    """Walk up the master chain to find the app's ToastManager, or None."""
-    w = widget
-    while w is not None:
-        toast = getattr(w, 'toast', None)
-        if toast is not None:
-            return toast
-        w = getattr(w, 'master', None)
-    return None
 
 
 # ============================================================================
@@ -296,11 +285,7 @@ class AddGridWizard(tk.Toplevel):
         total = rows * cols
 
         if total > self.available_slots:
-            toast = _root_toast(self.parent)
-            if toast:
-                toast.show(f"Only {self.available_slots} slots available. Reduce rows or columns.", 'warning')
-            else:
-                Messagebox.show_error(f"Only {self.available_slots} slots available.\n\nReduce rows or columns, or remove another grid to free up slots.", title="Slot Limit")
+            app_toast(self.parent, f"Only {self.available_slots} slots available. Reduce rows or columns.", 'warning')
             return
 
         self.result = create_default_grid(

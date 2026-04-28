@@ -59,7 +59,7 @@ class CombatLogMonitor:
             str: Path to latest log file, or None if not found
         """
         self.log_folder = folder
-        latest = self.find_latest_log()
+        latest = self._find_latest_log()
         if latest:
             self.log_path = latest
             p = Path(latest)
@@ -77,7 +77,7 @@ class CombatLogMonitor:
         Returns:
             str: Path to latest log file, or None if not found
         """
-        latest = self.find_latest_log()
+        latest = self._find_latest_log()
         if latest:
             if self.file_handle:
                 try:
@@ -93,22 +93,7 @@ class CombatLogMonitor:
                 self.last_position = 0
         return latest
 
-    def set_log_path(self, path):
-        """
-        Directly set a specific log file path.
-
-        Args:
-            path: Full path to a CombatLog*.txt file
-        """
-        self.log_path = path
-        self.log_folder = str(Path(path).parent)
-        p = Path(path)
-        if p.exists():
-            self.last_position = p.stat().st_size
-        else:
-            self.last_position = 0
-
-    def find_latest_log(self):
+    def _find_latest_log(self):
         """
         Find the most recently modified CombatLog*.txt file.
 
@@ -169,10 +154,6 @@ class CombatLogMonitor:
             except (IOError, OSError):
                 pass
             self.file_handle = None
-
-    def is_monitoring(self):
-        """Check if monitor is currently running."""
-        return self.monitoring
 
     def _check_for_newer_log(self):
         """

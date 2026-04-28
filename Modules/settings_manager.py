@@ -2,7 +2,7 @@
 Kaz Grids — Settings persistence.
 
 Owns the SettingsManager class (JSON file → in-memory dict → atomic save) plus
-the safe_load_json / safe_save_json helpers it's built on. Also exposes a
+the safe_save_json helper it's built on. Also exposes a
 module-global reference set via init_settings() so modules can call
 get_setting / set_setting without threading the manager through every API.
 """
@@ -14,7 +14,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-def safe_load_json(path, fallback=None):
+def _safe_load_json(path, fallback=None):
     """Load JSON with fallback on any corruption."""
     if fallback is None:
         fallback = {}
@@ -44,7 +44,7 @@ class SettingsManager:
 
     def __init__(self, filepath):
         self.filepath = Path(filepath)
-        self.data = safe_load_json(self.filepath)
+        self.data = _safe_load_json(self.filepath)
 
     def save(self):
         try:

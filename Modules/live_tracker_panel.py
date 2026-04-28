@@ -22,7 +22,7 @@ from .ui_helpers import (
     BTN_SMALL,
     PAD_TAB, PAD_XS, PAD_SMALL, PAD_LF, PAD_BUTTON_GAP, PAD_MID,
 )
-from .ui_widgets import create_tip_bar, create_dialog_header, add_tooltip
+from .ui_widgets import create_tip_bar, create_dialog_header, add_tooltip, app_toast
 from .window_position import restore_window_position
 
 
@@ -310,7 +310,7 @@ class LiveTrackerPanel(tk.Toplevel):
         self._update_log_path()
 
         if not self.combat_monitor.log_path:
-            self._toast("Can't start: no combat log. Set game path and run /logcombat on", 'warning', 8)
+            app_toast(self, "Can't start: no combat log. Set game path and run /logcombat on", 'warning', 8)
             return
 
         if self.combat_monitor.start_monitoring():
@@ -325,7 +325,7 @@ class LiveTrackerPanel(tk.Toplevel):
                 self.overlay.show()
                 self.visibility_btn.config(text="Hide")
         else:
-            self._toast("Couldn't start monitoring. Try /logcombat off, then /logcombat on", 'error', 10)
+            app_toast(self, "Couldn't start monitoring. Try /logcombat off, then /logcombat on", 'error', 10)
 
     def _stop_monitoring(self):
         """Stop combat log monitoring."""
@@ -516,9 +516,3 @@ class LiveTrackerPanel(tk.Toplevel):
         if self.overlay:
             self.overlay.destroy()
             self.overlay = None
-
-    def _toast(self, message, style='info', duration=6):
-        """Show a toast via KzGridsApp's runtime-attached ToastManager (master is the root app)."""
-        toast = getattr(self.master, 'toast', None)
-        if toast:
-            toast.show(message, style=style, duration=duration)

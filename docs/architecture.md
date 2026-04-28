@@ -96,21 +96,21 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 
 | File | Lines | Role |
 |---|---:|---|
-| `Modules/grids_panel.py` | 1186 | Grid list UI, grid management |
+| `Modules/grids_panel.py` | 1184 | Grid list UI, grid management |
 | `Modules/database_editor.py` | 866 | Buff DB CRUD, search, filtering |
-| `Modules/grid_dialogs.py` | 842 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
+| `Modules/grid_dialogs.py` | 827 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
 | `Modules/build_loading.py` | 796 | Build-progress screen + welcome/about popups |
 | `kzgrids.py` | 563 | Entry point + `KzGridsApp` root window (widgets, menu, lifecycle) |
-| `Modules/ui_widgets.py` | 527 | Widget builders, tooltips, bindings, `CollapsibleSection`, `blend_alpha`, `flash_status_bar` |
-| `Modules/live_tracker_panel.py` | 524 | Live Tracker Toplevel orchestrator |
-| `Modules/boss_timer.py` | 441 | Boss timer state + UI |
+| `Modules/ui_widgets.py` | 544 | Widget builders, tooltips, bindings, `CollapsibleSection`, `blend_alpha`, `flash_status_bar`, `app_toast` |
+| `Modules/live_tracker_panel.py` | 518 | Live Tracker Toplevel orchestrator |
 | `Modules/timer_overlay.py` | 440 | In-game transparent timer overlay |
+| `Modules/boss_timer.py` | 422 | Boss timer state + UI |
 | `Modules/ui_components.py` | 419 | `ToastManager`, `DragReorderManager`, scrollable frame |
 | `Modules/grids_generator.py` | 424 | AS2 code generation from grid configs |
 | `Modules/instructions_panel.py` | 372 | Help/instructions view |
 | `Modules/first_launch.py` | 353 | First-launch dialog + post-dialog orchestrator (`run_first_launch`) |
 | `Modules/custom_menu_bar.py` | 359 | Canvas-based dark menu bar |
-| `Modules/combat_monitor.py` | 313 | Combat log parser feeding the tracker |
+| `Modules/combat_monitor.py` | 294 | Combat log parser feeding the tracker |
 | `Modules/build_executor.py` | 227 | MTASC compile + deploy |
 | `build.py` | 225 | PyInstaller build driver |
 | `Modules/game_folder.py` | 185 | Game folder UI + Aoc.exe bypass + uninstall |

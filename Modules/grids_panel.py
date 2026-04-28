@@ -26,7 +26,7 @@ from .ui_helpers import (
 )
 from .ui_widgets import (
     CollapsibleSection, add_tooltip, bind_card_events,
-    bind_label_press_effect, bind_label_hover_colors,
+    bind_label_press_effect, bind_label_hover_colors, app_toast,
 )
 from .ui_components import create_scrollable_frame, DragReorderManager
 from .settings_manager import get_setting
@@ -550,7 +550,7 @@ class GridEditorPanel(ttk.Frame):
             new_cols = 2
             self.grid_config['cols'] = new_cols
             self._cols_var.set('2')
-            self._notify("Dynamic grids need at least 2 slots, switched to 1×2", 'info')
+            app_toast(self, "Dynamic grids need at least 2 slots, switched to 1×2", 'info')
         self._update_fill_options(new_rows, new_cols)
         self.update_labels()
         self._update_preview()
@@ -574,7 +574,8 @@ class GridEditorPanel(ttk.Frame):
         self.grid_config['_orphanedAssignments'] = list(dict.fromkeys(existing + dropped_ids))
         # Non-blocking toast: a modal here would let the spinbox arrow's auto-repeat
         # keep firing during the popup, recursively trimming further.
-        self._notify(
+        app_toast(
+            self,
             f"{len(dropped_ids)} buff(s) unassigned (resize back up to restore): "
             f"{self._format_buff_preview(dropped_ids)}",
             'warning'
@@ -600,14 +601,11 @@ class GridEditorPanel(ttk.Frame):
             return
         self.grid_config['slotAssignments'] = sa
         self.grid_config['_orphanedAssignments'] = orphans
-        self._notify(
+        app_toast(
+            self,
             f"{len(restored)} buff(s) restored: {self._format_buff_preview(restored)}",
             'success'
         )
-
-    def _notify(self, message, style='info'):
-        """Toast via KzGridsApp's runtime-attached ToastManager (getattr to silence type checker)."""
-        getattr(self.winfo_toplevel(), 'toast').show(message, style=style, duration=6)
 
     def _update_fill_options(self, rows, cols):
         if rows == 1:

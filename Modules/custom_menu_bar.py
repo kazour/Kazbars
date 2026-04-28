@@ -90,7 +90,7 @@ class CustomMenuBar(tk.Canvas):
         idx = self._hit_cascade(event.x)
         if idx < 0:
             return
-        menu_def, command = self._cascades[idx][3], self._cascades[idx][4]
+        command = self._cascades[idx][4]
         if command is not None:
             self._invoke(command)
             return

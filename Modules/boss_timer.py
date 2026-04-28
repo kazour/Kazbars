@@ -74,10 +74,6 @@ class BossTimer:
         self.double_seed_mode = False
         self.second_seed_active = False
 
-    def set_callback(self, callback):
-        """Set or update the display callback."""
-        self._update_callback = callback
-
     def start_cycle(self, player_name):
         """
         Start a new seed cycle for the given player.
@@ -128,21 +124,6 @@ class BossTimer:
             self.syphon_active = True
             self.timer_active = False
             self.cycle_start_time = None
-
-    def reset_fight(self):
-        """Full fight reset (boss death/restart)."""
-        with self._lock:
-            self.timer_active = False
-            self.cycle_start_time = None
-            self.seed_player = None
-            self.fixation_player = None
-            self.seed_detected = False
-            self.fixation_detected = False
-            self.syphon_active = False
-            self.double_seed_mode = False
-            self.second_seed_active = False
-
-        self._push_waiting_state()
 
     def update_fixation(self, player_name):
         """Record the fixation target."""

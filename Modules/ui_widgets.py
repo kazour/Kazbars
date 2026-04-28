@@ -79,6 +79,23 @@ def flash_status_bar(bar, color=None, steps=8, interval=30):
     _step(0)
 
 
+def app_toast(widget, message, style='info', duration=6):
+    """Show a toast via the app's runtime-attached ToastManager.
+
+    Walks `widget`.master upward looking for a `.toast` attribute (set by
+    KzGridsApp on the root window). Silently no-ops if no manager is found,
+    so callers can use this from dialogs that are sometimes parented to
+    non-app roots (tests, isolated previews).
+    """
+    w = widget
+    while w is not None:
+        toast = getattr(w, 'toast', None)
+        if toast is not None:
+            toast.show(message, style=style, duration=duration)
+            return
+        w = getattr(w, 'master', None)
+
+
 def create_dialog_header(parent, title_text, accent_color, width=460):
     """CRT-styled header canvas strip for dialogs — matches BuildLoadingScreen aesthetic.
 

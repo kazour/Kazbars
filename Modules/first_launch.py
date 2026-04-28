@@ -10,7 +10,7 @@ from pathlib import Path
 from ttkbootstrap.dialogs import Messagebox
 
 from .ui_helpers import (
-    FONT_BODY_LG, FONT_BODY, FONT_SMALL, FONT_SECTION,
+    FONT_BODY, FONT_SMALL, FONT_SECTION,
     THEME_COLORS, TK_COLORS, MODULE_COLORS,
     PAD_TAB, PAD_SMALL, PAD_TINY, PAD_XS, PAD_LF,
     BTN_SMALL,
