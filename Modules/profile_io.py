@@ -95,8 +95,14 @@ def apply_profile_data(app, path, data, *, corrupt=False):
             title="Profile Warning"
         )
 
+    # Don't anchor saves to the bundled Default.json: a subsequent Save would
+    # overwrite the shipped templates. Force Save As instead. Also used as
+    # the profile identity in the build-signature comparison below.
+    bundled_default = (app.assets_path / "kzgrids" / "Default.json").resolve()
+    profile_key = None if Path(path).resolve() == bundled_default else str(path)
+
     grids = data.get('grids', [])
-    missing_by_grid = app.grids_panel.load_profile_data(grids)
+    missing_by_grid = app.grids_panel.load_profile_data(grids, profile_path=profile_key)
     if missing_by_grid:
         warn_missing_buffs(app, missing_by_grid)
 
@@ -106,13 +112,7 @@ def apply_profile_data(app, path, data, *, corrupt=False):
     ref = data.get('reference_resolution')
     app.reference_resolution = list(ref) if isinstance(ref, list) and len(ref) == 2 else None
 
-    # Don't anchor saves to the bundled Default.json: a subsequent Save would
-    # overwrite the shipped templates. Force Save As instead.
-    bundled_default = (app.assets_path / "kzgrids" / "Default.json").resolve()
-    if Path(path).resolve() == bundled_default:
-        app.current_profile = None
-    else:
-        app.current_profile = str(path)
+    app.current_profile = profile_key
     app.modified = False
     app.settings.set('last_profile', str(path))
     app.settings.save()

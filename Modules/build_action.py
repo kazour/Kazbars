@@ -138,7 +138,7 @@ def build(app):
             else:
                 app_toast(app, "/reloadui + /reloadgrids", 'success', 8)
             flash_status_bar(app.bottom_bar)
-            app.grids_panel.notify_build_done(app.use_aoc_bypass)
+            app.grids_panel.notify_build_done(app.use_aoc_bypass, app.current_profile)
             if not app.settings.get('has_built_before'):
                 app.settings.set('has_built_before', True)
                 app.settings.save()

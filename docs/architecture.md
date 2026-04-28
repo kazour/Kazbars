@@ -1,6 +1,6 @@
 # Architectural Map
 
-**Current as of:** 2026-04-29 (after toast system unification: coalesce-by-key, single `app_toast` API across the app, perf + brand-fit + entrance-animation fixes)
+**Current as of:** 2026-04-29 (after toast system unification: coalesce-by-key, single `app_toast` API across the app, perf + brand-fit + entrance-animation fixes; onboarding step 4 persistence via `last_build_signature` keyed on profile path + grids hash)
 **Purpose:** Module topology, dependencies, and coupling hotspots. Updated alongside code changes — if you edit this file, commit it with the code. `CLAUDE.md` has the short version; this file has the detail that doesn't fit there.
 
 ## Dependency clusters
@@ -97,7 +97,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 
 | File | Lines | Role |
 |---|---:|---|
-| `Modules/grids_panel.py` | 1194 | Grid list UI, grid management |
+| `Modules/grids_panel.py` | 1220 | Grid list UI, grid management |
 | `Modules/database_editor.py` | 865 | Buff DB CRUD, search, filtering |
 | `Modules/grid_dialogs.py` | 827 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
 | `Modules/build_loading.py` | 796 | Build-progress screen + welcome/about popups |
