@@ -81,11 +81,13 @@ class GridEditorPanel(ttk.Frame):
 
         grid_type = grid_config.get('type', 'player')
         self._accent_color = GRID_TYPE_COLORS.get(grid_type, GRID_TYPE_COLORS['player'])
+        self._resting_border_color = self._accent_color
 
-        card = tk.Frame(self,
-                        highlightbackground=self._accent_color,
-                        highlightcolor=self._accent_color,
-                        highlightthickness=1)
+        self._card = tk.Frame(self,
+                               highlightbackground=self._accent_color,
+                               highlightcolor=self._accent_color,
+                               highlightthickness=1)
+        card = self._card
         card.pack(fill='x')
 
         self.drag_handle = ttk.Label(card, text=" \u2630 ", font=FONT_BODY_LG,
@@ -120,8 +122,9 @@ class GridEditorPanel(ttk.Frame):
         self._build_info_and_dynamic(settings_col)
 
         self.load_from_config()
+        self._apply_enabled_styling(self.enabled_var.get())
 
-        bind_card_events(card, self._accent_color)
+        bind_card_events(card, lambda: self._resting_border_color)
 
     def _build_header_widgets(self):
         """Pack right-side header controls: × delete, Enabled toggle, X/Y, mode button."""
@@ -141,6 +144,7 @@ class GridEditorPanel(ttk.Frame):
         add_tooltip(delete_label, "Delete this grid")
         ttk.Checkbutton(header, text="Enabled",
                         variable=self.enabled_var,
+                        command=self._on_enabled_toggled,
                         bootstyle="success-round-toggle").pack(side='right', padx=(0, PAD_XS))  # type: ignore[call-arg]
 
         pos_frame = ttk.Frame(header)
@@ -506,6 +510,21 @@ class GridEditorPanel(ttk.Frame):
         if Messagebox.yesno(f"Delete grid '{self.id_var.get()}'?", title="Delete Grid") == "Yes":
             if self.on_delete:
                 self.on_delete(self)
+
+    def _on_enabled_toggled(self):
+        self._apply_enabled_styling(self.enabled_var.get())
+
+    def _apply_enabled_styling(self, enabled):
+        """Drain the grid's identity colors when it's excluded from the build.
+
+        Title, badge, and accent strips drop to greys; the card frame border
+        falls back from the player/target accent to the neutral border. The
+        Enabled toggle is the affordance — this is the visual consequence.
+        """
+        self._resting_border_color = self._accent_color if enabled else TK_COLORS['border']
+        self._card.configure(highlightbackground=self._resting_border_color,
+                             highlightcolor=self._resting_border_color)
+        self.section.set_dimmed(not enabled)
 
     def _on_timers_toggled(self):
         if self.timers_var.get():

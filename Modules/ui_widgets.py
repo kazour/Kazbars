@@ -241,9 +241,13 @@ def bind_card_events(card_border, color, hover_color=None):
     widget ancestry of whatever is under the mouse to decide whether the
     pointer is still inside the card (moved to a child) or truly left.
     Works reliably for both tk and ttk widgets — no debounce needed.
+
+    `color` may be a callable returning the current resting color, so the
+    caller can flip the resting state (e.g. enabled -> disabled) without
+    rebinding.
     """
     _hover = hover_color or '#ffffff'
-    _normal = color
+    _resting = color if callable(color) else (lambda c=color: c)
 
     def _is_descendant(widget):
         """Walk .master chain to check if widget is inside card_border."""
@@ -264,7 +268,8 @@ def bind_card_events(card_border, color, hover_color=None):
                 return
         except (tk.TclError, RuntimeError):
             pass
-        card_border.config(highlightbackground=_normal, highlightcolor=_normal)
+        normal = _resting()
+        card_border.config(highlightbackground=normal, highlightcolor=normal)
 
     card_border.bind('<Enter>', on_enter)
     card_border.bind('<Leave>', on_leave)
@@ -418,6 +423,9 @@ class CollapsibleSection(ttk.Frame):
         """Initialize a collapsible section with a clickable header and togglable content area."""
         super().__init__(parent)
         self._is_open = initially_open
+        self._dimmed = False
+        self._accent_color = accent_color
+        self._badge_color = badge_color
 
         # --- Header bar (always visible) ---
         self.header_frame = ttk.Frame(self)
@@ -436,10 +444,11 @@ class CollapsibleSection(ttk.Frame):
         self._arrow_label.pack(side='left')
         clickable.append(self._arrow_label)
 
+        self._accent_canvas = None
         if accent_color:
-            accent = tk.Canvas(left, width=3, height=16,
-                               highlightthickness=0, bg=accent_color)
-            accent.pack(side='left', padx=(0, PAD_MID))
+            self._accent_canvas = tk.Canvas(left, width=3, height=16,
+                                             highlightthickness=0, bg=accent_color)
+            self._accent_canvas.pack(side='left', padx=(0, PAD_MID))
 
         self._title_label = ttk.Label(
             left, text=title, font=FONT_SECTION,
@@ -448,7 +457,7 @@ class CollapsibleSection(ttk.Frame):
         self._title_label.pack(side='left')
         clickable.append(self._title_label)
 
-        # Optional type badge (always visible, even when expanded)
+        self._badge_label = None
         if badge_text:
             self._badge_label = ttk.Label(
                 left, text=badge_text, font=FONT_SMALL,
@@ -470,11 +479,12 @@ class CollapsibleSection(ttk.Frame):
         left.bind('<Return>', lambda e: self.toggle())
         left.bind('<space>', lambda e: self.toggle())
         def _on_focus_in(e):
-            self._arrow_label.config(foreground=THEME_COLORS['accent'])
-            self._title_label.config(foreground=THEME_COLORS['accent'])
+            focus_color = THEME_COLORS['muted'] if self._dimmed else THEME_COLORS['accent']
+            self._arrow_label.config(foreground=focus_color)
+            self._title_label.config(foreground=focus_color)
         def _on_focus_out(e):
             self._arrow_label.config(foreground=THEME_COLORS['muted'])
-            self._title_label.config(foreground=THEME_COLORS['heading'])
+            self._title_label.config(foreground=self._resting_title_color())
         left.bind('<FocusIn>', _on_focus_in)
         left.bind('<FocusOut>', _on_focus_out)
 
@@ -503,11 +513,12 @@ class CollapsibleSection(ttk.Frame):
         # --- Content area (toggled) ---
         # Wrapper holds optional left accent bar + content side-by-side
         self._content_wrapper = ttk.Frame(self)
+        self._content_bar = None
         if badge_color:
             tint = blend_alpha(badge_color, TK_COLORS['bg'], 8)
-            bar = tk.Frame(self._content_wrapper, width=2, bg=badge_color)
-            bar.pack(side='left', fill='y')
-            bar.pack_propagate(False)
+            self._content_bar = tk.Frame(self._content_wrapper, width=2, bg=badge_color)
+            self._content_bar.pack(side='left', fill='y')
+            self._content_bar.pack_propagate(False)
             style_name = f"Tint_{tint.replace('#', '')}.TFrame"
             ttk.Style().configure(style_name, background=tint)
             self.content = ttk.Frame(self._content_wrapper, style=style_name)
@@ -540,6 +551,31 @@ class CollapsibleSection(ttk.Frame):
 
     def set_title(self, text):
         self._title_label.config(text=text)
+
+    def _resting_title_color(self):
+        return TK_COLORS['dim_text'] if self._dimmed else THEME_COLORS['heading']
+
+    def set_dimmed(self, dimmed):
+        """Mark the section as inactive: title, badge, and accent strips drop to greys.
+
+        Used for grids excluded from the build — the row stays interactive,
+        but its identity drains so the user can see at a glance which grids
+        won't ship.
+        """
+        if self._dimmed == bool(dimmed):
+            return
+        self._dimmed = bool(dimmed)
+        self._title_label.config(foreground=self._resting_title_color())
+        if self._badge_label is not None:
+            badge_fg = TK_COLORS['dim_text'] if self._dimmed else (
+                self._badge_color or THEME_COLORS['muted'])
+            self._badge_label.config(foreground=badge_fg)
+        if self._accent_canvas is not None:
+            self._accent_canvas.config(
+                bg=TK_COLORS['border'] if self._dimmed else self._accent_color)
+        if self._content_bar is not None:
+            self._content_bar.config(
+                bg=TK_COLORS['border'] if self._dimmed else self._badge_color)
 
     def set_summary(self, text):
         self._summary_label.config(text=text)

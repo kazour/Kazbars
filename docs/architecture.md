@@ -97,12 +97,12 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 
 | File | Lines | Role |
 |---|---:|---|
-| `Modules/grids_panel.py` | 1220 | Grid list UI, grid management |
+| `Modules/grids_panel.py` | 1239 | Grid list UI, grid management |
 | `Modules/database_editor.py` | 865 | Buff DB CRUD, search, filtering |
 | `Modules/grid_dialogs.py` | 827 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
 | `Modules/build_loading.py` | 796 | Build-progress screen + welcome/about popups |
 | `kzgrids.py` | 562 | Entry point + `KzGridsApp` root window (widgets, menu, lifecycle) |
-| `Modules/ui_widgets.py` | 549 | Widget builders, tooltips, bindings, `CollapsibleSection`, `blend_alpha`, `flash_status_bar`, `app_toast` |
+| `Modules/ui_widgets.py` | 585 | Widget builders, tooltips, bindings, `CollapsibleSection` (with `set_dimmed`), `blend_alpha`, `flash_status_bar`, `app_toast` |
 | `Modules/live_tracker_panel.py` | 518 | Live Tracker Toplevel orchestrator |
 | `Modules/ui_components.py` | 451 | `ToastManager` (coalesce-by-key, in-place text update), `DragReorderManager`, scrollable frame |
 | `Modules/timer_overlay.py` | 440 | In-game transparent timer overlay |
