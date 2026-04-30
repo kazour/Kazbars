@@ -5,18 +5,39 @@ from tkinter import ttk
 from .ui_helpers import (
     THEME_COLORS, GRID_TYPE_COLORS, TK_COLORS,
     FONT_BODY, FONT_SECTION,
-    PAD_TAB, PAD_SMALL, PAD_XS, PAD_ROW, PAD_INNER,
+    PAD_TAB, PAD_SMALL, PAD_XS, PAD_ROW, PAD_INNER, PAD_COLLAPSE_INDENT,
 )
 from .ui_widgets import CollapsibleSection
 from .ui_components import create_scrollable_frame
+
+
+# Pixel margins from canvas-outer width to text-wrap width. Built up by adding
+# the chrome layered between the canvas edge and each nesting level:
+#   top:        PAD_TAB padding both sides + scrollbar + ttk frame chrome
+#   section:    above + CollapsibleSection collapse indent
+#   subsection: above + PAD_INNER (subsection padx) + frame border slack
+# Empirically tuned for ttkbootstrap-darkly chrome — revisit if the theme changes.
+_CHROME_SLACK       = 36   # scrollbar (~16) + ttk frame internal padding
+_TOP_MARGIN         = PAD_TAB * 2 + _CHROME_SLACK
+_SECTION_MARGIN     = _TOP_MARGIN + PAD_COLLAPSE_INDENT + 10
+_SUBSECTION_MARGIN  = _SECTION_MARGIN + PAD_INNER + 8
+
+# Reading column constraints. ~75ch upper bound at 9px Segoe (≈5px/char average)
+# keeps line length within the 65-75ch comfort range from the design laws.
+_MIN_TEXT_WIDTH = 220
+_MAX_TEXT_WIDTH = 460
 
 
 class InstructionsPanel(ttk.Frame):
 
     def __init__(self, parent):
         super().__init__(parent)
-        self._wrap_labels = []  # (label, margin) pairs for dynamic wraplength
+        self._wrap_labels = []
+        self._body_font = tkfont.Font(font=FONT_BODY)
         self._create_widgets()
+
+    def _target_width(self, margin, canvas_w):
+        return min(_MAX_TEXT_WIDTH, max(_MIN_TEXT_WIDTH, canvas_w - margin))
 
     def _create_widgets(self):
         outer, inner, canvas = create_scrollable_frame(self)
@@ -30,10 +51,10 @@ class InstructionsPanel(ttk.Frame):
             "overlays for Age of Conan. Track effects on your own character "
             "or on your current target.",
             font=FONT_BODY, foreground=THEME_COLORS['body'],
-            wraplength=700, justify='left',
+            wraplength=_MAX_TEXT_WIDTH, justify='left',
         )
         intro.pack(fill='x', padx=PAD_TAB, pady=(PAD_TAB, PAD_SMALL))
-        self._wrap_labels.append((intro, PAD_TAB * 2))
+        self._wrap_labels.append((intro, _TOP_MARGIN))
 
         # --- Quick Start ---
 
@@ -41,15 +62,16 @@ class InstructionsPanel(ttk.Frame):
             "Follow these steps to get your first grid running:",
         ], initially_open=True)
         self._add_subsection(qs.content, "1. Set your game folder", [
-            "Click the \"Game:\" label at the bottom and choose your Age of "
-            "Conan install folder. Right-click later to change or clear it.",
+            "Click \"(not set)\" next to the Game: label at the bottom and "
+            "choose your Age of Conan install folder. Click it again later "
+            "to change or clear it.",
         ])
         self._add_subsection(qs.content, "2. Create a grid", [
-            "Click + Add Grid in the Grids tab. The 1\u00d710 horizontal bar "
+            "Click + Add Grid in the Grids tab. The H-bar 1x10 preset "
             "is a good starting point for tracking player buffs.",
         ])
         self._add_subsection(qs.content, "3. Choose which buffs to track", [
-            "Use the Tracked Buffs button to pick buffs from the database. "
+            "Use the Tracked Buffs... button to pick buffs from the database. "
             "Only buffs you've selected will appear in the grid.",
         ])
         self._add_subsection(qs.content, "4. Build and install", [
@@ -57,21 +79,21 @@ class InstructionsPanel(ttk.Frame):
              ("Build & Install", THEME_COLORS['success']),
              (" at the bottom. This compiles your grids and writes them "
               "to your game folder.", None)],
-            "How you apply later changes depends on your setup \u2014 "
+            "How you apply later changes depends on your setup — "
             "see 'Building and Installing' below.",
         ])
 
         # --- Player vs Target ---
 
         grid_types = self._add_section(inner, "Player vs Target Grids", [
-            "Each grid is tied to one source \u2014 chosen when you create the grid.",
+            "Each grid is tied to one source — chosen when you create the grid.",
         ])
         self._add_subsection(grid_types.content, "Player grid", [
             "Tracks buffs and debuffs on your own character.",
         ], title_color=GRID_TYPE_COLORS['player'])
         self._add_subsection(grid_types.content, "Target grid", [
-            "Tracks buffs and debuffs on whoever you're targeting \u2014 "
-            "a mob, a friendly player, or an enemy player.",
+            "Tracks buffs and debuffs on your current target (mob, "
+            "friendly, or enemy player).",
         ], title_color=GRID_TYPE_COLORS['target'])
 
         # --- Grid Modes ---
@@ -80,23 +102,19 @@ class InstructionsPanel(ttk.Frame):
             "Each grid runs in one of two modes:",
         ])
         self._add_subsection(modes.content, "Dynamic", [
-            "Slots fill automatically as buffs activate, and empty when they expire. "
-            "You control the fill direction, sort order, and grouping.",
+            "Slots fill automatically as buffs activate, and empty when they expire.",
         ])
         self._add_subsection(modes.content, "Dynamic options", [
-            "Fill direction \u2014 left-to-right, right-to-left, top-to-bottom, "
-            "bottom-to-top, or diagonal.",
-            "Sort order \u2014 longest timer first, shortest timer first, or "
-            "the order buffs were applied.",
-            "Grouping \u2014 Buff First: misc, then buffs, then debuffs. "
-            "Debuff First: misc, then debuffs, then buffs. "
-            "Mixed: no type grouping; all effects sorted together by time.",
+            "Fill — left-to-right, right-to-left, top-to-bottom, "
+            "bottom-to-top, or one of four diagonals.",
+            "Sort — longest first, shortest first, or order applied.",
+            "Order — Buffs first: misc, buffs, debuffs. "
+            "Debuffs first: misc, debuffs, buffs. "
+            "Mixed: sorted by time, no grouping.",
         ])
         self._add_subsection(modes.content, "Static", [
-            "Each slot is pinned to one or more specific buffs. The slot shows "
-            "the buff when active and stays empty when it's not.",
-            "If multiple buffs are assigned to the same slot, the most recently "
-            "applied one is shown.",
+            "Each slot is pinned to specific buffs. Empty when none are "
+            "active; if several share a slot, the most recent wins.",
         ])
 
         # --- Whitelist & Slot Assignments ---
@@ -104,96 +122,22 @@ class InstructionsPanel(ttk.Frame):
         wl_section = self._add_section(inner, "Tracked Buffs", [
             "These are the two ways to tell a grid which buffs to track.",
         ])
-        self._add_subsection(wl_section.content, "Tracked Buffs (Dynamic mode)", [
-            "A list of buff names the grid watches for. Only buffs on this list "
-            "appear in the grid. If no buffs are tracked, nothing is shown.",
+        self._add_subsection(wl_section.content, "Dynamic mode", [
+            "A list of buff names the grid watches for. Only listed buffs "
+            "appear; an empty list shows nothing.",
         ])
-        self._add_subsection(wl_section.content, "Tracked Buffs (Static mode)", [
-            "Assign one or more buffs to each slot by position. "
-            "Unassigned slots stay empty.",
-            "If multiple buffs share a slot, the most recently applied one is shown.",
-        ])
-
-        # --- Buffs, Debuffs, and Misc ---
-
-        types_section = self._add_section(inner, "Buffs, Debuffs, and Misc", [
-            "Age of Conan doesn't label effects as buffs or debuffs \u2014 you "
-            "make the call. Each buff ID in the database is tagged Buff, "
-            "Debuff, or Misc; the type sets the icon border color and "
-            "controls grouping.",
-        ])
-        self._add_subsection(types_section.content, "Buff", [
-            "Effects you consider positive \u2014 typically the removable bar "
-            "on your own character. Grey border.",
-        ], title_color=THEME_COLORS['muted'])
-        self._add_subsection(types_section.content, "Debuff", [
-            "Effects you consider negative \u2014 typically the non-removable "
-            "bar, or anything you track on a target. Red border.",
-        ], title_color=THEME_COLORS['danger'])
-        self._add_subsection(types_section.content, "Misc", [
-            "Anything you want separated from Buff/Debuff. Golden border.",
-            "The included database uses Misc for CC durations and heals-over-time.",
-        ], title_color=THEME_COLORS['warning'])
-        self._add_paragraph(types_section.content,
-            "Non-Unique debuffs on Target grids show unreliable timers \u2014 "
-            "multiple casters' copies overwrite each other.",
-            foreground=THEME_COLORS['warning'])
-
-        # --- Buff Database ---
-
-        db_section = self._add_section(inner, "The Buff Database", [
-            "Every effect in Age of Conan has one or more numeric buff IDs. "
-            "The Database tab is where you map those IDs to human-readable names "
-            "and decide how each one is classified \u2014 so you can pick effects "
-            "by name when setting up grids and have them grouped and colored correctly.",
-            "Use the search bar and category/type filters to find what you need.",
-        ])
-        self._add_subsection(db_section.content, "Adding or editing an entry", [
-            "Name \u2014 a unique label for this effect (e.g. \"Cunning Deflection\").",
-            "ID(s) \u2014 the numeric buff ID(s). Enter one per line or "
-            "comma-separated.",
-            "Category \u2014 groups related entries together for easier browsing.",
-            "Type \u2014 your classification of this effect. Sets the icon border "
-            "color and controls grouping: Buff (grey), Debuff (red), Misc (golden).",
-        ])
-
-        # --- Stacking ---
-
-        stacking = self._add_section(inner, "Stacking", [
-            "Some buffs have multiple stack levels, each with its own buff ID. "
-            "The stacking options in the database editor control how multiple IDs "
-            "are interpreted.",
-        ])
-        self._add_subsection(stacking.content, "Stacking disabled (default)", [
-            "Multiple IDs are treated as different ranks of the same buff. "
-            "Only one rank can be active at a time \u2014 a higher rank replaces "
-            "a lower one.",
-        ])
-        self._add_subsection(stacking.content, "Stacking enabled", [
-            "IDs represent increasing stack levels. Enter them in order: "
-            "stack 1 first, stack 2 second, and so on. The current stack "
-            "number is displayed over the icon.",
-        ])
-        self._add_subsection(stacking.content, "Partial list (stacking only)", [
-            "Turn this on when you only have IDs for part of the stack range. "
-            "For example, if you have the last 5 IDs of a \u00d715 buff, enter "
-            "those 5 IDs and set 'Start at' to 11.",
-        ])
-        self._add_subsection(stacking.content, "Stack range (stacking only, partial list off)", [
-            "When you have the full ID list but only want the icon to appear "
-            "within a certain range. 'Start at' is when the icon becomes visible, "
-            "'End at' is the last stack shown (0 means show all).",
+        self._add_subsection(wl_section.content, "Static mode", [
+            "Assign buffs to each slot by position. Unassigned slots stay "
+            "empty; if several share a slot, the most recent wins.",
         ])
 
         # --- Grid display options ---
 
         self._add_section(inner, "Grid Display Options", [
-            "Timers \u2014 show the remaining duration below each buff icon.",
-            "Flash \u2014 icons pulse when a buff is about to expire. Set the "
-            "threshold in seconds.",
-            "Icon size and gaps are also per-grid settings in the Grids tab. "
-            "For where grids appear on screen, see "
-            "'Positioning Grids In-Game'.",
+            "Timers — remaining duration below each icon.",
+            "Flash — icons pulse near expiry. Set the threshold in seconds.",
+            "Icon size and gaps are also per-grid. For position, see "
+            "'Applying and Positioning In-Game'.",
         ])
 
         # --- Building & Installing ---
@@ -201,26 +145,18 @@ class InstructionsPanel(ttk.Frame):
         build_section = self._add_section(inner, "Building and Installing", [
             [("Build & Install", THEME_COLORS['success']),
              (" compiles your grid layout and writes it to your game folder. "
-              "The compiler is bundled \u2014 no extra setup needed.", None)],
+              "The compiler is bundled.", None)],
         ])
+        self._add_rich_paragraph(build_section.content, [
+            ("Aoc.exe is a third-party launcher bypass. Kaz Grids asks "
+             "once at first launch and uses that answer for every build. ", None),
+            ("Aoc.exe users must close the game before the first build.",
+             THEME_COLORS['danger']),
+            (" After that, rebuild while playing.", None),
+        ], padx=(PAD_INNER, 0))
         self._add_paragraph(build_section.content,
-            "Aoc.exe is a third-party tool that bypasses the standard launcher. "
-            "Kaz Grids asks once at first launch whether you use it; that answer "
-            "drives every future build. Aoc.exe users must close the game before "
-            "the first build — after that, rebuild any time and /reloadui."
-        )
-        self._add_subsection(build_section.content, "With Aoc.exe (launcher bypass)", [
-            "Rebuild any time, then type /reloadui in chat to apply.",
-        ])
-        self._add_subsection(build_section.content, "Without Aoc.exe (standard launcher)", [
-            "Rebuild any time, then type /reloadui then /reloadgrids to apply.",
-            "The launcher resets grid positions each session \u2014 "
-            "see 'Positioning Grids In-Game'.",
-        ])
-        self._add_paragraph(build_section.content,
-            "If you install or remove Aoc.exe, change the game folder so Kaz "
-            "Grids re-asks the bypass question \u2014 grids won't work if built "
-            "for the wrong mode.",
+            "If you install or remove Aoc.exe later, clear and re-set the "
+            "game folder. Kaz Grids re-detects and adjusts.",
             foreground=THEME_COLORS['warning'])
         self._add_subsection(build_section.content, "After game patches", [
             [("A patch may overwrite your overlay files. If grids disappear "
@@ -229,29 +165,94 @@ class InstructionsPanel(ttk.Frame):
              (" again.", None)],
         ])
         self._add_subsection(build_section.content, "Removing Kaz Grids from your game folder", [
-            "File \u2192 Uninstall from game folder\u2026 removes KazGrids.swf "
+            "File → Uninstall from game client... removes KazGrids.swf "
             "and related files from your Age of Conan install.",
         ])
 
-        # --- Positioning ---
+        # --- Applying and Positioning In-Game ---
 
-        positioning = self._add_section(inner, "Positioning Grids In-Game", [
-            "Preview mode is how you place grids on screen. Press "
-            "Shift+Ctrl+Alt while in-game to toggle it \u2014 all your grids "
-            "appear with sample icons so you can see them even when no "
-            "buffs are active.",
-            "Preview mode is only for positioning. All other grid settings "
-            "\u2014 icon size, gaps, colors, tracked buffs, mode \u2014 are "
+        in_game = self._add_section(inner, "Applying and Positioning In-Game", [
+            "Reload the overlay in-game and place grids on screen. Both "
+            "depend on whether you use Aoc.exe.",
+        ])
+        self._add_subsection(in_game.content, "Preview mode", [
+            "Press Shift+Ctrl+Alt in-game to toggle. Each grid appears as "
+            "a colored rectangle with its name and live X/Y coordinates. "
+            "Preview mode is only for positioning; all other settings are "
             "configured in the app.",
         ])
-        self._add_subsection(positioning.content, "With Aoc.exe (launcher bypass)", [
-            "Drag grids to where you want them. Positions save automatically "
-            "and persist between sessions.",
+        self._add_subsection(in_game.content, "With Aoc.exe (launcher bypass)", [
+            "Apply with /reloadui. Drag grids to position; they save "
+            "automatically and persist between sessions.",
         ])
-        self._add_subsection(positioning.content, "Without Aoc.exe (standard launcher)", [
-            "The launcher resets grid positions each session, so dragging "
-            "in-game doesn't stick. Instead: read each grid's X/Y coordinates "
+        self._add_subsection(in_game.content, "Without Aoc.exe (standard launcher)", [
+            "Apply with /reloadui, then /reloadgrids. The launcher resets "
+            "positions each session, so dragging doesn't stick. Read X/Y "
             "from preview mode, enter them in the Grids tab, and rebuild.",
+        ])
+
+        # --- Buff Database ---
+
+        db_section = self._add_section(inner, "The Buff Database", [
+            "Every effect has one or more numeric buff IDs. The Database "
+            "tab maps those IDs to readable names and classifies them, so "
+            "you can pick effects by name in grids.",
+            "Use the search bar and category/type filters to find entries.",
+        ])
+        self._add_subsection(db_section.content, "Adding or editing an entry", [
+            "Name — a unique label (e.g. \"Cunning Deflection\").",
+            "ID(s) — numeric buff IDs. One per line, or comma-separated.",
+            "Category — groups related entries for browsing.",
+            "Type — Buff (grey), Debuff (red), or Misc (golden). Sets the "
+            "icon border and grouping.",
+        ])
+
+        # --- Buffs, Debuffs, and Misc ---
+
+        types_section = self._add_section(inner, "Buffs, Debuffs, and Misc", [
+            "Age of Conan doesn't label effects as buffs or debuffs; you "
+            "make the call. The type sets the icon border and grouping.",
+        ])
+        self._add_subsection(types_section.content, "Buff", [
+            "Positive effects, typically the removable bar on your "
+            "character. Grey border.",
+        ], title_color=THEME_COLORS['muted'])
+        self._add_subsection(types_section.content, "Debuff", [
+            "Negative effects, typically the non-removable bar or "
+            "anything you track on a target. Red border.",
+        ], title_color=THEME_COLORS['danger'])
+        self._add_subsection(types_section.content, "Misc", [
+            "Anything separated from Buff/Debuff. Golden border.",
+            "The bundled database uses Misc for CC durations and heals-over-time.",
+        ], title_color=THEME_COLORS['warning'])
+        self._add_paragraph(types_section.content,
+            "Some debuffs create a new instance per cast instead of "
+            "refreshing one timer. The Flash combat-log API only exposes "
+            "the latest instance, so on Target grids the timer shows the "
+            "most recent cast, not other active copies.",
+            foreground=THEME_COLORS['warning'])
+
+        # --- Stacking ---
+
+        stacking = self._add_section(inner, "Stacking", [
+            "Some buffs have multiple stack levels, each with its own ID. "
+            "Stacking options control how multiple IDs are read.",
+        ])
+        self._add_subsection(stacking.content, "Stacking disabled (default)", [
+            "Multiple IDs are treated as ranks of the same buff. Only one "
+            "rank is active at a time; a higher rank replaces a lower one.",
+        ])
+        self._add_subsection(stacking.content, "Stacking enabled", [
+            "IDs are stack levels in order: stack 1 first, stack 2 second, "
+            "and so on. The current level shows over the icon.",
+        ])
+        self._add_subsection(stacking.content, "Partial list (stacking only)", [
+            "Turn on when you only have IDs for part of the stack range. "
+            "Example: 5 IDs of a ×15 buff, set 'Start at' to 11.",
+        ])
+        self._add_subsection(stacking.content, "Stack range (stacking only, partial list off)", [
+            "Show the icon only within a stack range. 'Start at' is when "
+            "it appears; 'End at' is the last shown (0 means show all).",
         ])
 
         # Bottom spacer
@@ -279,15 +280,9 @@ class InstructionsPanel(ttk.Frame):
     def _apply_wraplengths(self, w):
         self._resize_after_id = None
         for lbl, margin in self._wrap_labels:
-            lbl.configure(wraplength=min(self._MAX_TEXT_WIDTH, max(200, w - margin)))
-        # Rich paragraphs relayout themselves via their own <Configure> binding
-
-    # Section/subsection margins relative to canvas edge:
-    #   section content:    PAD_TAB + collapse_indent + scrollbar ≈ 80
-    #   subsection content: PAD_TAB + collapse_indent + PAD_INNER + scrollbar ≈ 100
-    _SECTION_MARGIN = 80
-    _SUBSECTION_MARGIN = 100
-    _MAX_TEXT_WIDTH = 700   # Cap reading line width so wide windows stay scannable
+            lbl.configure(wraplength=self._target_width(margin, w))
+        # Rich paragraphs relayout themselves via their own <Configure> binding,
+        # which also fires when their CollapsibleSection is first opened.
 
     def _add_section(self, parent, title, paragraphs, initially_open=False, accent_color=None):
         section = CollapsibleSection(parent, title=title, initially_open=initially_open,
@@ -306,19 +301,18 @@ class InstructionsPanel(ttk.Frame):
             self._add_body_item(frame, item, subsection=True)
 
     def _add_body_item(self, parent, item, subsection):
+        margin = _SUBSECTION_MARGIN if subsection else _SECTION_MARGIN
         if isinstance(item, str):
-            margin = self._SUBSECTION_MARGIN if subsection else self._SECTION_MARGIN
-            wl = 620 if subsection else 650
             lbl = ttk.Label(parent, text=item, font=FONT_BODY,
-                            foreground=THEME_COLORS['body'], wraplength=wl,
-                            justify='left')
+                            foreground=THEME_COLORS['body'],
+                            wraplength=_MAX_TEXT_WIDTH, justify='left')
             lbl.pack(fill='x', pady=(0, PAD_XS))
             self._wrap_labels.append((lbl, margin))
         else:
             self._add_rich_paragraph(parent, item)
 
-    def _add_rich_paragraph(self, parent, parts):
-        font = tkfont.Font(font=FONT_BODY)
+    def _add_rich_paragraph(self, parent, parts, padx=(0, 0)):
+        font = self._body_font
         line_h = font.metrics('linespace')
 
         tokens = []
@@ -338,7 +332,7 @@ class InstructionsPanel(ttk.Frame):
 
         canvas = tk.Canvas(parent, bg=self._frame_bg, highlightthickness=0, borderwidth=0,
                            height=line_h, takefocus=0)
-        canvas.pack(fill='x', pady=(0, PAD_XS))
+        canvas.pack(fill='x', padx=padx, pady=(0, PAD_XS))
 
         def relayout(width):
             canvas.delete('all')
@@ -360,13 +354,13 @@ class InstructionsPanel(ttk.Frame):
                 x += word_w
             canvas.configure(height=y + line_h)
 
-        canvas.bind('<Configure>', lambda e: relayout(min(self._MAX_TEXT_WIDTH, e.width)))
-        self.after_idle(lambda: relayout(min(self._MAX_TEXT_WIDTH, canvas.winfo_width())))
+        canvas.bind('<Configure>', lambda e: relayout(min(_MAX_TEXT_WIDTH, e.width)))
+        self.after_idle(lambda: relayout(min(_MAX_TEXT_WIDTH, canvas.winfo_width())))
         return canvas
 
     def _add_paragraph(self, parent, text, foreground=None):
         lbl = ttk.Label(parent, text=text, font=FONT_BODY,
                         foreground=foreground or THEME_COLORS['body'],
-                        wraplength=650, justify='left')
+                        wraplength=_MAX_TEXT_WIDTH, justify='left')
         lbl.pack(fill='x', padx=(PAD_INNER, 0), pady=PAD_XS)
-        self._wrap_labels.append((lbl, self._SUBSECTION_MARGIN))
+        self._wrap_labels.append((lbl, _SUBSECTION_MARGIN))

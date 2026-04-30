@@ -227,3 +227,22 @@ Steps:
 7. `on_dialog_closed()` — Modules/first_launch.py:340 — runs as in Flow 6 but `welcome_data` was never populated, so the welcome popup is suppressed
 
 End state: `game_path`, `use_aoc_bypass`, and `game_resolution` persisted; no profile loaded; no welcome popup; user lands on the empty `GridsPanel` empty-state
+
+---
+
+## 14. change game folder (with Aoc.exe reconcile)
+
+Trigger: User left- or right-clicks the path label in the bottom bar and picks "Change game folder…" from the context menu
+
+Steps:
+1. `KzGridsApp._show_game_context_menu()` — kzgrids.py:438 — one-line delegator to `game_folder.show_game_context_menu(self, event)`
+2. `show_game_context_menu()` — Modules/game_folder.py:117 — pops `app._game_context_menu` at the event coordinates; both `<Button-1>` and `<Button-3>` route here
+3. User picks "Change game folder…" → `KzGridsApp._change_game_folder()` — kzgrids.py:432 — one-line delegator to `game_folder.change_game_folder(self)`
+4. `change_game_folder()` — Modules/game_folder.py:63 — opens `filedialog.askdirectory`; validates AoC folder structure (warns if `Data/Gui/Default` is missing); warns if the resulting `KazGrids.swf` path exceeds 240 characters
+5. `save_game_path()` — Modules/game_folder.py:122 — persists `game_path` to settings; calls `grids_panel.notify_game_path_changed()` so the panel can refresh
+6. **Reconcile (only when `resolved != previous`)**: `detect_aoc_launcher()` — Modules/build_executor.py:139 — checks for `aoc.exe` or `Aoc.log` under `Data/Gui/Aoc/`. Two state-divergence branches fire:
+   - **Aoc.exe newly present** (`has_aoc=True, use_aoc_bypass=False`) → `prompt_aoc_bypass()` — Modules/game_folder.py:139 — modal yes/no; answer is persisted via `save_aoc_bypass()`
+   - **Aoc.exe newly absent** (`has_aoc=False, use_aoc_bypass=True`) → `save_aoc_bypass(app, False)` (Modules/game_folder.py:132) and `app_toast(app, "Aoc.exe not found in this folder — bypass mode disabled.", 'info', 8)`
+7. `refresh_game_path_label()` — Modules/game_folder.py:36 — updates the path label text/tooltip and calls `update_build_state()` to re-enable or disable the Build button based on the new path's existence
+
+End state: `game_path` and (when divergence triggered it) `use_aoc_bypass` persisted; path label updated; Build button state synced; if state diverged, the user has either confirmed bypass via the prompt or seen the auto-disable toast

@@ -87,8 +87,15 @@ def change_game_folder(app):
     save_game_path(app)
 
     from .build_executor import detect_aoc_launcher
-    if detect_aoc_launcher(resolved) and resolved != previous:
-        prompt_aoc_bypass(app)
+    if resolved != previous:
+        has_aoc = detect_aoc_launcher(resolved)
+        if has_aoc and not app.use_aoc_bypass:
+            prompt_aoc_bypass(app)
+        elif not has_aoc and app.use_aoc_bypass:
+            save_aoc_bypass(app, False)
+            app_toast(app,
+                      "Aoc.exe not found in this folder — bypass mode disabled.",
+                      'info', 8)
 
     refresh_game_path_label(app)
 

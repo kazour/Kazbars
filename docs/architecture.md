@@ -1,6 +1,6 @@
 # Architectural Map
 
-**Current as of:** 2026-04-29 (after toast system unification: coalesce-by-key, single `app_toast` API across the app, perf + brand-fit + entrance-animation fixes; onboarding step 4 persistence via `last_build_signature` keyed on profile path + grids hash)
+**Current as of:** 2026-05-01 (after Help-panel pass: 460px column cap (~75ch at 9px Segoe), derived section/subsection margins, body-font caching, content reorder, copy clarification, new merged "Applying and Positioning In-Game" section. `game_folder.change_game_folder` reconciles `use_aoc_bypass` on every folder change: prompt on install transitions, auto-disable on removal.)
 **Purpose:** Module topology, dependencies, and coupling hotspots. Updated alongside code changes — if you edit this file, commit it with the code. `CLAUDE.md` has the short version; this file has the detail that doesn't fit there.
 
 ## Dependency clusters
@@ -108,14 +108,14 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `Modules/timer_overlay.py` | 440 | In-game transparent timer overlay |
 | `Modules/boss_timer.py` | 422 | Boss timer state + UI |
 | `Modules/grids_generator.py` | 424 | AS2 code generation from grid configs |
-| `Modules/instructions_panel.py` | 372 | Help/instructions view |
+| `Modules/instructions_panel.py` | 366 | Help/instructions view |
 | `Modules/first_launch.py` | 353 | First-launch dialog + post-dialog orchestrator (`run_first_launch`) |
 | `Modules/custom_menu_bar.py` | 359 | Canvas-based dark menu bar |
 | `Modules/combat_monitor.py` | 294 | Combat log parser feeding the tracker |
 | `Modules/build_executor.py` | 227 | MTASC compile + deploy |
 | `build.py` | 225 | PyInstaller build driver |
 | `Modules/profile_io.py` | 219 | Profile load (read+apply split) / save (build+write+commit, `silent=` for piggyback saves) / new / open + missing-buff warning |
-| `Modules/game_folder.py` | 185 | Game folder UI + Aoc.exe bypass + uninstall |
+| `Modules/game_folder.py` | 192 | Game folder UI + Aoc.exe bypass (with install/remove reconciler) + uninstall |
 | `Modules/build_action.py` | 168 | Build & Install flow |
 | `Modules/ui_helpers.py` | 157 | Design tokens + `setup_custom_styles` |
 | `Modules/live_tracker_settings.py` | 145 | Tracker persistence |
