@@ -511,14 +511,9 @@ class CollapsibleSection(ttk.Frame):
         _left.bind('<Leave>', _on_header_leave)
 
         # --- Content area (toggled) ---
-        # Wrapper holds optional left accent bar + content side-by-side
         self._content_wrapper = ttk.Frame(self)
-        self._content_bar = None
         if badge_color:
             tint = blend_alpha(badge_color, TK_COLORS['bg'], 8)
-            self._content_bar = tk.Frame(self._content_wrapper, width=2, bg=badge_color)
-            self._content_bar.pack(side='left', fill='y')
-            self._content_bar.pack_propagate(False)
             style_name = f"Tint_{tint.replace('#', '')}.TFrame"
             ttk.Style().configure(style_name, background=tint)
             self.content = ttk.Frame(self._content_wrapper, style=style_name)
@@ -573,9 +568,6 @@ class CollapsibleSection(ttk.Frame):
         if self._accent_canvas is not None:
             self._accent_canvas.config(
                 bg=TK_COLORS['border'] if self._dimmed else self._accent_color)
-        if self._content_bar is not None:
-            self._content_bar.config(
-                bg=TK_COLORS['border'] if self._dimmed else self._badge_color)
 
     def set_summary(self, text):
         self._summary_label.config(text=text)
