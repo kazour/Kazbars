@@ -8,14 +8,14 @@ product
 
 Age of Conan players who run a buff/debuff icon grid overlay during play. Two distinct contexts:
 
-1. **One-time setup (the long tail).** A player downloads Kaz Grids, opens it, loads the default profile, maybe tweaks one or two grids, hits Build & Install, and never opens the editor again. Most users live here. They are not power users of *this app*; they are power users of *the game*. The editor is a means to an end.
+1. **One-time setup (the long tail).** A player downloads KazBars, opens it, loads the default profile, maybe tweaks one or two grids, hits Build & Install, and never opens the editor again. Most users live here. They are not power users of *this app*; they are power users of *the game*. The editor is a means to an end.
 2. **Live raid coordination (Ethram Fal).** When a raid pulls Ethram Fal, every player has the Live Tracker open during the fight. The seven-stage Viscous Seed / Lotus Fixation / Syphon cycle is mandatory information for a smooth pull. Glances at the tracker happen between mechanics, often while the player is repositioning or casting. Stakes are real: a missed timer wipes the raid.
 
 A small fraction of users return to the editor when swapping characters, classes, or fight contexts. They benefit from speed, but the design priority is the first audience.
 
 ## Product Purpose
 
-Kaz Grids does two jobs that share infrastructure:
+KazBars does two jobs that share infrastructure:
 
 - **Compile a buff-grid overlay** for the in-game UI: the editor lets a player describe icon grids (player vs. target, dynamic vs. static, sort/group/timer/flash rules) and one click compiles them to ActionScript 2, then deploys them to the game folder. After that the player types `/reloadui` in chat and forgets the editor exists.
 - **Run the Ethram Fal Live Tracker** during the relevant fight. An always-on-top overlay shows the current cycle stage and timer, sourced from the game's combat log.
@@ -27,7 +27,7 @@ Success is measured the way good tools are: a player who set their grids up six 
 Three words: **honest, characterful, fast.**
 
 - **Honest.** The README admits the .exe is unsigned because a hobby project doesn't justify a code-signing certificate, and tells the user exactly how to bypass SmartScreen. UI copy carries the same plainness. No marketing varnish, no false urgency, no "Pro tips" or "Did you know?" interruptions.
-- **Characterful.** Kaz Grids is a tool for a 2008 MMO with a small dedicated player base. The CRT/phosphor accents (`phosphor_green`, `phosphor_amber`, `crt_glow`, scanline overlays, glow layers on the build status icon, the CRT-styled dialog header font) are deliberate. They are not nostalgia for its own sake; they signal that this app belongs to a specific community and a specific era of gaming, not to the SaaS template economy.
+- **Characterful.** KazBars is a tool for a 2008 MMO with a small dedicated player base. The CRT/phosphor accents (`phosphor_green`, `phosphor_amber`, `crt_glow`, scanline overlays, glow layers on the build status icon, the CRT-styled dialog header font) are deliberate. They are not nostalgia for its own sake; they signal that this app belongs to a specific community and a specific era of gaming, not to the SaaS template economy.
 - **Fast.** The editor is a thing you do once. It should not feel like a configuration wizard. The Live Tracker is a thing you read in 200ms while a boss casts. It should feel weightless.
 
 Voice: direct, second-person, calm. Acknowledges that the user knows the game better than the tool does. Never apologetic, never breathless. When something fails, it says what failed and what to do, in that order.
@@ -36,10 +36,10 @@ Voice: direct, second-person, calm. Acknowledges that the user knows the game be
 
 The four directions that would betray the brand. The product must thread between all of them.
 
-1. **Generic SaaS dashboard (Stripe / Linear / Vercel-style enterprise dark UI).** Glass panels, soft gradients, hero metric tiles, identical icon-headline-paragraph card grids, polish substituted for character. Kaz Grids is not a B2B product; treating it like one drains the personality that makes the community trust it.
-2. **Twitch / Discord gamer UI.** Neon purple/blurple, heavy bloom and glow effects, cluttered side rails, big avatars, "gamery" badges. The category-reflex direction. Loud where Kaz Grids should be tight.
+1. **Generic SaaS dashboard (Stripe / Linear / Vercel-style enterprise dark UI).** Glass panels, soft gradients, hero metric tiles, identical icon-headline-paragraph card grids, polish substituted for character. KazBars is not a B2B product; treating it like one drains the personality that makes the community trust it.
+2. **Twitch / Discord gamer UI.** Neon purple/blurple, heavy bloom and glow effects, cluttered side rails, big avatars, "gamery" badges. The category-reflex direction. Loud where KazBars should be tight.
 3. **Windows 11 Settings.** Fluent-acrylic panels, oversized whitespace, soft pastels, vague labels. Loses the tool-character entirely; reads as a system utility no one chose to install.
-4. **WeakAuras / in-game addon UI.** Raised bevels, heavy chrome, tabs-within-tabs option panels, dense settings dialogs that look like they ship inside the game. Kaz Grids is the *editor* for an in-game overlay, not the overlay itself. The editor lives on the desktop and should look like it does.
+4. **WeakAuras / in-game addon UI.** Raised bevels, heavy chrome, tabs-within-tabs option panels, dense settings dialogs that look like they ship inside the game. KazBars is the *editor* for an in-game overlay, not the overlay itself. The editor lives on the desktop and should look like it does.
 
 ## Design Principles
 

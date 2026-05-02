@@ -1,4 +1,4 @@
-# Kaz Grids — Release Routine
+# KazBars — Release Routine
 
 Instructions for Claude Code. Run this routine when Kaz says "prepare a release" or "ship v1.x".
 
@@ -62,21 +62,12 @@ If anything is off, print what failed and stop. Do not attempt to fix pre-flight
 
 ## Step 1 — Determine the version bump
 
-Read the current version from `kzgrids.py`:
+Read the current version from `src/kazbars/__init__.py` (single source of truth — `pyproject.toml`'s hatchling reads from here):
 
 ```bash
-grep -E '^APP_VERSION\s*=' kzgrids.py
-# Expect one line like: APP_VERSION = "1.0.0"
+grep -E '^__version__\s*=' src/kazbars/__init__.py
+# Expect one line like: __version__ = "2.0.0"
 ```
-
-Also check `build.py`:
-
-```bash
-grep -E '^VERSION\s*=' build.py
-# Expect: VERSION = "1.0.0"
-```
-
-If the two values disagree, stop and report — that's a bug to fix before releasing.
 
 Get commits since the last tag:
 
@@ -132,7 +123,7 @@ Write `/mnt/user-data/outputs/CHANGELOG_DRAFT.md` grouping the commits:
 
 ### Added
 - Background check for new releases on launch. Click the toast to open release notes.
-- File → Uninstall from game client. Cleanly removes Kaz Grids files from the selected install.
+- File → Uninstall from game client. Cleanly removes KazBars files from the selected install.
 
 ### Changed
 - Grids now reference buffs by spell ID instead of name. Renaming a buff in the database no longer breaks grids that use it. Existing profiles migrate automatically on load; any buffs that can't be resolved are listed in a dialog so you can re-add them.
@@ -158,16 +149,16 @@ Once approved, the routine must also **prepend** the approved notes to `.github/
 
 ## Step 3 — Apply version bump and commit
 
-Update `APP_VERSION` in `kzgrids.py`:
+Update `__version__` in `src/kazbars/__init__.py`:
 
 ```bash
 # Replace only the version string, nothing else
-sed -i 's/^APP_VERSION = "1.0.0"/APP_VERSION = "1.1.0"/' kzgrids.py
-grep -E '^APP_VERSION\s*=' kzgrids.py
+sed -i 's/^__version__ = "2.0.0"/__version__ = "2.1.0"/' src/kazbars/__init__.py
+grep -E '^__version__\s*=' src/kazbars/__init__.py
 # Verify
 ```
 
-Update `VERSION` in `build.py` the same way.
+(One source: `pyproject.toml` reads this via hatchling's dynamic version. Don't bump anywhere else.)
 
 Prepend the approved changelog entry to `docs/CHANGELOG.md`. Keep the existing file header (if any) at the top:
 
@@ -185,11 +176,11 @@ Prepend the approved notes to `.github/release-notes.md` as a `## What's New in 
 Stage and commit:
 
 ```bash
-git add kzgrids.py build.py docs/CHANGELOG.md .github/release-notes.md
+git add src/kazbars/__init__.py docs/CHANGELOG.md .github/release-notes.md
 git status
-# Confirm only these 4 files are staged. If anything else shows up, stop.
+# Confirm only these 3 files are staged. If anything else shows up, stop.
 
-git commit -m "Release v1.1.0"
+git commit -m "Release v2.1.0"
 ```
 
 **APPROVAL GATE #3.** Show Kaz the commit and `git log -1 --stat` output. Wait for approval before pushing.
@@ -209,7 +200,7 @@ Wait for confirmation it succeeded. Then:
 
 ```bash
 # Annotated tag (annotated, not lightweight — release workflows expect this)
-git tag -a v1.1.0 -m "Kaz Grids v1.1.0"
+git tag -a v1.1.0 -m "KazBars v1.1.0"
 git push origin v1.1.0
 ```
 
@@ -231,8 +222,8 @@ While the build runs, prepare the post-release checklist (Step 6) so it's ready 
 - The fix is a new commit + new patch-version tag (e.g., v1.1.1), not force-rewriting v1.1.0.
 
 **If CI succeeds:**
-- Confirm the release appears at `https://github.com/kazour/Kaz-Grids/releases/tag/v1.1.0`.
-- Confirm `Kaz Grids.zip` and `Kaz Grids.zip.sha256` are attached as assets.
+- Confirm the release appears at `https://github.com/kazour/Kazbars/releases/tag/vX.Y.Z`.
+- Confirm `KazBars.zip` and `KazBars.zip.sha256` are attached as assets.
 
 ---
 
@@ -243,7 +234,7 @@ Print this checklist for Kaz:
 ```
 Release v1.1.0 shipped. Don't forget:
 
-[ ] Download the zip and sanity-check: extract, run Kaz Grids.exe,
+[ ] Download the zip and sanity-check: extract, run KazBars.exe,
     confirm the version in the About dialog reads 1.1.0
 [ ] Submit the exe to Microsoft Defender for reputation:
     https://www.microsoft.com/en-us/wdsi/filesubmission
@@ -270,8 +261,8 @@ Claude Code runs this routine from Step 0. If Kaz specifies a version explicitly
 
 ## Things NOT in scope for the routine
 
-- Do not modify `build.py` beyond the version string
-- Do not touch `release.yml` during a release (it's a one-time fix, committed separately)
+- Do not touch `kazbars.spec` during a release (the spec is checked-in; changes are committed separately)
+- Do not touch `release.yml` during a release (one-time fixes, committed separately)
 - Do not create draft releases — this routine goes straight to published
 - Do not handle pre-releases / RCs — if Kaz wants one, add that to this doc first
 - Do not auto-generate changelog from commits without the approval gate. The gate exists because commit messages are internal and notes are external.

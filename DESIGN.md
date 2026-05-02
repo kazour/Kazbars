@@ -1,5 +1,5 @@
 ---
-name: Kaz Grids
+name: KazBars
 description: Buff/debuff grid overlay editor for Age of Conan, with a CRT-tinted dark UI.
 colors:
   text-bright: "#FFFFFF"
@@ -193,13 +193,13 @@ components:
     padding: "6px 10px"
 ---
 
-# Design System: Kaz Grids
+# Design System: KazBars
 
 ## 1. Overview
 
 **Creative North Star: "The Phosphor Bench"**
 
-Kaz Grids is a workbench for buff data. Functional density carries most of the surface (Aseprite/Reaper energy: tight rows, small text, dense forms, no decorative whitespace), and the CRT/phosphor language is reserved for the moments where the tool talks back: the Build & Install status icon, the CRT-styled dialog header, the Ethram Fal seed timer overlay. Most of the app is a quiet dark workbench. A handful of surfaces glow.
+KazBars is a workbench for buff data. Functional density carries most of the surface (Aseprite/Reaper energy: tight rows, small text, dense forms, no decorative whitespace), and the CRT/phosphor language is reserved for the moments where the tool talks back: the Build & Install status icon, the CRT-styled dialog header, the Ethram Fal seed timer overlay. Most of the app is a quiet dark workbench. A handful of surfaces glow.
 
 The system is built on ttkbootstrap-darkly as a base palette and inherits its tonal grammar (`#222` working surface, `#1a1a1a` chrome, `#2f2f2f` inputs). On top of that base, a deliberate retro layer (`phosphor_green`, `phosphor_amber`, `crt_glow`, scanline overlays) carries the brand. That layer is decoration-only by contract: phosphor colors are off-limits for body text and interactive states because they fail WCAG contrast on the dark bg, and `_RETRO_COLORS` is named with a leading underscore to mark it private.
 

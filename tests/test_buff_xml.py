@@ -6,21 +6,17 @@ here cover: attribute extraction, surgical attribute replacement (other
 bytes preserved verbatim), the KZ_OFF on/off comment-wrap toggle, the
 filter whitespace normaliser, and the no-BuffListView guard.
 
-Run: python tests/test_buff_xml.py
-Exit code 0 on success, non-zero on any assertion failure.
+Run: `pytest tests/test_buff_xml.py` (from repo root).
 """
 
-import sys
-from pathlib import Path
-
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
-
-from Modules.buff_display_editor import (
-    _read_bufflistview, _write_bufflistview, _normalise_filter,
-    FILTER_FRIENDLY, FILTER_HOSTILE, FILTER_BOTH,
+from kazbars.buff_display_editor import (
+    FILTER_BOTH,
+    FILTER_FRIENDLY,
+    FILTER_HOSTILE,
+    _normalise_filter,
+    _read_bufflistview,
+    _write_bufflistview,
 )
-
 
 SAMPLE = '''\
 <?xml version="1.0" encoding="UTF-8"?>
@@ -144,32 +140,3 @@ def test_filter_canonical_form_written():
     assert 'filter            = "friendly | hostile"' in written
 
 
-def main():
-    tests = [
-        test_read_basic,
-        test_write_attrs_preserves_surrounding_bytes,
-        test_write_unchanged_when_no_attrs_passed,
-        test_off_wraps_in_sentinel_and_round_trips,
-        test_on_unwraps_sentinel,
-        test_off_then_edit_then_on_preserves_edits,
-        test_no_bufflistview_returns_none,
-        test_filter_normalise_whitespace_roundtrip,
-        test_filter_canonical_form_written,
-    ]
-    failed = []
-    for t in tests:
-        try:
-            t()
-        except AssertionError as e:
-            failed.append((t.__name__, e))
-        except Exception as e:
-            failed.append((t.__name__, f"{type(e).__name__}: {e}"))
-    if failed:
-        for name, err in failed:
-            print(f"FAIL {name}: {err}")
-        sys.exit(1)
-    print(f"OK -- {len(tests)} buff_display_editor XML tests passed.")
-
-
-if __name__ == '__main__':
-    main()

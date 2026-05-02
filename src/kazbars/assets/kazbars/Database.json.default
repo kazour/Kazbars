@@ -1,0 +1,3223 @@
+{
+  "version": 2,
+  "description": "KazBars buff/debuff database v2",
+  "buffs": [
+    {
+      "name": "Ethereal Lash 1-4",
+      "ids": [
+        4281285,
+        4281287,
+        4281288,
+        4281289
+      ],
+      "category": "#T3",
+      "type": "debuff",
+      "stacking": true
+    },
+    {
+      "name": "Human Prey",
+      "ids": [
+        4706108
+      ],
+      "category": "#T3",
+      "type": "debuff"
+    },
+    {
+      "name": "Impel 1-3",
+      "ids": [
+        4281931,
+        4923159,
+        4923160
+      ],
+      "category": "#T3",
+      "type": "debuff",
+      "stacking": true
+    },
+    {
+      "name": "Incinerate 1-5 (Kharon)",
+      "ids": [
+        4259934,
+        4260179,
+        4260181,
+        4260183,
+        4260198
+      ],
+      "category": "#T3",
+      "type": "debuff",
+      "stacking": true
+    },
+    {
+      "name": "Miasma (HathorKa)",
+      "ids": [
+        4281812
+      ],
+      "category": "#T3",
+      "type": "debuff"
+    },
+    {
+      "name": "Crimson Coating (Archfiend)",
+      "ids": [
+        4836698
+      ],
+      "category": "#T3.5",
+      "type": "debuff"
+    },
+    {
+      "name": "Host (Nergal)",
+      "ids": [
+        4757361
+      ],
+      "category": "#T3.5",
+      "type": "debuff"
+    },
+    {
+      "name": "Ire of the Archfiend (Archfiend)",
+      "ids": [
+        4752750
+      ],
+      "category": "#T3.5",
+      "type": "debuff"
+    },
+    {
+      "name": "Nauseating Backlash (Zaal)",
+      "ids": [
+        4752518
+      ],
+      "category": "#T3.5",
+      "type": "debuff"
+    },
+    {
+      "name": "Nergal's Parasite 1-5 (Nergal)",
+      "ids": [
+        4757309,
+        4757310,
+        4757311,
+        4757318,
+        4757329
+      ],
+      "category": "#T3.5",
+      "type": "misc",
+      "stacking": true
+    },
+    {
+      "name": "Nergal's Protection (Nergal)",
+      "ids": [
+        4757285
+      ],
+      "category": "#T3.5",
+      "type": "buff"
+    },
+    {
+      "name": "Nergal's Ruin (Nergal)",
+      "ids": [
+        4836609
+      ],
+      "category": "#T3.5",
+      "type": "debuff"
+    },
+    {
+      "name": "Supercharged Parasite (Nergal)",
+      "ids": [
+        4757336
+      ],
+      "category": "#T3.5",
+      "type": "misc"
+    },
+    {
+      "name": "Unholy Reversal (Zaal)",
+      "ids": [
+        4836424
+      ],
+      "category": "#T3.5",
+      "type": "debuff"
+    },
+    {
+      "name": "Veil of the Unliving (Zaal)",
+      "ids": [
+        4752520
+      ],
+      "category": "#T3.5",
+      "type": "debuff"
+    },
+    {
+      "name": "Zaal's Ruin (Zaal)",
+      "ids": [
+        4836738
+      ],
+      "category": "#T3.5",
+      "type": "debuff"
+    },
+    {
+      "name": "Zaal's Torment (Zaal)",
+      "ids": [
+        4836739
+      ],
+      "category": "#T3.5",
+      "type": "debuff"
+    },
+    {
+      "name": "Acid Decay (Basilisk)",
+      "ids": [
+        4383191
+      ],
+      "category": "#T4",
+      "type": "debuff"
+    },
+    {
+      "name": "Aflame (Sheng)",
+      "ids": [
+        4357732
+      ],
+      "category": "#T4",
+      "type": "debuff"
+    },
+    {
+      "name": "Broken Armor Ruin (T4 adds)",
+      "ids": [
+        4552633
+      ],
+      "category": "#T4",
+      "type": "debuff"
+    },
+    {
+      "name": "Crushed Armor Wrack (T4 adds)",
+      "ids": [
+        4553214
+      ],
+      "category": "#T4",
+      "type": "debuff"
+    },
+    {
+      "name": "Hands of Corruption (Entity)",
+      "ids": [
+        4924718
+      ],
+      "category": "#T4",
+      "type": "misc"
+    },
+    {
+      "name": "Open Wound Wrack (T4 adds)",
+      "ids": [
+        4552666
+      ],
+      "category": "#T4",
+      "type": "debuff"
+    },
+    {
+      "name": "Petrify (Basilisk)",
+      "ids": [
+        5064063
+      ],
+      "category": "#T4",
+      "type": "debuff"
+    },
+    {
+      "name": "Predatory Torment (T4 adds)",
+      "ids": [
+        4857503
+      ],
+      "category": "#T4",
+      "type": "debuff"
+    },
+    {
+      "name": "Shackles (Shadur)",
+      "ids": [
+        4857484
+      ],
+      "category": "#T4",
+      "type": "debuff"
+    },
+    {
+      "name": "Shimmering Armor Shield (Basilisk)",
+      "ids": [
+        4380771
+      ],
+      "category": "#T4",
+      "type": "buff"
+    },
+    {
+      "name": "Tainted Blood (Basilisk)",
+      "ids": [
+        4383111
+      ],
+      "category": "#T4",
+      "type": "debuff"
+    },
+    {
+      "name": "Beautiful Death (Kyllikki)",
+      "ids": [
+        5014940
+      ],
+      "category": "#T5",
+      "type": "debuff"
+    },
+    {
+      "name": "Broodcall (Yakhmar)",
+      "ids": [
+        5016429
+      ],
+      "category": "#T5",
+      "type": "debuff"
+    },
+    {
+      "name": "Deep Freeze (Kyllikki)",
+      "ids": [
+        5015019
+      ],
+      "category": "#T5",
+      "type": "debuff"
+    },
+    {
+      "name": "Rake (Vistrix)",
+      "ids": [
+        5016796
+      ],
+      "category": "#T5",
+      "type": "debuff"
+    },
+    {
+      "name": "Snow and Sorrow (Kyllikki)",
+      "ids": [
+        5014916
+      ],
+      "category": "#T5",
+      "type": "debuff"
+    },
+    {
+      "name": "They Hunger (Yakhmar)",
+      "ids": [
+        5016222
+      ],
+      "category": "#T5",
+      "type": "debuff"
+    },
+    {
+      "name": "Time Fades Away (Kyllikki)",
+      "ids": [
+        5015024
+      ],
+      "category": "#T5",
+      "type": "debuff"
+    },
+    {
+      "name": "Acidic Meltdown 1-5 (Yothians)",
+      "ids": [
+        5051633,
+        5051634,
+        5051635,
+        5051636,
+        5051637
+      ],
+      "category": "#T6",
+      "type": "debuff",
+      "stacking": true
+    },
+    {
+      "name": "Affliction (Ethram)",
+      "ids": [
+        5054120
+      ],
+      "category": "#T6",
+      "type": "debuff"
+    },
+    {
+      "name": "Anvil (Zelandra)",
+      "ids": [
+        5052352
+      ],
+      "category": "#T6",
+      "type": "debuff"
+    },
+    {
+      "name": "Born from the Dragon's Spine (Rocknoses)",
+      "ids": [
+        5052177
+      ],
+      "category": "#T6",
+      "type": "buff"
+    },
+    {
+      "name": "Burning Sands (Rocknoses)",
+      "ids": [
+        5052211
+      ],
+      "category": "#T6",
+      "type": "debuff"
+    },
+    {
+      "name": "Charred 1-5 (Yothians)",
+      "ids": [
+        5051640,
+        5051641,
+        5051642,
+        5051643,
+        5051644
+      ],
+      "category": "#T6",
+      "type": "debuff",
+      "stacking": true
+    },
+    {
+      "name": "Concentrated Lotus Miasma (Zelandra)",
+      "ids": [
+        5052368
+      ],
+      "category": "#T6",
+      "type": "misc"
+    },
+    {
+      "name": "Derketo's Ruin (Yothians)",
+      "ids": [
+        5064042
+      ],
+      "category": "#T6",
+      "type": "debuff"
+    },
+    {
+      "name": "Grip of Bel (Zelandra)",
+      "ids": [
+        5052277
+      ],
+      "category": "#T6",
+      "type": "debuff"
+    },
+    {
+      "name": "Hunger of the Faceless God (Cetris)",
+      "ids": [
+        5052693,
+        5052694
+      ],
+      "category": "#T6",
+      "type": "buff"
+    },
+    {
+      "name": "Lotus Fixation (Ethram)",
+      "ids": [
+        5055907
+      ],
+      "category": "#T6",
+      "type": "debuff"
+    },
+    {
+      "name": "Lotus Miasma (Levi-Ethram)",
+      "ids": [
+        5052114
+      ],
+      "category": "#T6",
+      "type": "misc"
+    },
+    {
+      "name": "Lotus Miasma 1-5 (Levi-Ethram)",
+      "ids": [
+        5062623,
+        5062624,
+        5062625,
+        5062626,
+        5062627
+      ],
+      "category": "#T6",
+      "type": "debuff",
+      "stacking": true
+    },
+    {
+      "name": "Lotus Regression (Ethram)",
+      "ids": [
+        5064459
+      ],
+      "category": "#T6",
+      "type": "debuff"
+    },
+    {
+      "name": "Shadow Visage (Zelandra)",
+      "ids": [
+        5056787
+      ],
+      "category": "#T6",
+      "type": "debuff"
+    },
+    {
+      "name": "Shuriken Blades (Zelandra)",
+      "ids": [
+        5056777
+      ],
+      "category": "#T6",
+      "type": "debuff"
+    },
+    {
+      "name": "Stone Spear (Rocknoses)",
+      "ids": [
+        5052200
+      ],
+      "category": "#T6",
+      "type": "debuff"
+    },
+    {
+      "name": "Viscous Seed (Ethram)",
+      "ids": [
+        5054493
+      ],
+      "category": "#T6",
+      "type": "debuff"
+    },
+    {
+      "name": "Affected by Knockback (Self Debuff)",
+      "ids": [
+        1094673
+      ],
+      "category": "#Resistances",
+      "type": "debuff"
+    },
+    {
+      "name": "Celestial Boon",
+      "ids": [
+        5017472
+      ],
+      "category": "#Global",
+      "type": "buff"
+    },
+    {
+      "name": "Cunning Deflection",
+      "ids": [
+        3191514
+      ],
+      "category": "#Global",
+      "type": "buff"
+    },
+    {
+      "name": "Elemental Ruin",
+      "ids": [
+        3963062
+      ],
+      "category": "#Global",
+      "type": "debuff"
+    },
+    {
+      "name": "Elemental Torment 1-5",
+      "ids": [
+        3963193,
+        3963194,
+        3963195,
+        3963196,
+        3963198
+      ],
+      "category": "#Global",
+      "type": "debuff",
+      "stacking": true
+    },
+    {
+      "name": "Elemental Wrack",
+      "ids": [
+        3963061
+      ],
+      "category": "#Global",
+      "type": "debuff"
+    },
+    {
+      "name": "Fatality",
+      "ids": [
+        791221
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Fear Immunity",
+      "ids": [
+        3882133
+      ],
+      "category": "#Resistances",
+      "type": "buff"
+    },
+    {
+      "name": "Forced Engage (duration)",
+      "ids": [
+        4325954
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Forced Engage",
+      "ids": [
+        4487417
+      ],
+      "category": "#Resistances",
+      "type": "buff"
+    },
+    {
+      "name": "Goaded",
+      "ids": [
+        4086624
+      ],
+      "category": "#Resistances",
+      "type": "buff"
+    },
+    {
+      "name": "Ice Strike L (Slow)",
+      "ids": [
+        5077874
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Knockback Immunity",
+      "ids": [
+        4784832
+      ],
+      "category": "#Resistances",
+      "type": "buff"
+    },
+    {
+      "name": "Physical Ruin",
+      "ids": [
+        3963059,
+        4743743
+      ],
+      "category": "#Global",
+      "type": "debuff"
+    },
+    {
+      "name": "Physical Torment 1-5",
+      "ids": [
+        3963299,
+        3963300,
+        3963301,
+        3963302,
+        3963303
+      ],
+      "category": "#Global",
+      "type": "debuff",
+      "stacking": true
+    },
+    {
+      "name": "Physical Wrack",
+      "ids": [
+        3963058
+      ],
+      "category": "#Global",
+      "type": "debuff"
+    },
+    {
+      "name": "Recently Affected by Thundering Flames (Self Debuff)",
+      "ids": [
+        3514544
+      ],
+      "category": "#Resistances",
+      "type": "debuff"
+    },
+    {
+      "name": "Recently Blessed by Mitra (Self Debuff)",
+      "ids": [
+        3591149
+      ],
+      "category": "#Resistances",
+      "type": "debuff"
+    },
+    {
+      "name": "Recently Impaired",
+      "ids": [
+        4372820,
+        4372889
+      ],
+      "category": "#Resistances",
+      "type": "buff"
+    },
+    {
+      "name": "Resistant to Bewilder",
+      "ids": [
+        1126127
+      ],
+      "category": "#Resistances",
+      "type": "buff"
+    },
+    {
+      "name": "Resistant to Fangs of Set",
+      "ids": [
+        4931433
+      ],
+      "category": "#Resistances",
+      "type": "buff"
+    },
+    {
+      "name": "Resistant to Warped Dread",
+      "ids": [
+        3964324
+      ],
+      "category": "#Resistances",
+      "type": "buff"
+    },
+    {
+      "name": "Silence Immunity",
+      "ids": [
+        4079364
+      ],
+      "category": "#Resistances",
+      "type": "buff"
+    },
+    {
+      "name": "Spiritual Ruin",
+      "ids": [
+        3963070
+      ],
+      "category": "#Global",
+      "type": "debuff"
+    },
+    {
+      "name": "Spiritual Torment 1-5",
+      "ids": [
+        3963268,
+        3963269,
+        3963270,
+        3963271,
+        3963272
+      ],
+      "category": "#Global",
+      "type": "debuff",
+      "stacking": true
+    },
+    {
+      "name": "Spiritual Wrack",
+      "ids": [
+        3963068,
+        4882958
+      ],
+      "category": "#Global",
+      "type": "debuff"
+    },
+    {
+      "name": "Stagger Immunity",
+      "ids": [
+        4742630
+      ],
+      "category": "#Resistances",
+      "type": "buff"
+    },
+    {
+      "name": "Staggered (Slow)",
+      "ids": [
+        783747
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Stun Immunity",
+      "ids": [
+        3882135
+      ],
+      "category": "#Resistances",
+      "type": "buff"
+    },
+    {
+      "name": "Double Tap (Stun)",
+      "ids": [
+        3130398
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Yellow Lotus (Stun)",
+      "ids": [
+        4478385
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Atrophy",
+      "ids": [
+        3076662
+      ],
+      "category": "Assassin",
+      "type": "debuff"
+    },
+    {
+      "name": "Avatar of Death",
+      "ids": [
+        3105441
+      ],
+      "category": "Assassin",
+      "type": "buff"
+    },
+    {
+      "name": "Cat's Paw",
+      "ids": [
+        3077701
+      ],
+      "category": "Assassin",
+      "type": "buff"
+    },
+    {
+      "name": "Choking Powder (Silence)",
+      "ids": [
+        4277186
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Cover of Dusk (Sin)",
+      "ids": [
+        4484855
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Curse of the Lotus (Fear)",
+      "ids": [
+        3784874
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Death's Gaze (Fear)",
+      "ids": [
+        3675546
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Dread Venom",
+      "ids": [
+        3744190
+      ],
+      "category": "Assassin",
+      "type": "debuff"
+    },
+    {
+      "name": "Dull Pain",
+      "ids": [
+        4350674
+      ],
+      "category": "Assassin",
+      "type": "buff"
+    },
+    {
+      "name": "Lethargy",
+      "ids": [
+        3146985,
+        149055,
+        149056,
+        4486950
+      ],
+      "category": "Assassin",
+      "type": "debuff"
+    },
+    {
+      "name": "Lotus Overdose",
+      "ids": [
+        3105515
+      ],
+      "category": "Assassin",
+      "type": "buff"
+    },
+    {
+      "name": "Lotus Overload",
+      "ids": [
+        3761363
+      ],
+      "category": "Assassin",
+      "type": "buff"
+    },
+    {
+      "name": "Lotus Toxin: Grim Essence (Fizzle)",
+      "ids": [
+        4350347
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Opportunistic Strike (Stun)",
+      "ids": [
+        3078446
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Soul Toxin: Venom Spike (Stun)",
+      "ids": [
+        4350334
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Vampyric Nature (Stun)",
+      "ids": [
+        4351401
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Vivacity",
+      "ids": [
+        5017554
+      ],
+      "category": "Assassin",
+      "type": "buff"
+    },
+    {
+      "name": "Armageddon Falls",
+      "ids": [
+        1095413
+      ],
+      "category": "Barbarian",
+      "type": "debuff"
+    },
+    {
+      "name": "Earth Shatter (Stun)",
+      "ids": [
+        1092543
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Rampaging Horde 1-10",
+      "ids": [
+        1093969,
+        1093970,
+        1093971,
+        1093972,
+        1093973,
+        1093974,
+        1093975,
+        1093976,
+        1093977,
+        1093978
+      ],
+      "category": "Barbarian",
+      "type": "buff",
+      "stacking": true,
+      "stackEnd": 10
+    },
+    {
+      "name": "Reaver 1-15",
+      "ids": [
+        1093355,
+        1093356,
+        1093357,
+        4086380,
+        4086381,
+        4086382,
+        4086383,
+        4086384,
+        4086385,
+        4086386,
+        4086387,
+        4086388,
+        4086389,
+        4086390,
+        4086391
+      ],
+      "category": "Barbarian",
+      "type": "buff",
+      "stacking": true,
+      "stackEnd": 15
+    },
+    {
+      "name": "Reverse Swing",
+      "ids": [
+        1093987
+      ],
+      "category": "Barbarian",
+      "type": "buff"
+    },
+    {
+      "name": "Stunning Punch (Stun)",
+      "ids": [
+        4501845,
+        4501847
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Thirst For Blood 1-5 (Barb)",
+      "ids": [
+        1095374,
+        1095375,
+        1095376,
+        1095377,
+        1095378
+      ],
+      "category": "#Group Buffs",
+      "type": "buff",
+      "stacking": true,
+      "stackEnd": 5
+    },
+    {
+      "name": "Bewilder (Miss)",
+      "ids": [
+        1126126
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Blood Flow",
+      "ids": [
+        154775,
+        151040
+      ],
+      "category": "#Group HoT",
+      "type": "misc"
+    },
+    {
+      "name": "Blood Warrior",
+      "ids": [
+        1112456
+      ],
+      "category": "Bear Shaman",
+      "type": "buff"
+    },
+    {
+      "name": "Booming Roar (Silence)",
+      "ids": [
+        1126244
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Fierce Aegis (Poison)",
+      "ids": [
+        5017458
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Hibernation (Self Debuff)",
+      "ids": [
+        5015761
+      ],
+      "category": "#Resistances",
+      "type": "debuff"
+    },
+    {
+      "name": "Manifestation of Spirit",
+      "ids": [
+        4188293
+      ],
+      "category": "Bear Shaman",
+      "type": "debuff"
+    },
+    {
+      "name": "Nature's Wrath 1-10",
+      "ids": [
+        1126047,
+        1126048,
+        1126049,
+        1126050,
+        1126051,
+        1126052,
+        1126053,
+        1126054,
+        1126055,
+        1126056
+      ],
+      "category": "Bear Shaman",
+      "type": "buff",
+      "stacking": true,
+      "stackStart": 10
+    },
+    {
+      "name": "Renewal",
+      "ids": [
+        143746
+      ],
+      "category": "#Group HoT",
+      "type": "misc"
+    },
+    {
+      "name": "Rune of Aggression (BS)",
+      "ids": [
+        1126136,
+        1126135
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Rune of Resilience (BS)",
+      "ids": [
+        146124,
+        146091
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Rune of Resistance (BS)",
+      "ids": [
+        146103,
+        145828
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Ursine Crush (Stun)",
+      "ids": [
+        3203620
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Ursine Brawl",
+      "ids": [
+        149410,
+        149411,
+        149412,
+        4501853
+      ],
+      "category": "Bear Shaman",
+      "type": "debuff"
+    },
+    {
+      "name": "Crushing Onslaught",
+      "ids": [
+        974157
+      ],
+      "category": "Conqueror",
+      "type": "debuff"
+    },
+    {
+      "name": "Fighting Spirit (Self Debuff)",
+      "ids": [
+        4229891
+      ],
+      "category": "#Resistances",
+      "type": "debuff"
+    },
+    {
+      "name": "Furious Inspiration 1-10",
+      "ids": [
+        299065,
+        299066,
+        299067,
+        299068,
+        299069,
+        299070,
+        299071,
+        299072,
+        299073,
+        299064
+      ],
+      "category": "Conqueror",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Heroic Call (Conq)",
+      "ids": [
+        3301829
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Overwhelm (Fear)",
+      "ids": [
+        4501889
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Throat Slash (Silence)",
+      "ids": [
+        974548
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Dooming Presence (Fear)",
+      "ids": [
+        792735
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Drain Strength",
+      "ids": [
+        792085
+      ],
+      "category": "Dark Templar",
+      "type": "debuff"
+    },
+    {
+      "name": "Hexed 1-3",
+      "ids": [
+        4079114,
+        4079112,
+        4079115
+      ],
+      "category": "Dark Templar",
+      "type": "debuff",
+      "stacking": true
+    },
+    {
+      "name": "Mind Shatter (Stun)",
+      "ids": [
+        792742
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Mind Wrack (Stun)",
+      "ids": [
+        792741
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Sadism 1-10",
+      "ids": [
+        297684,
+        297714,
+        297748,
+        297749,
+        297750,
+        297751,
+        297752,
+        297753,
+        297754,
+        297755
+      ],
+      "category": "Dark Templar",
+      "type": "buff",
+      "stacking": true,
+      "stackEnd": 10
+    },
+    {
+      "name": "Void of Madness (crit dmg)",
+      "ids": [
+        4259878
+      ],
+      "category": "Dark Templar",
+      "type": "buff"
+    },
+    {
+      "name": "Warped Dread (Miss)",
+      "ids": [
+        792739
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Demonic Renewal",
+      "ids": [
+        4047227
+      ],
+      "category": "#Group HoT",
+      "type": "misc"
+    },
+    {
+      "name": "Empowered Shock Lance 1-5",
+      "ids": [
+        3987868,
+        3987869,
+        3987870,
+        3987871,
+        3987896
+      ],
+      "category": "Demonologist",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Fiery Torment (Stun)",
+      "ids": [
+        217106
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Flame Body",
+      "ids": [
+        1142203
+      ],
+      "category": "Demonologist",
+      "type": "buff"
+    },
+    {
+      "name": "Mystic Suppression (Demo)",
+      "ids": [
+        145782,
+        145762
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Possession (Stun)",
+      "ids": [
+        1148380
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Unholy Hate (Demo)",
+      "ids": [
+        1142219
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Battle Cry (Guard)",
+      "ids": [
+        872832
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Brutal Destroyer",
+      "ids": [
+        4715685
+      ],
+      "category": "Guardian",
+      "type": "buff"
+    },
+    {
+      "name": "Call to Arms (Guard)",
+      "ids": [
+        4720807,
+        872995
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Evaded",
+      "ids": [
+        3476105
+      ],
+      "category": "Guardian",
+      "type": "buff"
+    },
+    {
+      "name": "Guard",
+      "ids": [
+        3115350,
+        151407,
+        151408,
+        151413,
+        151436,
+        4299694
+      ],
+      "category": "Guardian",
+      "type": "buff"
+    },
+    {
+      "name": "Guarded",
+      "ids": [
+        4715190,
+        4715196,
+        3768020
+      ],
+      "category": "Guardian",
+      "type": "buff"
+    },
+    {
+      "name": "Overwhelming Shout (Fear)",
+      "ids": [
+        3487052
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Strike and Guard",
+      "ids": [
+        872966
+      ],
+      "category": "Guardian",
+      "type": "buff"
+    },
+    {
+      "name": "Shield Strike (Stun)",
+      "ids": [
+        3203611
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Vengeance 1-3",
+      "ids": [
+        3221320,
+        3221321,
+        3221323
+      ],
+      "category": "Guardian",
+      "type": "debuff",
+      "stacking": true
+    },
+    {
+      "name": "Vengeance 1-10",
+      "ids": [
+        299050,
+        299052,
+        299053,
+        299054,
+        299055,
+        299056,
+        299057,
+        299058,
+        299059,
+        299051
+      ],
+      "category": "Guardian",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Arcane Abatement (HoX)",
+      "ids": [
+        145790,
+        145771
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Dread Visage (Fear)",
+      "ids": [
+        196430
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Enslaving Fire (Stun)",
+      "ids": [
+        4478650
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Flame Lash 1-10",
+      "ids": [
+        3198201,
+        3198210,
+        3198214,
+        3198218,
+        3198391,
+        3198396,
+        3198442,
+        3198445,
+        3198463,
+        3198467
+      ],
+      "category": "Herald of Xotli",
+      "type": "buff",
+      "stacking": true,
+      "stackEnd": 10
+    },
+    {
+      "name": "Flame Tongue 1-5",
+      "ids": [
+        3202230,
+        3202248,
+        3202265,
+        3202266,
+        3202269
+      ],
+      "category": "Herald of Xotli",
+      "type": "buff",
+      "stacking": true,
+      "stackEnd": 5
+    },
+    {
+      "name": "Inferno Curse",
+      "ids": [
+        3975588
+      ],
+      "category": "Herald of Xotli",
+      "type": "debuff"
+    },
+    {
+      "name": "Hox Morphs (Stun)",
+      "ids": [
+        5015832
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Death's Terror (Fear)",
+      "ids": [
+        3763216
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Exploit",
+      "ids": [
+        5015893
+      ],
+      "category": "#Group HoT",
+      "type": "misc"
+    },
+    {
+      "name": "Freeze (Stun)",
+      "ids": [
+        223248,
+        223236
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Gangrenous Stench",
+      "ids": [
+        221069
+      ],
+      "category": "Necromancer",
+      "type": "debuff"
+    },
+    {
+      "name": "Ghoulish Feast (Necro)",
+      "ids": [
+        222635,
+        222638
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Mark of the Devourer",
+      "ids": [
+        3725940
+      ],
+      "category": "Necromancer",
+      "type": "buff"
+    },
+    {
+      "name": "Quell the Ether (Necro)",
+      "ids": [
+        145626,
+        145778
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Unimaginable Terror (Fear)",
+      "ids": [
+        223496
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Withered Soul",
+      "ids": [
+        1374890
+      ],
+      "category": "Necromancer",
+      "type": "buff"
+    },
+    {
+      "name": "Avatar of Mitra (Stun)",
+      "ids": [
+        3766763
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Avert Thine Eyes",
+      "ids": [
+        4892128
+      ],
+      "category": "Priest of Mitra",
+      "type": "debuff"
+    },
+    {
+      "name": "Condemn (Stun)",
+      "ids": [
+        198398
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Emanation of Life",
+      "ids": [
+        144105
+      ],
+      "category": "#Group HoT",
+      "type": "misc"
+    },
+    {
+      "name": "Eye of Judgment (Fear)",
+      "ids": [
+        198387
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Holy Cleansing (PoM)",
+      "ids": [
+        3202863
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Holy Storm",
+      "ids": [
+        4107296,
+        4792155
+      ],
+      "category": "Priest of Mitra",
+      "type": "buff"
+    },
+    {
+      "name": "Radiant Aegis (Unholy)",
+      "ids": [
+        5017456
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Radiant Glow (Self Debuff)",
+      "ids": [
+        5015755
+      ],
+      "category": "#Resistances",
+      "type": "debuff"
+    },
+    {
+      "name": "Sacred Smite",
+      "ids": [
+        4119586
+      ],
+      "category": "Priest of Mitra",
+      "type": "buff"
+    },
+    {
+      "name": "Wave of Life",
+      "ids": [
+        154750,
+        150672
+      ],
+      "category": "#Group HoT",
+      "type": "misc"
+    },
+    {
+      "name": "Concussive Blast (Stun)",
+      "ids": [
+        3964868
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Crippling Snipe",
+      "ids": [
+        3238327
+      ],
+      "category": "Ranger",
+      "type": "debuff"
+    },
+    {
+      "name": "Evasive Action",
+      "ids": [
+        3513707
+      ],
+      "category": "Ranger",
+      "type": "buff"
+    },
+    {
+      "name": "Hunting Hawk (Silence)",
+      "ids": [
+        4268126
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Immolation (Fear)",
+      "ids": [
+        3499109
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Incendiary Shot (Fear)",
+      "ids": [
+        4646965
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Jarring Shot (Stun)",
+      "ids": [
+        4486969
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Marked Target",
+      "ids": [
+        3182089
+      ],
+      "category": "Ranger",
+      "type": "debuff"
+    },
+    {
+      "name": "Marked Target 1-5 (Ranger)",
+      "ids": [
+        3181396,
+        3181401,
+        3181406,
+        3181411,
+        3181417
+      ],
+      "category": "#Group Buffs",
+      "type": "buff",
+      "stacking": true,
+      "stackEnd": 5
+    },
+    {
+      "name": "Marked for Death",
+      "ids": [
+        3181435
+      ],
+      "category": "Ranger",
+      "type": "buff"
+    },
+    {
+      "name": "Master Trapper",
+      "ids": [
+        4650088
+      ],
+      "category": "Ranger",
+      "type": "buff"
+    },
+    {
+      "name": "Mezz Shot (Stun)",
+      "ids": [
+        3499696
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Cobra Stare (Stun)",
+      "ids": [
+        3075406,
+        4309868
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Curse of Set",
+      "ids": [
+        206025,
+        206026,
+        4309702
+      ],
+      "category": "Tempest of Set",
+      "type": "debuff"
+    },
+    {
+      "name": "Damnation of Set (ToS)",
+      "ids": [
+        146099,
+        145802
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Energized Soul (Self Debuff)",
+      "ids": [
+        5015762
+      ],
+      "category": "#Resistances",
+      "type": "debuff"
+    },
+    {
+      "name": "Fangs of Set (Miss)",
+      "ids": [
+        4927248
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Force of Lightning (ToS)",
+      "ids": [
+        4053112,
+        3105976
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Glorification of Set (ToS)",
+      "ids": [
+        146122,
+        146089
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Healing Lotus",
+      "ids": [
+        143948
+      ],
+      "category": "#Group HoT",
+      "type": "misc"
+    },
+    {
+      "name": "Life of Set",
+      "ids": [
+        154770,
+        151030
+      ],
+      "category": "#Group HoT",
+      "type": "misc"
+    },
+    {
+      "name": "Puppets of Set (Fear)",
+      "ids": [
+        4050865
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Spark Storm",
+      "ids": [
+        4054297
+      ],
+      "category": "Tempest of Set",
+      "type": "buff"
+    },
+    {
+      "name": "Storm Field",
+      "ids": [
+        3494054,
+        205691,
+        205693,
+        4487670
+      ],
+      "category": "Tempest of Set",
+      "type": "buff"
+    },
+    {
+      "name": "Thundering Voice (Silence)",
+      "ids": [
+        4924367
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Rampaging Horde (Barb)",
+      "ids": [
+        4106958
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Liberation",
+      "ids": [
+        4330152
+      ],
+      "category": "#Global",
+      "type": "buff"
+    },
+    {
+      "name": "Thirst For Blood 1-6 (Barb)",
+      "ids": [
+        1095379,
+        1095380,
+        1095381,
+        1095382,
+        1095383,
+        1095384
+      ],
+      "category": "#Group Buffs",
+      "type": "buff",
+      "stacking": true,
+      "stackEnd": 6
+    },
+    {
+      "name": "Blood Rage 1-15",
+      "ids": [
+        1093375,
+        1093379,
+        1093380,
+        4087095,
+        4087130,
+        4087161,
+        4087162,
+        4087163,
+        4087164,
+        4087165,
+        4087166,
+        4087167,
+        4087168,
+        4087169,
+        4087170
+      ],
+      "category": "Barbarian",
+      "type": "buff",
+      "stacking": true,
+      "stackEnd": 15
+    },
+    {
+      "name": "Finishing Blow",
+      "ids": [
+        1144605
+      ],
+      "category": "Barbarian",
+      "type": "buff"
+    },
+    {
+      "name": "Welcoming Death",
+      "ids": [
+        4104362
+      ],
+      "category": "Barbarian",
+      "type": "buff"
+    },
+    {
+      "name": "Unstoppable",
+      "ids": [
+        3539351
+      ],
+      "category": "Barbarian",
+      "type": "buff"
+    },
+    {
+      "name": "Decapitation",
+      "ids": [
+        1092541
+      ],
+      "category": "Barbarian",
+      "type": "buff"
+    },
+    {
+      "name": "Too Many to Count 1-10",
+      "ids": [
+        1093560,
+        1093561,
+        1093562,
+        1093563,
+        1093564,
+        1093565,
+        1093566,
+        1093567,
+        1093568,
+        1093569
+      ],
+      "category": "Barbarian",
+      "type": "buff",
+      "stacking": true,
+      "stackEnd": 10
+    },
+    {
+      "name": "Vision of the Sky (BS)",
+      "ids": [
+        4240082
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Nature's Revenge 1-10",
+      "ids": [
+        1126099,
+        1126100,
+        1126101,
+        1126102,
+        1126103,
+        1126104,
+        1126105,
+        1126106,
+        1126107,
+        4940353
+      ],
+      "category": "Bear Shaman",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Rune of Grounding",
+      "ids": [
+        3667218
+      ],
+      "category": "Bear Shaman",
+      "type": "buff"
+    },
+    {
+      "name": "Desert Bloom",
+      "ids": [
+        4188298
+      ],
+      "category": "Bear Shaman",
+      "type": "buff"
+    },
+    {
+      "name": "Savage Fury (Barb)",
+      "ids": [
+        1093577,
+        1093579
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Prince of Terror",
+      "ids": [
+        4281690
+      ],
+      "category": "Herald of Xotli",
+      "type": "buff"
+    },
+    {
+      "name": "Demon Maw",
+      "ids": [
+        195093
+      ],
+      "category": "Herald of Xotli",
+      "type": "buff"
+    },
+    {
+      "name": "Xotli's Vengeance 1-5",
+      "ids": [
+        3202221,
+        3202222,
+        3202223,
+        3202224,
+        3202225
+      ],
+      "category": "Herald of Xotli",
+      "type": "buff",
+      "stacking": true,
+      "stackEnd": 5
+    },
+    {
+      "name": "Desecrating Essence",
+      "ids": [
+        146273
+      ],
+      "category": "Herald of Xotli",
+      "type": "buff"
+    },
+    {
+      "name": "Avatar of Xotli",
+      "ids": [
+        3203604
+      ],
+      "category": "Herald of Xotli",
+      "type": "buff"
+    },
+    {
+      "name": "Subtle Illusion",
+      "ids": [
+        4489251
+      ],
+      "category": "#Global",
+      "type": "buff"
+    },
+    {
+      "name": "Phoenix Cloak",
+      "ids": [
+        195143
+      ],
+      "category": "Herald of Xotli",
+      "type": "buff"
+    },
+    {
+      "name": "Exultation of Xotli",
+      "ids": [
+        195151
+      ],
+      "category": "Herald of Xotli",
+      "type": "buff"
+    },
+    {
+      "name": "Grey Lotus",
+      "ids": [
+        4478386
+      ],
+      "category": "#Global",
+      "type": "buff"
+    },
+    {
+      "name": "No Escape (Stun)",
+      "ids": [
+        1093979
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Overwhelming Shout (Stun)",
+      "ids": [
+        3487056
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Stunning Charge (Stun)",
+      "ids": [
+        872844
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Guard of Dancing Steel",
+      "ids": [
+        565495,
+        565496,
+        565498,
+        565499,
+        4307907
+      ],
+      "category": "Conqueror",
+      "type": "buff"
+    },
+    {
+      "name": "Whirlwind 1-5",
+      "ids": [
+        4206920,
+        4206921,
+        4206922,
+        4206923,
+        4206924
+      ],
+      "category": "Conqueror",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Retaliation",
+      "ids": [
+        4037972
+      ],
+      "category": "Conqueror",
+      "type": "buff"
+    },
+    {
+      "name": "Burst of Aggression",
+      "ids": [
+        974283
+      ],
+      "category": "Conqueror",
+      "type": "buff"
+    },
+    {
+      "name": "Volcanic Rage",
+      "ids": [
+        3192066
+      ],
+      "category": "#Global",
+      "type": "buff"
+    },
+    {
+      "name": "Hateful Strikes",
+      "ids": [
+        1136634
+      ],
+      "category": "#Global",
+      "type": "buff"
+    },
+    {
+      "name": "Overcome the Odds",
+      "ids": [
+        974216
+      ],
+      "category": "Conqueror",
+      "type": "buff"
+    },
+    {
+      "name": "Blessed Conquest",
+      "ids": [
+        974759
+      ],
+      "category": "Conqueror",
+      "type": "buff"
+    },
+    {
+      "name": "Seal of Chaos 1-4",
+      "ids": [
+        3984064,
+        3984065,
+        3984066,
+        3984067
+      ],
+      "category": "Dark Templar",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Hex Marked Soul",
+      "ids": [
+        4204200
+      ],
+      "category": "Dark Templar",
+      "type": "buff"
+    },
+    {
+      "name": "Blood Seal 1-20",
+      "ids": [
+        4190531,
+        4190532,
+        4190534,
+        4190535,
+        4190537,
+        4190538,
+        4190540,
+        4190541,
+        4190542,
+        4190544,
+        4190545,
+        4190547,
+        4190548,
+        4190549,
+        4190550,
+        4190551,
+        4190552,
+        4190553,
+        4190555,
+        4190556
+      ],
+      "category": "Dark Templar",
+      "type": "buff",
+      "stacking": true,
+      "stackEnd": 20
+    },
+    {
+      "name": "Arcane Seal 1-10",
+      "ids": [
+        4190215,
+        4190217,
+        4190218,
+        4190219,
+        4190220,
+        4190221,
+        4190222,
+        4190224,
+        4190225,
+        4190226
+      ],
+      "category": "Dark Templar",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Invulnerable Soul 1-5",
+      "ids": [
+        4190203,
+        4190204,
+        4190205,
+        4190206,
+        4190207
+      ],
+      "category": "Dark Templar",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Sacrificial Fury",
+      "ids": [
+        792543
+      ],
+      "category": "Dark Templar",
+      "type": "buff"
+    },
+    {
+      "name": "Shadowed Soul",
+      "ids": [
+        4204219
+      ],
+      "category": "Dark Templar",
+      "type": "buff"
+    },
+    {
+      "name": "Leech Life",
+      "ids": [
+        3115393,
+        150369,
+        150371,
+        150373,
+        150376,
+        150378
+      ],
+      "category": "Dark Templar",
+      "type": "buff"
+    },
+    {
+      "name": "A Soul for our Feast (DT)",
+      "ids": [
+        3115474,
+        150360,
+        150362,
+        150364,
+        4501841
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Furious Strikes",
+      "ids": [
+        4232852
+      ],
+      "category": "Conqueror",
+      "type": "buff"
+    },
+    {
+      "name": "At Death's Door",
+      "ids": [
+        4230433
+      ],
+      "category": "Conqueror",
+      "type": "buff"
+    },
+    {
+      "name": "Assail 1-5",
+      "ids": [
+        4266138,
+        4266139,
+        4266664,
+        4599662,
+        4599663
+      ],
+      "category": "Conqueror",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Ice Cloak L (Slow)",
+      "ids": [
+        5077889
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Ice Storm L (Slow)",
+      "ids": [
+        5077955
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Excellent Balance",
+      "ids": [
+        3227091
+      ],
+      "category": "#Global",
+      "type": "buff"
+    },
+    {
+      "name": "Stone Hide",
+      "ids": [
+        1126207
+      ],
+      "category": "Bear Shaman",
+      "type": "buff"
+    },
+    {
+      "name": "Iron Hide",
+      "ids": [
+        1126208
+      ],
+      "category": "Bear Shaman",
+      "type": "buff"
+    },
+    {
+      "name": "Hand of Mitra",
+      "ids": [
+        146402
+      ],
+      "category": "Priest of Mitra",
+      "type": "buff"
+    },
+    {
+      "name": "Litany of Protection (PoM)",
+      "ids": [
+        4922964,
+        4245371
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Spiritual Feedback 1-5",
+      "ids": [
+        3197968,
+        3197969,
+        3197970,
+        3197971,
+        3197972
+      ],
+      "category": "Priest of Mitra",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Holy Vengeance 1-5",
+      "ids": [
+        3663640,
+        3663636,
+        3663637,
+        3663639,
+        3663638
+      ],
+      "category": "Priest of Mitra",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Divine Blessing 1-5",
+      "ids": [
+        3975725,
+        3975726,
+        3975727,
+        3975728,
+        3975729
+      ],
+      "category": "Priest of Mitra",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Ice Storm E (Slow)",
+      "ids": [
+        5077953
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Chains of Anguish",
+      "ids": [
+        4061745
+      ],
+      "category": "Herald of Xotli",
+      "type": "debuff"
+    },
+    {
+      "name": "Molten Flesh",
+      "ids": [
+        3202576
+      ],
+      "category": "Herald of Xotli",
+      "type": "buff"
+    },
+    {
+      "name": "Tome of Erlik",
+      "ids": [
+        1173273
+      ],
+      "category": "#Global",
+      "type": "buff"
+    },
+    {
+      "name": "Snare Immunity",
+      "ids": [
+        3882154
+      ],
+      "category": "#Resistances",
+      "type": "buff"
+    },
+    {
+      "name": "Root Immunity",
+      "ids": [
+        3882140
+      ],
+      "category": "#Resistances",
+      "type": "buff"
+    },
+    {
+      "name": "Tome of Epithur",
+      "ids": [
+        222609
+      ],
+      "category": "Necromancer",
+      "type": "buff"
+    },
+    {
+      "name": "SW Arcane Renewal",
+      "ids": [
+        3762921
+      ],
+      "category": "#Global",
+      "type": "buff"
+    },
+    {
+      "name": "SW Arcane Surge",
+      "ids": [
+        3762648
+      ],
+      "category": "#Global",
+      "type": "buff"
+    },
+    {
+      "name": "SW Parasite Host",
+      "ids": [
+        3663577
+      ],
+      "category": "Necromancer",
+      "type": "buff"
+    },
+    {
+      "name": "SW Death God",
+      "ids": [
+        3762722
+      ],
+      "category": "Necromancer",
+      "type": "buff"
+    },
+    {
+      "name": "SW Benevolence of Mitra",
+      "ids": [
+        3763853
+      ],
+      "category": "Priest of Mitra",
+      "type": "buff"
+    },
+    {
+      "name": "SW Mitra's Thunder",
+      "ids": [
+        3763855
+      ],
+      "category": "Priest of Mitra",
+      "type": "buff"
+    },
+    {
+      "name": "SW Mitra's Grace",
+      "ids": [
+        3763852
+      ],
+      "category": "Priest of Mitra",
+      "type": "buff"
+    },
+    {
+      "name": "Idol of Dark Rejuvenation 1-4",
+      "ids": [
+        4616092,
+        4616095,
+        4616094,
+        4616096
+      ],
+      "category": "Tempest of Set",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Thunderhead",
+      "ids": [
+        205687
+      ],
+      "category": "Tempest of Set",
+      "type": "buff"
+    },
+    {
+      "name": "Symbiotic Idol of Set 1-5",
+      "ids": [
+        3776175,
+        3776176,
+        3776177,
+        3776178,
+        3776179
+      ],
+      "category": "Tempest of Set",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Power of the Serpent Ring",
+      "ids": [
+        3074485
+      ],
+      "category": "Tempest of Set",
+      "type": "buff"
+    },
+    {
+      "name": "Serpent Transmutation",
+      "ids": [
+        3074186
+      ],
+      "category": "Tempest of Set",
+      "type": "buff"
+    },
+    {
+      "name": "Storm Crown",
+      "ids": [
+        3074473
+      ],
+      "category": "Tempest of Set",
+      "type": "buff"
+    },
+    {
+      "name": "Storm Blood",
+      "ids": [
+        3074161
+      ],
+      "category": "Tempest of Set",
+      "type": "buff"
+    },
+    {
+      "name": "Quicksand (Root)",
+      "ids": [
+        3494035,
+        3147779,
+        206040,
+        206041,
+        206042,
+        206043
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "SW Set's Rebuke",
+      "ids": [
+        3764133
+      ],
+      "category": "Tempest of Set",
+      "type": "buff"
+    },
+    {
+      "name": "SW Power Surge",
+      "ids": [
+        3764495
+      ],
+      "category": "Tempest of Set",
+      "type": "buff"
+    },
+    {
+      "name": "From the Darkness (Root)",
+      "ids": [
+        4349387
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Word of Command (Root)",
+      "ids": [
+        3203789
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Frost Blast (Root)",
+      "ids": [
+        1282531,
+        223463,
+        223464,
+        223465,
+        223466
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Unholy Hands (Root)",
+      "ids": [
+        3055164
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Spirit of Yggdrasil (BS)",
+      "ids": [
+        4239993
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Martyrdom",
+      "ids": [
+        143626
+      ],
+      "category": "#Group HoT",
+      "type": "misc"
+    },
+    {
+      "name": "Growing Storm 1-4",
+      "ids": [
+        3105662,
+        3084576,
+        3105656,
+        3105661
+      ],
+      "category": "Tempest of Set",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Stall the Advance 1-3",
+      "ids": [
+        4239176,
+        4239175,
+        4239174
+      ],
+      "category": "Guardian",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Wrath 1-20",
+      "ids": [
+        3209153,
+        3209154,
+        3209155,
+        3209156,
+        3209157,
+        3209158,
+        3209159,
+        3209160,
+        3209161,
+        3209162,
+        3209163,
+        3209164,
+        3209165,
+        3209171,
+        3209172,
+        3209173,
+        3209174,
+        3209175,
+        3209176,
+        3209182
+      ],
+      "category": "Guardian",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Counterstrike",
+      "ids": [
+        3115141,
+        228821,
+        228819,
+        228820,
+        4299690
+      ],
+      "category": "Guardian",
+      "type": "buff"
+    },
+    {
+      "name": "Reckoning",
+      "ids": [
+        4059492
+      ],
+      "category": "Guardian",
+      "type": "buff"
+    },
+    {
+      "name": "Champion Spirit 1-4",
+      "ids": [
+        4609487,
+        4609489,
+        4609491,
+        4609488
+      ],
+      "category": "Guardian",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Powerhouse",
+      "ids": [
+        3690381
+      ],
+      "category": "Guardian",
+      "type": "buff"
+    },
+    {
+      "name": "Juggernaut",
+      "ids": [
+        872822
+      ],
+      "category": "Guardian",
+      "type": "buff"
+    },
+    {
+      "name": "The Last Stand",
+      "ids": [
+        872865
+      ],
+      "category": "Guardian",
+      "type": "buff"
+    },
+    {
+      "name": "Exhilarating Martyrdom (DT)",
+      "ids": [
+        792484
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Lumbering Hulk",
+      "ids": [
+        974246
+      ],
+      "category": "Conqueror",
+      "type": "buff"
+    },
+    {
+      "name": "Emissary of Elysium (PoM)",
+      "ids": [
+        4244612
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Eyes of Set (ToS)",
+      "ids": [
+        4471707
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Storm Charge (ToS)",
+      "ids": [
+        3105981
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Blood Mana (ToS)",
+      "ids": [
+        4053117
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Demonic Anger (Demo)",
+      "ids": [
+        1136440
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Pollen Cloud (Imp)",
+      "ids": [
+        4680545
+      ],
+      "category": "#T4",
+      "type": "debuff"
+    },
+    {
+      "name": "Flashing Defense",
+      "ids": [
+        4208084
+      ],
+      "category": "Conqueror",
+      "type": "buff"
+    },
+    {
+      "name": "Planar Shift",
+      "ids": [
+        217733
+      ],
+      "category": "Demonologist",
+      "type": "buff"
+    },
+    {
+      "name": "Gate of Hell (Root)",
+      "ids": [
+        1148639
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Storm Chains (Root)",
+      "ids": [
+        217114
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Archfiend's Pact",
+      "ids": [
+        216054
+      ],
+      "category": "Demonologist",
+      "type": "buff"
+    },
+    {
+      "name": "Bloody Pact with Set",
+      "ids": [
+        145313
+      ],
+      "category": "Demonologist",
+      "type": "buff"
+    },
+    {
+      "name": "Pact with Set",
+      "ids": [
+        145303
+      ],
+      "category": "Demonologist",
+      "type": "buff"
+    },
+    {
+      "name": "Pact of Dread 1-5",
+      "ids": [
+        3774177,
+        3774176,
+        3774175,
+        3774174,
+        3774173
+      ],
+      "category": "Demonologist",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Quickening",
+      "ids": [
+        4472903
+      ],
+      "category": "Demonologist",
+      "type": "buff"
+    },
+    {
+      "name": "Amassed Flames 1-5",
+      "ids": [
+        1136245,
+        1136248,
+        1136250,
+        1136251,
+        1136252
+      ],
+      "category": "Demonologist",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Incinerate 1-5",
+      "ids": [
+        1148647,
+        1148648,
+        1148649,
+        1148650,
+        1148651
+      ],
+      "category": "Demonologist",
+      "type": "debuff",
+      "stacking": true
+    },
+    {
+      "name": "Leghold Trap (Root)",
+      "ids": [
+        4717943
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Cripple (Root)",
+      "ids": [
+        710440,
+        710441
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Vitalizing Aegis (Fire)",
+      "ids": [
+        5017457
+      ],
+      "category": "#Group Buffs",
+      "type": "buff"
+    },
+    {
+      "name": "Heart of Fire 1-4 (Vistrix)",
+      "ids": [
+        5016774,
+        5016775,
+        5016776,
+        5016777
+      ],
+      "category": "#T5",
+      "type": "debuff",
+      "stacking": true
+    },
+    {
+      "name": "Cleave of the Northern Wastes (Kyllikki)",
+      "ids": [
+        5014929
+      ],
+      "category": "#T5",
+      "type": "buff"
+    },
+    {
+      "name": "Blades of the Dark Sun (Kyllikki)",
+      "ids": [
+        5014930
+      ],
+      "category": "#T5",
+      "type": "buff"
+    },
+    {
+      "name": "Fury of the Sleeping Stars (Kyllikki)",
+      "ids": [
+        5014931
+      ],
+      "category": "#T5",
+      "type": "buff"
+    },
+    {
+      "name": "Wail of Madness (Cetriss)",
+      "ids": [
+        5052584
+      ],
+      "category": "#T6",
+      "type": "misc"
+    },
+    {
+      "name": "Recently healed by Shimmering Invocation (Self Debuff)",
+      "ids": [
+        4383426
+      ],
+      "category": "#Resistances",
+      "type": "debuff"
+    },
+    {
+      "name": "Blessing of the Pure (PoM)",
+      "ids": [
+        4245897,
+        4245898,
+        4245899,
+        4245900,
+        4245901,
+        4245902,
+        4245903,
+        4245904,
+        4245905,
+        4245906
+      ],
+      "category": "#Group Buffs",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Flurry of Blows",
+      "ids": [
+        3085809
+      ],
+      "category": "Assassin",
+      "type": "buff"
+    },
+    {
+      "name": "Kidney Shots 1-5",
+      "ids": [
+        3094558,
+        3094555,
+        3094556,
+        3094559,
+        3094560
+      ],
+      "category": "Assassin",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Dance of Death",
+      "ids": [
+        4485334
+      ],
+      "category": "Assassin",
+      "type": "debuff"
+    },
+    {
+      "name": "Consume (HathorKa)",
+      "ids": [
+        4206340
+      ],
+      "category": "#T3",
+      "type": "buff"
+    },
+    {
+      "name": "Blood Draw (Arbanus)",
+      "ids": [
+        4261544
+      ],
+      "category": "#T3",
+      "type": "debuff"
+    },
+    {
+      "name": "Grim Bane (Arbanus)",
+      "ids": [
+        4189297
+      ],
+      "category": "#T3",
+      "type": "debuff"
+    },
+    {
+      "name": "Tartaros Vapors (Vistrix)",
+      "ids": [
+        5016792
+      ],
+      "category": "#T5",
+      "type": "debuff"
+    },
+    {
+      "name": "Frostbite (Honorguard)",
+      "ids": [
+        5014715
+      ],
+      "category": "#T5",
+      "type": "debuff"
+    },
+    {
+      "name": "Rage Implosion (Honorguard)",
+      "ids": [
+        5014799
+      ],
+      "category": "#T5",
+      "type": "debuff"
+    },
+    {
+      "name": "Focus of the Sadist (Honorguard)",
+      "ids": [
+        5014791
+      ],
+      "category": "#T5",
+      "type": "debuff"
+    },
+    {
+      "name": "Endless Winter 1-3 (Honorguard)",
+      "ids": [
+        5014753,
+        5014754,
+        5014755
+      ],
+      "category": "#T5",
+      "type": "debuff",
+      "stacking": true
+    },
+    {
+      "name": "Sickness (Zodiac)",
+      "ids": [
+        4704427
+      ],
+      "category": "#T4",
+      "type": "debuff"
+    },
+    {
+      "name": "Withering (Zodiac)",
+      "ids": [
+        4704872
+      ],
+      "category": "#T4",
+      "type": "debuff"
+    },
+    {
+      "name": "Mortal Affliction (Emperor)",
+      "ids": [
+        4701862
+      ],
+      "category": "#T4",
+      "type": "debuff"
+    },
+    {
+      "name": "Aflame Cleanse (Sheng)",
+      "ids": [
+        4414104
+      ],
+      "category": "#T4",
+      "type": "misc"
+    },
+    {
+      "name": "Targetted Strikes (Sheng)",
+      "ids": [
+        4357818
+      ],
+      "category": "#T4",
+      "type": "debuff"
+    },
+    {
+      "name": "Acid Bite (Basilisk)",
+      "ids": [
+        4383121
+      ],
+      "category": "#T4",
+      "type": "debuff"
+    },
+    {
+      "name": "Wail of Chaos (Cetriss)",
+      "ids": [
+        5052580
+      ],
+      "category": "#T6",
+      "type": "misc"
+    },
+    {
+      "name": "Zaal's Wrack (Zaal)",
+      "ids": [
+        4836737
+      ],
+      "category": "#T3.5",
+      "type": "debuff"
+    },
+    {
+      "name": "Watchful Eye of Yun  (LuZhi)",
+      "ids": [
+        4857536
+      ],
+      "category": "#T4",
+      "type": "debuff"
+    }
+  ]
+}

@@ -1,13 +1,19 @@
-# Kaz Grids
+# KazBars
+
+[![CI](https://github.com/kazour/Kazbars/actions/workflows/ci.yml/badge.svg)](https://github.com/kazour/Kazbars/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/kazour/Kazbars?label=release)](https://github.com/kazour/Kazbars/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Buff/debuff grid overlay editor for **Age of Conan**. Design icon grids that show your active effects on top of the game, then compile and install them in one click.
 
+> **Renamed from Kaz Grids.** The community has always called this mod "KazBars". As of v2.0, the project takes that name back. Existing users can install KazBars over their old Kaz Grids without uninstalling first — the build pipeline auto-cleans the old `KazGrids.swf`, `Aoc/KzGrids/`, and `# KzGrids auto-load` markers, and `SettingsManager` migrates `kzgrids_settings.json` → `kazbars_settings.json` on first launch. Old preferences and game folder configuration carry over.
+
 ## Install
 
-1. Download `Kaz Grids.zip` from the [latest release](../../releases/latest) and extract it anywhere.
-2. Run `Kaz Grids.exe`.
+1. Download `KazBars.zip` from the [latest release](../../releases/latest) and extract it anywhere.
+2. Run `KazBars.exe`.
 
-> **SmartScreen warning**: Windows may flag the `.exe` as unrecognized on first launch. Click **More info** → **Run anyway**. Kaz Grids is unsigned because code signing certificates aren't justified for a hobby project.
+> **SmartScreen warning**: Windows may flag the `.exe` as unrecognized on first launch. Click **More info** → **Run anyway**. KazBars is unsigned because code signing certificates aren't justified for a hobby project.
 
 ## Quick start
 
@@ -27,6 +33,7 @@ Up to **64 slots total** across all your grids.
 - **Stacking** — show stack counts over icons for multi-stack effects
 - **Timers and flash warnings** — optional remaining-duration text and pulse-on-low-time
 - **Ethram-Fal Seed Timer** — always-on-top overlay for the Viscous Seed / Lotus Fixation / Syphon cycle
+- **Default Buff Bars editor** — edit the in-game HUD `<BuffListView />` widgets (icon size, spacing, columns, friendly/hostile filter) without hand-editing XML
 
 ## Requirements
 
@@ -34,7 +41,59 @@ Up to **64 slots total** across all your grids.
 - Age of Conan installed
 - No Python install needed — ships as a standalone executable
 
-Kaz Grids only reads files the game writes (combat logs, UI folder). It does not read game memory or inject anything into the game process.
+KazBars only reads files the game writes (combat logs, UI folder). It does not read game memory or inject anything into the game process.
+
+## Building from source
+
+Developer setup. End users should download a release.
+
+```powershell
+# 1. Clone
+git clone https://github.com/kazour/Kazbars.git
+cd Kazbars
+
+# 2. Install (uv recommended; pip works too)
+uv sync --extra dev --extra build
+# or:  pip install -e ".[dev,build]"
+
+# 3. Run from source
+uv run python -m kazbars
+
+# 4. Tests
+uv run pytest
+
+# 5. Lint + format
+uv run ruff check src tests
+uv run ruff format src tests
+
+# 6. Build a distributable .exe
+uv run pyinstaller kazbars.spec
+# Output: dist/KazBars/KazBars.exe + bundled assets
+```
+
+The PyInstaller build is reproducible from the checked-in [`kazbars.spec`](kazbars.spec). CI builds the same artifact on every tagged release via [`.github/workflows/release.yml`](.github/workflows/release.yml).
+
+## Documentation
+
+- **[`docs/README.md`](docs/README.md)** — index of all docs with audience + refresh-cadence guide
+- **[`docs/CHANGELOG.md`](docs/CHANGELOG.md)** — release history (Keep a Changelog format)
+- **[`docs/architecture.md`](docs/architecture.md)** — module inventory, dependency clusters, conventions
+- **[`docs/flows.md`](docs/flows.md)** — runtime sequences for the main user actions
+- **[`PRODUCT.md`](PRODUCT.md)** — brand brief: register, voice, anti-references, design principles
+- **[`DESIGN.md`](DESIGN.md)** — visual system: tokens, colors, typography, component contracts
+
+The project follows a `src/` layout — entry point is `python -m kazbars`, which loads `KazBarsApp` from [`src/kazbars/app.py`](src/kazbars/app.py).
+
+## Releasing
+
+Releases are tag-driven. Bump `__version__` in [`src/kazbars/__init__.py`](src/kazbars/__init__.py), update [`docs/CHANGELOG.md`](docs/CHANGELOG.md) and [`.github/release-notes.md`](.github/release-notes.md), then:
+
+```bash
+git tag v2.0.0
+git push origin v2.0.0
+```
+
+The release workflow builds `KazBars.zip` + SHA256 checksum and publishes them as a GitHub release. See [`.github/release.md`](.github/release.md) for the full checklist.
 
 ## License
 

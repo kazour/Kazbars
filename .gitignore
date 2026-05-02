@@ -1,14 +1,23 @@
 # Python
 __pycache__/
 *.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Virtual envs
+.venv/
+venv/
 
 # PyInstaller build artifacts
 build/
 dist/
 *.spec
+!kazbars.spec
 
 # Release zip (published as a GitHub release asset, not in repo)
-Kaz Grids.zip
+KazBars.zip
 *.sha256
 
 # Internal planning docs

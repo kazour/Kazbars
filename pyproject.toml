@@ -1,0 +1,82 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kazbars"
+description = "KazBars — Standalone buff-tracking grid editor for Age of Conan"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+authors = [{ name = "Kaz" }]
+dynamic = ["version"]
+dependencies = [
+    "ttkbootstrap>=1.10",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.6",
+    "mypy>=1.10",
+    "pytest>=8.0",
+    "pre-commit>=3.7",
+]
+build = [
+    "pyinstaller>=6.0",
+]
+
+[project.scripts]
+kazbars = "kazbars.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/kazour/Kazbars"
+Issues = "https://github.com/kazour/Kazbars/issues"
+Changelog = "https://github.com/kazour/Kazbars/blob/main/docs/CHANGELOG.md"
+
+[tool.hatch.version]
+path = "src/kazbars/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kazbars"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "RUF"]
+ignore = [
+    "E501",   # line too long — let formatter handle
+    "E402",   # module-import-not-at-top — codebase convention: logger = getLogger() after imports
+    "E741",   # ambiguous variable names (l, I, O) — used as AS2 loop counters in generators
+    "B008",   # function call in default argument (common in tk callbacks)
+    "B905",   # zip-without-explicit-strict — one site, low value
+    "RUF001", # ambiguous unicode in strings — em dashes / × are intentional brand voice
+    "RUF002", # same, in docstrings
+    "RUF003", # same, in comments
+    "RUF005", # collection-literal-concatenation — 3 sites, fine as-is
+    "RUF012", # mutable-class-default — TODO: convert to ClassVar/field(default_factory=...)
+    "RUF059", # unused-unpacked-variable — one site, fine as-is
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src/kazbars"]
+ignore_missing_imports = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+pythonpath = ["src"]
+addopts = "-ra"

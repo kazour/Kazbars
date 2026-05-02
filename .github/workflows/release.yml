@@ -12,22 +12,33 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+
+      - uses: astral-sh/setup-uv@v4
         with:
-          python-version: '3.11'
-          cache: 'pip'
-      - run: pip install -r docs/requirements.txt
-      - run: python build.py
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --extra build
+
+      - name: Build
+        run: uv run pyinstaller kazbars.spec
+
+      - name: Package zip
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "dist/KazBars" -DestinationPath "KazBars.zip" -Force
+
       - name: Compute SHA256
         shell: pwsh
         run: |
-          $hash = (Get-FileHash "Kaz Grids.zip" -Algorithm SHA256).Hash.ToLower()
-          "$hash  Kaz Grids.zip" | Out-File -Encoding ascii -NoNewline "Kaz Grids.zip.sha256"
+          $hash = (Get-FileHash "KazBars.zip" -Algorithm SHA256).Hash.ToLower()
+          "$hash  KazBars.zip" | Out-File -Encoding ascii -NoNewline "KazBars.zip.sha256"
+
       - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          name: Kaz Grids ${{ github.ref_name }}
+          name: KazBars ${{ github.ref_name }}
           body_path: .github/release-notes.md
           files: |
-            Kaz Grids.zip
-            Kaz Grids.zip.sha256
+            KazBars.zip
+            KazBars.zip.sha256

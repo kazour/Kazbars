@@ -1,47 +1,33 @@
 """
-Smoke test: walk the full import graph for Kaz Grids.
+Smoke test: every kazbars submodule imports cleanly.
 
-Auto-discovers every *.py file under Modules/ plus kzgrids. Catches missing
-symbols, wrong-module references, and import cycles — every failure mode a
-symbol-move refactor can introduce.
+Catches missing symbols, wrong-module references, and import cycles — every
+failure mode a symbol-move refactor can introduce. Each module is its own
+parametrized test case so pytest reports the failure on the offending module
+rather than a single rolled-up error.
 
-Run: python tests/test_imports.py
-Exit code 0 on success, non-zero on any import error.
+Run: `pytest tests/test_imports.py` (from repo root).
 """
 
 import importlib
-import sys
-from pathlib import Path
+import pkgutil
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
+import kazbars
 
 
-def discover_modules():
-    mods = ['kzgrids']
-    for f in sorted((ROOT / 'Modules').glob('*.py')):
-        if f.stem == '__init__':
+def _all_modules() -> list[str]:
+    mods = ["kazbars", "kazbars.app", "kazbars.__main__"]
+    for _, name, _ in pkgutil.iter_modules(kazbars.__path__):
+        if name in ("__main__", "app"):
             continue
-        mods.append(f'Modules.{f.stem}')
-    return mods
+        mods.append(f"kazbars.{name}")
+    return sorted(mods)
 
 
-def main():
-    modules = discover_modules()
-    failed = []
-    for name in modules:
-        try:
-            importlib.import_module(name)
-        except Exception as e:
-            failed.append((name, e))
-
-    if failed:
-        for name, e in failed:
-            print(f"FAIL {name}: {type(e).__name__}: {e}")
-        sys.exit(1)
-
-    print(f"OK — imported {len(modules)} modules cleanly.")
+def pytest_generate_tests(metafunc):
+    if "modname" in metafunc.fixturenames:
+        metafunc.parametrize("modname", _all_modules())
 
 
-if __name__ == '__main__':
-    main()
+def test_module_imports_cleanly(modname: str) -> None:
+    importlib.import_module(modname)

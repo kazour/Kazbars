@@ -1,9 +1,9 @@
 {
   "schemaVersion": 2,
   "generatedAt": "2026-04-26T00:00:00Z",
-  "title": "Design System: Kaz Grids",
+  "title": "Design System: KazBars",
   "extensions": {
-    "platformNote": "Kaz Grids is a Python/tkinter/ttkbootstrap desktop app. Component primitives (buttons, inputs, menus, dialogs) are tkinter widgets, not browser elements, so the components[] block is intentionally empty; component contracts are documented in DESIGN.md section 5. Tonal ramps reflect the actual neutral steps the project uses; non-neutral colors carry ramps where useful and are omitted otherwise.",
+    "platformNote": "KazBars is a Python/tkinter/ttkbootstrap desktop app. Component primitives (buttons, inputs, menus, dialogs) are tkinter widgets, not browser elements, so the components[] block is intentionally empty; component contracts are documented in DESIGN.md section 5. Tonal ramps reflect the actual neutral steps the project uses; non-neutral colors carry ramps where useful and are omitted otherwise.",
     "colorMeta": {
       "text-bright": { "role": "neutral", "displayName": "Text Bright", "canonical": "#FFFFFF", "tonalRamp": ["#1a1a1a", "#2f2f2f", "#444444", "#666666", "#888888", "#B0B0B0", "#C0C7CE", "#FFFFFF"] },
       "text-body": { "role": "neutral", "displayName": "Text Body", "canonical": "#C0C7CE", "tonalRamp": ["#1a1a1a", "#2f2f2f", "#444444", "#666666", "#888888", "#B0B0B0", "#C0C7CE", "#FFFFFF"] },
@@ -62,7 +62,7 @@
   "components": [],
   "narrative": {
     "northStar": "The Phosphor Bench",
-    "overview": "Kaz Grids is a workbench for buff data. Functional density carries most of the surface (Aseprite/Reaper energy: tight rows, small text, dense forms, no decorative whitespace), and the CRT/phosphor language is reserved for the moments where the tool talks back: the Build & Install status icon, the CRT-styled dialog header, the Ethram Fal seed timer overlay. Most of the app is a quiet dark workbench. A handful of surfaces glow. The system is built on ttkbootstrap-darkly as a base palette and inherits its tonal grammar (#222 working surface, #1a1a1a chrome, #2f2f2f inputs). On top of that base, a deliberate retro layer (phosphor_green, phosphor_amber, crt_glow, scanline overlays) carries the brand. That layer is decoration-only by contract: phosphor colors are off-limits for body text and interactive states because they fail WCAG contrast on the dark bg, and _RETRO_COLORS is named with a leading underscore to mark it private. This system explicitly rejects the four directions called out in PRODUCT.md: generic SaaS dashboard polish, Twitch/Discord neon, Windows 11 Settings acrylic, and WeakAuras in-game addon chrome. None of those are starting points; all of them are anti-patterns.",
+    "overview": "KazBars is a workbench for buff data. Functional density carries most of the surface (Aseprite/Reaper energy: tight rows, small text, dense forms, no decorative whitespace), and the CRT/phosphor language is reserved for the moments where the tool talks back: the Build & Install status icon, the CRT-styled dialog header, the Ethram Fal seed timer overlay. Most of the app is a quiet dark workbench. A handful of surfaces glow. The system is built on ttkbootstrap-darkly as a base palette and inherits its tonal grammar (#222 working surface, #1a1a1a chrome, #2f2f2f inputs). On top of that base, a deliberate retro layer (phosphor_green, phosphor_amber, crt_glow, scanline overlays) carries the brand. That layer is decoration-only by contract: phosphor colors are off-limits for body text and interactive states because they fail WCAG contrast on the dark bg, and _RETRO_COLORS is named with a leading underscore to mark it private. This system explicitly rejects the four directions called out in PRODUCT.md: generic SaaS dashboard polish, Twitch/Discord neon, Windows 11 Settings acrylic, and WeakAuras in-game addon chrome. None of those are starting points; all of them are anti-patterns.",
     "keyCharacteristics": [
       "Dark-by-design (ttkbootstrap-darkly base, never light theme).",
       "Tight density: 8-10px workhorse type, sub-10px paddings throughout, sharp corners (0-3px radius).",

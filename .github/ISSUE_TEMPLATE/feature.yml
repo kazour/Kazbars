@@ -1,0 +1,19 @@
+name: Feature request
+description: Suggest an addition or change to KazBars
+labels: [enhancement]
+body:
+  - type: textarea
+    attributes:
+      label: What would you like KazBars to do?
+      description: Describe the use case before the implementation. What you're trying to accomplish in-game and why the current build doesn't cover it.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: How do you imagine it working?
+      description: Optional. Sketch the UI / flow if you have one in mind. Skip if "I don't know, just need it solved somehow".
+  - type: input
+    attributes:
+      label: Class / playstyle this is for
+      description: Optional. Helps prioritize when multiple requests overlap.
+      placeholder: e.g. Tempest of Set raid, Conqueror PvP

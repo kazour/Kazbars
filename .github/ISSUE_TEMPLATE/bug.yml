@@ -1,5 +1,5 @@
 name: Bug report
-description: Something in Kaz Grids isn't working
+description: Something in KazBars isn't working
 labels: [bug]
 body:
   - type: textarea
@@ -10,7 +10,7 @@ body:
       required: true
   - type: input
     attributes:
-      label: Kaz Grids version
+      label: KazBars version
       placeholder: e.g. 1.0.0
     validations:
       required: true
