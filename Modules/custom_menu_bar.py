@@ -23,7 +23,7 @@ class CustomMenuBar(tk.Canvas):
 
     Uses a Canvas for the bar (immune to ttkbootstrap theme overrides) and a
     place()-based Frame overlay for dropdowns (no Toplevel = no Windows flash).
-    Supports accelerator text, separators, disabled items, keyboard nav, and Alt activation.
+    Supports accelerator text, separators, disabled items, and keyboard nav.
     """
 
     _MENU_BG = TK_COLORS['status_bg']      # #1a1a1a

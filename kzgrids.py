@@ -273,7 +273,7 @@ class KzGridsApp(ttkb.Window):
 
         self._game_context_menu = tk.Menu(self, tearoff=0)
         self._game_context_menu.add_command(
-            label="Change game folder…", command=self._change_game_folder)
+            label="Change game folder...", command=self._change_game_folder)
         self._game_context_menu.add_command(
             label="Clear", command=self._clear_game_path)
 
@@ -319,12 +319,17 @@ class KzGridsApp(ttkb.Window):
             {'type': 'command', 'label': 'Save Profile As...',
              'command': self._save_profile_as},
             {'type': 'separator'},
-            {'type': 'command', 'label': 'Uninstall from game client...',
-             'command': self._uninstall_game},
+            {'type': 'command', 'label': 'Exit',
+             'command': self._on_close},
         ])
         self._menubar.add_cascade(label="Game", menu_def=[
             {'type': 'command', 'label': 'Default buff bars...',
              'command': self._open_buff_display_editor},
+            {'type': 'separator'},
+            {'type': 'command', 'label': 'Change game folder...',
+             'command': self._change_game_folder},
+            {'type': 'command', 'label': 'Uninstall from game client...',
+             'command': self._uninstall_game},
         ])
         self._menubar.add_command(label="About", command=self._show_about)
 

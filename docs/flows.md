@@ -153,10 +153,10 @@ End state: new buff entry visible in treeview; `by_id` and `by_name` indexes upd
 
 ## 9. uninstall from game folder
 
-Trigger: User selects File > Uninstall from game client... and confirms the dialog
+Trigger: User selects Game > Uninstall from game client... and confirms the dialog
 
 Steps:
-1. `KzGridsApp._uninstall_game()` — kzgrids.py:442 — one-line delegator to `game_folder.uninstall_game(self)`
+1. `KzGridsApp._uninstall_game()` — kzgrids.py:450 — one-line delegator to `game_folder.uninstall_game(self)`
 2. `game_folder.uninstall_game()` — Modules/game_folder.py:142 — guards on `app.game_path`; confirms with the user; calls `uninstall_from_client()`
 3. `uninstall_from_client()` — Modules/build_executor.py:95 — deletes `Data/Gui/Default/Flash/KazGrids.swf`, the `Data/Gui/Aoc/KazGrids/` directory (if present), and `Scripts/reloadgrids` + `Scripts/unloadgrids`; strips the auto-load marker block from `Scripts/auto_login`
 4. `strip_marker_block()` — Modules/build_utils.py:60 — removes the `# KzGrids auto-load` marker-delimited section (marker line through the next blank line) from the `auto_login` file content; the script is rewritten or, if empty after the strip, deleted
@@ -232,12 +232,12 @@ End state: `game_path`, `use_aoc_bypass`, and `game_resolution` persisted; no pr
 
 ## 14. change game folder (with Aoc.exe reconcile)
 
-Trigger: User left- or right-clicks the path label in the bottom bar and picks "Change game folder…" from the context menu
+Trigger: User selects Game > Change game folder... from the menu, OR left/right-clicks the path label in the bottom bar and picks "Change game folder..." from the context menu
 
 Steps:
-1. `KzGridsApp._show_game_context_menu()` — kzgrids.py:438 — one-line delegator to `game_folder.show_game_context_menu(self, event)`
+1. `KzGridsApp._show_game_context_menu()` — kzgrids.py:447 — one-line delegator to `game_folder.show_game_context_menu(self, event)`
 2. `show_game_context_menu()` — Modules/game_folder.py:117 — pops `app._game_context_menu` at the event coordinates; both `<Button-1>` and `<Button-3>` route here
-3. User picks "Change game folder…" → `KzGridsApp._change_game_folder()` — kzgrids.py:432 — one-line delegator to `game_folder.change_game_folder(self)`
+3. User picks "Change game folder..." → `KzGridsApp._change_game_folder()` — kzgrids.py:441 — one-line delegator to `game_folder.change_game_folder(self)`. (When triggered via Game menu the cascade invokes the same delegator directly, skipping steps 1-2.)
 4. `change_game_folder()` — Modules/game_folder.py:63 — opens `filedialog.askdirectory`; validates AoC folder structure (warns if `Data/Gui/Default` is missing); warns if the resulting `KazGrids.swf` path exceeds 240 characters
 5. `save_game_path()` — Modules/game_folder.py:122 — persists `game_path` to settings; calls `grids_panel.notify_game_path_changed()` so the panel can refresh
 6. **Reconcile (only when `resolved != previous`)**: `detect_aoc_launcher()` — Modules/build_executor.py:139 — checks for `aoc.exe` or `Aoc.log` under `Data/Gui/Aoc/`. Two state-divergence branches fire:
