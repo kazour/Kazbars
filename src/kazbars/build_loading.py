@@ -247,6 +247,7 @@ def show_welcome_popup(parent, grid_count, enabled_count,
     _draw_close_button(popup, canvas, btn_y)
     _center_popup(popup, parent, h)
     popup.deiconify()
+    popup.grab_set()
     popup.focus_set()
 
 
@@ -374,6 +375,7 @@ def show_about_popup(parent, app_name, app_version):
     popup.protocol("WM_DELETE_WINDOW", close)
     _center_popup(popup, parent, h)
     popup.deiconify()
+    popup.grab_set()
     popup.focus_set()
     animate()
     return popup
@@ -413,6 +415,7 @@ class BuildLoadingScreen(tk.Toplevel):
         self._build_progress_ui()
         self._center_on_parent(HEIGHT_PROGRESS)
         self.deiconify()
+        self.grab_set()
         self._animate()
 
         # Safety timeout — allow Escape to force-close after 30s
