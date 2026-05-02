@@ -246,3 +246,28 @@ Steps:
 7. `refresh_game_path_label()` — Modules/game_folder.py:36 — updates the path label text/tooltip and calls `update_build_state()` to re-enable or disable the Build button based on the new path's existence
 
 End state: `game_path` and (when divergence triggered it) `use_aoc_bypass` persisted; path label updated; Build button state synced; if state diverged, the user has either confirmed bypass via the prompt or seen the auto-disable toast
+
+---
+
+## 15. open Buff Display editor and apply
+
+Trigger: User selects Game > Default buff bars… from the menu
+
+Steps:
+1. `KzGridsApp._open_buff_display_editor()` — kzgrids.py:448 — one-line delegator to `buff_display_editor.open_buff_display_editor(self)`
+2. `open_buff_display_editor()` — Modules/buff_display_editor.py:815 — pre-flight: validates `app.game_path` is set and points to a real directory; on miss, shows a `Messagebox.show_warning` (the only modal in this module — toast can't render before the dialog exists) and returns
+3. `BuffDisplayDialog.__init__()` — Modules/buff_display_editor.py:652 — `withdraw → transient → grab_set`; calls `_create_widgets()`; restores window position; binds `<Escape>` → `_on_cancel`, `<Return>` → `_on_apply`, `WM_DELETE_WINDOW` → `_on_close`; schedules `_set_initial_focus()` via `after_idle` so the toggle widget is fully realized
+4. `_create_widgets()` — Modules/buff_display_editor.py:690 — packs CRT-styled header, plain-language subtitle, conditional custom-UI banner; **bottom button row packs first** (`side='bottom'`) so it reserves height before body claims expansion (Cancel + Apply stay visible at any window size); **scrollable body** wraps the section iteration via `create_scrollable_frame`; reads `SETTINGS_KEY_SECTION_OPEN` for per-section open/closed state
+5. For each entry in `BUFF_FILES` (Player, Target, Top, Floating): `_Section.load()` — Modules/buff_display_editor.py:354 — resolves Customized→Default→None precedence via `_resolve_paths`; reads source XML; calls `_read_bufflistview()` (regex match on `<BuffListView ... />`, optionally inside a `<!--KZ_OFF ... KZ_OFF-->` wrapper); sets `state` to `STATE_OK / STATE_MISSING / STATE_UNSUPPORTED`; calls `_populate_vars()` which mirrors source byte-for-byte (blank field when attr is missing or unrecognised — no stock defaults)
+6. `_Section.build(parent, initial_open)` — Modules/buff_display_editor.py:423 — builds a `CollapsibleSection` per entry with `initial_open` from saved settings (default: Player open, rest collapsed); badge label packs to `cs.header_frame` side='right' so status stays visible whether expanded or collapsed; form rows or state message pack into `cs.content`
+7. User edits a field → spinbox `command=` or `<KeyRelease>` fires `_Section._on_change()` → applies disabled-style, refreshes filter hint, refreshes badge, calls dialog's `_refresh_apply_state()` which toggles the Apply button enabled state based on `dirty()` across all sections
+8. User clicks Apply → `BuffDisplayDialog._on_apply()` — Modules/buff_display_editor.py:766 — collects sections where `dirty()` is True; for each: `write_to_disk()` then `load_after_write()`
+9. `_Section.write_to_disk()` — Modules/buff_display_editor.py:589 — reads source text; builds attrs dict from form values (only non-blank fields land in attrs; numerics clamped to `ICON_SIZE_MIN/MAX` etc. so a typed 999 can't reach the file); calls `_write_bufflistview()`
+10. `_write_bufflistview()` — Modules/buff_display_editor.py:218 — unwraps any `KZ_OFF` span; for each attr in attrs dict: skips when on-disk value already equals new value (keeps file byte-identical for untouched fields); else `_replace_attr()` either replaces existing value or **injects before the closing `/>`** when the attr is missing (the source XML doesn't always carry every attr — most stock files have no `filter`); re-wraps in `KZ_OFF` if `enabled=False`
+11. `_backup_once()` — Modules/buff_display_editor.py:255 — copies the existing Customized file to `*.kzgrids.bak` once (idempotent — skips if backup already exists)
+12. Customized file written via `Path.write_text` (parent dirs created)
+13. `_Section.load_after_write()` — Modules/buff_display_editor.py:629 — flips `source_path` to the now-existing Customized file; re-reads to refresh `_baseline` and the badge to `[Customized]`
+14. Per-result toast via `app_toast`: success → `Saved: <names>` (`'success'`, default 6 s); failure → `Couldn't write <names>. Check folder permissions and disk space.` (`'danger'`, 10 s, `key='buff_apply_failed'` so retries coalesce); OS reasons go to the logger
+15. User closes dialog (X button, Escape, Cancel, or any path that hits `WM_DELETE_WINDOW`) → `BuffDisplayDialog._on_close()` — Modules/buff_display_editor.py:800 — calls `_save_section_states()` (writes a per-label `is_open` dict to `settings[SETTINGS_KEY_SECTION_OPEN]`), then `destroy()`. Apply alone does not destroy the dialog — the user keeps editing.
+
+End state: changed sections written to `<game>/Data/Gui/Customized/Views/HUD/<file>.xml` (Player → CharPortraitLeft.xml, Target → CharPortraitRight.xml, Top → HUDView.xml, Floating → FloatingPortraitView.xml) with surgical regex edits and one-shot backups; section open/closed state persisted to `kzgrids_settings.json`; user types `/reloadui` in-game to see the changes.

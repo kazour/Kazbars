@@ -30,7 +30,7 @@ from Modules.ui_components import (
 from Modules.custom_menu_bar import CustomMenuBar
 from Modules.ui_tk_style import apply_dark_titlebar, enable_global_dark_titlebar
 from Modules.settings_manager import SettingsManager, init_settings
-from Modules import profile_io, game_folder, build_action, update_check
+from Modules import profile_io, game_folder, build_action, buff_display_editor, update_check
 from Modules.window_position import restore_window_position, bind_window_position_save
 from Modules.build_loading import show_about_popup
 from Modules.live_tracker_panel import LiveTrackerPanel
@@ -322,6 +322,10 @@ class KzGridsApp(ttkb.Window):
             {'type': 'command', 'label': 'Uninstall from game client...',
              'command': self._uninstall_game},
         ])
+        self._menubar.add_cascade(label="Game", menu_def=[
+            {'type': 'command', 'label': 'Default buff bars...',
+             'command': self._open_buff_display_editor},
+        ])
         self._menubar.add_command(label="About", command=self._show_about)
 
         # Keyboard shortcuts
@@ -440,6 +444,9 @@ class KzGridsApp(ttkb.Window):
 
     def _uninstall_game(self):
         return game_folder.uninstall_game(self)
+
+    def _open_buff_display_editor(self):
+        return buff_display_editor.open_buff_display_editor(self)
 
     # ========================================================================
     # PROFILE SYSTEM

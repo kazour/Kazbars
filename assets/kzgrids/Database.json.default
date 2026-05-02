@@ -188,12 +188,12 @@
       "type": "debuff"
     },
     {
-      "name": "Hands of Corruption",
+      "name": "Hands of Corruption (Entity)",
       "ids": [
         4924718
       ],
       "category": "#T4",
-      "type": "debuff"
+      "type": "misc"
     },
     {
       "name": "Open Wound Wrack (T4 adds)",
@@ -220,7 +220,7 @@
       "type": "debuff"
     },
     {
-      "name": "Shackles (Basilisk)",
+      "name": "Shackles (Shadur)",
       "ids": [
         4857484
       ],
@@ -3209,6 +3209,14 @@
         4836737
       ],
       "category": "#T3.5",
+      "type": "debuff"
+    },
+    {
+      "name": "Watchful Eye of Yun  (LuZhi)",
+      "ids": [
+        4857536
+      ],
+      "category": "#T4",
       "type": "debuff"
     }
   ]

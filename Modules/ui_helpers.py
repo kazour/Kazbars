@@ -107,6 +107,7 @@ INPUT_WIDTH_NUM    = 5    # Numeric spinboxes
 INPUT_WIDTH_TYPE   = 10   # Compact type/state dropdowns
 INPUT_WIDTH_FILTER = 18   # Filter category combobox
 INPUT_WIDTH_SEARCH = 20   # Search entries
+LABEL_WIDTH_FORM   = 14   # Left-column form labels (fits "Icon spacing:" + 1ch)
 
 # Scanline overlay alpha (0-255). Used for CRT decorative scanline overlays.
 SCANLINE_ALPHA = 12

@@ -1,6 +1,6 @@
 # Architectural Map
 
-**Current as of:** 2026-05-01 (after Help-panel pass: 460px column cap (~75ch at 9px Segoe), derived section/subsection margins, body-font caching, content reorder, copy clarification, new merged "Applying and Positioning In-Game" section. `game_folder.change_game_folder` reconciles `use_aoc_bypass` on every folder change: prompt on install transitions, auto-disable on removal.)
+**Current as of:** 2026-05-02 (after Buff Display editor pass: new `Modules/buff_display_editor.py` modal under Game → "Default buff bars…" edits four HUD XML files (Player, Target, Top, Floating) via surgical regex; mirror-the-XML semantics with no stock defaults; collapsible per-file sections persist open/closed via `settings_manager`; scrollable body with pinned bottom button row; Apply uses success bootstyle; sister smoke test `tests/test_buff_xml.py` covers the round-trip helpers.)
 **Purpose:** Module topology, dependencies, and coupling hotspots. Updated alongside code changes — if you edit this file, commit it with the code. `CLAUDE.md` has the short version; this file has the detail that doesn't fit there.
 
 ## Dependency clusters
@@ -49,7 +49,7 @@ live_tracker_settings  ← boss_timer
 
 ### kzgrids-only satellites (extracted from KzGridsApp)
 ```
-kzgrids.py  → profile_io, game_folder, build_action, first_launch, custom_menu_bar, update_check
+kzgrids.py  → profile_io, game_folder, build_action, buff_display_editor, first_launch, custom_menu_bar, update_check
 ```
 These modules are consumed only by `kzgrids.py` by design — they hold logic that belongs to the root window but would otherwise bloat the entry-point file. Each takes `app` (the `KzGridsApp` instance) as first arg. `KzGridsApp` keeps thin delegator methods so internal call sites (menus, dialog callbacks) don't need rewriting when new functions get added. `first_launch` is the only satellite that crosses cluster boundaries — its `run_first_launch(app, app_name)` orchestrator imports `game_folder`, `profile_io`, `build_loading`, and `grid_model` to drive the dialog's post-close actions (default profile load, scaling, welcome popup). `update_check` is the only satellite called directly (no delegator on `KzGridsApp`) since it has a single fire-and-forget caller in `__init__`; its worker thread schedules a named main-thread dispatcher (`_show_update_toast`) guarded by `winfo_exists()`.
 
@@ -85,10 +85,11 @@ Two plain-Python scripts guard the failure modes we've actually hit. No pytest.
 
 - **`tests/test_imports.py`** — auto-discovers every `Modules/*.py` + `kzgrids` and imports each. Catches missing symbols, wrong-module references, and cycles. Add nothing — new modules are picked up automatically.
 - **`tests/test_data_integrity.py`** — validates every buff reference in `assets/kzgrids/Default.json` (whitelists + slot assignments) resolves to a `Database.json` entry, and that `Database.json.default` matches `Database.json` byte-for-byte.
+- **`tests/test_buff_xml.py`** — round-trips the `buff_display_editor` XML helpers: attribute extraction, surgical attribute replacement (other bytes preserved verbatim), the KZ_OFF on/off comment-wrap toggle, the filter whitespace normaliser, and the no-`<BuffListView>` guard. Added with the editor itself; covers the regex contract since the module deliberately uses no XML parser.
 
 Run before every commit touching code or data:
 ```bash
-python tests/test_imports.py && python tests/test_data_integrity.py
+python tests/test_imports.py && python tests/test_data_integrity.py && python tests/test_buff_xml.py
 ```
 
 UI behavior (Tk event flow, dialog timing, subprocess integration in the build flow) is not covered by the smoke tests — rely on manual smoke-testing for those.
@@ -100,9 +101,10 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `Modules/grids_panel.py` | 1239 | Grid list UI, grid management |
 | `Modules/database_editor.py` | 865 | Buff DB CRUD, search, filtering |
 | `Modules/grid_dialogs.py` | 827 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
+| `Modules/buff_display_editor.py` | 823 | Default Buff Bars dialog — edits HUD XML for 4 portraits via surgical regex; collapsible sections persist open state |
 | `Modules/build_loading.py` | 796 | Build-progress screen + welcome/about popups |
-| `kzgrids.py` | 562 | Entry point + `KzGridsApp` root window (widgets, menu, lifecycle) |
-| `Modules/ui_widgets.py` | 585 | Widget builders, tooltips, bindings, `CollapsibleSection` (with `set_dimmed`), `blend_alpha`, `flash_status_bar`, `app_toast` |
+| `kzgrids.py` | 569 | Entry point + `KzGridsApp` root window (widgets, menu, lifecycle) |
+| `Modules/ui_widgets.py` | 577 | Widget builders, tooltips, bindings, `CollapsibleSection` (with `set_dimmed`), `blend_alpha`, `flash_status_bar`, `app_toast` |
 | `Modules/live_tracker_panel.py` | 518 | Live Tracker Toplevel orchestrator |
 | `Modules/ui_components.py` | 451 | `ToastManager` (coalesce-by-key, in-place text update), `DragReorderManager`, scrollable frame |
 | `Modules/timer_overlay.py` | 440 | In-game transparent timer overlay |
@@ -116,8 +118,9 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `build.py` | 225 | PyInstaller build driver |
 | `Modules/profile_io.py` | 219 | Profile load (read+apply split) / save (build+write+commit, `silent=` for piggyback saves) / new / open + missing-buff warning |
 | `Modules/game_folder.py` | 192 | Game folder UI + Aoc.exe bypass (with install/remove reconciler) + uninstall |
+| `tests/test_buff_xml.py` | 175 | Round-trip smoke test for `buff_display_editor` XML helpers |
 | `Modules/build_action.py` | 168 | Build & Install flow |
-| `Modules/ui_helpers.py` | 157 | Design tokens + `setup_custom_styles` |
+| `Modules/ui_helpers.py` | 158 | Design tokens + `setup_custom_styles` |
 | `Modules/live_tracker_settings.py` | 145 | Tracker persistence |
 | `Modules/grid_model.py` | 117 | Grid dataclasses + `parse_resolution` helper |
 | `tests/test_data_integrity.py` | 103 | Buff-ref resolution smoke test |
