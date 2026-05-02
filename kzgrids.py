@@ -534,8 +534,18 @@ class KzGridsApp(ttkb.Window):
         self.grids_panel.clear_all_grids()
 
     def _show_about(self):
-        """Show the About dialog."""
-        show_about_popup(self, APP_NAME, APP_VERSION)
+        """Show the About dialog (single-instance — focus existing if alive)."""
+        existing = getattr(self, '_about_popup', None)
+        if existing is not None:
+            try:
+                if existing.winfo_exists():
+                    existing.deiconify()
+                    existing.lift()
+                    existing.focus_set()
+                    return
+            except tk.TclError:
+                pass
+        self._about_popup = show_about_popup(self, APP_NAME, APP_VERSION)
 
     # ========================================================================
     # FIRST LAUNCH

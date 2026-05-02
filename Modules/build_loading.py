@@ -370,6 +370,7 @@ def show_about_popup(parent, app_name, app_version):
     popup.deiconify()
     popup.focus_set()
     animate()
+    return popup
 
 
 class BuildLoadingScreen(tk.Toplevel):

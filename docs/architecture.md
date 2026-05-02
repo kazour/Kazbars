@@ -102,8 +102,8 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `Modules/database_editor.py` | 865 | Buff DB CRUD, search, filtering |
 | `Modules/grid_dialogs.py` | 841 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
 | `Modules/buff_display_editor.py` | 743 | Default Buff Bars dialog — edits HUD XML for 4 portraits via surgical regex; collapsible sections persist open state |
-| `Modules/build_loading.py` | 796 | Build-progress screen + welcome/about popups |
-| `kzgrids.py` | 574 | Entry point + `KzGridsApp` root window (widgets, menu, lifecycle) |
+| `Modules/build_loading.py` | 797 | Build-progress screen + welcome/about popups |
+| `kzgrids.py` | 584 | Entry point + `KzGridsApp` root window (widgets, menu, lifecycle) |
 | `Modules/ui_widgets.py` | 577 | Widget builders, tooltips, bindings, `CollapsibleSection` (with `set_dimmed`), `blend_alpha`, `flash_status_bar`, `app_toast` |
 | `Modules/live_tracker_panel.py` | 518 | Live Tracker Toplevel orchestrator |
 | `Modules/ui_components.py` | 451 | `ToastManager` (coalesce-by-key, in-place text update), `DragReorderManager`, scrollable frame |
