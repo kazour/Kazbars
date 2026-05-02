@@ -111,10 +111,16 @@ class AddGridWizard(tk.Toplevel):
         source_frame = _section(frame, "Source")
 
         self.type_var = tk.StringVar(value="player")
-        ttk.Radiobutton(source_frame, text="Player", variable=self.type_var, value="player").pack(anchor='w')
+        self.type_var.trace_add('write', lambda *a: self._on_type_changed())
+        # ttkbootstrap strips custom style= at construction; apply via configure() after.
+        rb_player = ttk.Radiobutton(source_frame, text="Player", variable=self.type_var, value="player")
+        rb_player.configure(style='Player.TRadiobutton')
+        rb_player.pack(anchor='w')
         ttk.Label(source_frame, text="Track buffs/debuffs on yourself",
                  foreground=THEME_COLORS['muted'], font=FONT_SMALL).pack(anchor='w', padx=PAD_RADIO_INDENT)
-        ttk.Radiobutton(source_frame, text="Target", variable=self.type_var, value="target").pack(anchor='w', pady=(PAD_TINY, 0))
+        rb_target = ttk.Radiobutton(source_frame, text="Target", variable=self.type_var, value="target")
+        rb_target.configure(style='Target.TRadiobutton')
+        rb_target.pack(anchor='w', pady=(PAD_TINY, 0))
         ttk.Label(source_frame, text="Track buffs/debuffs on your current target",
                  foreground=THEME_COLORS['muted'], font=FONT_SMALL).pack(anchor='w', padx=PAD_RADIO_INDENT)
 
@@ -160,10 +166,13 @@ class AddGridWizard(tk.Toplevel):
         preset_frame = ttk.Frame(dim_frame)
         preset_frame.pack(pady=(PAD_XS, 0))
 
+        self._preset_buttons = []
         for label, r, c in [("H-bar 1x10", 1, 10), ("V-bar 10x1", 10, 1),
                              ("Grid 3x3", 3, 3), ("Single 1x1", 1, 1)]:
-            ttk.Button(preset_frame, text=label, width=11, bootstyle='info-outline',
-                       command=lambda r=r, c=c: self.apply_preset(r, c)).pack(side='left', padx=PAD_MICRO)
+            btn = ttk.Button(preset_frame, text=label, width=11, bootstyle='info-outline',
+                             command=lambda r=r, c=c: self.apply_preset(r, c))
+            btn.pack(side='left', padx=PAD_MICRO)
+            self._preset_buttons.append(btn)
 
         self.warning_var = tk.StringVar(value="")
         ttk.Label(frame, textvariable=self.warning_var, foreground=THEME_COLORS['danger']).pack(pady=PAD_BUTTON_GAP)
@@ -176,6 +185,11 @@ class AddGridWizard(tk.Toplevel):
         self.bind('<Escape>', lambda e: self.on_cancel())
         self.bind('<Return>', lambda e: self.on_create())
         self.update_display()
+
+    def _on_type_changed(self):
+        bs = 'info-outline' if self.type_var.get() == 'player' else 'warning-outline'
+        for btn in self._preset_buttons:
+            btn.configure(bootstyle=bs)
 
     def apply_preset(self, rows, cols):
         total = rows * cols

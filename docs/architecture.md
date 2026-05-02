@@ -98,9 +98,9 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 
 | File | Lines | Role |
 |---|---:|---|
-| `Modules/grids_panel.py` | 1239 | Grid list UI, grid management |
+| `Modules/grids_panel.py` | 1242 | Grid list UI, grid management |
 | `Modules/database_editor.py` | 865 | Buff DB CRUD, search, filtering |
-| `Modules/grid_dialogs.py` | 827 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
+| `Modules/grid_dialogs.py` | 841 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
 | `Modules/buff_display_editor.py` | 743 | Default Buff Bars dialog — edits HUD XML for 4 portraits via surgical regex; collapsible sections persist open state |
 | `Modules/build_loading.py` | 796 | Build-progress screen + welcome/about popups |
 | `kzgrids.py` | 574 | Entry point + `KzGridsApp` root window (widgets, menu, lifecycle) |
@@ -120,7 +120,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `Modules/game_folder.py` | 192 | Game folder UI + Aoc.exe bypass (with install/remove reconciler) + uninstall |
 | `tests/test_buff_xml.py` | 175 | Round-trip smoke test for `buff_display_editor` XML helpers |
 | `Modules/build_action.py` | 168 | Build & Install flow |
-| `Modules/ui_helpers.py` | 158 | Design tokens + `setup_custom_styles` |
+| `Modules/ui_helpers.py` | 168 | Design tokens + `setup_custom_styles` |
 | `Modules/live_tracker_settings.py` | 145 | Tracker persistence |
 | `Modules/grid_model.py` | 117 | Grid dataclasses + `parse_resolution` helper |
 | `tests/test_data_integrity.py` | 103 | Buff-ref resolution smoke test |

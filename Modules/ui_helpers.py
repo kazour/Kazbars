@@ -154,5 +154,15 @@ def setup_custom_styles(root):
     # don't show ttkbootstrap's lighter default below the last row.
     style.configure('Treeview', fieldbackground=TK_COLORS['bg'], background=TK_COLORS['bg'])
 
+    # Type-tinted Radiobutton labels (Add Grid wizard). Bold so the colored
+    # label reads as semantic identity, not as just "decorated text".
+    for name, color in (('Player', GRID_TYPE_COLORS['player']),
+                        ('Target', GRID_TYPE_COLORS['target'])):
+        style_name = f'{name}.TRadiobutton'
+        style.configure(style_name, foreground=color, font=FONT_SECTION)
+        style.map(style_name,
+                  foreground=[('disabled', TK_COLORS['dim_text']),
+                              ('!disabled', color)])
+
 
 

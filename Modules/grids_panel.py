@@ -808,7 +808,10 @@ class GridsPanel(ttk.Frame):
         self._radio_player, self._radio_target = self._build_radio_row(
             center, "Source:", self._empty_type_var,
             [("Player", "player"), ("Target", "target")],
-            command=self._redraw_empty_cards, pady=(0, PAD_XS))
+            command=self._redraw_empty_cards, pady=(0, PAD_LF))
+        # ttkbootstrap strips custom style= at construction; apply via configure() after.
+        self._radio_player.configure(style='Player.TRadiobutton')
+        self._radio_target.configure(style='Target.TRadiobutton')
 
         self._empty_mode_var = tk.StringVar(value="dynamic")
         self._radio_dynamic, self._radio_static = self._build_radio_row(
@@ -822,7 +825,7 @@ class GridsPanel(ttk.Frame):
         presets = [
             ("1\u00d710 Bar", 1, 10, "dynamic", PRESET_CARD_BAR_LONG, PRESET_CARD_BAR_SHORT,
              "Horizontal bar, great for tracking player buffs across the top"),
-            ("10\u00d71 Bar", 10, 1, "dynamic", PRESET_CARD_BAR_SHORT, PRESET_CARD_BAR_LONG,
+            ("10\u00d71 Bar", 10, 1, "dynamic", PRESET_CARD_BAR_SHORT, PRESET_CARD_SQUARE,
              "Vertical bar, stack buffs along the side of your screen"),
             ("3\u00d73 Grid", 3, 3, "dynamic", PRESET_CARD_SQUARE, PRESET_CARD_SQUARE,
              "Compact grid, fits many buffs in a small area"),
@@ -928,7 +931,7 @@ class GridsPanel(ttk.Frame):
             preview_h = card_h - PRESET_LABEL_AREA
             if rows is None:
                 card.create_text(card_w // 2, preview_h // 2 + 10, text="+",
-                                 anchor='center', fill=THEME_COLORS['heading'],
+                                 anchor='center', fill=type_color,
                                  font=FONT_HEADING, tags='cells')
                 continue
             draw_grid_cells(card, rows, cols, type_color, card_w, preview_h)
