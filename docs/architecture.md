@@ -14,7 +14,7 @@ ui_helpers  ← ui_widgets          ← ui_components
                                     (also imports ui_tk_style)
 ui_helpers  ← custom_menu_bar
 ```
-- `ui_helpers` holds design tokens only (fonts, colors, padding, BTN_*, INPUT_WIDTH_*, canvas-geometry constants, SCANLINE_ALPHA) + `setup_custom_styles`. Leaf — imports nothing internal.
+- `ui_helpers` holds design tokens only (fonts, colors, padding, BTN_*, INPUT_WIDTH_*, canvas-geometry constants, SCANLINE_ALPHA) + `setup_custom_styles` + `style_treeview_heading` (called post-Treeview-construction because ttkbootstrap rebuilds `Treeview.Heading` lazily on first instantiation, clobbering boot-time styling). Leaf — imports nothing internal.
 - `ui_widgets` adds the builder layer: `blend_alpha`, `CollapsibleSection`, tooltips, dialog/app headers, event bindings, `debounced_callback`.
 - `ui_components` adds stateful composites: `ToastManager` (coalesce-by-key for spammy emitters; single trailing `update_idletasks` in `_reposition`), `DragReorderManager`, `create_scrollable_frame`, global mousewheel routing.
 - `ui_tk_style` handles raw-tk widget styling + dark-titlebar monkey-patch.
@@ -99,7 +99,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | File | Lines | Role |
 |---|---:|---|
 | `src/kazbars/grids_panel.py` | 1242 | Grid list UI, grid management |
-| `src/kazbars/database_editor.py` | 865 | Buff DB CRUD, search, filtering |
+| `src/kazbars/database_editor.py` | 883 | Buff DB CRUD, search, filtering |
 | `src/kazbars/grid_dialogs.py` | 841 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
 | `src/kazbars/build_loading.py` | 797 | Build-progress screen + welcome/about popups |
 | `src/kazbars/buff_display_editor.py` | 743 | Default Buff Bars dialog — edits HUD XML for 4 portraits via surgical regex; collapsible sections persist open state |
@@ -120,7 +120,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/game_folder.py` | 192 | Game folder UI + Aoc.exe bypass (with install/remove reconciler) + uninstall |
 | `tests/test_buff_xml.py` | 175 | Round-trip smoke test for `buff_display_editor` XML helpers |
 | `src/kazbars/build_action.py` | 168 | Build & Install flow |
-| `src/kazbars/ui_helpers.py` | 169 | Design tokens + `setup_custom_styles` |
+| `src/kazbars/ui_helpers.py` | 193 | Design tokens + `setup_custom_styles` + `style_treeview_heading` |
 | `src/kazbars/live_tracker_settings.py` | 168 | Tracker persistence (with one-shot legacy filename migration) |
 | `src/kazbars/grid_model.py` | 117 | Grid dataclasses + `parse_resolution` helper |
 | `tests/test_data_integrity.py` | 103 | Buff-ref resolution smoke test |

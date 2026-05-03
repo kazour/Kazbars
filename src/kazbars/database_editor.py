@@ -39,6 +39,7 @@ from .ui_helpers import (
     PAD_TAB,
     PAD_XS,
     THEME_COLORS,
+    style_treeview_heading,
 )
 from .ui_tk_style import style_tk_text
 from .ui_widgets import add_tooltip, app_toast, create_dialog_header, debounced_callback
@@ -516,6 +517,10 @@ class DatabaseEditorTab(ttk.Frame):
         self._column_labels = {key: label for key, label, *_ in column_specs}
         keys = list(self._column_labels)
         self.tree = ttk.Treeview(list_frame, columns=keys, show='headings', selectmode='browse')
+        # ttkbootstrap configures Treeview.Heading lazily on first Treeview
+        # creation with relief=FLAT — apply our visible-divider style now
+        # that the widget exists so it doesn't get overwritten.
+        style_treeview_heading()
 
         for key, label, width, minw, stretch, anchor in column_specs:
             self.tree.heading(key, text=label, command=lambda k=key: self.sort_by(k))

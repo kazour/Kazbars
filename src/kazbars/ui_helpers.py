@@ -154,6 +154,30 @@ def setup_custom_styles(root):
     # Treeview empty-area background — match working surface so list panels
     # don't show ttkbootstrap's lighter default below the last row.
     style.configure('Treeview', fieldbackground=TK_COLORS['bg'], background=TK_COLORS['bg'])
+    # NOTE: Treeview.Heading is styled in `style_treeview_heading()` below,
+    # NOT here — ttkbootstrap's create_treeview_style runs lazily on first
+    # Treeview instantiation and overwrites any heading config done at boot.
+
+
+def style_treeview_heading():
+    """Apply visible column dividers to Treeview headings.
+
+    Must be called *after* a Treeview widget has been constructed.
+    ttkbootstrap's create_treeview_style hardcodes `relief=FLAT, padding=5`
+    on `Treeview.Heading` and runs lazily when the first Treeview is created,
+    so any styling done before that gets clobbered.
+
+    Visual: a subtly lifted heading strip with hairline column dividers —
+    just enough contrast to find the resize edges, not so much that it
+    reads as a row of boxes.
+    """
+    style = ttk.Style()
+    style.configure('Treeview.Heading',
+                    background='#2a2a2a',
+                    relief='solid',
+                    borderwidth=1,
+                    bordercolor='#353535',
+                    padding=(10, 6))
 
     # Type-tinted Radiobutton labels (Add Grid wizard). Bold so the colored
     # label reads as semantic identity, not as just "decorated text".
