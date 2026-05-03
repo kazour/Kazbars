@@ -110,7 +110,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/ui_components.py` | 451 | `ToastManager` (coalesce-by-key, in-place text update), `DragReorderManager`, scrollable frame |
 | `src/kazbars/grids_generator.py` | 424 | AS2 code generation from grid configs |
 | `src/kazbars/boss_timer.py` | 381 | Boss timer state + UI |
-| `src/kazbars/instructions_panel.py` | 366 | Help/instructions view |
+| `src/kazbars/instructions_panel.py` | 403 | Help/instructions view |
 | `src/kazbars/first_launch.py` | 353 | First-launch dialog + post-dialog orchestrator (`run_first_launch`) |
 | `src/kazbars/custom_menu_bar.py` | 359 | Canvas-based dark menu bar |
 | `src/kazbars/combat_monitor.py` | 294 | Combat log parser feeding the tracker |

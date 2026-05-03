@@ -198,6 +198,36 @@ class InstructionsPanel(ttk.Frame):
             "from preview mode, enter them in the Grids tab, and rebuild.",
         ])
 
+        # --- Ethram-Fal Live Tracker ---
+
+        tracker = self._add_section(inner, "Ethram-Fal Live Tracker", [
+            "Always-on-top overlay for the Viscous Seed cycle in the "
+            "Ethram-Fal raid. Reads your combat log so the raid can "
+            "coordinate scorpion kills.",
+        ])
+        self._add_subsection(tracker.content, "Setup", [
+            [("Click ", None),
+             ("⏱ Ethram-Fal", THEME_COLORS['accent']),
+             (" at the bottom right. Type /logcombat on in-game once per "
+              "session, then ", None),
+             ("Start Monitoring", THEME_COLORS['success']),
+             (".", None)],
+            "Test Cycle simulates a full ~40s cycle for positioning.",
+        ])
+        self._add_subsection(tracker.content, "Positioning", [
+            "Drag to position. Click the ○ glyph to lock; it becomes ●, "
+            "and game clicks pass through to AoC. Unlock from the panel's "
+            "Lock button.",
+        ])
+        self._add_subsection(tracker.content, "The cycle", [
+            "Every ~40s: Viscous Seed debuffs a player, Lotus Fixation "
+            "locks onto another 4s later. Silence the plants, drag the "
+            "scorpions to the pile, and kill them after 31s but before "
+            "the next seed.",
+            "Phase 4: two seeds at once, kite the scorpions. Syphon "
+            "clouds interrupt the cycle.",
+        ])
+
         # --- Buff Database ---
 
         db_section = self._add_section(inner, "The Buff Database", [
