@@ -70,30 +70,25 @@ class TimerOverlay:
         """
         self.root = tk.Toplevel(root)
         self._on_settings_changed = on_settings_changed
-        self._suspend_notify = False
 
-        # Load settings — fall back to TIMERS_DEFAULTS so the source of truth is single
         self.is_visible = settings.get('visible', TIMERS_DEFAULTS['visible'])
         self.transparent_bg = settings.get('transparent_bg', TIMERS_DEFAULTS['transparent_bg'])
         self.opacity = settings.get('opacity', TIMERS_DEFAULTS['opacity'])
         self.font_size = settings.get('font_size', TIMERS_DEFAULTS['font_size'])
         self.overlay_width = settings.get('width', TIMERS_DEFAULTS['width'])
         self.overlay_height = settings.get('height', TIMERS_DEFAULTS['height'])
-        # Lock state is applied via set_locked() at the end of __init__ so the
-        # state machine path runs (UI sync + click-through arming).
         self.is_locked = False
 
-        # Window attributes
         self.root.attributes('-topmost', True)
         self.root.attributes('-alpha', self.opacity)
-        self.root.overrideredirect(True)  # title() unused — no title bar
+        self.root.overrideredirect(True)
         self.root.attributes('-transparentcolor', self.TRANSPARENT_COLOR)
-        self.root.protocol("WM_DELETE_WINDOW", self._block_close)
+        # Overlay can't be closed via the window manager — only the panel
+        # may hide or destroy it.
+        self.root.protocol("WM_DELETE_WINDOW", lambda: None)
 
-        # Track widgets that need background updates
         self._bg_widgets = []
 
-        # Last-known display state, used to repaint the canvas on resize/theme change
         self._display_state = {
             'row1_msg': "Waiting for Seed...",
             'row1_player': "", 'row1_timer': "", 'row1_color': COLORS["default"],
@@ -102,7 +97,6 @@ class TimerOverlay:
             'cycle_timer': "",
         }
 
-        # Position window
         x = settings.get('x', TIMERS_DEFAULTS['x'])
         y = settings.get('y', TIMERS_DEFAULTS['y'])
         if not settings.get('positioned', False):
@@ -112,24 +106,14 @@ class TimerOverlay:
 
         self.root.geometry(f'{self.overlay_width}x{self.overlay_height}+{x}+{y}')
 
-        # Build UI
         self._build_ui()
         self._setup_dragging()
         self._apply_background()
 
-        # Apply initial lock state via set_locked so click-through arms via after_idle
-        target_locked = settings.get('locked', TIMERS_DEFAULTS['locked'])
-        if target_locked:
-            self._suspend_notify = True
-            try:
-                self.set_locked(True)
-            finally:
-                self._suspend_notify = False
-        else:
-            # Set the indicator glyph for the initial unlocked state.
-            self.lock_indicator.config(text=self.UNLOCK_GLYPH)
+        # Apply initial lock state with notify=False so the freshly-loaded
+        # settings don't trigger an immediate save.
+        self.set_locked(settings.get('locked', TIMERS_DEFAULTS['locked']), notify=False)
 
-        # Apply initial visibility
         if not self.is_visible:
             self.root.withdraw()
 
@@ -192,7 +176,7 @@ class TimerOverlay:
         # Chrome lives on the cycle_timer_canvas so it's naturally docked
         # bottom-right, never colliding with the message rows.
         self.lock_indicator = tk.Label(
-            self.cycle_timer_canvas, text="", font=FONT_SMALL,
+            self.cycle_timer_canvas, text=self.UNLOCK_GLYPH, font=FONT_SMALL,
             fg=TK_COLORS['border'], bg=self.BG_INNER, cursor='hand2'
         )
         self.lock_indicator.place(**self.LOCK_INDICATOR_PLACE)
@@ -249,6 +233,11 @@ class TimerOverlay:
 
     def _on_cycle_canvas_resize(self, _event):
         self._redraw_cycle_timer()
+
+    _TEXT_CANVAS_KEYS = (
+        'row1_msg', 'row1_player', 'row1_timer', 'row1_color',
+        'row2_msg', 'row2_player', 'row2_timer', 'row2_color',
+    )
 
     def _redraw(self):
         """Repaint both canvases from the last-known display state."""
@@ -369,59 +358,35 @@ class TimerOverlay:
             self._notify_settings_changed()
 
     def _notify_settings_changed(self):
-        """Notify parent that settings changed (for auto-save). Skipped while
-        a batch operation suspends notifications."""
-        if self._suspend_notify:
-            return
+        """Notify parent that settings changed (for auto-save)."""
         if self._on_settings_changed:
             self._on_settings_changed()
 
-    def _block_close(self):
-        """No-op WM_DELETE_WINDOW handler — overlay can't be closed via the
-        window manager; only the panel can hide or destroy it."""
-
     def _on_lock_click(self, _event):
         self.toggle_lock()
-
-    def _arm_click_through_on(self):
-        """Apply click-through after the window is realized (called via after_idle)."""
-        self._set_click_through(True)
 
     # =========================================================================
     # PUBLIC METHODS
     # =========================================================================
 
-    def update_display(self, row1_msg, row1_player, row1_timer, row1_color,
-                       row2_msg, row2_player, row2_timer, row2_color, cycle_timer):
+    def update_display(self, state):
         """
-        Update all display elements.
+        Update all display elements from a phase dict (see BossTimer._phase).
 
-        Args:
-            row1_msg: Text for row 1 (e.g., "Seed: ")
-            row1_player: Player name for row 1
-            row1_timer: Timer text for row 1 (e.g., "3s")
-            row1_color: Color for row 1 text
-            row2_msg: Text for row 2
-            row2_player: Player name for row 2
-            row2_timer: Timer text for row 2
-            row2_color: Color for row 2 text
-            cycle_timer: Overall cycle timer (e.g., "25s")
+        Boss timer pushes state every 50ms but already dedupes at the source;
+        the per-canvas diff here means a cycle-timer tick (1/sec) doesn't
+        rebuild the message rows, and vice versa.
         """
-        new_state = {
-            'row1_msg': row1_msg, 'row1_player': row1_player,
-            'row1_timer': row1_timer, 'row1_color': row1_color,
-            'row2_msg': row2_msg, 'row2_player': row2_player,
-            'row2_timer': row2_timer, 'row2_color': row2_color,
-            'cycle_timer': cycle_timer,
-        }
-        # Boss timer pushes state every 50ms; skip the redraw when the integer
-        # second hasn't ticked, ~9 of every 10 calls in steady state.
-        if new_state == self._display_state:
+        if state == self._display_state:
             return
-        self._display_state = new_state
-        self._redraw()
+        old = self._display_state
+        self._display_state = state
+        if any(state[k] != old[k] for k in self._TEXT_CANVAS_KEYS):
+            self._redraw_text_canvas()
+        if state['cycle_timer'] != old['cycle_timer']:
+            self._redraw_cycle_timer()
 
-    def set_locked(self, locked):
+    def set_locked(self, locked, notify=True):
         """Set lock state to a target (idempotent). Updates UI and click-through."""
         if locked == self.is_locked:
             return
@@ -430,12 +395,13 @@ class TimerOverlay:
             self.lock_indicator.config(text=self.LOCK_GLYPH, fg=TK_COLORS['border'])
             self.resize_handle.place_forget()
             # Defer click-through enable until the window is realized.
-            self.root.after_idle(self._arm_click_through_on)
+            self.root.after_idle(lambda: self._set_click_through(True))
         else:
             self.lock_indicator.config(text=self.UNLOCK_GLYPH, fg=TK_COLORS['border'])
             self.resize_handle.place(**self.RESIZE_HANDLE_PLACE)
             self._set_click_through(False)
-        self._notify_settings_changed()
+        if notify:
+            self._notify_settings_changed()
 
     def toggle_lock(self):
         """Toggle lock state."""
@@ -456,12 +422,13 @@ class TimerOverlay:
         except Exception as e:
             logger.warning("Failed to set click-through: %s", e)
 
-    def set_transparent(self, transparent):
+    def set_transparent(self, transparent, notify=True):
         """Toggle transparent background."""
         self.transparent_bg = transparent
         self._apply_background()
         self._redraw()  # Stroke layer toggles with this state
-        self._notify_settings_changed()
+        if notify:
+            self._notify_settings_changed()
 
     def _apply_background(self):
         """Apply current background mode to all widgets."""
@@ -474,38 +441,29 @@ class TimerOverlay:
             inner_color = self.BG_INNER
             border_color = self.BG_BORDER
 
+        bg_by_type = {'outer': outer_color, 'inner': inner_color, 'border': border_color}
         for widget_type, widget in self._bg_widgets:
-            try:
-                if widget_type == 'outer':
-                    widget.config(bg=outer_color)
-                elif widget_type == 'inner':
-                    widget.config(bg=inner_color)
-                elif widget_type == 'border':
-                    widget.config(bg=border_color)
-            except (tk.TclError, AttributeError):
-                pass
+            widget.config(bg=bg_by_type[widget_type])
 
-        try:
-            if self.transparent_bg:
-                self.frame.config(
-                    highlightbackground=self.TRANSPARENT_COLOR,
-                    highlightthickness=0
-                )
-            else:
-                self.frame.config(
-                    highlightbackground=border_color,
-                    highlightthickness=1
-                )
-        except (tk.TclError, AttributeError):
-            pass
+        if self.transparent_bg:
+            self.frame.config(
+                highlightbackground=self.TRANSPARENT_COLOR,
+                highlightthickness=0,
+            )
+        else:
+            self.frame.config(
+                highlightbackground=border_color,
+                highlightthickness=1,
+            )
 
-    def set_opacity(self, value):
+    def set_opacity(self, value, notify=True):
         """Set overlay opacity (0.3 - 1.0)."""
         self.opacity = float(value)
         self.root.attributes('-alpha', self.opacity)
-        self._notify_settings_changed()
+        if notify:
+            self._notify_settings_changed()
 
-    def set_font_size(self, size):
+    def set_font_size(self, size, notify=True):
         """Set font size for all text (8 - 20). Resizes the cycle-timer dock,
         re-clamps overlay height to the new minimum if needed, and repaints
         both canvases."""
@@ -516,7 +474,8 @@ class TimerOverlay:
             self.overlay_height = min_h
             self.root.geometry(f'{self.overlay_width}x{self.overlay_height}')
         self._redraw()
-        self._notify_settings_changed()
+        if notify:
+            self._notify_settings_changed()
 
     def show(self, notify=True):
         """Show the overlay window. Pass notify=False when the call is a UI
@@ -543,29 +502,23 @@ class TimerOverlay:
 
     def apply_settings(self, settings):
         """Apply a settings dict to the overlay (used by profile load).
-
-        Suspends per-setter notifications so the cascade saves once at the end
-        instead of N times.
-        """
-        self._suspend_notify = True
-        try:
-            self.set_opacity(settings.get('opacity', TIMERS_DEFAULTS['opacity']))
-            self.set_font_size(settings.get('font_size', TIMERS_DEFAULTS['font_size']))
-            self.set_transparent(settings.get('transparent_bg', TIMERS_DEFAULTS['transparent_bg']))
-            self.set_locked(settings.get('locked', TIMERS_DEFAULTS['locked']))
-            if settings.get('visible', TIMERS_DEFAULTS['visible']):
-                self.show()
-            else:
-                self.hide()
-            x = settings.get('x', self.root.winfo_x())
-            y = settings.get('y', self.root.winfo_y())
-            width = max(self.MIN_WIDTH, settings.get('width', self.overlay_width))
-            height = max(self._min_height(), settings.get('height', self.overlay_height))
-            self.overlay_width = width
-            self.overlay_height = height
-            self.root.geometry(f"{width}x{height}+{x}+{y}")
-        finally:
-            self._suspend_notify = False
+        Cascades through setters with notify=False so the parent only sees
+        a single save at the end."""
+        self.set_opacity(settings.get('opacity', TIMERS_DEFAULTS['opacity']), notify=False)
+        self.set_font_size(settings.get('font_size', TIMERS_DEFAULTS['font_size']), notify=False)
+        self.set_transparent(settings.get('transparent_bg', TIMERS_DEFAULTS['transparent_bg']), notify=False)
+        self.set_locked(settings.get('locked', TIMERS_DEFAULTS['locked']), notify=False)
+        if settings.get('visible', TIMERS_DEFAULTS['visible']):
+            self.show(notify=False)
+        else:
+            self.hide(notify=False)
+        x = settings.get('x', self.root.winfo_x())
+        y = settings.get('y', self.root.winfo_y())
+        width = max(self.MIN_WIDTH, settings.get('width', self.overlay_width))
+        height = max(self._min_height(), settings.get('height', self.overlay_height))
+        self.overlay_width = width
+        self.overlay_height = height
+        self.root.geometry(f"{width}x{height}+{x}+{y}")
         self._notify_settings_changed()
 
     def get_settings(self):

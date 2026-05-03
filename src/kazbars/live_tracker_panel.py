@@ -39,6 +39,9 @@ from .ui_helpers import (
 from .ui_widgets import add_tooltip, app_toast, create_dialog_header, create_tip_bar
 from .window_position import restore_window_position
 
+# Game-loop tick (ms) — drives both the schedule cadence and the reschedule.
+GAME_TICK_MS = 50
+
 # Test-cycle timing (ms)
 TEST_FIXATION_DELAY_MS = 4000
 TEST_RESET_DELAY_MS = 39500
@@ -115,16 +118,16 @@ class LiveTrackerPanel(tk.Toplevel):
     # UI CONSTRUCTION
     # =========================================================================
 
-    def _dispatch_overlay_update(self, **kwargs):
+    def _dispatch_overlay_update(self, phase):
         """Hand off an overlay update from any thread to the Tk main loop.
         Combat monitoring runs in a background thread; touching tk widgets
         directly from there is unsafe."""
-        self.after(0, partial(self._apply_overlay_update, kwargs))
+        self.after(0, partial(self._apply_overlay_update, phase))
 
-    def _apply_overlay_update(self, kwargs):
+    def _apply_overlay_update(self, phase):
         """Apply the queued overlay update on the Tk main thread."""
         if self.overlay:
-            self.overlay.update_display(**kwargs)
+            self.overlay.update_display(phase)
 
     def _build_ui(self):
         """Build the panel UI."""
@@ -312,26 +315,19 @@ class LiveTrackerPanel(tk.Toplevel):
 
         self._update_overlay_idle()
 
-    _LOG_STATE_FG = {
-        "found":     'success',
-        "missing":   'warning',
-        "no_path":   'warning',
-        "no_folder": 'danger',
-        "default":   'muted',
-    }
-
-    _LOG_STATE_OVERLAY = {
-        "found":     "active",
-        "missing":   "warning",
-        "no_path":   "warning",
-        "no_folder": "alert",
-        "default":   "default",
+    # Per log-state: (label foreground key in THEME_COLORS, overlay color key in COLORS).
+    _LOG_STATE_STYLE = {
+        "found":     ('success', 'active'),
+        "missing":   ('warning', 'warning'),
+        "no_path":   ('warning', 'warning'),
+        "no_folder": ('danger',  'alert'),
+        "default":   ('muted',   'default'),
     }
 
     def _set_log_status(self, text, state):
         """Update the log status label and remember its semantic state."""
         self._log_state = state
-        fg_key = self._LOG_STATE_FG.get(state, 'muted')
+        fg_key, _ = self._LOG_STATE_STYLE.get(state, self._LOG_STATE_STYLE["default"])
         self.log_status_label.config(text=text, foreground=THEME_COLORS[fg_key])
 
     def _update_overlay_idle(self):
@@ -340,12 +336,15 @@ class LiveTrackerPanel(tk.Toplevel):
             return
 
         log_text = self.log_status_label.cget('text')
-        log_color = COLORS[self._LOG_STATE_OVERLAY.get(self._log_state, "default")]
+        _, overlay_key = self._LOG_STATE_STYLE.get(self._log_state, self._LOG_STATE_STYLE["default"])
 
-        self.overlay.update_display(
-            "Monitor: Stopped", "", "", COLORS["default"],
-            log_text, "", "", log_color, ""
-        )
+        self.overlay.update_display({
+            'row1_msg': "Monitor: Stopped", 'row1_player': "", 'row1_timer': "",
+            'row1_color': COLORS["default"],
+            'row2_msg': log_text, 'row2_player': "", 'row2_timer': "",
+            'row2_color': COLORS[overlay_key],
+            'cycle_timer': "",
+        })
 
     def _start_monitoring(self):
         """Start combat log monitoring."""
@@ -396,8 +395,8 @@ class LiveTrackerPanel(tk.Toplevel):
         self._update_overlay_idle()
 
     def _start_game_loop(self):
-        """Start the 50ms update loop."""
-        self._game_loop_id = self.after(50, self._run_game_tick)
+        """Start the update loop."""
+        self._game_loop_id = self.after(GAME_TICK_MS, self._run_game_tick)
 
     def _run_game_tick(self):
         """One iteration of the boss-timer update loop. Re-schedules itself."""
@@ -406,7 +405,7 @@ class LiveTrackerPanel(tk.Toplevel):
         except Exception as e:
             logger.error("Timer loop error: %s", e)
         finally:
-            self._game_loop_id = self.after(50, self._run_game_tick)
+            self._game_loop_id = self.after(GAME_TICK_MS, self._run_game_tick)
 
     def _stop_game_loop(self):
         """Stop the update loop."""

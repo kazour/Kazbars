@@ -46,7 +46,7 @@ Steps:
 5. `_migrate_grid()` — src/kazbars/grids_panel.py:1047 — normalizes legacy `int` IDs and legacy name strings in `whitelist` and `slotAssignments` to current primary spell IDs via `database.by_id` and `database.get_entry_by_name`
 6. `validate_grid()` — src/kazbars/grid_model.py:74 — fills missing keys from `create_default_grid()`; clamps every numeric field against `CLAMP_SPECS`; coerces enums in `ENUM_SPECS`; coerces booleans and lists/dicts
 7. `refresh_panels()` — src/kazbars/grids_panel.py:1172 — destroys existing `GridEditorPanel` widgets; creates new ones for the validated list; shows empty state if list is empty
-8. If a Boss Timer panel is alive, `LiveTrackerPanel.load_profile_data()` — src/kazbars/live_tracker_panel.py:518 — applies the embedded `boss_timer.overlay` settings to the overlay (`apply_settings` then propagates opacity, font, transparent, lock, x/y/width/height, and visible state through `set_*` calls under `_suspend_notify`, saving once at the end)
+8. If a Boss Timer panel is alive, `LiveTrackerPanel.load_profile_data()` — src/kazbars/live_tracker_panel.py:517 — applies the embedded `boss_timer.overlay` settings to the overlay (`apply_settings` then propagates opacity, font, transparent, lock, x/y/width/height, and visible state through `set_*(..., notify=False)` calls, with a single `_notify_settings_changed()` at the end so the parent saves once)
 9. `warn_missing_buffs()` — src/kazbars/profile_io.py:122 — if migration dropped any references, displays them (deferred 200ms when called during startup so the dialog doesn't race the welcome popup)
 10. `app.settings.set('last_profile', ...)` then `app.settings.save()` — persists `last_profile` path to `kazbars_settings.json` via atomic temp-rename in `safe_save_json` (src/kazbars/settings_manager.py:33)
 
@@ -65,7 +65,7 @@ Steps:
 4. `get_profile_data()` — src/kazbars/grids_panel.py:1020 — calls `save_settings()` then returns `self.grids`
 5. `save_settings()` — src/kazbars/grids_panel.py:1126 — iterates all `GridEditorPanel` instances calling `save_to_config()`
 6. `save_to_config()` — src/kazbars/grids_panel.py:405 — reads all widget values into the grid config dict
-7. If a Boss Timer panel is alive, `LiveTrackerPanel.get_profile_data()` — src/kazbars/live_tracker_panel.py:513 — returns `{'overlay': {...}}` for embedding
+7. If a Boss Timer panel is alive, `LiveTrackerPanel.get_profile_data()` — src/kazbars/live_tracker_panel.py:512 — returns `{'overlay': {...}}` for embedding
 8. `safe_save_json()` — src/kazbars/settings_manager.py:33 — writes JSON to `path.tmp` then `Path.replace`-renames it over the target atomically
 9. `app.settings.set('last_profile', ...)` then `app.settings.save()` — persists `last_profile` to `kazbars_settings.json`
 
@@ -171,12 +171,12 @@ Trigger: User clicks the "⏱ Ethram-Fal" button in the bottom bar (right side, 
 
 Steps:
 1. `_open_boss_timer()` — src/kazbars/app.py:412 — checks `_boss_timer_if_alive()`; if a panel exists, deiconifies/lifts/restores the overlay; otherwise constructs a new `LiveTrackerPanel`
-2. `LiveTrackerPanel.__init__()` — src/kazbars/live_tracker_panel.py:71 — runs the one-shot `_migrate_window_position_key()` (renames legacy `window_pos_boss_timer` → `window_pos_live_tracker`); restores window position; calls `load_settings()`; builds UI; creates overlay; constructs `BossTimer` and `CombatLogMonitor`; auto-detects log path
+2. `LiveTrackerPanel.__init__()` — src/kazbars/live_tracker_panel.py:74 — runs the one-shot `_migrate_window_position_key()` (renames legacy `window_pos_boss_timer` → `window_pos_live_tracker`); restores window position; calls `load_settings()`; builds UI; creates overlay; constructs `BossTimer` and `CombatLogMonitor`; auto-detects log path
 3. `load_settings()` — src/kazbars/live_tracker_settings.py:119 — runs the one-shot `_migrate_legacy_filename()` (renames legacy `timers_settings.json` → `live_tracker_settings.json`); reads `live_tracker_settings.json` from the settings folder; returns dict validated against `TIMERS_DEFAULTS` and `TIMERS_RANGES`
-4. `BossTimer.__init__()` — src/kazbars/boss_timer.py:53 — initializes cycle state fields; stores `LiveTrackerPanel._dispatch_overlay_update` (src/kazbars/live_tracker_panel.py:118) as `_update_callback` — that method hops cross-thread updates onto the Tk main loop via `self.after(0, partial(_apply_overlay_update, kwargs))` (src/kazbars/live_tracker_panel.py:124)
+4. `BossTimer.__init__()` — src/kazbars/boss_timer.py:53 — initializes cycle state fields and `_last_phase = None` (the source-side dedupe cache); stores `LiveTrackerPanel._dispatch_overlay_update` (src/kazbars/live_tracker_panel.py:121) as `_update_callback` — that method hops cross-thread updates onto the Tk main loop via `self.after(0, partial(_apply_overlay_update, phase))` (src/kazbars/live_tracker_panel.py:127)
 5. `CombatLogMonitor.__init__()` — src/kazbars/combat_monitor.py:34 — initializes daemon thread state; stores the `boss_timer` reference
 6. `TimerOverlay.__init__()` — src/kazbars/timer_overlay.py:62 — creates always-on-top `Toplevel` with configured opacity and position; calls `_build_ui()` which packs a two-canvas docked layout (top `text_canvas` for rows 1+2, 1px separator frame, bottom fixed-height `cycle_timer_canvas` hosting cycle timer + lock indicator (●/○, clickable to lock; click-through blocks the unlock direction) + resize handle); auto-centers on first run when `positioned=False`; auto-shows on launch via `show(notify=False)` (preserves any saved `visible=False` preference)
-7. `LiveTrackerPanel._update_log_path()` — src/kazbars/live_tracker_panel.py:294 — calls `combat_monitor.set_log_folder()` with the current game path
+7. `LiveTrackerPanel._update_log_path()` — src/kazbars/live_tracker_panel.py:297 — calls `combat_monitor.set_log_folder()` with the current game path
 8. `CombatLogMonitor.set_log_folder()` — src/kazbars/combat_monitor.py:51 — finds latest `CombatLog*.txt` in the game folder; records file end position as `last_position`
 
 End state: `LiveTrackerPanel` window visible; `TimerOverlay` shown; `CombatLogMonitor` ready with log file path set; overlay shows monitor + log status
@@ -188,12 +188,12 @@ End state: `LiveTrackerPanel` window visible; `TimerOverlay` shown; `CombatLogMo
 Trigger: User clicks "Start Monitoring" button in `LiveTrackerPanel`
 
 Steps:
-1. `LiveTrackerPanel._start_monitoring()` — src/kazbars/live_tracker_panel.py:350 — re-runs `_update_log_path()` (which calls `combat_monitor.set_log_folder()` to refresh `log_path` and `last_position`); toasts a warning if no log file is found; disables the Test Cycle button so the two modes are mutually exclusive
+1. `LiveTrackerPanel._start_monitoring()` — src/kazbars/live_tracker_panel.py:349 — re-runs `_update_log_path()` (which calls `combat_monitor.set_log_folder()` to refresh `log_path` and `last_position`); toasts a warning if no log file is found; disables the Test Cycle button so the two modes are mutually exclusive
 2. `CombatLogMonitor.start_monitoring()` — src/kazbars/combat_monitor.py:122 — sets `monitoring=True`; spawns the `CombatLogMonitor` daemon thread running `_monitor_loop()`
-3. `BossTimer.push_waiting_state()` — src/kazbars/boss_timer.py:231 — fires `_update_callback` with "Waiting for Seed..." strings
-4. `LiveTrackerPanel._dispatch_overlay_update()` — src/kazbars/live_tracker_panel.py:118 — named cross-thread dispatcher; queues `partial(_apply_overlay_update, kwargs)` on the Tk main loop via `self.after(0, ...)`. `_apply_overlay_update()` (src/kazbars/live_tracker_panel.py:124) applies the kwargs to `self.overlay.update_display()` if the overlay still exists
-5. `TimerOverlay.update_display()` — src/kazbars/timer_overlay.py:394 — short-circuits when `new_state == self._display_state` (skips ~9 of every 10 calls in steady state); otherwise updates `_display_state` and calls `_redraw()` which repaints both `text_canvas` (rows 1+2) and `cycle_timer_canvas`
-6. `LiveTrackerPanel._start_game_loop()` — src/kazbars/live_tracker_panel.py:398 — schedules `_run_game_tick()` (src/kazbars/live_tracker_panel.py:402) on a 50ms recurring `after()` cadence; each tick calls `boss_timer.update_display()` and re-schedules itself
+3. `BossTimer.push_waiting_state()` — src/kazbars/boss_timer.py:199 — builds the idle phase dict via `_phase()`, caches it on `_last_phase`, and fires `_update_callback(phase)`
+4. `LiveTrackerPanel._dispatch_overlay_update()` — src/kazbars/live_tracker_panel.py:121 — named cross-thread dispatcher; queues `partial(_apply_overlay_update, phase)` on the Tk main loop via `self.after(0, ...)`. `_apply_overlay_update()` (src/kazbars/live_tracker_panel.py:127) calls `self.overlay.update_display(phase)` if the overlay still exists
+5. `TimerOverlay.update_display()` — src/kazbars/timer_overlay.py:372 — accepts the phase dict; short-circuits when it equals `_display_state`; otherwise diffs per-canvas, calling `_redraw_text_canvas()` only when a row* field changed and `_redraw_cycle_timer()` only when `cycle_timer` changed (so a 1/sec cycle-tick doesn't rebuild the rows)
+6. `LiveTrackerPanel._start_game_loop()` — src/kazbars/live_tracker_panel.py:397 — schedules `_run_game_tick()` (src/kazbars/live_tracker_panel.py:401) on a `GAME_TICK_MS` (50 ms) recurring `after()` cadence; each tick calls `boss_timer.update_display()` and re-schedules itself
 
 End state: `CombatLogMonitor` daemon thread running; 50ms UI poll active; overlay displays "Waiting for Seed..."
 
@@ -206,10 +206,10 @@ Trigger: `CombatLogMonitor` daemon thread reads a new log line containing "Visco
 Steps:
 1. `CombatLogMonitor._monitor_loop()` — src/kazbars/combat_monitor.py:196 — polls log file every 100ms; checks every 30s for a newer log file; handles truncation/rotation; reads bytes since `last_position`; dispatches matching lines to `_process_line()`
 2. `CombatLogMonitor._process_line()` — src/kazbars/combat_monitor.py:245 — identifies trigger type (Syphon → `start_syphon`, Viscous Seed from Ethram-Fal → `start_cycle`, Lotus Fixation from Emerald Lotus → `update_fixation`); extracts player name (or "YOU") from the line text via `_extract_player()`
-3. `BossTimer.start_cycle()` — src/kazbars/boss_timer.py:78 — sets `timer_active=True`; records `cycle_start_time` and `seed_player`; detects double-seed (P4) when called 5–12s after the previous seed for the same player
-4. `BossTimer.update_display()` — src/kazbars/boss_timer.py:212 — called from the 50ms UI loop; calls `get_current_phase()`; fires `_update_callback` with the phase display dict (msg, player, timer, color per row + cycle_timer)
-5. `LiveTrackerPanel._dispatch_overlay_update()` — src/kazbars/live_tracker_panel.py:118 — named cross-thread dispatcher; queues `partial(_apply_overlay_update, kwargs)` on the Tk main loop via `self.after(0, ...)`. `_apply_overlay_update()` (src/kazbars/live_tracker_panel.py:124) applies the kwargs to `self.overlay.update_display()` if the overlay still exists
-6. `TimerOverlay.update_display()` — src/kazbars/timer_overlay.py:394 — short-circuits if state hasn't changed; otherwise calls `_redraw()` which repaints `text_canvas` (rows 1+2 with their per-row colors via canvas text items, plus an 8-direction outline stroke when `transparent_bg=True`) and `cycle_timer_canvas` (cycle timer in `COLORS["default"]`)
+3. `BossTimer.start_cycle()` — src/kazbars/boss_timer.py:85 — calls `_reset_cycle_state()` then sets `timer_active=True`; records `cycle_start_time` and `seed_player`; detects double-seed (P4) when called 5–12s after the previous seed for the same player
+4. `BossTimer.update_display()` — src/kazbars/boss_timer.py:186 — called from the 50 ms UI loop; calls `get_current_phase()`; compares the result to the cached `_last_phase` and short-circuits if equal (skips ~19 of every 20 ticks once the integer second is steady), otherwise fires `_update_callback(phase)` with the new dict
+5. `LiveTrackerPanel._dispatch_overlay_update()` — src/kazbars/live_tracker_panel.py:121 — named cross-thread dispatcher; queues `partial(_apply_overlay_update, phase)` on the Tk main loop via `self.after(0, ...)`. `_apply_overlay_update()` (src/kazbars/live_tracker_panel.py:127) calls `self.overlay.update_display(phase)` if the overlay still exists
+6. `TimerOverlay.update_display()` — src/kazbars/timer_overlay.py:372 — second-line dedupe (skip when `phase == _display_state`); on a real change, repaints only the canvas whose fields changed: `_redraw_text_canvas()` for row* fields (per-row colors via canvas text items, plus an 8-direction outline stroke when `transparent_bg=True`), `_redraw_cycle_timer()` for `cycle_timer` (`COLORS["default"]`)
 
 End state: overlay displays the active seed/fixation/syphon phase with elapsed timer text updated on the next 50ms poll
 

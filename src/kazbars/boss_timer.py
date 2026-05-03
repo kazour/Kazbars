@@ -55,25 +55,32 @@ class BossTimer:
         Initialize the boss timer.
 
         Args:
-            update_callback: Function to call with display data. Signature:
-                callback(row1_msg, row1_player, row1_timer, row1_color,
-                        row2_msg, row2_player, row2_timer, row2_color, cycle_timer)
+            update_callback: callback(phase_dict) — receives the dict produced
+                by get_current_phase(), or the waiting/syphon equivalent.
         """
         self._update_callback = update_callback
         self._lock = threading.Lock()
+        # Last phase dict pushed to the callback; used to dedupe the 50ms tick
+        # so 19/20 calls short-circuit before scheduling a Tk redraw.
+        self._last_phase = None
 
-        # Core state
         self.timer_active = False
         self.cycle_start_time = None
         self.seed_player = None
         self.fixation_player = None
-        self.seed_detected = False
-        self.fixation_detected = False
 
-        # Special mechanics
         self.syphon_active = False
         self.double_seed_mode = False
         self.second_seed_active = False
+
+    def _reset_cycle_state(self):
+        """Reset cycle state. Caller must hold self._lock."""
+        self.timer_active = False
+        self.cycle_start_time = None
+        self.seed_player = None
+        self.fixation_player = None
+        self.second_seed_active = False
+        self.double_seed_mode = False
 
     def start_cycle(self, player_name):
         """
@@ -85,7 +92,6 @@ class BossTimer:
         with self._lock:
             self.syphon_active = False
 
-            # Check for double seed (P4 mechanic)
             if (self.timer_active and
                 self.cycle_start_time is not None and
                 self.seed_player == player_name):
@@ -96,27 +102,15 @@ class BossTimer:
                     self.second_seed_active = True
                     return
 
-            # New cycle - reset state
+            self._reset_cycle_state()
             self.timer_active = True
             self.cycle_start_time = current_time
             self.seed_player = player_name
-            self.fixation_player = None
-            self.seed_detected = True
-            self.fixation_detected = False
-            self.second_seed_active = False
-            self.double_seed_mode = False
 
     def stop_cycle(self):
         """Stop the current cycle and reset to waiting state."""
         with self._lock:
-            self.timer_active = False
-            self.cycle_start_time = None
-            self.seed_player = None
-            self.fixation_player = None
-            self.seed_detected = False
-            self.fixation_detected = False
-            self.second_seed_active = False
-            self.double_seed_mode = False
+            self._reset_cycle_state()
             self.syphon_active = False
 
         self.push_waiting_state()
@@ -131,7 +125,6 @@ class BossTimer:
     def update_fixation(self, player_name):
         """Record the fixation target."""
         with self._lock:
-            self.fixation_detected = True
             self.fixation_player = player_name
 
     def get_current_phase(self):
@@ -144,44 +137,28 @@ class BossTimer:
             None if no active display needed
         """
         with self._lock:
-            # Syphon phase overrides everything
             if self.syphon_active:
-                return {
-                    'row1_msg': "Avoid the clouds", 'row1_player': "",
-                    'row1_timer': "", 'row1_color': COLORS["alert"],
-                    'row2_msg': "", 'row2_player': "",
-                    'row2_timer': "", 'row2_color': COLORS["default"],
-                    'cycle_timer': ""
-                }
+                return self._phase("Avoid the clouds", COLORS["alert"], "")
 
             if not self.timer_active or self.cycle_start_time is None:
                 return None
 
             elapsed = time.time() - self.cycle_start_time
 
-            # Cycle complete — reset inline under the same lock to prevent
-            # start_cycle() from sneaking in between lock release and stop_cycle()
+            # Reset inline under the same lock so start_cycle() can't sneak in
+            # between lock release and a separate stop_cycle() call.
             if elapsed >= CYCLE_DURATION:
-                self.timer_active = False
-                self.cycle_start_time = None
-                self.seed_player = None
-                self.fixation_player = None
-                self.seed_detected = False
-                self.fixation_detected = False
-                self.second_seed_active = False
-                self.double_seed_mode = False
+                self._reset_cycle_state()
                 cycle_completed = True
             else:
                 cycle_completed = False
                 elapsed_int = int(elapsed)
                 timer_text = f"{elapsed_int}s"
 
-                is_first_seed = elapsed_int > FIRST_SEED_THRESHOLD and not self.fixation_detected
+                fixation_detected = self.fixation_player is not None
+                is_first_seed = elapsed_int > FIRST_SEED_THRESHOLD and not fixation_detected
                 is_double_seed = self.double_seed_mode
                 second_seed_active = self.second_seed_active
-
-                seed_detected = self.seed_detected
-                fixation_detected = self.fixation_detected
                 seed_player = self.seed_player
                 fixation_player = self.fixation_player
 
@@ -189,7 +166,6 @@ class BossTimer:
             self.push_waiting_state()
             return None
 
-        # Determine which phase we're in
         if is_double_seed:
             return self._get_double_seed_phase(
                 elapsed_int, timer_text, seed_player, fixation_player,
@@ -197,13 +173,11 @@ class BossTimer:
             )
 
         if is_first_seed:
-            return self._get_first_seed_phase(
-                elapsed_int, timer_text, seed_detected, seed_player
-            )
+            return self._get_first_seed_phase(elapsed_int, timer_text, seed_player)
 
         if elapsed_int < BRING_SCORP_END + 1:
             return self._get_seed_fixation_phase(
-                elapsed_int, timer_text, seed_detected, fixation_detected,
+                elapsed_int, timer_text, fixation_detected,
                 seed_player, fixation_player
             )
 
@@ -211,31 +185,23 @@ class BossTimer:
 
     def update_display(self):
         """
-        Get current phase and push to callback.
-        Call this every 50ms in the game loop.
+        Get current phase and push to callback if it changed.
+        Call this every 50ms in the game loop; identical phases short-circuit
+        so the Tk redraw is skipped ~19 of every 20 ticks.
         """
         phase = self.get_current_phase()
-        if phase and self._update_callback:
-            self._update_callback(
-                row1_msg=phase.get('row1_msg', ''),
-                row1_player=phase.get('row1_player', ''),
-                row1_timer=phase.get('row1_timer', ''),
-                row1_color=phase.get('row1_color', COLORS["default"]),
-                row2_msg=phase.get('row2_msg', ''),
-                row2_player=phase.get('row2_player', ''),
-                row2_timer=phase.get('row2_timer', ''),
-                row2_color=phase.get('row2_color', COLORS["default"]),
-                cycle_timer=phase.get('cycle_timer', '')
-            )
+        if phase is None or phase == self._last_phase:
+            return
+        self._last_phase = phase
+        if self._update_callback:
+            self._update_callback(phase)
 
     def push_waiting_state(self):
         """Push the idle/waiting display state."""
+        phase = self._phase("Waiting for Seed...", COLORS["default"], "")
+        self._last_phase = phase
         if self._update_callback:
-            self._update_callback(
-                row1_msg="Waiting for Seed...", row1_player="", row1_timer="",
-                row1_color=COLORS["default"], row2_msg="", row2_player="",
-                row2_timer="", row2_color=COLORS["default"], cycle_timer=""
-            )
+            self._update_callback(phase)
 
     # =========================================================================
     # HELPER: Build phase display dict
@@ -260,20 +226,20 @@ class BossTimer:
     # PHASE CALCULATION METHODS
     # =========================================================================
 
-    def _get_first_seed_phase(self, elapsed, timer_text, seed_detected, seed_player):
+    def _get_first_seed_phase(self, elapsed, timer_text, seed_player):
         """First seed without fixation (scorpion soon)."""
         if elapsed <= SEED_DURATION:
             seed_remaining = max(0, SEED_DURATION - elapsed)
-            row1_msg = "Seed: " if seed_detected and seed_player else "Seed"
-            row1_player = seed_player if seed_detected and seed_player else ""
+            row1_msg = "Seed: " if seed_player else "Seed"
+            row1_player = seed_player or ""
             row1_timer = f"{int(seed_remaining)}s" if seed_remaining > 0 else "Done"
             return self._phase(row1_msg, COLORS["alert"], timer_text,
                                row1_player=row1_player, row1_timer=row1_timer)
 
         return self._phase("First Seed - Scorpion Soon", COLORS["warning"], timer_text)
 
-    def _get_seed_fixation_phase(self, elapsed, timer_text, seed_detected,
-                                  fixation_detected, seed_player, fixation_player):
+    def _get_seed_fixation_phase(self, elapsed, timer_text, fixation_detected,
+                                  seed_player, fixation_player):
         """Normal seed + fixation cycle phases."""
         if elapsed <= SEED_ACTIVE_END:
             return self._phase_seed_active(

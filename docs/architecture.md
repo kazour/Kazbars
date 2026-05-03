@@ -103,13 +103,13 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/grid_dialogs.py` | 841 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
 | `src/kazbars/build_loading.py` | 797 | Build-progress screen + welcome/about popups |
 | `src/kazbars/buff_display_editor.py` | 743 | Default Buff Bars dialog — edits HUD XML for 4 portraits via surgical regex; collapsible sections persist open state |
-| `src/kazbars/timer_overlay.py` | 589 | In-game transparent timer overlay (two-canvas docked layout, stroke rendering, click-through lock) |
 | `src/kazbars/app.py` | 584 | Entry point + `KazBarsApp` root window (widgets, menu, lifecycle) |
 | `src/kazbars/ui_widgets.py` | 577 | Widget builders, tooltips, bindings, `CollapsibleSection` (with `set_dimmed`), `blend_alpha`, `flash_status_bar`, `app_toast` |
-| `src/kazbars/live_tracker_panel.py` | 576 | Live Tracker Toplevel orchestrator |
+| `src/kazbars/live_tracker_panel.py` | 575 | Live Tracker Toplevel orchestrator |
+| `src/kazbars/timer_overlay.py` | 542 | In-game transparent timer overlay (two-canvas docked layout, stroke rendering, click-through lock) |
 | `src/kazbars/ui_components.py` | 451 | `ToastManager` (coalesce-by-key, in-place text update), `DragReorderManager`, scrollable frame |
-| `src/kazbars/boss_timer.py` | 415 | Boss timer state + UI |
 | `src/kazbars/grids_generator.py` | 424 | AS2 code generation from grid configs |
+| `src/kazbars/boss_timer.py` | 381 | Boss timer state + UI |
 | `src/kazbars/instructions_panel.py` | 366 | Help/instructions view |
 | `src/kazbars/first_launch.py` | 353 | First-launch dialog + post-dialog orchestrator (`run_first_launch`) |
 | `src/kazbars/custom_menu_bar.py` | 359 | Canvas-based dark menu bar |
