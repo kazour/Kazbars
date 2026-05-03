@@ -1,6 +1,6 @@
 # Architectural Map
 
-**Current as of:** 2026-05-02 (after Buff Display editor pass: new `src/kazbars/buff_display_editor.py` modal under Game → "Default buff bars…" edits four HUD XML files (Player, Target, Top, Floating) via surgical regex; mirror-the-XML semantics with no stock defaults; collapsible per-file sections persist open/closed via `settings_manager`; scrollable body with pinned bottom button row; Apply uses success bootstyle; sister smoke test `tests/test_buff_xml.py` covers the round-trip helpers.)
+**Current as of:** 2026-05-03 (after Live Tracker pass: Ethram-Fal seed phase strings restructured ("Bring Scorpion to the pile" 15–18s; "Kill window in" 19–30s with color escalation at 28s; Scorp → Scorpion across all overlay strings); Test Cycle and Start Monitoring are mutually exclusive; overlay padlock is now click-to-lock with the app's Lock/Unlock button auto-syncing via the new `_on_overlay_settings_changed` callback; `pywin32` declared as a Windows-only dependency so `WS_EX_TRANSPARENT` click-through actually engages when locked (was a silent no-op before); `BossTimer._push_waiting_state` renamed to public `push_waiting_state` since it's called from `live_tracker_panel`; `stop_cycle` now also clears `syphon_active`/`double_seed_mode` to prevent stale phase display after stop+restart.)
 **Purpose:** Module topology, dependencies, and coupling hotspots. Updated alongside code changes — if you edit this file, commit it with the code. `CLAUDE.md` has the short version; this file has the detail that doesn't fit there.
 
 ## Dependency clusters
@@ -105,10 +105,10 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/build_loading.py` | 797 | Build-progress screen + welcome/about popups |
 | `src/kazbars/app.py` | 584 | Entry point + `KazBarsApp` root window (widgets, menu, lifecycle) |
 | `src/kazbars/ui_widgets.py` | 577 | Widget builders, tooltips, bindings, `CollapsibleSection` (with `set_dimmed`), `blend_alpha`, `flash_status_bar`, `app_toast` |
-| `src/kazbars/live_tracker_panel.py` | 518 | Live Tracker Toplevel orchestrator |
+| `src/kazbars/live_tracker_panel.py` | 534 | Live Tracker Toplevel orchestrator |
 | `src/kazbars/ui_components.py` | 451 | `ToastManager` (coalesce-by-key, in-place text update), `DragReorderManager`, scrollable frame |
-| `src/kazbars/timer_overlay.py` | 440 | In-game transparent timer overlay |
-| `src/kazbars/boss_timer.py` | 422 | Boss timer state + UI |
+| `src/kazbars/timer_overlay.py` | 451 | In-game transparent timer overlay |
+| `src/kazbars/boss_timer.py` | 416 | Boss timer state + UI |
 | `src/kazbars/grids_generator.py` | 424 | AS2 code generation from grid configs |
 | `src/kazbars/instructions_panel.py` | 366 | Help/instructions view |
 | `src/kazbars/first_launch.py` | 353 | First-launch dialog + post-dialog orchestrator (`run_first_launch`) |

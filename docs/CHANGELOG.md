@@ -14,7 +14,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Overlay padlock icon is now clickable to lock the overlay in place — no need to reach back into the app to lock it. Clicking 🔓 in the overlay toggles to 🔒 and the app's Lock button updates to "Unlock" automatically. Unlock still has to come from the app, by design: locking enables OS-level click-through (`WS_EX_TRANSPARENT`) so game clicks pass through to AoC underneath, which means clicks on 🔒 also pass through and can't trigger an unlock.
+- `pywin32` declared as a real Windows-only dependency. Previously the click-through (the whole point of "Lock") was guarded by `try: import win32con` and silently did nothing in shipped builds because `pywin32` was never installed. With this release, locking the overlay actually lets you click through to the game UI behind it.
+
+### Changed
+- Ethram-Fal seed phase strings tightened: "Bring Scorp to the pile" stays up two seconds longer (15–18s instead of 15–16s), then the row1 message becomes "Kill window in Xs" (warning) for 19–27s before escalating to alert color at 28s. "Scorp" / "Scorps" renamed to "Scorpion" / "Scorpions" in every overlay message ("First Seed - Scorpion Soon", "Bring Scorpion to the pile", "Dps Scorpion to 5%", "Kill Scorpion!", "Kite Scorpions").
+- Live Tracker enforces mutual exclusion between Test Cycle and Start Monitoring. Starting a test cycle disables the "Start Monitoring" button until the test ends (manually or after the natural ~40s reset); starting monitoring already disabled "Test Cycle". You can no longer wedge the two modes into running simultaneously.
+- "Transparent background" tooltip rewritten — was misleadingly tied to click-through behavior, which is actually controlled by Lock state.
+
 ### Fixed
+- After a syphon event followed by Stop Monitoring, the overlay would show "Avoid the clouds" indefinitely on the next Start Monitoring because `stop_cycle` didn't reset `syphon_active`. `stop_cycle` now clears all special-mechanic flags.
+- `_set_click_through` no longer silently swallows pywin32 errors; failures are now logged.
 - About popup is now single-instance — repeat clicks on the menu's About button lift and focus the existing popup instead of stacking a new one each time. Pattern matches the boss-timer single-instance gate (`_open_boss_timer` / `_boss_timer_if_alive`): `_show_about` checks `getattr(self, '_about_popup', None)` and `winfo_exists()`, calls `deiconify/lift/focus_set` if alive, otherwise creates a fresh one and stores it. `show_about_popup` now returns the `Toplevel` so the caller can hold the reference. Audited every other clickable popup trigger in the app — all the other dialogs (`BuffDisplayDialog`, `BuffEditDialog`, `AddGridWizard`, `BuffSelectorDialog`, `SlotAssignmentDialog`, `show_close_game_required_dialog`) are `grab_set()` modals so their triggers are unreachable while alive; `LiveTrackerPanel` already had its own single-instance gate; `BuildLoadingScreen` is fronted by the `_building` re-entry flag in `build_action.build`. About was the only window that combined a frameless / non-modal style with a clickable affordance that stays live.
 
 ### Changed

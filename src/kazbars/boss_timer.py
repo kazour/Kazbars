@@ -21,7 +21,7 @@ FIXATION_DELAY = 4          # Seconds after seed before fixation appears
 SEED_ACTIVE_END = 10        # End of seed active display phase
 SILENCE_START = 14          # Wait-for-silence phase ends here (countdown from 15)
 SILENCE_COUNTDOWN = 15      # Silence countdown target
-SCORPION_SPAWN = 16         # Scorpion spawns / DPS phase starts
+BRING_SCORP_END = 18        # "Bring Scorpion to the pile" message ends here
 KILL_WINDOW_START = 31      # Kill window opens
 URGENCY_START = 33          # Urgency escalation starts (! marks)
 KILL_WINDOW_END = 36        # Kill window urgency ramps up
@@ -116,8 +116,10 @@ class BossTimer:
             self.seed_detected = False
             self.fixation_detected = False
             self.second_seed_active = False
+            self.double_seed_mode = False
+            self.syphon_active = False
 
-        self._push_waiting_state()
+        self.push_waiting_state()
 
     def start_syphon(self):
         """Boss is using syphon attack - interrupt timer."""
@@ -167,6 +169,7 @@ class BossTimer:
                 self.seed_detected = False
                 self.fixation_detected = False
                 self.second_seed_active = False
+                self.double_seed_mode = False
                 cycle_completed = True
             else:
                 cycle_completed = False
@@ -183,7 +186,7 @@ class BossTimer:
                 fixation_player = self.fixation_player
 
         if cycle_completed:
-            self._push_waiting_state()
+            self.push_waiting_state()
             return None
 
         # Determine which phase we're in
@@ -198,7 +201,7 @@ class BossTimer:
                 elapsed_int, timer_text, seed_detected, seed_player
             )
 
-        if elapsed_int < SCORPION_SPAWN + 1:
+        if elapsed_int < BRING_SCORP_END + 1:
             return self._get_seed_fixation_phase(
                 elapsed_int, timer_text, seed_detected, fixation_detected,
                 seed_player, fixation_player
@@ -225,7 +228,7 @@ class BossTimer:
                 cycle_timer=phase.get('cycle_timer', '')
             )
 
-    def _push_waiting_state(self):
+    def push_waiting_state(self):
         """Push the idle/waiting display state."""
         if self._update_callback:
             self._update_callback(
@@ -267,7 +270,7 @@ class BossTimer:
             return self._phase(row1_msg, COLORS["alert"], timer_text,
                                row1_player=row1_player, row1_timer=row1_timer)
 
-        return self._phase("First Seed - Scorp Soon", COLORS["warning"], timer_text)
+        return self._phase("First Seed - Scorpion Soon", COLORS["warning"], timer_text)
 
     def _get_seed_fixation_phase(self, elapsed, timer_text, seed_detected,
                                   fixation_detected, seed_player, fixation_player):
@@ -279,14 +282,7 @@ class BossTimer:
         if elapsed <= SILENCE_START:
             return self._phase_wait_silence(elapsed, timer_text, fixation_player)
 
-        if elapsed <= SCORPION_SPAWN:
-            return self._phase_dps_scorpion(timer_text)
-
-        # Kill window countdown
-        kill_window_in = KILL_WINDOW_START - elapsed
-        return self._phase("Kill window in", COLORS["warning"], timer_text,
-                           row1_timer=f"{int(kill_window_in)}s",
-                           row2_msg="Dps Scorp to 5%", row2_color=COLORS["warning"])
+        return self._phase_dps_scorpion(timer_text)
 
     def _phase_seed_active(self, elapsed, timer_text, seed_player,
                            fixation_detected, fixation_player):
@@ -294,10 +290,7 @@ class BossTimer:
         seed_remaining = max(0, SEED_DURATION - elapsed)
         row1_msg = "Seed: " if seed_player else "Seed"
         row1_player = seed_player if seed_player else ""
-        if elapsed <= SEED_DURATION:
-            row1_timer = f"{int(seed_remaining)}s" if seed_remaining > 0 else "Done"
-        else:
-            row1_timer = "Done"
+        row1_timer = f"{int(seed_remaining)}s" if seed_remaining > 0 else "Done"
 
         if fixation_detected:
             fixation_elapsed = elapsed - FIXATION_DELAY
@@ -325,7 +318,7 @@ class BossTimer:
         """Silence done, DPS scorpion phase (15-16s)."""
         return self._phase("Wait for Silence", COLORS["active"], timer_text,
                            row1_timer="Done",
-                           row2_msg="Bring Scorp to the pile", row2_color=COLORS["warning"])
+                           row2_msg="Bring Scorpion to the pile", row2_color=COLORS["warning"])
 
     def _get_dps_kill_phase(self, elapsed, timer_text):
         """DPS window and kill scorpion phases."""
@@ -336,17 +329,17 @@ class BossTimer:
             color = COLORS["alert"] if elapsed >= KILL_ALERT_THRESHOLD else COLORS["warning"]
             return self._phase("Kill window in", color, timer_text,
                                row1_timer=f"{int(kill_window_in)}s",
-                               row2_msg="Dps Scorp to 5%", row2_color=COLORS["warning"])
+                               row2_msg="Dps Scorpion to 5%", row2_color=COLORS["warning"])
 
         if elapsed < KILL_WINDOW_END:
             urgency = "!" * max(0, elapsed - URGENCY_START) if elapsed > URGENCY_START else ""
             row1_timer = f"{int(new_seed_in)}s" if elapsed > URGENCY_START else ""
-            return self._phase(f"Kill Scorp{urgency}", COLORS["alert"], timer_text,
+            return self._phase(f"Kill Scorpion{urgency}", COLORS["alert"], timer_text,
                                row1_timer=row1_timer)
 
         # Final burn - new seed imminent
         urgency = "!" * (elapsed - URGENCY_START)
-        return self._phase(f"Kill Scorp{urgency}", COLORS["alert"], timer_text,
+        return self._phase(f"Kill Scorpion{urgency}", COLORS["alert"], timer_text,
                            row1_timer=f"{int(new_seed_in)}s",
                            row2_msg=f"New Seed in {int(new_seed_in)}",
                            row2_color=COLORS["warning"])
@@ -416,8 +409,8 @@ class BossTimer:
         new_seed_in = max(0, CYCLE_DURATION - elapsed)
 
         if new_seed_in <= NEW_SEED_WARNING:
-            return self._phase("Kite Scorps", COLORS["warning"], timer_text,
+            return self._phase("Kite Scorpions", COLORS["warning"], timer_text,
                                row2_msg=f"New Seed in {int(new_seed_in)}",
                                row2_color=COLORS["alert"])
 
-        return self._phase("Kite Scorps", COLORS["warning"], timer_text)
+        return self._phase("Kite Scorpions", COLORS["warning"], timer_text)

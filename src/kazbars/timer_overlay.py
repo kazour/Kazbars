@@ -151,9 +151,10 @@ class TimerOverlay:
         # Lock indicator (bottom right, left of resize handle)
         self.lock_indicator = tk.Label(
             self.frame, text="", font=FONT_SMALL,
-            fg=TK_COLORS['border'], bg=self.BG_INNER
+            fg=TK_COLORS['border'], bg=self.BG_INNER, cursor='hand2'
         )
         self.lock_indicator.place(relx=1.0, rely=1.0, anchor='se', x=-18, y=-1)
+        self.lock_indicator.bind('<Button-1>', lambda _e: self.toggle_lock())
         self._bg_widgets.append(('inner', self.lock_indicator))
 
         # Resize handle (bottom right corner)
@@ -333,8 +334,8 @@ class TimerOverlay:
             else:
                 ex_style &= ~win32con.WS_EX_TRANSPARENT
             win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE, ex_style)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to set click-through: %s", e)
 
     def set_transparent(self, transparent):
         """Toggle transparent background."""

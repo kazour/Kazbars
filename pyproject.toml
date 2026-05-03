@@ -12,6 +12,7 @@ authors = [{ name = "Kaz" }]
 dynamic = ["version"]
 dependencies = [
     "ttkbootstrap>=1.10",
+    "pywin32>=306; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]

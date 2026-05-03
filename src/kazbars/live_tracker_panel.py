@@ -199,7 +199,7 @@ class LiveTrackerPanel(tk.Toplevel):
             bootstyle="success-round-toggle"
         )
         self.transparent_cb.pack(anchor='w', pady=(0, PAD_MID))
-        add_tooltip(self.transparent_cb, "Make overlay background transparent (click-through when locked)")
+        add_tooltip(self.transparent_cb, "Hide the overlay's background panel; only the text remains visible")
 
         opacity_row = ttk.Frame(overlay_frame)
         opacity_row.pack(fill='x', pady=(0, PAD_XS))
@@ -245,7 +245,7 @@ class LiveTrackerPanel(tk.Toplevel):
         self.overlay = TimerOverlay(
             root,
             self.timer_settings,
-            on_settings_changed=self.save_settings
+            on_settings_changed=self._on_overlay_settings_changed
         )
         # Always show the overlay when the tracker panel is launched,
         # regardless of any previously-saved hidden state.
@@ -305,14 +305,11 @@ class LiveTrackerPanel(tk.Toplevel):
         if not self.overlay or self._monitoring:
             return
 
-        status_text = "Monitor: Running" if self._monitoring else "Monitor: Stopped"
-        status_color = COLORS["active"] if self._monitoring else COLORS["default"]
-
         log_text = self.log_status_label.cget('text')
         log_color = COLORS[self._LOG_STATE_OVERLAY.get(self._log_state, "default")]
 
         self.overlay.update_display(
-            status_text, "", "", status_color,
+            "Monitor: Stopped", "", "", COLORS["default"],
             log_text, "", "", log_color, ""
         )
 
@@ -330,7 +327,7 @@ class LiveTrackerPanel(tk.Toplevel):
             self.start_btn.config(state='disabled')
             self.stop_btn.config(state='normal')
             self.test_btn.config(state='disabled')
-            self.boss_timer._push_waiting_state()
+            self.boss_timer.push_waiting_state()
             self._start_game_loop()
             if self.overlay and not self.overlay.is_visible:
                 self.overlay.show()
@@ -396,7 +393,6 @@ class LiveTrackerPanel(tk.Toplevel):
 
     def _toggle_lock(self):
         self.overlay.toggle_lock()
-        self.lock_btn.config(text="Unlock" if self.overlay.is_locked else "Lock")
 
     def _toggle_transparent(self):
         self.overlay.set_transparent(self.transparent_var.get())
@@ -418,12 +414,14 @@ class LiveTrackerPanel(tk.Toplevel):
         if self.boss_timer.timer_active:
             self.boss_timer.stop_cycle()
             self.test_btn.config(text="Test Cycle")
+            self.start_btn.config(state='normal')
             self._stop_game_loop()
             self._cancel_test_callbacks()
         else:
             self._cancel_test_callbacks()
             self.boss_timer.start_cycle("TestPlayer")
             self.test_btn.config(text="Stop Test")
+            self.start_btn.config(state='disabled')
             self._start_game_loop()
             if self.overlay and not self.overlay.is_visible:
                 self.overlay.show()
@@ -438,6 +436,7 @@ class LiveTrackerPanel(tk.Toplevel):
                 if not self.boss_timer.timer_active:
                     self._test_reset_id = None
                     self.test_btn.config(text="Test Cycle")
+                    self.start_btn.config(state='normal')
                     self._stop_game_loop()
                 else:
                     self._test_reset_id = self.after(500, check_reset)
@@ -464,6 +463,12 @@ class LiveTrackerPanel(tk.Toplevel):
             settings = self.overlay.get_settings()
             if not save_settings(self.settings_folder, settings):
                 logger.warning("Failed to save timer overlay settings")
+
+    def _on_overlay_settings_changed(self):
+        """Persist settings and resync the lock button when state changes from the overlay."""
+        self.save_settings()
+        if self.overlay:
+            self.lock_btn.config(text="Unlock" if self.overlay.is_locked else "Lock")
 
     def get_profile_data(self) -> dict:
         """Get overlay settings dict for embedding in a profile."""
