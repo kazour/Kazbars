@@ -197,7 +197,7 @@ class TimerOverlay:
     def _row_line_height(self):
         """Vertical space per message row. Mirrors the formula in
         _redraw_text_canvas so layout math stays in one place."""
-        return max(self.font_size + 9, int(self.font_size * 1.6))
+        return max(self.font_size + 13, int(self.font_size * 1.8))
 
     def _min_height(self):
         """Minimum overlay height for the current font size: cycle dock +
