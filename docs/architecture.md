@@ -1,6 +1,6 @@
 # Architectural Map
 
-**Current as of:** 2026-05-03 (after Live Tracker pass: Ethram-Fal seed phase strings restructured ("Bring Scorpion to the pile" 15–18s; "Kill window in" 19–30s with color escalation at 28s; Scorp → Scorpion across all overlay strings); Test Cycle and Start Monitoring are mutually exclusive; overlay padlock is now click-to-lock with the app's Lock/Unlock button auto-syncing via the new `_on_overlay_settings_changed` callback; `pywin32` declared as a Windows-only dependency so `WS_EX_TRANSPARENT` click-through actually engages when locked (was a silent no-op before); `BossTimer._push_waiting_state` renamed to public `push_waiting_state` since it's called from `live_tracker_panel`; `stop_cycle` now also clears `syphon_active`/`double_seed_mode` to prevent stale phase display after stop+restart.)
+**Current as of:** 2026-05-03 (after Live Tracker hardening pass: overlay rebuilt on a two-canvas docked layout — `text_canvas` on top with rows 1+2, fixed-height `cycle_timer_canvas` at the bottom hosting the cycle timer + chrome (lock indicator, resize handle), 1px separator frame between, so the cycle timer can no longer overlap message rows on resize; text rendered through canvas items with an 8-direction outline stroke when transparent_bg is on (legibility over arbitrary game scenes); minimum height scales with font via `_min_height()` so the layout never collapses; lock indicator switched from emoji to monochrome geometric circles (●/○) matching the resize-handle triangle (◢); cross-thread / cross-event-loop callbacks are named methods (`_dispatch_overlay_update` + `_apply_overlay_update` for the combat-monitor → main-loop hop, `_run_game_tick` for the 50ms loop, `_test_trigger_fixation` / `_test_check_reset` for the test cycle, `_block_close` / `_on_lock_click` / `_arm_click_through_on` for overlay events) instead of lambdas/closures; defaults route through `TIMERS_DEFAULTS` everywhere via `.get(key, TIMERS_DEFAULTS[key])`; `apply_settings` suspends per-setter notifications and now also applies width/height/visible (was: dropped silently); idempotent `set_locked(target)` replaces toggle-to-reach-state; click-through arms via `after_idle` instead of `after(100, ...)`; `update_display` short-circuits when state hasn't changed (~90% reduction in canvas churn at 50ms cadence); cycle timer uses `COLORS["default"]` (Tracker palette) instead of `THEME_COLORS['muted']`; new `MODULE_COLORS['live_tracker']` token used for the dialog header; settings file `timers_settings.json` → `live_tracker_settings.json` and window-pos key `window_pos_boss_timer` → `window_pos_live_tracker`, both with one-shot migrations; fixed: `positioned` flag was being stripped from saves on every launch since the rebrand because it wasn't in `TIMERS_DEFAULTS`, so the overlay re-centered every time.)
 **Purpose:** Module topology, dependencies, and coupling hotspots. Updated alongside code changes — if you edit this file, commit it with the code. `CLAUDE.md` has the short version; this file has the detail that doesn't fit there.
 
 ## Dependency clusters
@@ -101,14 +101,14 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/grids_panel.py` | 1242 | Grid list UI, grid management |
 | `src/kazbars/database_editor.py` | 865 | Buff DB CRUD, search, filtering |
 | `src/kazbars/grid_dialogs.py` | 841 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
-| `src/kazbars/buff_display_editor.py` | 743 | Default Buff Bars dialog — edits HUD XML for 4 portraits via surgical regex; collapsible sections persist open state |
 | `src/kazbars/build_loading.py` | 797 | Build-progress screen + welcome/about popups |
+| `src/kazbars/buff_display_editor.py` | 743 | Default Buff Bars dialog — edits HUD XML for 4 portraits via surgical regex; collapsible sections persist open state |
+| `src/kazbars/timer_overlay.py` | 589 | In-game transparent timer overlay (two-canvas docked layout, stroke rendering, click-through lock) |
 | `src/kazbars/app.py` | 584 | Entry point + `KazBarsApp` root window (widgets, menu, lifecycle) |
 | `src/kazbars/ui_widgets.py` | 577 | Widget builders, tooltips, bindings, `CollapsibleSection` (with `set_dimmed`), `blend_alpha`, `flash_status_bar`, `app_toast` |
-| `src/kazbars/live_tracker_panel.py` | 534 | Live Tracker Toplevel orchestrator |
+| `src/kazbars/live_tracker_panel.py` | 576 | Live Tracker Toplevel orchestrator |
 | `src/kazbars/ui_components.py` | 451 | `ToastManager` (coalesce-by-key, in-place text update), `DragReorderManager`, scrollable frame |
-| `src/kazbars/timer_overlay.py` | 451 | In-game transparent timer overlay |
-| `src/kazbars/boss_timer.py` | 416 | Boss timer state + UI |
+| `src/kazbars/boss_timer.py` | 415 | Boss timer state + UI |
 | `src/kazbars/grids_generator.py` | 424 | AS2 code generation from grid configs |
 | `src/kazbars/instructions_panel.py` | 366 | Help/instructions view |
 | `src/kazbars/first_launch.py` | 353 | First-launch dialog + post-dialog orchestrator (`run_first_launch`) |
@@ -120,8 +120,8 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/game_folder.py` | 192 | Game folder UI + Aoc.exe bypass (with install/remove reconciler) + uninstall |
 | `tests/test_buff_xml.py` | 175 | Round-trip smoke test for `buff_display_editor` XML helpers |
 | `src/kazbars/build_action.py` | 168 | Build & Install flow |
-| `src/kazbars/ui_helpers.py` | 168 | Design tokens + `setup_custom_styles` |
-| `src/kazbars/live_tracker_settings.py` | 145 | Tracker persistence |
+| `src/kazbars/ui_helpers.py` | 169 | Design tokens + `setup_custom_styles` |
+| `src/kazbars/live_tracker_settings.py` | 168 | Tracker persistence (with one-shot legacy filename migration) |
 | `src/kazbars/grid_model.py` | 117 | Grid dataclasses + `parse_resolution` helper |
 | `tests/test_data_integrity.py` | 103 | Buff-ref resolution smoke test |
 | `src/kazbars/build_utils.py` | 98 | Compiler discovery + path helpers |

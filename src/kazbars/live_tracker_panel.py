@@ -5,6 +5,7 @@ Boss Timer child window: Ethram-Fal seed timer overlay and combat log monitoring
 
 import logging
 import tkinter as tk
+from functools import partial
 from pathlib import Path
 from tkinter import ttk
 
@@ -14,11 +15,13 @@ from .boss_timer import BossTimer
 from .combat_monitor import CombatLogMonitor
 from .live_tracker_settings import (
     COLORS,
+    TIMERS_DEFAULTS,
     get_default_settings,
     load_settings,
     save_settings,
     validate_all_settings,
 )
+from .settings_manager import get_setting, set_setting
 from .timer_overlay import TimerOverlay
 from .ui_helpers import (
     BTN_SMALL,
@@ -35,6 +38,20 @@ from .ui_helpers import (
 )
 from .ui_widgets import add_tooltip, app_toast, create_dialog_header, create_tip_bar
 from .window_position import restore_window_position
+
+# Test-cycle timing (ms)
+TEST_FIXATION_DELAY_MS = 4000
+TEST_RESET_DELAY_MS = 39500
+TEST_RESET_POLL_MS = 500
+
+
+def _migrate_window_position_key():
+    """One-time rename of the legacy 'window_pos_boss_timer' key to
+    'window_pos_live_tracker' after the module rebrand."""
+    legacy = get_setting('window_pos_boss_timer')
+    current = get_setting('window_pos_live_tracker')
+    if legacy and not current:
+        set_setting('window_pos_live_tracker', legacy)
 
 
 class LiveTrackerPanel(tk.Toplevel):
@@ -62,7 +79,8 @@ class LiveTrackerPanel(tk.Toplevel):
         self.title("Ethram-Fal Seed Timer \u2014 KazBars")
         self.resizable(False, False)
 
-        restore_window_position(self, 'boss_timer', 460, 470, parent, resizable=False)
+        _migrate_window_position_key()
+        restore_window_position(self, 'live_tracker', 460, 470, parent, resizable=False)
 
         self.settings_folder = str(settings_path)
         self.game_path_getter = game_path_getter
@@ -79,11 +97,9 @@ class LiveTrackerPanel(tk.Toplevel):
         self._log_state = "default"
 
         # Wire timer + monitor first so guards aren't needed downstream.
-        # The closure resolves self.overlay at call time, after _create_overlay runs.
-        def _thread_safe_update(**kwargs):
-            self.after(0, lambda: self.overlay and self.overlay.update_display(**kwargs))
-
-        self.boss_timer = BossTimer(update_callback=_thread_safe_update)
+        # _dispatch_overlay_update hops from the combat-monitor thread to the
+        # Tk main loop where the overlay can be touched safely.
+        self.boss_timer = BossTimer(update_callback=self._dispatch_overlay_update)
         self.combat_monitor = CombatLogMonitor(self.boss_timer)
 
         # Build UI, then the overlay (which configures visibility/lock buttons)
@@ -99,9 +115,20 @@ class LiveTrackerPanel(tk.Toplevel):
     # UI CONSTRUCTION
     # =========================================================================
 
+    def _dispatch_overlay_update(self, **kwargs):
+        """Hand off an overlay update from any thread to the Tk main loop.
+        Combat monitoring runs in a background thread; touching tk widgets
+        directly from there is unsafe."""
+        self.after(0, partial(self._apply_overlay_update, kwargs))
+
+    def _apply_overlay_update(self, kwargs):
+        """Apply the queued overlay update on the Tk main thread."""
+        if self.overlay:
+            self.overlay.update_display(**kwargs)
+
     def _build_ui(self):
         """Build the panel UI."""
-        create_dialog_header(self, "Ethram-Fal Seed Timer", MODULE_COLORS['grids'])
+        create_dialog_header(self, "Ethram-Fal Seed Timer", MODULE_COLORS['live_tracker'])
         create_tip_bar(
             self,
             "Tracks the Viscous Seed cycle in real time to help coordinate scorpion kills."
@@ -191,7 +218,9 @@ class LiveTrackerPanel(tk.Toplevel):
 
         ttk.Separator(overlay_frame, orient='horizontal').pack(fill='x', pady=(PAD_XS, PAD_MID))
 
-        self.transparent_var = tk.BooleanVar(value=self.timer_settings.get('transparent_bg', False))
+        self.transparent_var = tk.BooleanVar(
+            value=self.timer_settings.get('transparent_bg', TIMERS_DEFAULTS['transparent_bg'])
+        )
         self.transparent_cb = ttk.Checkbutton(
             overlay_frame, text="Transparent background",
             variable=self.transparent_var,
@@ -205,7 +234,9 @@ class LiveTrackerPanel(tk.Toplevel):
         opacity_row.pack(fill='x', pady=(0, PAD_XS))
         ttk.Label(opacity_row, text="Opacity:",
                   font=FONT_SMALL).pack(side='left')
-        self.opacity_var = tk.DoubleVar(value=self.timer_settings.get('opacity', 0.9))
+        self.opacity_var = tk.DoubleVar(
+            value=self.timer_settings.get('opacity', TIMERS_DEFAULTS['opacity'])
+        )
         self.opacity_value_label = ttk.Label(
             opacity_row, text=f"{int(self.opacity_var.get() * 100)}%",
             font=FONT_SMALL, foreground=THEME_COLORS['muted'], width=4, anchor='e'
@@ -218,13 +249,15 @@ class LiveTrackerPanel(tk.Toplevel):
             command=self._on_opacity_change
         )
         self.opacity_slider.pack(side='left', padx=(PAD_SMALL, PAD_XS), fill='x', expand=True)
-        add_tooltip(self.opacity_slider, "Overlay window transparency (30% to 100%)")
+        add_tooltip(self.opacity_slider, "Overlay opacity (30% = mostly transparent, 100% = solid)")
 
         font_row = ttk.Frame(overlay_frame)
         font_row.pack(fill='x')
         ttk.Label(font_row, text="Font size:",
                   font=FONT_SMALL).pack(side='left')
-        self.font_var = tk.IntVar(value=self.timer_settings.get('font_size', 11))
+        self.font_var = tk.IntVar(
+            value=self.timer_settings.get('font_size', TIMERS_DEFAULTS['font_size'])
+        )
         self.font_value_label = ttk.Label(
             font_row, text=f"{self.font_var.get()}pt",
             font=FONT_SMALL, foreground=THEME_COLORS['muted'], width=4, anchor='e'
@@ -248,8 +281,9 @@ class LiveTrackerPanel(tk.Toplevel):
             on_settings_changed=self._on_overlay_settings_changed
         )
         # Always show the overlay when the tracker panel is launched,
-        # regardless of any previously-saved hidden state.
-        self.overlay.show()
+        # regardless of any previously-saved hidden state. notify=False so
+        # this UI nudge doesn't overwrite the persisted visibility preference.
+        self.overlay.show(notify=False)
         self.visibility_btn.config(text="Hide")
         self.lock_btn.config(text="Unlock" if self.overlay.is_locked else "Lock")
 
@@ -363,15 +397,16 @@ class LiveTrackerPanel(tk.Toplevel):
 
     def _start_game_loop(self):
         """Start the 50ms update loop."""
-        def loop():
-            try:
-                self.boss_timer.update_display()
-            except Exception as e:
-                logger.error("Timer loop error: %s", e)
-            finally:
-                self._game_loop_id = self.after(50, loop)
+        self._game_loop_id = self.after(50, self._run_game_tick)
 
-        self._game_loop_id = self.after(50, loop)
+    def _run_game_tick(self):
+        """One iteration of the boss-timer update loop. Re-schedules itself."""
+        try:
+            self.boss_timer.update_display()
+        except Exception as e:
+            logger.error("Timer loop error: %s", e)
+        finally:
+            self._game_loop_id = self.after(50, self._run_game_tick)
 
     def _stop_game_loop(self):
         """Stop the update loop."""
@@ -426,23 +461,28 @@ class LiveTrackerPanel(tk.Toplevel):
             if self.overlay and not self.overlay.is_visible:
                 self.overlay.show()
                 self.visibility_btn.config(text="Hide")
+            self._test_fix_id = self.after(TEST_FIXATION_DELAY_MS,
+                                           self._test_trigger_fixation)
+            self._test_reset_id = self.after(TEST_RESET_DELAY_MS,
+                                             self._test_check_reset)
 
-            def trigger_fixation():
-                self._test_fix_id = None
-                if self.boss_timer.timer_active:
-                    self.boss_timer.update_fixation("FixPlayer")
+    def _test_trigger_fixation(self):
+        """Test-cycle: inject a fake fixation event after the configured delay."""
+        self._test_fix_id = None
+        if self.boss_timer.timer_active:
+            self.boss_timer.update_fixation("FixPlayer")
 
-            def check_reset():
-                if not self.boss_timer.timer_active:
-                    self._test_reset_id = None
-                    self.test_btn.config(text="Test Cycle")
-                    self.start_btn.config(state='normal')
-                    self._stop_game_loop()
-                else:
-                    self._test_reset_id = self.after(500, check_reset)
-
-            self._test_fix_id = self.after(4000, trigger_fixation)
-            self._test_reset_id = self.after(39500, check_reset)
+    def _test_check_reset(self):
+        """Test-cycle: poll for the boss timer returning to idle, then restore
+        the panel button states."""
+        if not self.boss_timer.timer_active:
+            self._test_reset_id = None
+            self.test_btn.config(text="Test Cycle")
+            self.start_btn.config(state='normal')
+            self._stop_game_loop()
+        else:
+            self._test_reset_id = self.after(TEST_RESET_POLL_MS,
+                                             self._test_check_reset)
 
     def _cancel_test_callbacks(self):
         """Cancel any pending test-cycle after() handlers."""
@@ -498,11 +538,13 @@ class LiveTrackerPanel(tk.Toplevel):
 
     def _sync_overlay_ui(self):
         """Sync overlay control widgets to current timer_settings."""
-        self.transparent_var.set(self.timer_settings.get('transparent_bg', False))
-        opacity = self.timer_settings.get('opacity', 0.9)
+        self.transparent_var.set(
+            self.timer_settings.get('transparent_bg', TIMERS_DEFAULTS['transparent_bg'])
+        )
+        opacity = self.timer_settings.get('opacity', TIMERS_DEFAULTS['opacity'])
         self.opacity_var.set(opacity)
         self.opacity_value_label.config(text=f"{int(opacity * 100)}%")
-        font_size = self.timer_settings.get('font_size', 11)
+        font_size = self.timer_settings.get('font_size', TIMERS_DEFAULTS['font_size'])
         self.font_var.set(font_size)
         self.font_value_label.config(text=f"{font_size}pt")
         if self.overlay:

@@ -28,6 +28,10 @@ TIMERS_DEFAULTS = {
 
     # Visibility (remember if user hid the overlay)
     "visible": True,
+
+    # True once the user (or auto-center) has placed the overlay; gates the
+    # one-time centering pass in TimerOverlay.__init__.
+    "positioned": False,
 }
 
 # =============================================================================
@@ -55,7 +59,7 @@ def get_default_settings():
 
 def validate_setting(key, value):
     """Validate a single timer setting. Returns clamped/corrected value."""
-    if key in ("locked", "transparent_bg", "visible"):
+    if key in ("locked", "transparent_bg", "visible", "positioned"):
         return bool(value)
 
     if key in TIMERS_RANGES:
@@ -89,9 +93,27 @@ def validate_all_settings(settings):
 # SETTINGS FILE I/O
 # =============================================================================
 
+SETTINGS_FILENAME = "live_tracker_settings.json"
+LEGACY_SETTINGS_FILENAME = "timers_settings.json"
+
+
 def get_settings_path(settings_folder):
-    """Get the full path to timers_settings.json."""
-    return str(Path(settings_folder) / "timers_settings.json")
+    """Get the full path to live_tracker_settings.json."""
+    return str(Path(settings_folder) / SETTINGS_FILENAME)
+
+
+def _migrate_legacy_filename(settings_folder):
+    """One-shot rename of the pre-rebrand timers_settings.json so users keep
+    their saved overlay position, size, and preferences."""
+    legacy = Path(settings_folder) / LEGACY_SETTINGS_FILENAME
+    current = Path(settings_folder) / SETTINGS_FILENAME
+    if legacy.exists() and not current.exists():
+        try:
+            legacy.rename(current)
+            logger.info("Migrated %s to %s",
+                        LEGACY_SETTINGS_FILENAME, SETTINGS_FILENAME)
+        except OSError as e:
+            logger.warning("Live tracker settings migration failed: %s", e)
 
 
 def load_settings(settings_folder):
@@ -99,6 +121,7 @@ def load_settings(settings_folder):
     Load timer settings from JSON file.
     Returns validated settings dict (with defaults for missing keys).
     """
+    _migrate_legacy_filename(settings_folder)
     settings_path = get_settings_path(settings_folder)
 
     try:

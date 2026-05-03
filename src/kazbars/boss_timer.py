@@ -324,6 +324,7 @@ class BossTimer:
         """DPS window and kill scorpion phases."""
         kill_window_in = max(0, KILL_WINDOW_START - elapsed)
         new_seed_in = max(0, CYCLE_DURATION - elapsed)
+        urgency = "!" * max(0, elapsed - URGENCY_START)
 
         if elapsed < KILL_WINDOW_START:
             color = COLORS["alert"] if elapsed >= KILL_ALERT_THRESHOLD else COLORS["warning"]
@@ -332,13 +333,11 @@ class BossTimer:
                                row2_msg="Dps Scorpion to 5%", row2_color=COLORS["warning"])
 
         if elapsed < KILL_WINDOW_END:
-            urgency = "!" * max(0, elapsed - URGENCY_START) if elapsed > URGENCY_START else ""
             row1_timer = f"{int(new_seed_in)}s" if elapsed > URGENCY_START else ""
             return self._phase(f"Kill Scorpion{urgency}", COLORS["alert"], timer_text,
                                row1_timer=row1_timer)
 
         # Final burn - new seed imminent
-        urgency = "!" * (elapsed - URGENCY_START)
         return self._phase(f"Kill Scorpion{urgency}", COLORS["alert"], timer_text,
                            row1_timer=f"{int(new_seed_in)}s",
                            row2_msg=f"New Seed in {int(new_seed_in)}",

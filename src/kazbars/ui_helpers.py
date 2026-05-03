@@ -112,9 +112,10 @@ LABEL_WIDTH_FORM   = 14   # Left-column form labels (fits "Icon spacing:" + 1ch)
 # Scanline overlay alpha (0-255). Used for CRT decorative scanline overlays.
 SCANLINE_ALPHA = 12
 
-# Module accent colors (grids-only)
+# Module accent colors
 MODULE_COLORS = {
-    'grids': '#3498db',   # Blue
+    'grids':        '#3498db',   # Blue
+    'live_tracker': '#3498db',   # Blue — Live Tracker editor panel header
 }
 
 # Retro/CRT decorative colors — DECORATIVE ONLY.
