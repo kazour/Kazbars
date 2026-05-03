@@ -182,8 +182,21 @@ class CustomMenuBar(tk.Canvas):
             fg = self._MENU_FG if state == 'normal' else self._MENU_DISABLED_FG
             accel_fg = self._ACCEL_FG if state == 'normal' else self._MENU_DISABLED_FG
 
+            label_text = entry['label']
+            cmd = entry.get('command') if state == 'normal' else None
+            if entry['type'] == 'checkbutton':
+                var = entry['variable']
+                glyph = '☑' if var.get() else '☐'
+                label_text = f"{glyph}  {label_text}"
+                user_cmd = cmd
+                def _toggle(v=var, c=user_cmd):
+                    v.set(not v.get())
+                    if c is not None:
+                        c()
+                cmd = _toggle
+
             text_lbl = tk.Label(
-                pill, text=entry['label'], bg=self._MENU_BG, fg=fg,
+                pill, text=label_text, bg=self._MENU_BG, fg=fg,
                 font=self._FONT, anchor='w',
             )
             text_lbl.pack(side='left', fill='x', expand=True, padx=(8, 0))
@@ -194,7 +207,6 @@ class CustomMenuBar(tk.Canvas):
             )
             accel_lbl.pack(side='right', padx=(14, 8))
 
-            cmd = entry.get('command') if state == 'normal' else None
             self._rows.append({
                 'row': row, 'pill': pill, 'text_lbl': text_lbl, 'accel_lbl': accel_lbl,
                 'cmd': cmd, 'state': state,

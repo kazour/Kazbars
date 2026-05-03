@@ -111,7 +111,8 @@ def build(app):
         app.update()
 
         staging_dir, compile_result = compile_to_staging(
-            grids, app.database, app.assets_path, compiler, app.app_version
+            grids, app.database, app.assets_path, compiler, app.app_version,
+            include_console=bool(app.settings.get('build_console', False)),
         )
 
         if not compile_result[0]:

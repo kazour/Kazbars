@@ -1,6 +1,6 @@
 # Architectural Map
 
-**Current as of:** 2026-05-03 (after Live Tracker hardening pass: overlay rebuilt on a two-canvas docked layout — `text_canvas` on top with rows 1+2, fixed-height `cycle_timer_canvas` at the bottom hosting the cycle timer + chrome (lock indicator, resize handle), 1px separator frame between, so the cycle timer can no longer overlap message rows on resize; text rendered through canvas items with an 8-direction outline stroke when transparent_bg is on (legibility over arbitrary game scenes); minimum height scales with font via `_min_height()` so the layout never collapses; lock indicator switched from emoji to monochrome geometric circles (●/○) matching the resize-handle triangle (◢); cross-thread / cross-event-loop callbacks are named methods (`_dispatch_overlay_update` + `_apply_overlay_update` for the combat-monitor → main-loop hop, `_run_game_tick` for the 50ms loop, `_test_trigger_fixation` / `_test_check_reset` for the test cycle, `_block_close` / `_on_lock_click` / `_arm_click_through_on` for overlay events) instead of lambdas/closures; defaults route through `TIMERS_DEFAULTS` everywhere via `.get(key, TIMERS_DEFAULTS[key])`; `apply_settings` suspends per-setter notifications and now also applies width/height/visible (was: dropped silently); idempotent `set_locked(target)` replaces toggle-to-reach-state; click-through arms via `after_idle` instead of `after(100, ...)`; `update_display` short-circuits when state hasn't changed (~90% reduction in canvas churn at 50ms cadence); cycle timer uses `COLORS["default"]` (Tracker palette) instead of `THEME_COLORS['muted']`; new `MODULE_COLORS['live_tracker']` token used for the dialog header; settings file `timers_settings.json` → `live_tracker_settings.json` and window-pos key `window_pos_boss_timer` → `window_pos_live_tracker`, both with one-shot migrations; fixed: `positioned` flag was being stripped from saves on every launch since the rebrand because it wasn't in `TIMERS_DEFAULTS`, so the overlay re-centered every time.)
+**Current as of:** 2026-05-03 (after the optional buff-discovery console pass: `KzGridsConsole` is no longer compiled into every build. `KzGrids_core.as.template` carries eight `{{CONSOLE_*}}` placeholders; `CodeGenerator._core_methods()` substitutes them with the original AS2 lines when `include_console=True`, empty strings otherwise. `CodeGenerator.__init__` and `build_grids()` gained `include_console: bool = False`, threaded through `build_executor.compile_to_staging()` from `build_action.build()` (which reads `settings['build_console']`). `_member_variables()` and `_constructor()` also branch on the flag so the `console` member declaration and constructor instantiation are skipped when off — MTASC then doesn't pull `KzGridsConsole.as` from the classpath. New Game-menu checkbox `"Include buff-discovery console in builds"` (default off) toggles the setting via `_on_toggle_build_console`. `CustomMenuBar` gained `'type': 'checkbutton'` entry support — renders a `☐`/`☑` glyph, toggles a `tk.BooleanVar` on click, calls the supplied command. New `tests/test_grids_generator.py` covers the on/off output.)
 **Purpose:** Module topology, dependencies, and coupling hotspots. Updated alongside code changes — if you edit this file, commit it with the code. `CLAUDE.md` has the short version; this file has the detail that doesn't fit there.
 
 ## Dependency clusters
@@ -81,15 +81,16 @@ These modules are consumed only by `src/kazbars/app.py` by design — they hold 
 
 ## Smoke tests
 
-Two plain-Python scripts guard the failure modes we've actually hit. No pytest.
+Plain-Python pytest cases guard the failure modes we've actually hit.
 
 - **`tests/test_imports.py`** — auto-discovers every `src/kazbars/*.py` + `kazbars` and imports each. Catches missing symbols, wrong-module references, and cycles. Add nothing — new modules are picked up automatically.
 - **`tests/test_data_integrity.py`** — validates every buff reference in `assets/kazbars/Default.json` (whitelists + slot assignments) resolves to a `Database.json` entry, and that `Database.json.default` matches `Database.json` byte-for-byte.
 - **`tests/test_buff_xml.py`** — round-trips the `buff_display_editor` XML helpers: attribute extraction, surgical attribute replacement (other bytes preserved verbatim), the KZ_OFF on/off comment-wrap toggle, the filter whitespace normaliser, and the no-`<BuffListView>` guard. Added with the editor itself; covers the regex contract since the module deliberately uses no XML parser.
+- **`tests/test_grids_generator.py`** — asserts `CodeGenerator(include_console=False)` produces zero `console.` / `KzGridsConsole` substrings (so MTASC won't fail to resolve a missing class) and `include_console=True` reproduces the original hooks (instantiation, log calls, preview wiring, persistence keys). Belt-and-suspenders test that the default is `False`.
 
 Run before every commit touching code or data:
 ```bash
-python tests/test_imports.py && python tests/test_data_integrity.py && python tests/test_buff_xml.py
+pytest tests/
 ```
 
 UI behavior (Tk event flow, dialog timing, subprocess integration in the build flow) is not covered by the smoke tests — rely on manual smoke-testing for those.
@@ -108,18 +109,18 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/live_tracker_panel.py` | 575 | Live Tracker Toplevel orchestrator |
 | `src/kazbars/timer_overlay.py` | 542 | In-game transparent timer overlay (two-canvas docked layout, stroke rendering, click-through lock) |
 | `src/kazbars/ui_components.py` | 451 | `ToastManager` (coalesce-by-key, in-place text update), `DragReorderManager`, scrollable frame |
-| `src/kazbars/grids_generator.py` | 424 | AS2 code generation from grid configs |
+| `src/kazbars/grids_generator.py` | 466 | AS2 code generation from grid configs (with optional console hooks via `include_console` flag) |
 | `src/kazbars/boss_timer.py` | 381 | Boss timer state + UI |
 | `src/kazbars/instructions_panel.py` | 403 | Help/instructions view |
 | `src/kazbars/first_launch.py` | 353 | First-launch dialog + post-dialog orchestrator (`run_first_launch`) |
-| `src/kazbars/custom_menu_bar.py` | 359 | Canvas-based dark menu bar |
+| `src/kazbars/custom_menu_bar.py` | 370 | Canvas-based dark menu bar (supports `command`, `separator`, `checkbutton` entries) |
 | `src/kazbars/combat_monitor.py` | 294 | Combat log parser feeding the tracker |
-| `src/kazbars/build_executor.py` | 227 | MTASC compile + deploy |
+| `src/kazbars/build_executor.py` | 238 | MTASC compile + deploy |
 | `build.py` | 225 | PyInstaller build driver |
 | `src/kazbars/profile_io.py` | 219 | Profile load (read+apply split) / save (build+write+commit, `silent=` for piggyback saves) / new / open + missing-buff warning |
 | `src/kazbars/game_folder.py` | 192 | Game folder UI + Aoc.exe bypass (with install/remove reconciler) + uninstall |
 | `tests/test_buff_xml.py` | 175 | Round-trip smoke test for `buff_display_editor` XML helpers |
-| `src/kazbars/build_action.py` | 168 | Build & Install flow |
+| `src/kazbars/build_action.py` | 169 | Build & Install flow |
 | `src/kazbars/ui_helpers.py` | 193 | Design tokens + `setup_custom_styles` + `style_treeview_heading` |
 | `src/kazbars/live_tracker_settings.py` | 168 | Tracker persistence (with one-shot legacy filename migration) |
 | `src/kazbars/grid_model.py` | 117 | Grid dataclasses + `parse_resolution` helper |
@@ -129,4 +130,5 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/settings_manager.py` | 82 | `SettingsManager`, JSON helpers, settings proxy |
 | `src/kazbars/update_check.py` | 69 | Background GitHub release check + named main-thread toast dispatcher |
 | `src/kazbars/ui_tk_style.py` | 57 | Raw-tk widget styling + dark titlebar |
-| `tests/test_imports.py` | 47 | Import-graph smoke test |
+| `tests/test_imports.py` | 33 | Import-graph smoke test |
+| `tests/test_grids_generator.py` | 103 | `CodeGenerator.include_console` on/off output checks |

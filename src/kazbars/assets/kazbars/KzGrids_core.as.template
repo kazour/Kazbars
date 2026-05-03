@@ -558,7 +558,7 @@
         if (m_Player != null && m_Player.m_BuffList != null && m_Player.m_BuffList[bid] != null) {
             var buff:Object = m_Player.m_BuffList[bid];
             addPBuff(buff);
-            if (console.isActive() && buff.m_Name != null) console.logPlayer(buff.m_Name, bid);
+            {{CONSOLE_LOG_PLAYER}}
         }
     }
 
@@ -566,7 +566,7 @@
         if (m_Target != null && m_Target.m_BuffList != null && m_Target.m_BuffList[bid] != null) {
             var buff:Object = m_Target.m_BuffList[bid];
             addTBuff(buff);
-            if (console.isActive() && buff.m_Name != null) console.logTarget(buff.m_Name, bid);
+            {{CONSOLE_LOG_TARGET}}
         }
     }
 
@@ -595,7 +595,7 @@
             preview.createOverlay(obj);
             i++;
         }
-        if (!console.isActive()) console.createConsole();
+        {{CONSOLE_PREVIEW_OPEN}}
     }
 
     private function exitPreview():Void {
@@ -608,11 +608,9 @@
                 config.ReplaceEntry("g" + j + "_y", grids[j].mc._y);
                 j++;
             }
-            config.ReplaceEntry("console_pin", consolePinned ? 1 : 0);
-            config.ReplaceEntry("log_p", console.logPlayerEnabled ? 1 : 0);
-            config.ReplaceEntry("log_t", console.logTargetEnabled ? 1 : 0);
+            {{CONSOLE_EXIT_PERSIST}}
         }
-        if (!consolePinned) console.removeConsole();
+        {{CONSOLE_EXIT_REMOVE}}
         var i:Number = 0;
         while (i < grids.length) { preview.removeOverlay(grids[i]); grids[i].dirty = true; updateGrid(grids[i]); i++; }
     }
@@ -621,7 +619,7 @@
         stopTimer();
         previewMode = false;
         if (keyListener != null) { Key.removeListener(keyListener); keyListener = null; }
-        console.removeConsole();
+        {{CONSOLE_CLEANUP}}
         playerBuffs = new Array();
         targetBuffs = new Array();
         buffIndexCache = {player: {}, target: {}};
@@ -672,13 +670,7 @@
                 }
                 i++;
             }
-            var cp:Object = config.FindEntry("console_pin");
-            if (cp !== undefined) consolePinned = (cp == 1);
-            var clp:Object = config.FindEntry("log_p");
-            if (clp !== undefined) console.logPlayerEnabled = (clp == 1);
-            var clt:Object = config.FindEntry("log_t");
-            if (clt !== undefined) console.logTargetEnabled = (clt == 1);
-            if (consolePinned) console.createConsole();
+            {{CONSOLE_LOAD_PERSIST}}
         }
     }
 
@@ -690,9 +682,7 @@
                 config.ReplaceEntry("g" + i + "_y", grids[i].mc._y);
                 i++;
             }
-            config.ReplaceEntry("console_pin", consolePinned ? 1 : 0);
-            config.ReplaceEntry("log_p", console.logPlayerEnabled ? 1 : 0);
-            config.ReplaceEntry("log_t", console.logTargetEnabled ? 1 : 0);
+            {{CONSOLE_DEACTIVATE_PERSIST}}
         }
         cleanup();
         try { com.GameInterface.Game.CharacterBase.SignalClientCharacterAlive.Disconnect(SlotAlive, this); } catch (e:Object) {}

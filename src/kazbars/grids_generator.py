@@ -34,7 +34,7 @@ def _load_core_template(assets_path=None):
 class CodeGenerator:
     """Generate AS2 source code for the KazBars buff-tracking grid system."""
 
-    def __init__(self, grids, database, app_version="3.6.0", assets_path=None):
+    def __init__(self, grids, database, app_version="3.6.0", assets_path=None, include_console=False):
         """Initialize the code generator with grid configs and the buff database."""
         # Filter out disabled grids
         self.grids = [g for g in grids if g.get('enabled', True)]
@@ -42,6 +42,7 @@ class CodeGenerator:
         self.app_version = app_version
         self._assets_path = assets_path
         self._stack_labels = {}
+        self.include_console = include_console
 
     def sanitize_id(self, grid_id):
         """Convert a grid ID to a safe AS2 identifier by replacing invalid characters."""
@@ -91,7 +92,9 @@ class CodeGenerator:
         return '}\n'
 
     def _member_variables(self):
-        return '''
+        console_decl = '\n    private var console:KzGridsConsole;' if self.include_console else ''
+        console_pin_decl = '\n\n    // Console pin state (persisted via config archive)\n    private var consolePinned:Boolean;' if self.include_console else ''
+        return f'''
     private var rootClip:MovieClip;
     private var m_Player:Object;
     private var m_Target:Object;
@@ -123,60 +126,56 @@ class CodeGenerator:
     private var _tempDebuffs:Array;
     private var _tempMisc:Array;
 
-    // HELPER CLASSES: Preview and Console functionality (32KB bytecode limit workaround)
-    private var preview:KzGridsPreview;
-    private var console:KzGridsConsole;
-    private var slot:KzGridsSlot;
-
-    // Console pin state (persisted via config archive)
-    private var consolePinned:Boolean;
+    // HELPER CLASSES: Preview, Slot, and (optional) Console (32KB bytecode limit workaround)
+    private var preview:KzGridsPreview;{console_decl}
+    private var slot:KzGridsSlot;{console_pin_decl}
 
     // Key listener reference for proper cleanup
     private var keyListener:Object;
 '''
 
     def _constructor(self):
-        return '''
-    public function KzGrids(root:MovieClip) {
+        console_pin_init = '\n        consolePinned = false;' if self.include_console else ''
+        console_init = '\n        console = new KzGridsConsole(this, rootClip);' if self.include_console else ''
+        return f'''
+    public function KzGrids(root:MovieClip) {{
         rootClip = root;
         playerBuffs = new Array();
         targetBuffs = new Array();
         grids = new Array();
-        buffIndexCache = {player: {}, target: {}};
+        buffIndexCache = {{player: {{}}, target: {{}}}};
         frameActive = false;
         frameCount = 0;
         previewMode = false;
-        previewArmed = true;
-        consolePinned = false;
+        previewArmed = true;{console_pin_init}
         C_BUFF = 0x666666;
         C_DEBUFF = 0x8B0000;
         C_BG = 0x000000;
-        TCACHE = {};
+        TCACHE = {{}};
         var i:Number = 0;
-        while (i <= 99) { TCACHE[i] = String(i); i++; }
+        while (i <= 99) {{ TCACHE[i] = String(i); i++; }}
 
         // OPTIMIZATION: Pre-calculate alpha flash values (100 entries)
         // Replaces Math.sin() calls every frame with array lookup
         AFLASH = new Array();
         var j:Number = 0;
-        while (j < 100) {
+        while (j < 100) {{
             var phase:Number = (j / 100) * 6.28318;
             AFLASH[j] = 33 + (Math.sin(phase) + 1) * 33.5;
             j++;
-        }
+        }}
 
         // OPTIMIZATION: Reusable arrays to reduce garbage collection
         _tempBuffs = new Array();
         _tempDebuffs = new Array();
         _tempMisc = new Array();
 
-        // HELPER CLASSES: Initialize preview, console, and slot managers
-        preview = new KzGridsPreview(this, rootClip);
-        console = new KzGridsConsole(this, rootClip);
+        // HELPER CLASSES: Initialize preview and slot managers (console added if enabled at build time)
+        preview = new KzGridsPreview(this, rootClip);{console_init}
         slot = new KzGridsSlot(this, rootClip);
 
         initConfig();
-    }
+    }}
 '''
 
     def _expand_primary_ids(self, primary_ids):
@@ -340,7 +339,50 @@ class CodeGenerator:
         return '\n'.join(lines)
 
     def _core_methods(self):
-        return _load_core_template(self._assets_path)
+        template = _load_core_template(self._assets_path)
+        if self.include_console:
+            tokens = {
+                '{{CONSOLE_LOG_PLAYER}}':
+                    'if (console.isActive() && buff.m_Name != null) console.logPlayer(buff.m_Name, bid);',
+                '{{CONSOLE_LOG_TARGET}}':
+                    'if (console.isActive() && buff.m_Name != null) console.logTarget(buff.m_Name, bid);',
+                '{{CONSOLE_PREVIEW_OPEN}}':
+                    'if (!console.isActive()) console.createConsole();',
+                '{{CONSOLE_EXIT_PERSIST}}':
+                    'config.ReplaceEntry("console_pin", consolePinned ? 1 : 0);\n'
+                    '            config.ReplaceEntry("log_p", console.logPlayerEnabled ? 1 : 0);\n'
+                    '            config.ReplaceEntry("log_t", console.logTargetEnabled ? 1 : 0);',
+                '{{CONSOLE_EXIT_REMOVE}}':
+                    'if (!consolePinned) console.removeConsole();',
+                '{{CONSOLE_CLEANUP}}':
+                    'console.removeConsole();',
+                '{{CONSOLE_LOAD_PERSIST}}':
+                    'var cp:Object = config.FindEntry("console_pin");\n'
+                    '            if (cp !== undefined) consolePinned = (cp == 1);\n'
+                    '            var clp:Object = config.FindEntry("log_p");\n'
+                    '            if (clp !== undefined) console.logPlayerEnabled = (clp == 1);\n'
+                    '            var clt:Object = config.FindEntry("log_t");\n'
+                    '            if (clt !== undefined) console.logTargetEnabled = (clt == 1);\n'
+                    '            if (consolePinned) console.createConsole();',
+                '{{CONSOLE_DEACTIVATE_PERSIST}}':
+                    'config.ReplaceEntry("console_pin", consolePinned ? 1 : 0);\n'
+                    '            config.ReplaceEntry("log_p", console.logPlayerEnabled ? 1 : 0);\n'
+                    '            config.ReplaceEntry("log_t", console.logTargetEnabled ? 1 : 0);',
+            }
+        else:
+            tokens = {
+                '{{CONSOLE_LOG_PLAYER}}': '',
+                '{{CONSOLE_LOG_TARGET}}': '',
+                '{{CONSOLE_PREVIEW_OPEN}}': '',
+                '{{CONSOLE_EXIT_PERSIST}}': '',
+                '{{CONSOLE_EXIT_REMOVE}}': '',
+                '{{CONSOLE_CLEANUP}}': '',
+                '{{CONSOLE_LOAD_PERSIST}}': '',
+                '{{CONSOLE_DEACTIVATE_PERSIST}}': '',
+            }
+        for token, replacement in tokens.items():
+            template = template.replace(token, replacement)
+        return template
 
 
 # ============================================================================
@@ -354,7 +396,8 @@ def build_grids(
     output_swf: str,
     compiler_path: str,
     app_version: str = "3.6.0",
-    assets_path=None
+    assets_path=None,
+    include_console: bool = False,
 ) -> tuple[bool, str]:
     """
     Complete build process for KazBars.swf.
@@ -384,7 +427,7 @@ def build_grids(
     temp_dir = None
     try:
         # Step 1: Generate AS2 code (main class + data class)
-        generator = CodeGenerator(grids, database, app_version, assets_path=assets_path)
+        generator = CodeGenerator(grids, database, app_version, assets_path=assets_path, include_console=include_console)
         main_code, data_code = generator.generate()
 
         # Step 2: Write to temp .as files

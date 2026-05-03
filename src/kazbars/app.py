@@ -310,6 +310,8 @@ class KazBarsApp(ttkb.Window):
         self._menubar = CustomMenuBar(self)
         self._menubar.pack(fill='x', before=self._header_canvas)
 
+        self._build_console_var = tk.BooleanVar(value=bool(self.settings.get('build_console', False)))
+
         self._menubar.add_cascade(label="File", menu_def=[
             {'type': 'command', 'label': 'New Profile', 'accelerator': 'Ctrl+N',
              'command': self._new_profile},
@@ -333,6 +335,10 @@ class KazBarsApp(ttkb.Window):
              'command': self._change_game_folder},
             {'type': 'command', 'label': 'Uninstall from game client...',
              'command': self._uninstall_game},
+            {'type': 'separator'},
+            {'type': 'checkbutton', 'label': 'Include buff-discovery console in builds',
+             'variable': self._build_console_var,
+             'command': self._on_toggle_build_console},
         ])
         self._menubar.add_command(label="About", command=self._show_about)
 
@@ -455,6 +461,14 @@ class KazBarsApp(ttkb.Window):
 
     def _open_buff_display_editor(self):
         return buff_display_editor.open_buff_display_editor(self)
+
+    def _on_toggle_build_console(self):
+        enabled = self._build_console_var.get()
+        self.settings.set('build_console', enabled)
+        self.settings.save()
+        msg = ("Buff-discovery console will be included in next build"
+               if enabled else "Buff-discovery console excluded from next build")
+        self.toast.show(msg, style='info', duration=4)
 
     # ========================================================================
     # PROFILE SYSTEM
