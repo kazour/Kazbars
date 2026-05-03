@@ -167,14 +167,16 @@ components:
     backgroundColor: "{colors.surface-sub}"
     textColor: "{colors.text-body}"
     typography: "{typography.body}"
-    height: "24px"
-    padding: "0 6px"
+    height: "26px"
+    padding: "0 4px"
   menu-bar-hover:
-    backgroundColor: "{colors.surface-hover}"
+    backgroundColor: "{colors.surface-input}"
     textColor: "{colors.text-body}"
   menu-bar-active:
-    backgroundColor: "{colors.surface-active}"
-    textColor: "{colors.text-body}"
+    backgroundColor: "{colors.surface-input}"
+    textColor: "{colors.text-bright}"
+    accentLine: "{colors.phosphor-green}"
+    accentLineHeight: "2px"
   dialog-header:
     backgroundColor: "{colors.surface-sub}"
     textColor: "{colors.action-cyan}"
@@ -199,7 +201,7 @@ components:
 
 **Creative North Star: "The Phosphor Bench"**
 
-KazBars is a workbench for buff data. Functional density carries most of the surface (Aseprite/Reaper energy: tight rows, small text, dense forms, no decorative whitespace), and the CRT/phosphor language is reserved for the moments where the tool talks back: the Build & Install status icon, the CRT-styled dialog header, the Ethram Fal seed timer overlay. Most of the app is a quiet dark workbench. A handful of surfaces glow.
+KazBars is a workbench for buff data. Functional density carries most of the surface (Aseprite/Reaper energy: tight rows, small text, dense forms, no decorative whitespace), and the CRT/phosphor language is reserved for the moments where the tool talks back: the Build & Install status icon, the CRT-styled dialog header, the Ethram Fal seed timer overlay, and the 2px phosphor underline beneath the active top-menu cascade. Most of the app is a quiet dark workbench. A handful of surfaces glow.
 
 The system is built on ttkbootstrap-darkly as a base palette and inherits its tonal grammar (`#222` working surface, `#1a1a1a` chrome, `#2f2f2f` inputs). On top of that base, a deliberate retro layer (`phosphor_green`, `phosphor_amber`, `crt_glow`, scanline overlays) carries the brand. That layer is decoration-only by contract: phosphor colors are off-limits for body text and interactive states because they fail WCAG contrast on the dark bg, and `_RETRO_COLORS` is named with a leading underscore to mark it private.
 
@@ -277,7 +279,7 @@ These live in `_RETRO_COLORS` with a leading underscore. **Off-limits for text a
 
 ### Named Rules
 
-**The Two-Layer Rule.** The palette has two layers and they do not mix. Layer 1 is the workhorse semantic palette (text, surfaces, signals, module accents). Layer 2 is the phosphor decoration layer. Layer 1 may go anywhere. Layer 2 may *only* be used on canvas-drawn signal moments (build status, dialog header glow, the Ethram Fal seed timer). Never use a phosphor color for a tk widget background, a label foreground, or an interactive state. The leading underscore on `_RETRO_COLORS` enforces this in code; the rule enforces it in design.
+**The Two-Layer Rule.** The palette has two layers and they do not mix. Layer 1 is the workhorse semantic palette (text, surfaces, signals, module accents). Layer 2 is the phosphor decoration layer. Layer 1 may go anywhere. Layer 2 may *only* be used on canvas-drawn signal moments (build status, dialog header glow, the Ethram Fal seed timer, the active-cascade underline in the top menu bar). Never use a phosphor color for a tk widget background, a label foreground, or an interactive state. The leading underscore on `_RETRO_COLORS` enforces this in code; the rule enforces it in design.
 
 **The 7.2 Rule.** Body text on the dark surface (`Text Body` on `Surface Base`) measures ~7.2:1, comfortably WCAG AAA. New readable text targets the same bar. If a color cannot hit AAA on `#222`, it is decoration, not text.
 
@@ -348,12 +350,13 @@ ttkbootstrap-darkly handles the heavy lifting (button, entry, frame, treeview, c
 
 ### Menu Bar (custom)
 
-- **Surface:** Surface Sub bg (`#1a1a1a`), Text Body fg, 24px height. Drawn on a `tk.Canvas`, not a native `tk.Menu` (the native one cannot be themed dark on Windows).
-- **Hover:** Surface Hover bg (`#2a2a2a`), no fg change.
-- **Active (open dropdown):** Surface Active bg (`#333333`), no fg change.
+- **Surface:** Surface Sub bg (`#1a1a1a`), Text Body fg, 26px height. Drawn on a `tk.Canvas`, not a native `tk.Menu` (the native one cannot be themed dark on Windows).
+- **Hover:** Surface Input bg (`#2f2f2f`), no fg change. Reuses the same "this is interactive" tone as form inputs and buttons.
+- **Active (open dropdown):** Surface Input bg + Text Bright fg + a 2px Phosphor Green (`#4A7A5A`) underline beneath the cascade label, 6px inset on each side so it tracks the label, not the cell. The underline is the brand-defining detail; the bg + white text is the secondary cue.
 - **Disabled item:** Text Disabled fg.
 - **Accelerator label:** Text Muted fg, right-aligned in the dropdown row.
-- **Dropdown:** `place()`-positioned Frame overlay (no Toplevel, so no Windows white-flash), 1px Border Menu (`#3a3a3a`), 220px minimum width.
+- **Dropdown:** `place()`-positioned Frame overlay (no Toplevel, so no Windows white-flash), 1px Border Menu (`#3a3a3a`) painted via the dropdown frame's own `highlightthickness` (not via a padded inner wrapper — see ttkbootstrap caveat below), 220px minimum width.
+- **ttkbootstrap caveat (load-bearing):** under `ttkb.Window`, pack `pady` gaps and empty `tk.Frame` widgets render with the theme bg (`#222222`) instead of the parent frame's actual bg, leaking visible separator lines. Spacers and separators inside the dropdown must be `tk.Canvas` (which always paints) with explicit `width=1` (Canvas defaults to 378px), and the dropdown border must be drawn via `highlightthickness` rather than a padded child frame.
 
 ### Card / LabelFrame
 

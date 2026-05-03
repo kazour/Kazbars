@@ -8,7 +8,7 @@ Toplevel windows — no brief white flash on open, no native titlebar to style.
 
 import tkinter as tk
 
-from .ui_helpers import FONT_BODY, FONT_SMALL, THEME_COLORS, TK_COLORS
+from .ui_helpers import FONT_BODY, FONT_SMALL, THEME_COLORS, TK_COLORS, _RETRO_COLORS
 
 # ============================================================================
 # CUSTOM DARK MENU BAR
@@ -25,15 +25,18 @@ class CustomMenuBar(tk.Canvas):
     Supports accelerator text, separators, disabled items, and keyboard nav.
     """
 
-    _MENU_BG = TK_COLORS['status_bg']      # #1a1a1a
-    _MENU_FG = THEME_COLORS['body']         # #C0C7CE
-    _MENU_HOVER_BG = '#2a2a2a'
-    _MENU_ACTIVE_BG = '#333333'
+    _MENU_BG = TK_COLORS['status_bg']
+    _MENU_FG = THEME_COLORS['body']
+    _MENU_HOVER_BG = TK_COLORS['input_bg']
+    _MENU_ACTIVE_BG = TK_COLORS['input_bg']      # Same bg as hover; active differs via underline + white text
+    _MENU_ACTIVE_FG = THEME_COLORS['heading']
     _MENU_DISABLED_FG = '#666666'
-    _ACCEL_FG = THEME_COLORS['muted']       # #B0B0B0
-    _SEP_COLOR = TK_COLORS['separator']     # #333333
-    _FONT = FONT_BODY                       # ('Segoe UI', 9)
-    _BAR_HEIGHT = 24
+    _ACCEL_FG = THEME_COLORS['muted']
+    _SEP_COLOR = TK_COLORS['separator']
+    _FONT = FONT_BODY
+    _BAR_HEIGHT = 26
+    _CELL_PADX = 10
+    _ACTIVE_UNDERLINE = _RETRO_COLORS['phosphor_green']
 
     def __init__(self, parent):
         super().__init__(
@@ -49,7 +52,7 @@ class CustomMenuBar(tk.Canvas):
         self._rows = []            # Rows in current dropdown (for keyboard nav)
         self._focused_row = -1     # Keyboard-focused row index
         self._click_bind_id = None # Stored bind ID for safe unbinding
-        self._cursor_x = 6        # Next cascade label x position
+        self._cursor_x = 4        # Next cascade label x position
 
         self.bind('<Button-1>', self._bar_click)
         self.bind('<Motion>', self._bar_motion)
@@ -65,17 +68,17 @@ class CustomMenuBar(tk.Canvas):
         self._add_top_item(label, None, command)
 
     def _add_top_item(self, label, menu_def, command):
-        text = f"  {label}  "
         tag = f"cascade_{len(self._cascades)}"
         tid = self.create_text(
-            self._cursor_x, self._BAR_HEIGHT // 2,
-            text=text, anchor='w', fill=self._MENU_FG, font=self._FONT,
+            self._cursor_x + self._CELL_PADX, self._BAR_HEIGHT // 2,
+            text=label, anchor='w', fill=self._MENU_FG, font=self._FONT,
             tags=(tag,),
         )
         bbox = self.bbox(tid)
-        x1, x2 = bbox[0], bbox[2]
-        self._cursor_x = x2
-        self._cascades.append((tag, x1, x2, menu_def, command))
+        cell_x1 = self._cursor_x
+        cell_x2 = bbox[2] + self._CELL_PADX
+        self._cursor_x = cell_x2
+        self._cascades.append((tag, cell_x1, cell_x2, menu_def, command))
 
     # --- Canvas bar events ---
 
@@ -130,53 +133,80 @@ class CustomMenuBar(tk.Canvas):
             text_tag = self._cascades[idx][0]
             self.tag_raise(text_tag)
 
+    def _set_cascade_active(self, idx, on):
+        """Apply or revert the active visual state (bg + text + underline) for a cascade."""
+        text_tag, x1, x2, _, _ = self._cascades[idx]
+        self.delete('active_underline')
+        if on:
+            self._draw_cascade_bg(idx, self._MENU_ACTIVE_BG)
+            self.itemconfigure(text_tag, fill=self._MENU_ACTIVE_FG)
+            # 6px inset on each side so the underline tracks the label, not the cell.
+            self.create_rectangle(
+                x1 + 6, self._BAR_HEIGHT - 2, x2 - 6, self._BAR_HEIGHT,
+                fill=self._ACTIVE_UNDERLINE, outline='', tags=('active_underline',),
+            )
+        else:
+            self._draw_cascade_bg(idx, self._MENU_BG)
+            self.itemconfigure(text_tag, fill=self._MENU_FG)
+
     # --- Dropdown lifecycle ---
 
     def _ensure_dropdown(self):
         if self._dd_frame is not None:
             return
         root = self.winfo_toplevel()
-        self._dd_frame = tk.Frame(root, bg=_DD_BORDER_COLOR)
+        # Border is via highlightthickness — Tk paints this intrinsically, so it
+        # survives the ttkbootstrap pady-leak (see note in _open_at).
+        self._dd_frame = tk.Frame(
+            root, bg=self._MENU_BG,
+            highlightthickness=1, highlightbackground=_DD_BORDER_COLOR,
+            highlightcolor=_DD_BORDER_COLOR,
+        )
         # Unhighlight focused row when cursor exits the dropdown entirely
         self._dd_frame.bind('<Leave>', self._on_dropdown_leave)
 
     def _open_at(self, idx):
         self._ensure_dropdown()
 
-        # Reset old cascade highlight
         if self._open_index >= 0:
-            self._draw_cascade_bg(self._open_index, self._MENU_BG)
+            self._set_cascade_active(self._open_index, False)
 
         _, x1, x2, menu_def, _ = self._cascades[idx]
         self._open_index = idx
         self._hover_mode = True
-        self._draw_cascade_bg(idx, self._MENU_ACTIVE_BG)
+        self._set_cascade_active(idx, True)
 
-        # Clear old dropdown content
         if self._dd_inner:
             self._dd_inner.destroy()
-        inner = tk.Frame(self._dd_frame, bg=self._MENU_BG)
-        inner.pack(padx=1, pady=1)
-        self._dd_inner = inner
 
-        # Vertical breathing room above the first row and below the last
-        content = tk.Frame(inner, bg=self._MENU_BG)
-        content.pack(fill='both', expand=True, pady=5)
+        content = tk.Frame(self._dd_frame, bg=self._MENU_BG)
+        content.pack(fill='both', expand=True)
+        self._dd_inner = content
 
+        # Spacers/separators use tk.Canvas (not tk.Frame) because under ttkbootstrap,
+        # empty Frames and pack pady gaps both leak the theme bg (#222222) instead of
+        # painting the parent's bg. Canvas always paints. width=1 because Canvas
+        # defaults to width=378, which would force the dropdown wider than its content.
+        def spacer(height, color=self._MENU_BG, padx=0):
+            tk.Canvas(content, bg=color, width=1, height=height,
+                      highlightthickness=0).pack(fill='x', padx=padx)
+
+        spacer(5)
         self._rows = []
         self._focused_row = -1
 
         for entry in menu_def:
             if entry['type'] == 'separator':
-                tk.Frame(content, bg=self._SEP_COLOR, height=1).pack(
-                    fill='x', padx=8, pady=6)
+                spacer(6)
+                spacer(1, color=self._SEP_COLOR, padx=8)
+                spacer(6)
                 continue
 
             row = tk.Frame(content, bg=self._MENU_BG)
-            row.pack(fill='x', pady=1)
+            row.pack(fill='x')
 
             pill = tk.Frame(row, bg=self._MENU_BG)
-            pill.pack(fill='x', padx=5, ipady=4)
+            pill.pack(fill='x', padx=5, ipady=5)
 
             state = entry.get('state', 'normal')
             fg = self._MENU_FG if state == 'normal' else self._MENU_DISABLED_FG
@@ -218,10 +248,12 @@ class CustomMenuBar(tk.Canvas):
                     w.bind('<Enter>', lambda e, ri=row_idx: self._set_focused_row(ri))
                     w.bind('<Button-1>', lambda e, c=cmd: self._invoke(c))
 
+        spacer(5)
+
         # Enforce minimum width
-        inner.update_idletasks()
-        if inner.winfo_reqwidth() < _DD_MIN_WIDTH:
-            inner.configure(width=_DD_MIN_WIDTH)
+        content.update_idletasks()
+        if content.winfo_reqwidth() < _DD_MIN_WIDTH:
+            content.configure(width=_DD_MIN_WIDTH)
         self._dd_frame.update_idletasks()
 
         # Force the unhighlighted state explicitly so initial render matches
@@ -288,7 +320,7 @@ class CustomMenuBar(tk.Canvas):
         if self._dd_frame:
             self._dd_frame.place_forget()
         if self._open_index >= 0:
-            self._draw_cascade_bg(self._open_index, self._MENU_BG)
+            self._set_cascade_active(self._open_index, False)
         self._open_index = -1
         self._hover_mode = False
         self._rows = []

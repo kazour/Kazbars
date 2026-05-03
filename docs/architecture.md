@@ -113,7 +113,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/boss_timer.py` | 381 | Boss timer state + UI |
 | `src/kazbars/instructions_panel.py` | 403 | Help/instructions view |
 | `src/kazbars/first_launch.py` | 353 | First-launch dialog + post-dialog orchestrator (`run_first_launch`) |
-| `src/kazbars/custom_menu_bar.py` | 370 | Canvas-based dark menu bar (supports `command`, `separator`, `checkbutton` entries) |
+| `src/kazbars/custom_menu_bar.py` | 402 | Canvas-based dark menu bar (active-cascade phosphor underline; ttkb-safe Canvas spacers; supports `command`, `separator`, `checkbutton` entries) |
 | `src/kazbars/combat_monitor.py` | 294 | Combat log parser feeding the tracker |
 | `src/kazbars/build_executor.py` | 238 | MTASC compile + deploy |
 | `build.py` | 225 | PyInstaller build driver |
