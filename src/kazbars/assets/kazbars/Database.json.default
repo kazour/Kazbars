@@ -3242,6 +3242,14 @@
       ],
       "category": "#T4",
       "type": "buff"
+    },
+    {
+      "name": "Hopeless Reality Ruin (Shadur)",
+      "ids": [
+        4857485
+      ],
+      "category": "#T4",
+      "type": "debuff"
     }
   ]
 }

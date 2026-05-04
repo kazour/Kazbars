@@ -95,10 +95,10 @@ Trigger: User clicks "Tracked Buffs..." on a dynamic-mode `GridEditorPanel` (the
 Steps:
 1. `_on_mode_btn_click()` — src/kazbars/grid_editor_panel.py:441 — dispatches to `edit_whitelist()` when grid is in dynamic mode (or `edit_slots()` for static)
 2. `edit_whitelist()` — src/kazbars/grid_editor_panel.py:447 — flushes current widget state via `save_to_config()`; opens `BuffSelectorDialog`
-3. `BuffSelectorDialog.__init__()` — src/kazbars/grid_dialogs.py:325 — resolves initial `whitelist` primary IDs to entry names via `database.by_id`; restores last-used category/type filter from settings; calls `refresh_lists()`
+3. `BuffSelectorDialog.__init__()` — src/kazbars/grid_dialogs.py:347 — resolves initial `whitelist` primary IDs to entry names via `database.by_id`; restores last-used category/type filter from settings; calls `refresh_lists()`
 4. `BuffDatabase.search()` — src/kazbars/buff_database.py:64 — filters `grouped_buffs` by query/category/type; sorts by type then name
-5. `BuffSelectorDialog.refresh_lists()` — src/kazbars/grid_dialogs.py:435 — repopulates Available and Selected listboxes; selected entries sort by type when the grid `layout` is `buffFirst` or `debuffFirst`, alphabetically when `mixed`
-6. `BuffSelectorDialog.on_ok()` — src/kazbars/grid_dialogs.py:511 — saves filter state; maps each selected name back to `entry['ids'][0]` via `database.get_entry_by_name()`; sets `self.result`
+5. `BuffSelectorDialog.refresh_lists()` — src/kazbars/grid_dialogs.py:457 — repopulates Available and Selected listboxes; per-row foreground tinted by buff type (`THEME_COLORS['type_debuff']`/`type_misc`) to mirror the Database editor; selected entries sort by type when the grid `layout` is `buffFirst` or `debuffFirst`, alphabetically when `mixed`
+6. `BuffSelectorDialog.on_ok()` — src/kazbars/grid_dialogs.py:544 — saves filter state; maps each selected name back to `entry['ids'][0]` via `database.get_entry_by_name()`; sets `self.result`
 7. `update_labels()` — src/kazbars/grid_editor_panel.py:406 — refreshes whitelist count and buff-name preview text in card header
 
 End state: `grid_config['whitelist']` updated with new primary spell ID list; panel header shows new buff count and preview names

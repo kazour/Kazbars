@@ -111,7 +111,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/grids_panel.py` | 617 | `GridsPanel` container, toolbar, scrollable list. Per-row card lives in `grid_editor_panel.py` |
 | `src/kazbars/grid_editor_panel.py` | 646 | `GridEditorPanel` (per-row collapsible card) + module-level `_FILL_*`/`_LAYOUT_*`/`_SORT_*` option maps |
 | `src/kazbars/database_editor.py` | 750 | Buff DB UI (treeview, dialogs, category management). Pure data layer in `buff_database.py` |
-| `src/kazbars/grid_dialogs.py` | 841 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
+| `src/kazbars/grid_dialogs.py` | 874 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
 | `src/kazbars/build_loading.py` | 797 | Build-progress screen + welcome/about popups |
 | `src/kazbars/buff_display_editor.py` | 563 | Default Buff Bars dialog (UI). Pure XML helpers in `buff_xml.py` |
 | `src/kazbars/buff_xml.py` | 215 | AoC HUD XML helpers (regex-only). Pure — no Tk/ttkbootstrap, importable from CI without UI extra |

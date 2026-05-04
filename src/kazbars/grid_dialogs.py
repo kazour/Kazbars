@@ -471,11 +471,20 @@ class BuffSelectorDialog(tk.Toplevel):
             self._search_cache_key = cache_key
             self._search_cache_value = available
 
+        type_fg = {
+            'debuff': THEME_COLORS['type_debuff'],
+            'misc': THEME_COLORS['type_misc'],
+        }
+
         self.avail_list.delete(0, tk.END)
         self.avail_data = []
         for buff in available:
             if buff['name'] not in self.selected_names:
+                idx = self.avail_list.size()
                 self.avail_list.insert(tk.END, buff['name'])
+                fg = type_fg.get(buff.get('type', 'buff'))
+                if fg:
+                    self.avail_list.itemconfig(idx, foreground=fg)
                 self.avail_data.append(buff)
 
         self.sel_list.delete(0, tk.END)
@@ -483,11 +492,9 @@ class BuffSelectorDialog(tk.Toplevel):
         selected_entries = []
         for buff in self.database.grouped_buffs:
             if buff['name'] in self.selected_names:
-                tag = {"debuff": "(D)", "misc": "(M)"}.get(buff.get('type', 'buff'), "(B)")
                 selected_entries.append({
                     'name': buff['name'], 'ids': buff.get('ids', []),
                     'type': buff.get('type', 'buff'),
-                    'display': f"{buff['name']} {tag}"
                 })
         _type_order = (
             {'misc': 0, 'buff': 1, 'debuff': 2} if self.layout == 'buffFirst' else
@@ -499,7 +506,11 @@ class BuffSelectorDialog(tk.Toplevel):
         else:
             selected_entries.sort(key=lambda e: e['name'].lower())
         for entry in selected_entries:
-            self.sel_list.insert(tk.END, entry['display'])
+            idx = self.sel_list.size()
+            self.sel_list.insert(tk.END, entry['name'])
+            fg = type_fg.get(entry.get('type', 'buff'))
+            if fg:
+                self.sel_list.itemconfig(idx, foreground=fg)
             self.sel_data.append({'name': entry['name'], 'ids': entry['ids']})
 
         count = len(self.selected_names)
