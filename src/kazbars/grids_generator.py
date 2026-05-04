@@ -109,6 +109,9 @@ class CodeGenerator:
     private var TCACHE:Object;
     private var previewMode:Boolean;
     private var previewArmed:Boolean;
+    private var lastShiftDown:Number;
+    private var lastCtrlDown:Number;
+    private var lastAltDown:Number;
     private var C_BUFF:Number;
     private var C_DEBUFF:Number;
     private var C_BG:Number;
@@ -147,7 +150,10 @@ class CodeGenerator:
         frameActive = false;
         frameCount = 0;
         previewMode = false;
-        previewArmed = true;{console_pin_init}
+        previewArmed = true;
+        lastShiftDown = 0;
+        lastCtrlDown = 0;
+        lastAltDown = 0;{console_pin_init}
         C_BUFF = 0x666666;
         C_DEBUFF = 0x8B0000;
         C_BG = 0x000000;

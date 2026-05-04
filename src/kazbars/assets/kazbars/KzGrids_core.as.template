@@ -574,7 +574,14 @@
     private function SlotTBuffRem(bid:Number):Void { remTBuff(bid); }
 
     private function handleKeyDown():Void {
-        if (Key.isDown(16) && Key.isDown(17) && Key.isDown(18)) {
+        // Recency window, not Key.isDown: alt-tab leaves modifiers stuck-down in Flash.
+        var c:Number = Key.getCode();
+        var t:Number = getTimer();
+        if (c == 16) lastShiftDown = t;
+        else if (c == 17) lastCtrlDown = t;
+        else if (c == 18) lastAltDown = t;
+        var W:Number = 600;
+        if (t - lastShiftDown < W && t - lastCtrlDown < W && t - lastAltDown < W) {
             if (previewArmed) { previewArmed = false; if (!previewMode) enterPreview(); else exitPreview(); }
         }
     }
