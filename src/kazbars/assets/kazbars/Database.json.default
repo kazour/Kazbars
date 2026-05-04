@@ -3218,6 +3218,30 @@
       ],
       "category": "#T4",
       "type": "buff"
+    },
+    {
+      "name": "Tactic: Provoke (Strom)",
+      "ids": [
+        4857489
+      ],
+      "category": "#T4",
+      "type": "buff"
+    },
+    {
+      "name": "Tactic: Defense (Strom)",
+      "ids": [
+        4857488
+      ],
+      "category": "#T4",
+      "type": "buff"
+    },
+    {
+      "name": "Tactic: Frenzy (Strom)",
+      "ids": [
+        4857490
+      ],
+      "category": "#T4",
+      "type": "buff"
     }
   ]
 }

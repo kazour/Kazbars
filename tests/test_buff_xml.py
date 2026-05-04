@@ -9,7 +9,7 @@ filter whitespace normaliser, and the no-BuffListView guard.
 Run: `pytest tests/test_buff_xml.py` (from repo root).
 """
 
-from kazbars.buff_display_editor import (
+from kazbars.buff_xml import (
     FILTER_BOTH,
     FILTER_FRIENDLY,
     FILTER_HOSTILE,

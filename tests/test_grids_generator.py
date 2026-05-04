@@ -13,7 +13,7 @@ SlotPBuffAdd / SlotTBuffAdd, plus the preview-mode wiring.
 Run: `pytest tests/test_grids_generator.py` (from repo root).
 """
 
-from kazbars.database_editor import BuffDatabase
+from kazbars.buff_database import BuffDatabase
 from kazbars.grids_generator import CodeGenerator
 from kazbars.paths import KAZBARS_ASSETS
 
@@ -55,7 +55,7 @@ def _load_db():
 
 
 def test_console_off_emits_no_console_refs():
-    gen = CodeGenerator([_minimal_grid()], _load_db(), include_console=False)
+    gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0", include_console=False)
     main_code, _ = gen.generate()
 
     # The class name and identifier are namespaced in case-sensitive AS2.
@@ -73,7 +73,7 @@ def test_console_off_emits_no_console_refs():
 
 
 def test_console_on_emits_console_hooks():
-    gen = CodeGenerator([_minimal_grid()], _load_db(), include_console=True)
+    gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0", include_console=True)
     main_code, _ = gen.generate()
 
     # Instantiation
@@ -98,6 +98,6 @@ def test_console_on_emits_console_hooks():
 
 def test_console_default_is_off():
     """Belt-and-suspenders: the default in CodeGenerator must be opt-in."""
-    gen = CodeGenerator([_minimal_grid()], _load_db())
+    gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0")
     main_code, _ = gen.generate()
     assert "KzGridsConsole" not in main_code

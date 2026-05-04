@@ -1,6 +1,6 @@
 # Architectural Map
 
-**Current as of:** 2026-05-03 (after the optional buff-discovery console pass: `KzGridsConsole` is no longer compiled into every build. `KzGrids_core.as.template` carries eight `{{CONSOLE_*}}` placeholders; `CodeGenerator._core_methods()` substitutes them with the original AS2 lines when `include_console=True`, empty strings otherwise. `CodeGenerator.__init__` and `build_grids()` gained `include_console: bool = False`, threaded through `build_executor.compile_to_staging()` from `build_action.build()` (which reads `settings['build_console']`). `_member_variables()` and `_constructor()` also branch on the flag so the `console` member declaration and constructor instantiation are skipped when off — MTASC then doesn't pull `KzGridsConsole.as` from the classpath. New Game-menu checkbox `"Include buff-discovery console in builds"` (default off) toggles the setting via `_on_toggle_build_console`. `CustomMenuBar` gained `'type': 'checkbutton'` entry support — renders a `☐`/`☑` glyph, toggles a `tk.BooleanVar` on click, calls the supplied command. New `tests/test_grids_generator.py` covers the on/off output.)
+**Current as of:** 2026-05-04 (after the audit-cleanup pass: pure data layer extracted (`buff_database.py` + `buff_xml.py`) so `tests/test_buff_xml.py` and `tests/test_grids_generator.py` collect without `ttkbootstrap`; `GridEditorPanel` extracted to its own module with the private `_FILL_*`/`_LAYOUT_*`/`_SORT_*` option maps; new `labeled_spinbox`, `labeled_combobox`, `draw_grid_cells` helpers in `ui_widgets` consolidating the three labeled-widget patterns from `grids_panel`; `combat_monitor` lock now actually covers `log_path`/`last_position`/`file_handle` writes; `pywinstyles` declared in deps; `update_check` URLs rebranded; `MAX_TOTAL_SLOTS` deduped; `CodeGenerator.app_version` made required; `build_grids` exception path now logs traceback. New `tests/test_cluster_isolation.py` makes the Live Tracker isolation rule load-bearing rather than aspirational.)
 **Purpose:** Module topology, dependencies, and coupling hotspots. Updated alongside code changes — if you edit this file, commit it with the code. `CLAUDE.md` has the short version; this file has the detail that doesn't fit there.
 
 ## Dependency clusters
@@ -28,9 +28,17 @@ Window-position helpers reach settings via the public `get_setting`/`set_setting
 
 ### Grid editing
 ```
-grid_model  ← grid_dialogs  ← grids_panel
+grid_model  ← grid_dialogs  ← grid_editor_panel  ← grids_panel
             (also pulls settings_manager, window_position, ui_*)
 ```
+- `grid_editor_panel` owns the per-row collapsible card (`GridEditorPanel`) and the private `_FILL_*`/`_LAYOUT_*`/`_SORT_*` option maps that drive its three comboboxes. `grids_panel` is the container (toolbar, scrollable list, profile load/save bridge).
+
+### Buff database (pure data layer)
+```
+buff_database  ← database_editor   (UI; dialogs, treeview)
+buff_xml       ← buff_display_editor   (UI; HUD-XML editor dialog)
+```
+- `buff_database.py` and `buff_xml.py` import only stdlib — no Tk, no ttkbootstrap. Tests can collect them in a minimal CI image without the UI extra (`tests/test_buff_xml.py`, `tests/test_grids_generator.py`).
 
 ### Build pipeline
 ```
@@ -76,7 +84,7 @@ These modules are consumed only by `src/kazbars/app.py` by design — they hold 
   - Window geometry → `window_position`
   - Settings read/write → `settings_manager` (don't re-introduce UI-layer state)
   - Root-window logic (new menu action, new app-state flow) → extract to a new `src/kazbars/<concern>.py` taking `app` as first arg, add a one-line delegator on `KazBarsApp` if it has internal callers. Don't grow `src/kazbars/app.py`.
-- **Cluster isolation:** the Live Tracker cluster must not be imported from outside itself. Enforced by convention, not code.
+- **Cluster isolation:** the Live Tracker cluster must not be imported from outside itself (except `app.py`), and its members must not import other panels (cluster + shared infrastructure only). Enforced by `tests/test_cluster_isolation.py`.
 - **Toasts:** every toast goes through `app_toast(widget, message, style, duration=, key=, on_click=)` in `ui_widgets`. The walker resolves `.toast` from the widget's ancestry, so callers don't need a direct `ToastManager` reference. Pass `key=` for any emitter that can fire repeatedly in a short burst (spinbox auto-repeat is the canonical case) — same key replaces the live toast in place instead of stacking. Don't reintroduce `obj.toast.show(...)` direct calls — they bypass the walker, fragment defaults, and force a `toast=` constructor seam.
 
 ## Smoke tests
@@ -85,8 +93,9 @@ Plain-Python pytest cases guard the failure modes we've actually hit.
 
 - **`tests/test_imports.py`** — auto-discovers every `src/kazbars/*.py` + `kazbars` and imports each. Catches missing symbols, wrong-module references, and cycles. Add nothing — new modules are picked up automatically.
 - **`tests/test_data_integrity.py`** — validates every buff reference in `assets/kazbars/Default.json` (whitelists + slot assignments) resolves to a `Database.json` entry, and that `Database.json.default` matches `Database.json` byte-for-byte.
-- **`tests/test_buff_xml.py`** — round-trips the `buff_display_editor` XML helpers: attribute extraction, surgical attribute replacement (other bytes preserved verbatim), the KZ_OFF on/off comment-wrap toggle, the filter whitespace normaliser, and the no-`<BuffListView>` guard. Added with the editor itself; covers the regex contract since the module deliberately uses no XML parser.
-- **`tests/test_grids_generator.py`** — asserts `CodeGenerator(include_console=False)` produces zero `console.` / `KzGridsConsole` substrings (so MTASC won't fail to resolve a missing class) and `include_console=True` reproduces the original hooks (instantiation, log calls, preview wiring, persistence keys). Belt-and-suspenders test that the default is `False`.
+- **`tests/test_buff_xml.py`** — round-trips the pure XML helpers in `buff_xml.py`: attribute extraction, surgical attribute replacement (other bytes preserved verbatim), the KZ_OFF on/off comment-wrap toggle, the filter whitespace normaliser, and the no-`<BuffListView>` guard. Covers the regex contract since the module deliberately uses no XML parser. Imports only `kazbars.buff_xml` — no Tk required.
+- **`tests/test_grids_generator.py`** — asserts `CodeGenerator(include_console=False)` produces zero `console.` / `KzGridsConsole` substrings (so MTASC won't fail to resolve a missing class) and `include_console=True` reproduces the original hooks (instantiation, log calls, preview wiring, persistence keys). Belt-and-suspenders test that the default is `False`. Imports `BuffDatabase` from the pure `kazbars.buff_database` — no Tk required.
+- **`tests/test_cluster_isolation.py`** — static-import guard for the Live Tracker cluster. Walks every `src/kazbars/*.py` via `ast.parse`. Asserts (a) no module outside the cluster (except `app.py`) imports a cluster member, and (b) cluster members import only stdlib + cluster + shared infrastructure (`ui_*`, `settings_manager`, `window_position`, `paths`, `custom_menu_bar`). Makes the cluster isolation rule load-bearing.
 
 Run before every commit touching code or data:
 ```bash
@@ -99,20 +108,23 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 
 | File | Lines | Role |
 |---|---:|---|
-| `src/kazbars/grids_panel.py` | 1242 | Grid list UI, grid management |
-| `src/kazbars/database_editor.py` | 883 | Buff DB CRUD, search, filtering |
+| `src/kazbars/grids_panel.py` | 617 | `GridsPanel` container, toolbar, scrollable list. Per-row card lives in `grid_editor_panel.py` |
+| `src/kazbars/grid_editor_panel.py` | 646 | `GridEditorPanel` (per-row collapsible card) + module-level `_FILL_*`/`_LAYOUT_*`/`_SORT_*` option maps |
+| `src/kazbars/database_editor.py` | 750 | Buff DB UI (treeview, dialogs, category management). Pure data layer in `buff_database.py` |
 | `src/kazbars/grid_dialogs.py` | 841 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
 | `src/kazbars/build_loading.py` | 797 | Build-progress screen + welcome/about popups |
-| `src/kazbars/buff_display_editor.py` | 743 | Default Buff Bars dialog — edits HUD XML for 4 portraits via surgical regex; collapsible sections persist open state |
-| `src/kazbars/app.py` | 584 | Entry point + `KazBarsApp` root window (widgets, menu, lifecycle) |
-| `src/kazbars/ui_widgets.py` | 577 | Widget builders, tooltips, bindings, `CollapsibleSection` (with `set_dimmed`), `blend_alpha`, `flash_status_bar`, `app_toast` |
+| `src/kazbars/buff_display_editor.py` | 563 | Default Buff Bars dialog (UI). Pure XML helpers in `buff_xml.py` |
+| `src/kazbars/buff_xml.py` | 215 | AoC HUD XML helpers (regex-only). Pure — no Tk/ttkbootstrap, importable from CI without UI extra |
+| `src/kazbars/buff_database.py` | 140 | `BuffDatabase` class — JSON load/save, in-memory indexes, search. Pure — no Tk |
+| `src/kazbars/app.py` | 585 | Entry point + `KazBarsApp` root window (widgets, menu, lifecycle) |
+| `src/kazbars/ui_widgets.py` | 675 | Widget builders, tooltips, bindings, `CollapsibleSection` (with `set_dimmed`), `blend_alpha`, `flash_status_bar`, `app_toast`, `labeled_spinbox`/`labeled_combobox`, `draw_grid_cells` |
 | `src/kazbars/live_tracker_panel.py` | 575 | Live Tracker Toplevel orchestrator |
 | `src/kazbars/timer_overlay.py` | 542 | In-game transparent timer overlay (two-canvas docked layout, stroke rendering, click-through lock) |
 | `src/kazbars/ui_components.py` | 451 | `ToastManager` (coalesce-by-key, in-place text update), `DragReorderManager`, scrollable frame |
-| `src/kazbars/grids_generator.py` | 466 | AS2 code generation from grid configs (with optional console hooks via `include_console` flag) |
+| `src/kazbars/grids_generator.py` | 472 | AS2 code generation from grid configs (with optional console hooks via `include_console` flag) |
 | `src/kazbars/boss_timer.py` | 381 | Boss timer state + UI |
 | `src/kazbars/instructions_panel.py` | 403 | Help/instructions view |
-| `src/kazbars/first_launch.py` | 353 | First-launch dialog + post-dialog orchestrator (`run_first_launch`) |
+| `src/kazbars/first_launch.py` | 361 | First-launch dialog + post-dialog orchestrator (`run_first_launch`) |
 | `src/kazbars/custom_menu_bar.py` | 402 | Canvas-based dark menu bar (active-cascade phosphor underline; ttkb-safe Canvas spacers; supports `command`, `separator`, `checkbutton` entries) |
 | `src/kazbars/combat_monitor.py` | 294 | Combat log parser feeding the tracker |
 | `src/kazbars/build_executor.py` | 238 | MTASC compile + deploy |
@@ -132,3 +144,4 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/ui_tk_style.py` | 57 | Raw-tk widget styling + dark titlebar |
 | `tests/test_imports.py` | 33 | Import-graph smoke test |
 | `tests/test_grids_generator.py` | 103 | `CodeGenerator.include_console` on/off output checks |
+| `tests/test_cluster_isolation.py` | 101 | Static-import guard for the Live Tracker cluster (no inbound except `app.py`; cluster imports stdlib + cluster + shared infrastructure only) |

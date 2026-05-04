@@ -10,10 +10,9 @@ from datetime import datetime
 from pathlib import Path
 
 from .build_utils import compile_as2, resolve_assets_path
+from .grid_model import MAX_TOTAL_SLOTS
 
 logger = logging.getLogger(__name__)
-
-MAX_TOTAL_SLOTS = 64
 
 
 _template_cache = {}
@@ -34,7 +33,7 @@ def _load_core_template(assets_path=None):
 class CodeGenerator:
     """Generate AS2 source code for the KazBars buff-tracking grid system."""
 
-    def __init__(self, grids, database, app_version="3.6.0", assets_path=None, include_console=False):
+    def __init__(self, grids, database, app_version, assets_path=None, include_console=False):
         """Initialize the code generator with grid configs and the buff database."""
         # Filter out disabled grids
         self.grids = [g for g in grids if g.get('enabled', True)]
@@ -463,10 +462,11 @@ def build_grids(
         return True, f"KazBars.swf built successfully ({output_size:,} bytes)"
 
     except Exception as e:
+        logger.exception("build_grids failed")
         return False, f"Build error: {e!s}"
     finally:
         if temp_dir:
             try:
                 shutil.rmtree(temp_dir)
-            except Exception:
-                pass
+            except OSError as cleanup_err:
+                logger.warning("temp dir cleanup failed: %s", cleanup_err)

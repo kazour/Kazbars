@@ -19,8 +19,8 @@ from .ui_widgets import app_toast
 
 logger = logging.getLogger(__name__)
 
-LATEST_RELEASE_URL = "https://api.github.com/repos/kazour/Kaz-Grids/releases/latest"
-FALLBACK_RELEASES_URL = "https://github.com/kazour/Kaz-Grids/releases/latest"
+LATEST_RELEASE_URL = "https://api.github.com/repos/kazour/Kazbars/releases/latest"
+FALLBACK_RELEASES_URL = "https://github.com/kazour/Kazbars/releases/latest"
 
 
 def check_for_updates(app, current_version):

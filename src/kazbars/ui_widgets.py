@@ -11,7 +11,11 @@ import tkinter as tk
 from tkinter import ttk
 
 from .ui_helpers import (
+    CELL_GAP,
+    CELL_PX,
+    CELL_PX_LARGE,
     FONT_DIALOG_HEADER,
+    FONT_FORM_LABEL,
     FONT_HEADING,
     FONT_SECTION,
     FONT_SMALL,
@@ -289,6 +293,89 @@ def bind_card_events(card_border, color, hover_color=None):
 def add_tooltip(widget, text):
     """Add a hover tooltip that stays inside the app window."""
     _InAppToolTip(widget, text)
+
+
+def labeled_spinbox(parent, label, var, *, from_, to, width=5,
+                    tooltip=None, on_change=None,
+                    label_font=FONT_FORM_LABEL, label_color=None,
+                    padx=0):
+    """Labeled spinbox with key-validation and focus-out clamp.
+
+    `var` is a caller-owned StringVar or IntVar; the helper reads its type
+    to drive the clamp. `on_change`, if given, fires on spinbox arrows AND
+    after focus-out clamp. Returns the Spinbox so callers can bind extras.
+    """
+    lbl = ttk.Label(parent, text=label, font=label_font)
+    if label_color:
+        lbl.configure(foreground=label_color)
+    lbl.pack(side='left')
+
+    def _validate(value):
+        if value in ('', '-'):
+            return True
+        try:
+            int(value)
+            return True
+        except ValueError:
+            return False
+
+    vcmd = (parent.register(_validate), '%P')
+    spin = ttk.Spinbox(parent, from_=from_, to=to, textvariable=var, width=width,
+                       validate='key', validatecommand=vcmd, command=on_change or '')
+    spin.pack(side='left', padx=padx)
+
+    is_str_var = isinstance(var, tk.StringVar)
+
+    def _clamp(_evt=None):
+        try:
+            v = int(var.get()) if is_str_var else var.get()
+        except (ValueError, tk.TclError):
+            v = from_
+        clamped = max(from_, min(to, v))
+        var.set(str(clamped) if is_str_var else clamped)
+        if on_change is not None:
+            on_change()
+
+    spin.bind('<FocusOut>', _clamp)
+    if tooltip:
+        add_tooltip(spin, tooltip)
+    return spin
+
+
+def labeled_combobox(parent, label, var, values, *, width=11,
+                     tooltip=None, padx=0, label_font=FONT_FORM_LABEL):
+    """Labeled readonly combobox. Returns the Combobox widget."""
+    ttk.Label(parent, text=label, font=label_font).pack(side='left')
+    combo = ttk.Combobox(parent, textvariable=var, values=values,
+                         width=width, state='readonly')
+    combo.pack(side='left', padx=padx)
+    if tooltip:
+        add_tooltip(combo, tooltip)
+    return combo
+
+
+def draw_grid_cells(canvas, rows, cols, type_color, area_w, area_h, tag='cells'):
+    """Draw a miniature grid of colored rectangles on *canvas*."""
+    canvas.delete(tag)
+    cell_border = TK_COLORS['separator']
+    display_rows = min(rows, 5)
+    display_cols = min(cols, 5)
+    cell = CELL_PX_LARGE if rows == 1 and cols == 1 else CELL_PX
+    gap = CELL_GAP
+    while display_rows * cell + (display_rows - 1) * gap > area_h - 8 and cell > 3:
+        cell -= 1
+    while display_cols * cell + (display_cols - 1) * gap > area_w - 16 and cell > 3:
+        cell -= 1
+    total_w = display_cols * cell + (display_cols - 1) * gap
+    total_h = display_rows * cell + (display_rows - 1) * gap
+    sx = (area_w - total_w) // 2
+    sy = (area_h - total_h) // 2
+    for r in range(display_rows):
+        for c in range(display_cols):
+            x = sx + c * (cell + gap)
+            y = sy + r * (cell + gap)
+            canvas.create_rectangle(x, y, x + cell, y + cell,
+                                    fill=type_color, outline=cell_border, tags=tag)
 
 
 class _InAppToolTip:

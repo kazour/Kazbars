@@ -21,9 +21,10 @@ from kazbars import (
     update_check,
 )
 from kazbars import __version__ as APP_VERSION
+from kazbars.buff_database import BuffDatabase
 from kazbars.build_loading import show_about_popup
 from kazbars.custom_menu_bar import CustomMenuBar
-from kazbars.database_editor import BuffDatabase, DatabaseEditorTab
+from kazbars.database_editor import DatabaseEditorTab
 from kazbars.first_launch import run_first_launch
 from kazbars.grids_panel import GridsPanel
 from kazbars.instructions_panel import InstructionsPanel

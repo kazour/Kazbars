@@ -61,12 +61,11 @@ class CombatLogMonitor:
         self.log_folder = folder
         latest = self._find_latest_log()
         if latest:
-            self.log_path = latest
             p = Path(latest)
-            if p.exists():
-                self.last_position = p.stat().st_size
-            else:
-                self.last_position = 0
+            new_pos = p.stat().st_size if p.exists() else 0
+            with self._lock:
+                self.log_path = latest
+                self.last_position = new_pos
         return latest
 
     def rescan_log(self):
@@ -79,18 +78,17 @@ class CombatLogMonitor:
         """
         latest = self._find_latest_log()
         if latest:
-            if self.file_handle:
-                try:
-                    self.file_handle.close()
-                except OSError:
-                    pass
-                self.file_handle = None
-            self.log_path = latest
             p = Path(latest)
-            if p.exists():
-                self.last_position = p.stat().st_size
-            else:
-                self.last_position = 0
+            new_pos = p.stat().st_size if p.exists() else 0
+            with self._lock:
+                if self.file_handle:
+                    try:
+                        self.file_handle.close()
+                    except OSError:
+                        pass
+                    self.file_handle = None
+                self.log_path = latest
+                self.last_position = new_pos
         return latest
 
     def _find_latest_log(self):
@@ -126,10 +124,9 @@ class CombatLogMonitor:
         Returns:
             bool: True if started, False if no valid log path
         """
-        if not self.log_path or not Path(self.log_path).exists():
-            return False
-
         with self._lock:
+            if not self.log_path or not Path(self.log_path).exists():
+                return False
             if self.monitoring:
                 return True  # Already running
 
@@ -181,12 +178,14 @@ class CombatLogMonitor:
                         newest_log = full_path
 
             if newest_log and newest_log != self.log_path:
-                # Switch to newer log
-                if self.file_handle:
-                    self.file_handle.close()
-                    self.file_handle = None
-                self.log_path = newest_log
-                self.last_position = 0
+                # Switch to newer log. Take the lock so set_log_folder /
+                # rescan_log can't clobber the swap mid-flight.
+                with self._lock:
+                    if self.file_handle:
+                        self.file_handle.close()
+                        self.file_handle = None
+                    self.log_path = newest_log
+                    self.last_position = 0
                 return True
 
         except OSError:
