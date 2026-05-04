@@ -212,7 +212,7 @@
       "type": "debuff"
     },
     {
-      "name": "Predatory Torment (T4 adds)",
+      "name": "Predatory Torment (Mithrelle)",
       "ids": [
         4857503
       ],
@@ -3217,7 +3217,7 @@
         4857536
       ],
       "category": "#T4",
-      "type": "debuff"
+      "type": "buff"
     }
   ]
 }
