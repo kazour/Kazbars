@@ -114,13 +114,13 @@ Steps:
 2. `run_first_launch()` — src/kazbars/first_launch.py:292 — defines the `on_game_set`, `on_aoc_bypass_set`, `on_load_default`, `on_resolution_set`, `on_dialog_closed` closures; calls `show_first_launch_dialog()`
 3. `show_first_launch_dialog()` — src/kazbars/first_launch.py:26 — builds modal dialog with game folder entry, common-paths shortcuts, an Aoc.exe Yes/No section (revealed on demand), resolution picker, and two option cards ("Use Defaults" / "Start Empty")
 4. `detect_aoc_launcher()` — src/kazbars/build_executor.py:139 — called whenever the path entry changes; checks for `aoc.exe` or `Aoc.log` under `Data/Gui/Aoc/`; reveals the Aoc.exe radio group if found
-5. `on_load_default()` — src/kazbars/first_launch.py:313 — closure: persists game path, Aoc.exe preference, and resolution; composes `profile_io.read_profile_file()` + `apply_profile_data()` against `Default.json`; calls `grids_panel.scale_to_resolution()`; saves a personal copy as `profiles/MyGrids.json` (auto-incremented on collision); stashes data for the welcome popup
-6. `profile_io.read_profile_file()` + `apply_profile_data()` — src/kazbars/profile_io.py:70 + 82 — reads `assets/kazbars/Default.json` (pure I/O), then dispatches grids to `grids_panel.load_profile_data()`, populates `app.reference_resolution` from the JSON, anchors `current_profile` to None for the bundled default
-7. `GridsPanel.scale_to_resolution()` — src/kazbars/grids_panel.py:506 — proportionally adjusts each grid's `x`/`y` from `app.reference_resolution` to the selected game resolution; clamps to `SCREEN_MAX_X`/`SCREEN_MAX_Y`; calls `refresh_panels()`
-8. `profile_io.do_save_profile()` — src/kazbars/profile_io.py:194 — writes scaled profile to `profiles/MyGrids.json`
-9. `on_dialog_closed()` — src/kazbars/first_launch.py:340 — closure called when the dialog is destroyed; if the user took the defaults path, schedules `show_welcome_popup()` 100ms later
+5. `on_load_default()` — src/kazbars/first_launch.py:321 — closure: persists game path, Aoc.exe preference, and resolution **before** loading the profile so the auto-scale inside `apply_profile_data()` reads the just-saved `game_resolution`; composes `read_profile_file()` + `apply_profile_data()` against `Default.json`; saves a personal copy as `profiles/MyGrids.json` (auto-incremented on collision); stashes data for the welcome popup
+6. `profile_io.read_profile_file()` + `apply_profile_data()` — src/kazbars/profile_io.py:71 + 83 — reads `Default.json` (pure I/O), then dispatches grids to `grids_panel.load_profile_data()`, populates `app.reference_resolution` from the JSON, **auto-scales via `grids_panel.scale_to_resolution()` if the profile's reference differs from `game_resolution`**, anchors `current_profile` to None for the bundled default
+7. `GridsPanel.scale_to_resolution()` — src/kazbars/grids_panel.py:505 — anchor-based scaling (X center-anchored, Y bottom-anchored) via `grid_model.scale_grid_position()`; clamps to `SCREEN_MAX_X`/`SCREEN_MAX_Y` (8K sanity caps) and floors at 0; calls `refresh_panels()`
+8. `profile_io.do_save_profile()` — src/kazbars/profile_io.py:203 — writes scaled profile to `profiles/MyGrids.json`
+9. `on_dialog_closed()` — src/kazbars/first_launch.py:351 — closure called when the dialog is destroyed; if the user took the defaults path, schedules `show_welcome_popup()` 100ms later
 
-End state: `game_path` and `use_aoc_bypass` persisted; default profile loaded, scaled to resolution, saved as `profiles/MyGrids.json`; welcome popup shown after the dialog closes
+End state: `game_path`, `use_aoc_bypass`, and `game_resolution` persisted; default profile loaded, anchor-scaled to resolution, saved as `profiles/MyGrids.json`; welcome popup shown after the dialog closes
 
 ---
 
@@ -271,3 +271,22 @@ Steps:
 15. User closes dialog (X button, Escape, Cancel, or any path that hits `WM_DELETE_WINDOW`) → `BuffDisplayDialog._on_close()` — src/kazbars/buff_display_editor.py:720 — calls `_save_section_states()` (writes a per-label `is_open` dict to `settings[SETTINGS_KEY_SECTION_OPEN]`), then `destroy()`. Apply alone does not destroy the dialog — the user keeps editing.
 
 End state: changed sections written to `<game>/Data/Gui/Customized/Views/HUD/<file>.xml` (Player → CharPortraitLeft.xml, Target → CharPortraitRight.xml, Top → HUDView.xml, Floating → FloatingPortraitView.xml) with surgical regex edits and one-shot backups; section open/closed state persisted to `kazbars_settings.json`; user types `/reloadui` in-game to see the changes.
+
+---
+
+## 16. change game resolution
+
+Trigger: User selects Game > Game resolution... from the menu
+
+Steps:
+1. `KazBarsApp._change_game_resolution()` — src/kazbars/app.py:457 — one-line delegator to `game_resolution.change_game_resolution(self)`
+2. `change_game_resolution()` — src/kazbars/game_resolution.py:32 — reads current `game_resolution` setting via `get_game_resolution_or_default()`; builds a modal `Toplevel` with combobox of `["1920x1080", "2560x1440", "3840x2160"]` plus the OS-detected screen res prepended if not already in the list
+3. User picks a value and clicks Apply → `_apply()` closure inside the dialog
+4. `parse_resolution()` — src/kazbars/grid_model.py:122 — converts the chosen `"WxH"` string into `(w, h)`; on parse failure the dialog just closes
+5. **No-op short-circuit**: if `(new_w, new_h) == (current_w, current_h)`, dialog closes without scaling or persisting
+6. `GridsPanel.scale_to_resolution()` — src/kazbars/grids_panel.py:505 — anchor-scales every loaded grid's `x`/`y` from the previous game_resolution to the new one via `scale_grid_position()`; clamps to sanity caps; calls `refresh_panels()` so editor cards rebuild with the new spinbox max as well
+7. `app.reference_resolution = [new_w, new_h]` and `app.settings.set('game_resolution', [new_w, new_h])` + save — establishes the new identity so the next profile load auto-scale is a no-op
+8. `app.modified = True` + `app._update_title()` — the unsaved-changes guard now treats the in-memory profile as dirty so the user is prompted to save before closing
+9. `app_toast()` — src/kazbars/ui_widgets.py — success toast `"Scaled grids: {old_res} → {new_w}×{new_h}"` (or `"Resolution set to {...}"` if the scaler short-circuited)
+
+End state: `game_resolution` persisted; all loaded grids re-anchored to the new screen size; editor X/Y spinbox max picks up the new bounds on next panel rebuild; profile marked modified so the user is prompted on close

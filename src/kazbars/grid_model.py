@@ -9,8 +9,19 @@ Constants, validation specs, and default grid configuration.
 MAX_TOTAL_SLOTS = 64
 MAX_ROWS = 64
 MAX_COLS = 64
-SCREEN_MAX_X = 2560
-SCREEN_MAX_Y = 1440
+SCREEN_MAX_X = 7680
+SCREEN_MAX_Y = 4320
+
+# Anchor coefficients for resolution scaling. 0 = top-left anchored
+# (offset from origin stays constant), 0.5 = center anchored, 1.0 =
+# bottom-right anchored (offset from far edge stays constant). Tuned
+# to match AoC's fixed-pixel HUD: action bars don't grow with resolution,
+# so grids that flank them must hold a constant offset from screen
+# center (X) and screen bottom (Y).
+ANCHOR_COEFF_X = 0.5
+ANCHOR_COEFF_Y = 1.0
+
+DEFAULT_GAME_RESOLUTION = (1920, 1080)
 
 # Declarative validation specs: key → (default, min, max)
 CLAMP_SPECS = {
@@ -115,3 +126,25 @@ def parse_resolution(resolution_str):
         return int(w), int(h)
     except (ValueError, AttributeError):
         return None
+
+
+def get_game_resolution_or_default():
+    """Return (w, h) from settings.game_resolution, or DEFAULT_GAME_RESOLUTION
+    if unset/invalid. Reads via the settings_manager module-level proxy."""
+    from .settings_manager import get_setting
+    res = get_setting('game_resolution')
+    if isinstance(res, list) and len(res) == 2 and all(isinstance(v, int) and v > 0 for v in res):
+        return tuple(res)
+    return DEFAULT_GAME_RESOLUTION
+
+
+def scale_grid_position(x, y, ref_w, ref_h, game_w, game_h):
+    """Apply anchor-based scaling to one (x, y): X anchored to horizontal
+    center, Y anchored to screen bottom. Clamps to SCREEN_MAX bounds and
+    floors at 0. Pure function — testable without Tk."""
+    dw = game_w - ref_w
+    dh = game_h - ref_h
+    return (
+        max(0, min(round(x + ANCHOR_COEFF_X * dw), SCREEN_MAX_X)),
+        max(0, min(round(y + ANCHOR_COEFF_Y * dh), SCREEN_MAX_Y)),
+    )

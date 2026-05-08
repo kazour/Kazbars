@@ -18,8 +18,7 @@ from .grid_model import (
     MAX_COLS,
     MAX_ROWS,
     MAX_TOTAL_SLOTS,
-    SCREEN_MAX_X,
-    SCREEN_MAX_Y,
+    get_game_resolution_or_default,
 )
 from .ui_helpers import (
     BTN_MEDIUM,
@@ -117,6 +116,7 @@ class GridEditorPanel(ttk.Frame):
         """Pack right-side header controls: × delete, Enabled toggle, X/Y, mode button."""
         cfg = self.grid_config
         header = self.section.header_frame
+        max_x, max_y = get_game_resolution_or_default()
 
         self.enabled_var = tk.BooleanVar(value=True)
         delete_label = ttk.Label(header, text="×",
@@ -137,11 +137,11 @@ class GridEditorPanel(ttk.Frame):
         pos_frame = ttk.Frame(header)
         pos_frame.pack(side='right', padx=(0, PAD_LF))
         self.x_var = tk.StringVar(value=str(cfg.get('x', 0)))
-        self._add_position_entry(pos_frame, "X:", self.x_var, 0, SCREEN_MAX_X,
+        self._add_position_entry(pos_frame, "X:", self.x_var, 0, max_x,
                                  "Horizontal position on screen (pixels from left edge)",
                                  padx=(PAD_MICRO, PAD_MID))
         self.y_var = tk.StringVar(value=str(cfg.get('y', 0)))
-        self._add_position_entry(pos_frame, "Y:", self.y_var, 0, SCREEN_MAX_Y,
+        self._add_position_entry(pos_frame, "Y:", self.y_var, 0, max_y,
                                  "Vertical position on screen (pixels from top edge)",
                                  padx=(PAD_MICRO, 0))
 
@@ -319,8 +319,9 @@ class GridEditorPanel(ttk.Frame):
         cols = cfg.get('cols', 5)
         self._rows_var.set(str(rows))
         self._cols_var.set(str(cols))
-        self.x_var.set(str(min(cfg.get('x', 100), SCREEN_MAX_X)))
-        self.y_var.set(str(min(cfg.get('y', 400), SCREEN_MAX_Y)))
+        max_x, max_y = get_game_resolution_or_default()
+        self.x_var.set(str(min(cfg.get('x', 100), max_x)))
+        self.y_var.set(str(min(cfg.get('y', 400), max_y)))
         self.icon_var.set(min(cfg.get('iconSize', 56), 64))
         self.gap_var.set(max(-5, min(cfg.get('gap', -1), 10)))
         self.timers_var.set(cfg.get('showTimers', True))

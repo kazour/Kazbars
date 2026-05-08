@@ -241,7 +241,7 @@
         4383111
       ],
       "category": "#T4",
-      "type": "debuff"
+      "type": "misc"
     },
     {
       "name": "Beautiful Death (Kyllikki)",
@@ -3250,6 +3250,30 @@
       ],
       "category": "#T4",
       "type": "debuff"
+    },
+    {
+      "name": "Irritating (Strom)",
+      "ids": [
+        4857492
+      ],
+      "category": "#T4",
+      "type": "debuff"
+    },
+    {
+      "name": "Vivifier Wrack (Entity)",
+      "ids": [
+        4924714
+      ],
+      "category": "#T4",
+      "type": "debuff"
+    },
+    {
+      "name": "Poison Blades (Fizzle)",
+      "ids": [
+        3727070
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
     }
   ]
 }

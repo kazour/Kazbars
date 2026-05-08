@@ -26,6 +26,7 @@ from kazbars.build_loading import show_about_popup
 from kazbars.custom_menu_bar import CustomMenuBar
 from kazbars.database_editor import DatabaseEditorTab
 from kazbars.first_launch import run_first_launch
+from kazbars.game_resolution import change_game_resolution
 from kazbars.grids_panel import GridsPanel
 from kazbars.instructions_panel import InstructionsPanel
 from kazbars.live_tracker_panel import LiveTrackerPanel
@@ -334,6 +335,8 @@ class KazBarsApp(ttkb.Window):
             {'type': 'separator'},
             {'type': 'command', 'label': 'Change game folder...',
              'command': self._change_game_folder},
+            {'type': 'command', 'label': 'Game resolution...',
+             'command': self._change_game_resolution},
             {'type': 'command', 'label': 'Uninstall from game client...',
              'command': self._uninstall_game},
             {'type': 'separator'},
@@ -450,6 +453,9 @@ class KazBarsApp(ttkb.Window):
 
     def _change_game_folder(self):
         return game_folder.change_game_folder(self)
+
+    def _change_game_resolution(self):
+        return change_game_resolution(self)
 
     def _clear_game_path(self):
         return game_folder.clear_game_path(self)

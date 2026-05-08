@@ -57,7 +57,7 @@ live_tracker_settings  ← boss_timer
 
 ### kazbars-only satellites (extracted from KazBarsApp)
 ```
-src/kazbars/app.py  → profile_io, game_folder, build_action, buff_display_editor, first_launch, custom_menu_bar, update_check
+src/kazbars/app.py  → profile_io, game_folder, game_resolution, build_action, buff_display_editor, first_launch, custom_menu_bar, update_check
 ```
 These modules are consumed only by `src/kazbars/app.py` by design — they hold logic that belongs to the root window but would otherwise bloat the entry-point file. Each takes `app` (the `KazBarsApp` instance) as first arg. `KazBarsApp` keeps thin delegator methods so internal call sites (menus, dialog callbacks) don't need rewriting when new functions get added. `first_launch` is the only satellite that crosses cluster boundaries — its `run_first_launch(app, app_name)` orchestrator imports `game_folder`, `profile_io`, `build_loading`, and `grid_model` to drive the dialog's post-close actions (default profile load, scaling, welcome popup). `update_check` is the only satellite called directly (no delegator on `KazBarsApp`) since it has a single fire-and-forget caller in `__init__`; its worker thread schedules a named main-thread dispatcher (`_show_update_toast`) guarded by `winfo_exists()`.
 
@@ -108,15 +108,15 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 
 | File | Lines | Role |
 |---|---:|---|
-| `src/kazbars/grids_panel.py` | 617 | `GridsPanel` container, toolbar, scrollable list. Per-row card lives in `grid_editor_panel.py` |
-| `src/kazbars/grid_editor_panel.py` | 646 | `GridEditorPanel` (per-row collapsible card) + module-level `_FILL_*`/`_LAYOUT_*`/`_SORT_*` option maps |
+| `src/kazbars/grids_panel.py` | 615 | `GridsPanel` container, toolbar, scrollable list, anchor-based `scale_to_resolution`. Per-row card lives in `grid_editor_panel.py` |
+| `src/kazbars/grid_editor_panel.py` | 647 | `GridEditorPanel` (per-row collapsible card) + module-level `_FILL_*`/`_LAYOUT_*`/`_SORT_*` option maps; X/Y spinbox bounds pulled from `game_resolution` setting |
 | `src/kazbars/database_editor.py` | 750 | Buff DB UI (treeview, dialogs, category management). Pure data layer in `buff_database.py` |
 | `src/kazbars/grid_dialogs.py` | 874 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
 | `src/kazbars/build_loading.py` | 797 | Build-progress screen + welcome/about popups |
 | `src/kazbars/buff_display_editor.py` | 563 | Default Buff Bars dialog (UI). Pure XML helpers in `buff_xml.py` |
 | `src/kazbars/buff_xml.py` | 215 | AoC HUD XML helpers (regex-only). Pure — no Tk/ttkbootstrap, importable from CI without UI extra |
 | `src/kazbars/buff_database.py` | 140 | `BuffDatabase` class — JSON load/save, in-memory indexes, search. Pure — no Tk |
-| `src/kazbars/app.py` | 585 | Entry point + `KazBarsApp` root window (widgets, menu, lifecycle) |
+| `src/kazbars/app.py` | 591 | Entry point + `KazBarsApp` root window (widgets, menu, lifecycle) |
 | `src/kazbars/ui_widgets.py` | 675 | Widget builders, tooltips, bindings, `CollapsibleSection` (with `set_dimmed`), `blend_alpha`, `flash_status_bar`, `app_toast`, `labeled_spinbox`/`labeled_combobox`, `draw_grid_cells` |
 | `src/kazbars/live_tracker_panel.py` | 575 | Live Tracker Toplevel orchestrator |
 | `src/kazbars/timer_overlay.py` | 542 | In-game transparent timer overlay (two-canvas docked layout, stroke rendering, click-through lock) |
@@ -124,18 +124,19 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/grids_generator.py` | 472 | AS2 code generation from grid configs (with optional console hooks via `include_console` flag) |
 | `src/kazbars/boss_timer.py` | 381 | Boss timer state + UI |
 | `src/kazbars/instructions_panel.py` | 403 | Help/instructions view |
-| `src/kazbars/first_launch.py` | 361 | First-launch dialog + post-dialog orchestrator (`run_first_launch`) |
+| `src/kazbars/first_launch.py` | 364 | First-launch dialog + post-dialog orchestrator (`run_first_launch`) |
 | `src/kazbars/custom_menu_bar.py` | 402 | Canvas-based dark menu bar (active-cascade phosphor underline; ttkb-safe Canvas spacers; supports `command`, `separator`, `checkbutton` entries) |
 | `src/kazbars/combat_monitor.py` | 294 | Combat log parser feeding the tracker |
 | `src/kazbars/build_executor.py` | 238 | MTASC compile + deploy |
 | `build.py` | 225 | PyInstaller build driver |
-| `src/kazbars/profile_io.py` | 219 | Profile load (read+apply split) / save (build+write+commit, `silent=` for piggyback saves) / new / open + missing-buff warning |
+| `src/kazbars/profile_io.py` | 225 | Profile load (read+apply split, with auto-anchor-scale on resolution mismatch) / save (build+write+commit, `silent=` for piggyback saves) / new / open + missing-buff warning |
 | `src/kazbars/game_folder.py` | 192 | Game folder UI + Aoc.exe bypass (with install/remove reconciler) + uninstall |
+| `src/kazbars/game_resolution.py` | 104 | Game resolution dialog + anchor-rescale all loaded grids on apply |
 | `tests/test_buff_xml.py` | 175 | Round-trip smoke test for `buff_display_editor` XML helpers |
 | `src/kazbars/build_action.py` | 169 | Build & Install flow |
 | `src/kazbars/ui_helpers.py` | 193 | Design tokens + `setup_custom_styles` + `style_treeview_heading` |
 | `src/kazbars/live_tracker_settings.py` | 168 | Tracker persistence (with one-shot legacy filename migration) |
-| `src/kazbars/grid_model.py` | 117 | Grid dataclasses + `parse_resolution` helper |
+| `src/kazbars/grid_model.py` | 150 | Grid dataclasses, `parse_resolution`, `get_game_resolution_or_default`, anchor-based `scale_grid_position` (X center / Y bottom anchored) |
 | `tests/test_data_integrity.py` | 103 | Buff-ref resolution smoke test |
 | `src/kazbars/build_utils.py` | 98 | Compiler discovery + path helpers |
 | `src/kazbars/window_position.py` | 91 | Window geometry save/restore |
@@ -145,3 +146,4 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `tests/test_imports.py` | 33 | Import-graph smoke test |
 | `tests/test_grids_generator.py` | 103 | `CodeGenerator.include_console` on/off output checks |
 | `tests/test_cluster_isolation.py` | 101 | Static-import guard for the Live Tracker cluster (no inbound except `app.py`; cluster imports stdlib + cluster + shared infrastructure only) |
+| `tests/test_resolution_scaling.py` | 93 | Anchor-formula regression test (`scale_grid_position` predictions for 1080p → 1440p / 4K against `Default.json`) |

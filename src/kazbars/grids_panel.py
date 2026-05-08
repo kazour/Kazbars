@@ -19,10 +19,9 @@ from .grid_editor_panel import (
 )
 from .grid_model import (
     MAX_TOTAL_SLOTS,
-    SCREEN_MAX_X,
-    SCREEN_MAX_Y,
     create_default_grid,
     parse_resolution,
+    scale_grid_position,
     validate_grid,
 )
 from .settings_manager import get_setting, set_setting
@@ -504,20 +503,19 @@ class GridsPanel(ttk.Frame):
             panel.save_to_config()
 
     def scale_to_resolution(self, resolution_str, reference_resolution):
-        """Scale grid x/y from reference_resolution to the given game resolution.
-        Returns True if scaling was applied."""
+        """Scale grid x/y from reference_resolution to the given game resolution
+        using anchor-based positioning (X center-anchored, Y bottom-anchored)
+        to match AoC's fixed-pixel HUD behavior. Returns True if applied."""
         game_res = parse_resolution(resolution_str)
-        if not game_res:
-            return False
-        if not reference_resolution or len(reference_resolution) != 2:
+        if not game_res or not reference_resolution or len(reference_resolution) != 2:
             return False
         ref_w, ref_h = reference_resolution
         game_w, game_h = game_res
-        if ref_w == game_w and ref_h == game_h:
+        if (ref_w, ref_h) == (game_w, game_h):
             return False
         for grid in self.grids:
-            grid['x'] = min(round(grid['x'] * game_w / ref_w), SCREEN_MAX_X)
-            grid['y'] = min(round(grid['y'] * game_h / ref_h), SCREEN_MAX_Y)
+            grid['x'], grid['y'] = scale_grid_position(
+                grid['x'], grid['y'], ref_w, ref_h, game_w, game_h)
         self.refresh_panels()
         return True
 

@@ -21,6 +21,7 @@ from tkinter import filedialog
 
 from ttkbootstrap.dialogs import Messagebox
 
+from .grid_model import get_game_resolution_or_default
 from .settings_manager import safe_save_json
 from .ui_widgets import app_toast, flash_status_bar
 
@@ -111,6 +112,11 @@ def apply_profile_data(app, path, data, *, corrupt=False):
 
     ref = data.get('reference_resolution')
     app.reference_resolution = list(ref) if isinstance(ref, list) and len(ref) == 2 else None
+
+    game_w, game_h = get_game_resolution_or_default()
+    if app.reference_resolution and tuple(app.reference_resolution) != (game_w, game_h):
+        app.grids_panel.scale_to_resolution(f"{game_w}x{game_h}", app.reference_resolution)
+        app.reference_resolution = [game_w, game_h]
 
     app.current_profile = profile_key
     app.modified = False
