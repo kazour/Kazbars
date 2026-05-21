@@ -7,6 +7,8 @@ import json
 import logging
 from pathlib import Path
 
+from .overlay_engine import FONT_FAMILY_CHOICES
+
 logger = logging.getLogger(__name__)
 
 # =============================================================================
@@ -22,8 +24,8 @@ TIMERS_DEFAULTS = {
 
     # Overlay state
     "locked": False,
-    "transparent_bg": False,
-    "opacity": 0.90,            # 0.3 - 1.0
+    "bg_opacity": 0.0,          # 0.0 transparent → 1.0 solid dark
+    "font_family": "Segoe UI",  # one of overlay_engine.FONT_FAMILY_CHOICES
     "font_size": 12,            # 8 - 20
 
     # Visibility (remember if user hid the overlay)
@@ -39,12 +41,12 @@ TIMERS_DEFAULTS = {
 # =============================================================================
 
 TIMERS_RANGES = {
-    "x":        {"min": 0,    "max": 3840,  "step": 1},
-    "y":        {"min": 0,    "max": 2160,  "step": 1},
-    "width":    {"min": 150,  "max": 600,   "step": 1},
-    "height":   {"min": 60,   "max": 300,   "step": 1},
-    "opacity":  {"min": 0.3,  "max": 1.0,   "step": 0.05},
-    "font_size": {"min": 8,   "max": 20,    "step": 1},
+    "x":          {"min": 0,    "max": 3840,  "step": 1},
+    "y":          {"min": 0,    "max": 2160,  "step": 1},
+    "width":      {"min": 150,  "max": 600,   "step": 1},
+    "height":     {"min": 60,   "max": 300,   "step": 1},
+    "bg_opacity": {"min": 0.0,  "max": 1.0,   "step": 0.05},
+    "font_size":  {"min": 8,    "max": 20,    "step": 1},
 }
 
 
@@ -59,14 +61,17 @@ def get_default_settings():
 
 def validate_setting(key, value):
     """Validate a single timer setting. Returns clamped/corrected value."""
-    if key in ("locked", "transparent_bg", "visible", "positioned"):
+    if key in ("locked", "visible", "positioned"):
         return bool(value)
+
+    if key == "font_family":
+        return value if value in FONT_FAMILY_CHOICES else TIMERS_DEFAULTS["font_family"]
 
     if key in TIMERS_RANGES:
         r = TIMERS_RANGES[key]
         try:
             # Handle float vs int based on step
-            if isinstance(r.get("step"), float) or key == "opacity":
+            if isinstance(r.get("step"), float) or key == "bg_opacity":
                 value = float(value)
             else:
                 value = int(value)
@@ -77,8 +82,35 @@ def validate_setting(key, value):
     return value
 
 
+def _migrate_legacy_keys(raw: dict) -> dict:
+    """Convert pre-PIL settings (transparent_bg + opacity) to the new bg_opacity.
+
+    Old model: window-wide `-alpha` for opacity; `transparent_bg=True` meant
+    "no panel, just text + stroke". New model: bg-only `bg_opacity` controls
+    the backdrop, numbers always at full alpha. Map preserves the visual
+    intent so users don't see a sudden jump on upgrade.
+    """
+    migrated = dict(raw)
+    if "transparent_bg" in migrated or "opacity" in migrated:
+        was_transparent = bool(migrated.pop("transparent_bg", False))
+        old_opacity = float(migrated.pop("opacity", 0.9))
+        if was_transparent:
+            # User was running floating-text mode; preserve clear bg.
+            migrated["bg_opacity"] = 0.0
+        else:
+            # User had a solid panel; carry their alpha to the new bg fill.
+            migrated["bg_opacity"] = max(0.0, min(old_opacity, 1.0))
+    return migrated
+
+
 def validate_all_settings(settings):
-    """Validate all timer settings, returning cleaned dict."""
+    """Validate all timer settings, returning cleaned dict.
+
+    Applies legacy-key migration before validation so users coming from
+    the pre-PIL overlay see a sensible default rather than the raw
+    `bg_opacity=0.0` they'd get if their old keys were silently dropped.
+    """
+    settings = _migrate_legacy_keys(settings)
     defaults = get_default_settings()
     result = dict(defaults)
 

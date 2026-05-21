@@ -1,542 +1,515 @@
+"""KazBars — Live Tracker overlay (PIL + win32 layered window).
+
+The Ethram-Fal seed-timer overlay, rendered via the shared
+`overlay_engine.LayeredOverlay`. Uses true per-pixel alpha for both
+the bg fill and the text — bypassing Tk's `-alpha` /
+`-transparentcolor` machinery which is broken on this Tk install.
+
+Visual structure:
+  ┌────────────────────────────────────────────┐
+  │ row1_msg row1_player              row1_timer│
+  │ row2_msg row2_player              row2_timer│
+  │ ──────────────────────────────────────────── │  ← 1 px separator
+  │ cycle_timer                       ●   ◢    │
+  └────────────────────────────────────────────┘
+
+`bg_opacity` (0.0-1.0) drives the alpha of the dark backdrop:
+
+  - 0.0 → no backdrop, text floats over the game with a dark stroke for
+    legibility.
+  - 1.0 → solid dark panel.
+
+Numbers and labels are always fully opaque so they stay crisp at any
+backdrop opacity — same model as the Deeps overlay.
+
+Lock indicator (○/●) and resize handle (◢) are drawn as PIL shapes
+(circle, triangle) rather than as glyphs so they render consistently
+regardless of which font is selected.
+
+Interactions:
+  - click on lock indicator → toggle lock (engine's set_locked toggles
+    `WS_EX_TRANSPARENT` for OS-level click-through)
+  - drag on resize handle → resize
+  - drag anywhere else → move
 """
-Timer Overlay Module for KazBars
-Transparent, always-on-top overlay window for displaying boss timer information.
-"""
+
+from __future__ import annotations
 
 import logging
 import tkinter as tk
+from collections.abc import Callable
+
+from PIL import Image, ImageDraw, ImageFont
 
 from .live_tracker_settings import COLORS, TIMERS_DEFAULTS
-from .ui_helpers import (
-    FONT_FAMILY,
-    FONT_SMALL,
-    OVERLAY_COLORS,
-    PAD_MICRO,
-    PAD_SMALL,
-    PAD_XS,
-    TK_COLORS,
-)
+from .overlay_engine import LayeredOverlay, load_font
+from .ui_helpers import TK_COLORS
 
 logger = logging.getLogger(__name__)
 
-# Optional win32 import for click-through functionality
-try:
-    import win32con
-    import win32gui
-    HAS_WIN32 = True
-except ImportError:
-    HAS_WIN32 = False
 
+# =========================================================================== #
+# Visual constants                                                            #
+# =========================================================================== #
+
+_BG_FILL_RGB = (10, 10, 10)             # near-black backdrop fill
+_BG_BORDER_RGB = (51, 51, 51)           # 1 px frame border (only visible with bg)
+_STROKE_RGB = (10, 10, 10)              # text outline
+_CHROME_FG = TK_COLORS["border"]        # lock indicator + resize handle color
+
+# Chrome hit-test rectangles in overlay-local coordinates.
+_CHROME_HIT_W = 16
+_CHROME_HIT_H = 16
+_CHROME_PAD = 2
+
+MIN_WIDTH = 150
+
+
+def _hex_to_rgb(hex_str: str) -> tuple[int, int, int]:
+    h = hex_str.lstrip("#")
+    return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+
+
+# =========================================================================== #
+# TimerOverlay                                                                #
+# =========================================================================== #
 
 class TimerOverlay:
-    """
-    Transparent overlay window for displaying Ethram-Fal timer phases.
+    """Live Tracker overlay. Public API matches the pre-port shape so
+    `live_tracker_panel.py` doesn't need changes."""
 
-    Features:
-    - Always-on-top display
-    - Draggable when unlocked
-    - Resizable via corner handle
-    - Click-through when locked (requires pywin32)
-    - Transparent background option (text rendered with outline stroke for
-      readability over arbitrary game scenes)
-    - Configurable opacity and font size
-    """
+    MIN_WIDTH = MIN_WIDTH
 
-    # Visual constants. BG_OUTER doubles as the text outline color.
-    TRANSPARENT_COLOR = OVERLAY_COLORS['transparent']
-    BG_OUTER = OVERLAY_COLORS['bg_outer']
-    BG_INNER = TK_COLORS['status_bg']
-    BG_BORDER = TK_COLORS['separator']
-
-    # Lock indicator glyphs — monochrome, render consistently in Segoe UI.
-    LOCK_GLYPH = '●'    # Black circle
-    UNLOCK_GLYPH = '○'  # White circle
-
-    # Resize handle placement (relative to bottom-right of inner frame)
-    RESIZE_HANDLE_PLACE = {'relx': 1.0, 'rely': 1.0, 'anchor': 'se', 'x': -1, 'y': -1}
-    LOCK_INDICATOR_PLACE = {'relx': 1.0, 'rely': 1.0, 'anchor': 'se', 'x': -18, 'y': -1}
-
-    # Minimum width is fixed; minimum height scales with font (see _min_height).
-    MIN_WIDTH = 150
-
-    def __init__(self, root, settings, on_settings_changed=None):
-        """
-        Initialize the overlay window.
-
-        Args:
-            root: Parent Tk window
-            settings: Dict with x, y, width, height, locked, transparent_bg, opacity, font_size
-            on_settings_changed: Callback when position/settings change (for auto-save)
-        """
-        self.root = tk.Toplevel(root)
+    def __init__(
+        self,
+        root: tk.Misc,
+        settings: dict,
+        on_settings_changed: Callable[[], None] | None = None,
+    ) -> None:
         self._on_settings_changed = on_settings_changed
 
-        self.is_visible = settings.get('visible', TIMERS_DEFAULTS['visible'])
-        self.transparent_bg = settings.get('transparent_bg', TIMERS_DEFAULTS['transparent_bg'])
-        self.opacity = settings.get('opacity', TIMERS_DEFAULTS['opacity'])
-        self.font_size = settings.get('font_size', TIMERS_DEFAULTS['font_size'])
-        self.overlay_width = settings.get('width', TIMERS_DEFAULTS['width'])
-        self.overlay_height = settings.get('height', TIMERS_DEFAULTS['height'])
-        self.is_locked = False
+        # Persisted state
+        self.is_visible: bool = settings.get("visible", TIMERS_DEFAULTS["visible"])
+        self.bg_opacity: float = settings.get(
+            "bg_opacity", TIMERS_DEFAULTS["bg_opacity"]
+        )
+        self.font_family: str = settings.get(
+            "font_family", TIMERS_DEFAULTS["font_family"]
+        )
+        self.font_size: int = settings.get("font_size", TIMERS_DEFAULTS["font_size"])
+        self.overlay_width: int = settings.get("width", TIMERS_DEFAULTS["width"])
+        self.overlay_height: int = settings.get("height", TIMERS_DEFAULTS["height"])
+        self.is_locked: bool = False  # set below via set_locked
 
-        self.root.attributes('-topmost', True)
-        self.root.attributes('-alpha', self.opacity)
-        self.root.overrideredirect(True)
-        self.root.attributes('-transparentcolor', self.TRANSPARENT_COLOR)
-        # Overlay can't be closed via the window manager — only the panel
-        # may hide or destroy it.
-        self.root.protocol("WM_DELETE_WINDOW", lambda: None)
-
-        self._bg_widgets = []
-
-        self._display_state = {
-            'row1_msg': "Waiting for Seed...",
-            'row1_player': "", 'row1_timer': "", 'row1_color': COLORS["default"],
-            'row2_msg': "", 'row2_player': "", 'row2_timer': "",
-            'row2_color': COLORS["default"],
-            'cycle_timer': "",
+        # Current display state — same dict shape the panel/boss_timer push.
+        self._display_state: dict = {
+            "row1_msg": "Waiting for Seed...",
+            "row1_player": "", "row1_timer": "", "row1_color": COLORS["default"],
+            "row2_msg": "", "row2_player": "", "row2_timer": "",
+            "row2_color": COLORS["default"],
+            "cycle_timer": "",
         }
 
-        x = settings.get('x', TIMERS_DEFAULTS['x'])
-        y = settings.get('y', TIMERS_DEFAULTS['y'])
-        if not settings.get('positioned', False):
-            self.root.update_idletasks()
-            screen_w = self.root.winfo_screenwidth()
-            x = screen_w // 2 - self.overlay_width // 2
+        # Compute initial position (center on first run).
+        x = settings.get("x", TIMERS_DEFAULTS["x"])
+        y = settings.get("y", TIMERS_DEFAULTS["y"])
+        if not settings.get("positioned", False):
+            try:
+                screen_w = root.winfo_screenwidth()
+                x = screen_w // 2 - self.overlay_width // 2
+            except tk.TclError:
+                pass
 
-        self.root.geometry(f'{self.overlay_width}x{self.overlay_height}+{x}+{y}')
-
-        self._build_ui()
-        self._setup_dragging()
-        self._apply_background()
-
-        # Apply initial lock state with notify=False so the freshly-loaded
-        # settings don't trigger an immediate save.
-        self.set_locked(settings.get('locked', TIMERS_DEFAULTS['locked']), notify=False)
-
-        if not self.is_visible:
-            self.root.withdraw()
-
-    # =========================================================================
-    # UI CONSTRUCTION
-    # =========================================================================
-
-    def _build_ui(self):
-        """Build the overlay UI structure.
-
-        Layout (pack with side='bottom' for the bottom dock):
-          ┌──────────────────────────┐
-          │ text_canvas (top, fills) │  rows 1+2
-          │ ──── separator (1px) ─── │
-          │ cycle_timer_canvas       │  cycle timer + chrome (lock, resize)
-          └──────────────────────────┘
-        text_canvas and cycle_timer_canvas are discrete widgets, so the
-        cycle timer can never overlap the messages on resize.
-        """
-        self.root.config(bg=self.TRANSPARENT_COLOR)
-
-        # Outer container
-        self.container = tk.Frame(self.root, bg=self.BG_OUTER, bd=0)
-        self.container.pack(fill='both', expand=True)
-        self._bg_widgets.append(('outer', self.container))
-
-        # Inner frame with border
-        self.frame = tk.Frame(
-            self.container, bg=self.BG_INNER, bd=1, relief='flat',
-            highlightthickness=1, highlightbackground=self.BG_BORDER
+        # Build the engine.
+        self._engine = LayeredOverlay(
+            root,
+            render_callback=self._render,
+            width=self.overlay_width,
+            height=self.overlay_height,
         )
-        self.frame.pack(fill='both', expand=True, padx=PAD_MICRO, pady=PAD_MICRO)
-        self._bg_widgets.append(('inner', self.frame))
+        self._engine.set_position(x, y)
 
-        # === BOTTOM: cycle timer canvas (docked, fixed height). Hosts the
-        # cycle timer text plus the chrome (lock indicator, resize handle).
-        self.cycle_timer_canvas = tk.Canvas(
-            self.frame, bg=self.BG_INNER, bd=0, highlightthickness=0,
-            height=self._cycle_timer_height()
+        # Custom input — lock-click / resize / move dispatch.
+        self._drag_mode: str | None = None  # None | "move" | "resize"
+        self._drag_anchor_x = 0
+        self._drag_anchor_y = 0
+        self._drag_start_w = 0
+        self._drag_start_h = 0
+        self._engine.root.bind("<Button-1>", self._on_press)
+        self._engine.root.bind("<B1-Motion>", self._on_drag)
+        self._engine.root.bind("<ButtonRelease-1>", self._on_release)
+
+        # Apply initial lock — set_locked is idempotent and configures click-through.
+        self.set_locked(
+            settings.get("locked", TIMERS_DEFAULTS["locked"]), notify=False,
         )
-        self.cycle_timer_canvas.pack(side='bottom', fill='x',
-                                     padx=PAD_XS, pady=(0, PAD_MICRO))
-        self._bg_widgets.append(('inner', self.cycle_timer_canvas))
-        self.cycle_timer_canvas.bind('<Configure>', self._on_cycle_canvas_resize)
 
-        # === MIDDLE: 1px separator frame, docked above the cycle timer.
-        self.separator = tk.Frame(self.frame, bg=self.BG_BORDER, height=1)
-        self.separator.pack(side='bottom', fill='x', padx=PAD_XS)
-        self._bg_widgets.append(('border', self.separator))
+        # Visibility — hide() pushes a fully-transparent bitmap; show() repaints.
+        if self.is_visible:
+            self._engine.show()
+        else:
+            self._engine.hide()
 
-        # === TOP: message canvas (fills remaining vertical space).
-        self.text_canvas = tk.Canvas(
-            self.frame, bg=self.BG_INNER, bd=0, highlightthickness=0
-        )
-        self.text_canvas.pack(side='top', fill='both', expand=True,
-                              padx=PAD_XS, pady=(PAD_MICRO, 0))
-        self._bg_widgets.append(('inner', self.text_canvas))
-        self.text_canvas.bind('<Configure>', self._on_text_canvas_resize)
+    # ------------------------------------------------------------------ #
+    # Public API (preserved from the pre-port class)                      #
+    # ------------------------------------------------------------------ #
 
-        # Chrome lives on the cycle_timer_canvas so it's naturally docked
-        # bottom-right, never colliding with the message rows.
-        self.lock_indicator = tk.Label(
-            self.cycle_timer_canvas, text=self.UNLOCK_GLYPH, font=FONT_SMALL,
-            fg=TK_COLORS['border'], bg=self.BG_INNER, cursor='hand2'
-        )
-        self.lock_indicator.place(**self.LOCK_INDICATOR_PLACE)
-        self.lock_indicator.bind('<Button-1>', self._on_lock_click)
-        self._bg_widgets.append(('inner', self.lock_indicator))
-
-        self.resize_handle = tk.Label(
-            self.cycle_timer_canvas, text="◢", font=FONT_SMALL,
-            fg=TK_COLORS['border'], bg=self.BG_INNER
-        )
-        self.resize_handle.place(**self.RESIZE_HANDLE_PLACE)
-        self._bg_widgets.append(('inner', self.resize_handle))
-
-    def _cycle_timer_height(self):
-        """Pixel height of the docked cycle-timer canvas. Scales with font."""
-        return self.font_size + 14
-
-    def _row_line_height(self):
-        """Vertical space per message row. Mirrors the formula in
-        _redraw_text_canvas so layout math stays in one place."""
-        return max(self.font_size + 13, int(self.font_size * 1.8))
-
-    def _min_height(self):
-        """Minimum overlay height for the current font size: cycle dock +
-        separator + two rows + frame chrome. Prevents resize from squashing
-        the layout below something readable."""
-        rows = 2 * self._row_line_height() + 6  # rows + top/bottom pad
-        chrome = 8  # 1px frame border × 2 + 1px pad × 2 + safety
-        return self._cycle_timer_height() + 1 + rows + chrome
-
-    def _setup_dragging(self):
-        """Set up drag and resize handlers."""
-        self.drag_data = {'x': 0, 'y': 0}
-        self.resize_data = {'x': 0, 'y': 0, 'width': 0, 'height': 0}
-
-        # Drag works from the inner frame and either canvas surface.
-        for widget in (self.frame, self.text_canvas, self.cycle_timer_canvas):
-            widget.bind('<Button-1>', self._start_drag)
-            widget.bind('<B1-Motion>', self._on_drag)
-            widget.bind('<ButtonRelease-1>', self._stop_drag)
-
-        # Resize handle bindings
-        self.resize_handle.bind('<Button-1>', self._start_resize)
-        self.resize_handle.bind('<B1-Motion>', self._on_resize)
-        self.resize_handle.bind('<ButtonRelease-1>', self._stop_resize)
-        self.resize_handle.config(cursor='size_nw_se')
-
-    # =========================================================================
-    # CANVAS RENDERING
-    # =========================================================================
-
-    def _on_text_canvas_resize(self, _event):
-        self._redraw_text_canvas()
-
-    def _on_cycle_canvas_resize(self, _event):
-        self._redraw_cycle_timer()
-
-    _TEXT_CANVAS_KEYS = (
-        'row1_msg', 'row1_player', 'row1_timer', 'row1_color',
-        'row2_msg', 'row2_player', 'row2_timer', 'row2_color',
-    )
-
-    def _redraw(self):
-        """Repaint both canvases from the last-known display state."""
-        self._redraw_text_canvas()
-        self._redraw_cycle_timer()
-
-    def _redraw_text_canvas(self):
-        """Repaint message rows 1 and 2."""
-        c = self.text_canvas
-        c.delete('all')
-        s = self._display_state
-
-        w = c.winfo_width()
-        h = c.winfo_height()
-        if w < 4 or h < 4:
-            return  # Canvas not realized yet — next <Configure> redraws
-
-        msg_font = (FONT_FAMILY, self.font_size, 'bold')
-
-        line_h = self._row_line_height()
-
-        pad_top = 3
-        row1_y = pad_top
-        row2_y = row1_y + line_h
-
-        self._draw_row(c, row1_y, s['row1_msg'], s['row1_player'], s['row1_timer'],
-                       s['row1_color'], msg_font, w)
-        self._draw_row(c, row2_y, s['row2_msg'], s['row2_player'], s['row2_timer'],
-                       s['row2_color'], msg_font, w)
-
-    def _redraw_cycle_timer(self):
-        """Repaint the cycle timer in its docked canvas."""
-        c = self.cycle_timer_canvas
-        c.delete('all')
-        s = self._display_state
-
-        w = c.winfo_width()
-        h = c.winfo_height()
-        if w < 4 or h < 4:
-            return
-
-        if not s['cycle_timer']:
-            return
-
-        timer_font = (FONT_FAMILY, self.font_size + 4, 'bold')
-        # Anchor west: vertically centered, left-aligned. Tracker palette only.
-        self._draw_text(c, PAD_SMALL, h // 2, s['cycle_timer'],
-                        COLORS["default"], timer_font, anchor='w')
-
-    def _draw_row(self, canvas, y, msg, player, timer_text, color, font, width):
-        """Render one row: left-aligned message + player, right-aligned timer."""
-        if timer_text:
-            self._draw_text(canvas, width - 2, y, timer_text, color, font, anchor='ne')
-        if msg:
-            msg_id = self._draw_text(canvas, PAD_XS, y, msg, color, font, anchor='nw')
-            if player and msg_id is not None:
-                bbox = canvas.bbox(msg_id)
-                player_x = bbox[2] if bbox else PAD_XS
-                self._draw_text(canvas, player_x, y, player,
-                                COLORS["player"], font, anchor='nw')
-        elif player:
-            self._draw_text(canvas, PAD_XS, y, player,
-                            COLORS["player"], font, anchor='nw')
-
-    def _draw_text(self, canvas, x, y, text, color, font, anchor='nw'):
-        """Render a text element on the canvas. When transparent_bg is on, an
-        8-direction outline in BG_OUTER is drawn behind it for legibility
-        over arbitrary game scenes."""
-        if not text:
-            return None
-        if self.transparent_bg:
-            for dx, dy in ((-1, -1), (0, -1), (1, -1),
-                           (-1,  0),          (1,  0),
-                           (-1,  1), (0,  1), (1,  1)):
-                canvas.create_text(x + dx, y + dy, text=text, fill=self.BG_OUTER,
-                                   font=font, anchor=anchor)
-        return canvas.create_text(x, y, text=text, fill=color,
-                                  font=font, anchor=anchor)
-
-    # =========================================================================
-    # DRAG / RESIZE
-    # =========================================================================
-
-    def _start_drag(self, event):
-        if not self.is_locked:
-            self.drag_data['x'] = event.x
-            self.drag_data['y'] = event.y
-
-    def _on_drag(self, event):
-        if not self.is_locked:
-            x = self.root.winfo_x() + event.x - self.drag_data['x']
-            y = self.root.winfo_y() + event.y - self.drag_data['y']
-            self.root.geometry(f'+{x}+{y}')
-
-    def _stop_drag(self, _event):
-        if not self.is_locked:
-            self._notify_settings_changed()
-
-    def _start_resize(self, event):
-        if not self.is_locked:
-            self.resize_data['x'] = event.x_root
-            self.resize_data['y'] = event.y_root
-            self.resize_data['width'] = self.root.winfo_width()
-            self.resize_data['height'] = self.root.winfo_height()
-
-    def _on_resize(self, event):
-        if not self.is_locked:
-            delta_x = event.x_root - self.resize_data['x']
-            delta_y = event.y_root - self.resize_data['y']
-            new_width = max(self.MIN_WIDTH, self.resize_data['width'] + delta_x)
-            new_height = max(self._min_height(), self.resize_data['height'] + delta_y)
-            self.overlay_width = new_width
-            self.overlay_height = new_height
-            self.root.geometry(f'{new_width}x{new_height}')
-
-    def _stop_resize(self, _event):
-        if not self.is_locked:
-            self._notify_settings_changed()
-
-    def _notify_settings_changed(self):
-        """Notify parent that settings changed (for auto-save)."""
-        if self._on_settings_changed:
-            self._on_settings_changed()
-
-    def _on_lock_click(self, _event):
-        self.toggle_lock()
-
-    # =========================================================================
-    # PUBLIC METHODS
-    # =========================================================================
-
-    def update_display(self, state):
-        """
-        Update all display elements from a phase dict (see BossTimer._phase).
-
-        Boss timer pushes state every 50ms but already dedupes at the source;
-        the per-canvas diff here means a cycle-timer tick (1/sec) doesn't
-        rebuild the message rows, and vice versa.
-        """
+    def update_display(self, state: dict) -> None:
+        """Push a new phase dict from BossTimer. No-op when unchanged."""
         if state == self._display_state:
             return
-        old = self._display_state
         self._display_state = state
-        if any(state[k] != old[k] for k in self._TEXT_CANVAS_KEYS):
-            self._redraw_text_canvas()
-        if state['cycle_timer'] != old['cycle_timer']:
-            self._redraw_cycle_timer()
+        if self.is_visible:
+            self._engine.paint()
 
-    def set_locked(self, locked, notify=True):
-        """Set lock state to a target (idempotent). Updates UI and click-through."""
+    def set_locked(self, locked: bool, notify: bool = True) -> None:
         if locked == self.is_locked:
             return
-        self.is_locked = locked
-        if locked:
-            self.lock_indicator.config(text=self.LOCK_GLYPH, fg=TK_COLORS['border'])
-            self.resize_handle.place_forget()
-            # Defer click-through enable until the window is realized.
-            self.root.after_idle(lambda: self._set_click_through(True))
-        else:
-            self.lock_indicator.config(text=self.UNLOCK_GLYPH, fg=TK_COLORS['border'])
-            self.resize_handle.place(**self.RESIZE_HANDLE_PLACE)
-            self._set_click_through(False)
+        self.is_locked = bool(locked)
+        self._engine.set_locked(self.is_locked)
+        if self.is_visible:
+            self._engine.paint()
         if notify:
             self._notify_settings_changed()
 
-    def toggle_lock(self):
-        """Toggle lock state."""
+    def toggle_lock(self) -> None:
         self.set_locked(not self.is_locked)
 
-    def _set_click_through(self, enabled):
-        """Enable/disable click-through (requires pywin32)."""
-        if not HAS_WIN32:
+    def set_bg_opacity(self, value: float, notify: bool = True) -> None:
+        self.bg_opacity = max(0.0, min(float(value), 1.0))
+        if self.is_visible:
+            self._engine.paint()
+        if notify:
+            self._notify_settings_changed()
+
+    # Backwards-compat alias — panel/profile-load code may still call
+    # `set_opacity`. Forwards to the bg-opacity setter so old call sites
+    # keep working without surprises.
+    def set_opacity(self, value: float, notify: bool = True) -> None:
+        self.set_bg_opacity(value, notify=notify)
+
+    def set_font(self, family: str, size: int, notify: bool = True) -> None:
+        size = int(size)
+        if family == self.font_family and size == self.font_size:
             return
-        try:
-            hwnd = win32gui.GetParent(self.root.winfo_id())
-            ex_style = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
-            if enabled:
-                ex_style |= win32con.WS_EX_TRANSPARENT | win32con.WS_EX_LAYERED
-            else:
-                ex_style &= ~win32con.WS_EX_TRANSPARENT
-            win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE, ex_style)
-        except Exception as e:
-            logger.warning("Failed to set click-through: %s", e)
-
-    def set_transparent(self, transparent, notify=True):
-        """Toggle transparent background."""
-        self.transparent_bg = transparent
-        self._apply_background()
-        self._redraw()  # Stroke layer toggles with this state
-        if notify:
-            self._notify_settings_changed()
-
-    def _apply_background(self):
-        """Apply current background mode to all widgets."""
-        if self.transparent_bg:
-            outer_color = self.TRANSPARENT_COLOR
-            inner_color = self.TRANSPARENT_COLOR
-            border_color = self.TRANSPARENT_COLOR
-        else:
-            outer_color = self.BG_OUTER
-            inner_color = self.BG_INNER
-            border_color = self.BG_BORDER
-
-        bg_by_type = {'outer': outer_color, 'inner': inner_color, 'border': border_color}
-        for widget_type, widget in self._bg_widgets:
-            widget.config(bg=bg_by_type[widget_type])
-
-        if self.transparent_bg:
-            self.frame.config(
-                highlightbackground=self.TRANSPARENT_COLOR,
-                highlightthickness=0,
-            )
-        else:
-            self.frame.config(
-                highlightbackground=border_color,
-                highlightthickness=1,
-            )
-
-    def set_opacity(self, value, notify=True):
-        """Set overlay opacity (0.3 - 1.0)."""
-        self.opacity = float(value)
-        self.root.attributes('-alpha', self.opacity)
-        if notify:
-            self._notify_settings_changed()
-
-    def set_font_size(self, size, notify=True):
-        """Set font size for all text (8 - 20). Resizes the cycle-timer dock,
-        re-clamps overlay height to the new minimum if needed, and repaints
-        both canvases."""
-        self.font_size = int(size)
-        self.cycle_timer_canvas.config(height=self._cycle_timer_height())
+        self.font_family = family
+        self.font_size = size
+        # Re-clamp height in case the new font would push past the natural minimum.
         min_h = self._min_height()
         if self.overlay_height < min_h:
             self.overlay_height = min_h
-            self.root.geometry(f'{self.overlay_width}x{self.overlay_height}')
-        self._redraw()
+            self._engine.set_size(self.overlay_width, self.overlay_height)
+        if self.is_visible:
+            self._engine.paint()
         if notify:
             self._notify_settings_changed()
 
-    def show(self, notify=True):
-        """Show the overlay window. Pass notify=False when the call is a UI
-        nudge that shouldn't overwrite a saved visibility preference
-        (e.g., the panel force-showing on launch)."""
+    def set_font_size(self, size: int, notify: bool = True) -> None:
+        """Backwards-compat — sets only the size, family unchanged."""
+        self.set_font(self.font_family, size, notify=notify)
+
+    def set_font_family(self, family: str, notify: bool = True) -> None:
+        self.set_font(family, self.font_size, notify=notify)
+
+    def show(self, notify: bool = True) -> None:
         self.is_visible = True
-        self.root.deiconify()
+        self._engine.show()
         if notify:
             self._notify_settings_changed()
 
-    def hide(self, notify=True):
-        """Hide the overlay window. notify=False has the same semantics as show."""
+    def hide(self, notify: bool = True) -> None:
         self.is_visible = False
-        self.root.withdraw()
+        self._engine.hide()
         if notify:
             self._notify_settings_changed()
 
-    def destroy(self):
-        """Destroy the overlay window."""
-        try:
-            self.root.destroy()
-        except (tk.TclError, AttributeError):
-            pass
+    def destroy(self) -> None:
+        self._engine.destroy()
 
-    def apply_settings(self, settings):
-        """Apply a settings dict to the overlay (used by profile load).
-        Cascades through setters with notify=False so the parent only sees
-        a single save at the end."""
-        self.set_opacity(settings.get('opacity', TIMERS_DEFAULTS['opacity']), notify=False)
-        self.set_font_size(settings.get('font_size', TIMERS_DEFAULTS['font_size']), notify=False)
-        self.set_transparent(settings.get('transparent_bg', TIMERS_DEFAULTS['transparent_bg']), notify=False)
-        self.set_locked(settings.get('locked', TIMERS_DEFAULTS['locked']), notify=False)
-        if settings.get('visible', TIMERS_DEFAULTS['visible']):
+    def apply_settings(self, settings: dict) -> None:
+        """Bulk apply (used by profile load). Defers a single settings save."""
+        self.set_bg_opacity(
+            settings.get("bg_opacity", TIMERS_DEFAULTS["bg_opacity"]), notify=False,
+        )
+        self.set_font(
+            settings.get("font_family", TIMERS_DEFAULTS["font_family"]),
+            settings.get("font_size", TIMERS_DEFAULTS["font_size"]),
+            notify=False,
+        )
+        self.set_locked(settings.get("locked", TIMERS_DEFAULTS["locked"]), notify=False)
+        if settings.get("visible", TIMERS_DEFAULTS["visible"]):
             self.show(notify=False)
         else:
             self.hide(notify=False)
-        x = settings.get('x', self.root.winfo_x())
-        y = settings.get('y', self.root.winfo_y())
-        width = max(self.MIN_WIDTH, settings.get('width', self.overlay_width))
-        height = max(self._min_height(), settings.get('height', self.overlay_height))
+        x = settings.get("x")
+        y = settings.get("y")
+        width = max(self.MIN_WIDTH, settings.get("width", self.overlay_width))
+        height = max(self._min_height(), settings.get("height", self.overlay_height))
         self.overlay_width = width
         self.overlay_height = height
-        self.root.geometry(f"{width}x{height}+{x}+{y}")
+        self._engine.set_size(width, height)
+        if x is not None and y is not None:
+            self._engine.set_position(int(x), int(y))
+        if self.is_visible:
+            self._engine.paint()
         self._notify_settings_changed()
 
-    def get_settings(self):
-        """
-        Get current overlay settings dict.
-
-        Returns:
-            dict: Current position, size, and state settings
-        """
+    def get_settings(self) -> dict:
         return {
-            'x': self.root.winfo_x(),
-            'y': self.root.winfo_y(),
-            'width': self.overlay_width,
-            'height': self.overlay_height,
-            'locked': self.is_locked,
-            'transparent_bg': self.transparent_bg,
-            'opacity': self.opacity,
-            'font_size': self.font_size,
-            'visible': self.is_visible,
-            'positioned': True,
+            "x": self._engine._x,
+            "y": self._engine._y,
+            "width": self.overlay_width,
+            "height": self.overlay_height,
+            "locked": self.is_locked,
+            "bg_opacity": self.bg_opacity,
+            "font_family": self.font_family,
+            "font_size": self.font_size,
+            "visible": self.is_visible,
+            "positioned": True,
         }
+
+    # ------------------------------------------------------------------ #
+    # Geometry helpers                                                    #
+    # ------------------------------------------------------------------ #
+
+    def _cycle_timer_height(self) -> int:
+        return self.font_size + 14
+
+    def _row_line_height(self) -> int:
+        return max(self.font_size + 13, int(self.font_size * 1.8))
+
+    def _min_height(self) -> int:
+        rows = 2 * self._row_line_height() + 6
+        chrome = 8
+        return self._cycle_timer_height() + 1 + rows + chrome
+
+    def _lock_bounds(self) -> tuple[int, int, int, int]:
+        """(x1, y1, x2, y2) for the lock indicator hit zone."""
+        w, h = self.overlay_width, self.overlay_height
+        # Resize handle anchors bottom-right; lock sits to its left.
+        x2 = w - _CHROME_PAD - _CHROME_HIT_W - _CHROME_PAD
+        y2 = h - _CHROME_PAD
+        return (x2 - _CHROME_HIT_W, y2 - _CHROME_HIT_H, x2, y2)
+
+    def _resize_bounds(self) -> tuple[int, int, int, int]:
+        w, h = self.overlay_width, self.overlay_height
+        return (w - _CHROME_PAD - _CHROME_HIT_W, h - _CHROME_PAD - _CHROME_HIT_H,
+                w - _CHROME_PAD, h - _CHROME_PAD)
+
+    def _hit_test(self, x: int, y: int) -> str:
+        """Map a click in overlay-local coordinates to an interaction zone."""
+        if self.is_locked:
+            return "none"
+        lx1, ly1, lx2, ly2 = self._lock_bounds()
+        if lx1 <= x <= lx2 and ly1 <= y <= ly2:
+            return "lock"
+        rx1, ry1, rx2, ry2 = self._resize_bounds()
+        if rx1 <= x <= rx2 and ry1 <= y <= ry2:
+            return "resize"
+        return "move"
+
+    # ------------------------------------------------------------------ #
+    # Input handlers                                                      #
+    # ------------------------------------------------------------------ #
+
+    def _on_press(self, event: tk.Event) -> None:
+        if self.is_locked:
+            return
+        local_x = event.x_root - self._engine._x
+        local_y = event.y_root - self._engine._y
+        zone = self._hit_test(local_x, local_y)
+        if zone == "lock":
+            self._drag_mode = None
+            self.toggle_lock()
+            return
+        self._drag_mode = zone
+        self._drag_anchor_x = event.x_root
+        self._drag_anchor_y = event.y_root
+        self._drag_start_w = self.overlay_width
+        self._drag_start_h = self.overlay_height
+
+    def _on_drag(self, event: tk.Event) -> None:
+        if self.is_locked or self._drag_mode is None:
+            return
+        if self._drag_mode == "move":
+            dx = event.x_root - self._drag_anchor_x
+            dy = event.y_root - self._drag_anchor_y
+            self._engine.set_position(self._engine._x + dx, self._engine._y + dy)
+            self._drag_anchor_x = event.x_root
+            self._drag_anchor_y = event.y_root
+        elif self._drag_mode == "resize":
+            dw = event.x_root - self._drag_anchor_x
+            dh = event.y_root - self._drag_anchor_y
+            new_w = max(self.MIN_WIDTH, self._drag_start_w + dw)
+            new_h = max(self._min_height(), self._drag_start_h + dh)
+            if (new_w, new_h) != (self.overlay_width, self.overlay_height):
+                self.overlay_width = new_w
+                self.overlay_height = new_h
+                self._engine.set_size(new_w, new_h)
+        if self.is_visible:
+            self._engine.paint()
+
+    def _on_release(self, _event: tk.Event) -> None:
+        if self._drag_mode is None:
+            return
+        self._drag_mode = None
+        self._notify_settings_changed()
+
+    def _notify_settings_changed(self) -> None:
+        if self._on_settings_changed is not None:
+            self._on_settings_changed()
+
+    # ------------------------------------------------------------------ #
+    # Render callback (PIL bitmap)                                        #
+    # ------------------------------------------------------------------ #
+
+    def _render(self, width: int, height: int) -> Image.Image:
+        image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(image)
+
+        # BG fill — bg_opacity drives the alpha of a near-black rectangle.
+        # At 0.0 nothing is drawn; the dark stroke under each text glyph
+        # carries legibility. At 1.0 the panel is fully opaque.
+        if self.bg_opacity > 0.0:
+            alpha = round(self.bg_opacity * 255)
+            draw.rectangle((0, 0, width - 1, height - 1),
+                           fill=(*_BG_FILL_RGB, alpha))
+            # Hairline border at the same alpha — gives a subtle frame edge
+            # without competing with the bg fill.
+            draw.rectangle((0, 0, width - 1, height - 1),
+                           outline=(*_BG_BORDER_RGB, alpha), width=1)
+
+        # Layout dimensions (mirrors the pre-port _redraw_text_canvas math).
+        body_pad = 5
+        row_h = self._row_line_height()
+        cycle_h = self._cycle_timer_height()
+        sep_y = height - cycle_h - 1
+        row1_y = body_pad
+        row2_y = row1_y + row_h
+
+        msg_font = load_font(self.font_family, self.font_size, bold=True)
+        timer_font = load_font(self.font_family, self.font_size + 4, bold=True)
+
+        s = self._display_state
+
+        # Text rows
+        self._draw_row(draw, row1_y, row_h, width,
+                       s["row1_msg"], s["row1_player"], s["row1_timer"],
+                       s["row1_color"], msg_font)
+        self._draw_row(draw, row2_y, row_h, width,
+                       s["row2_msg"], s["row2_player"], s["row2_timer"],
+                       s["row2_color"], msg_font)
+
+        # 1px separator above the cycle dock — only when there's a bg to be
+        # separated from. With no bg, the stroked text doesn't need a divider.
+        if self.bg_opacity > 0.0:
+            alpha = round(self.bg_opacity * 255)
+            draw.line(
+                (body_pad, sep_y, width - body_pad - 1, sep_y),
+                fill=(*_BG_BORDER_RGB, alpha), width=1,
+            )
+
+        # Cycle timer — left-aligned in the bottom dock.
+        if s["cycle_timer"]:
+            cy = sep_y + 1 + cycle_h // 2
+            self._draw_text(
+                draw, body_pad + 1, cy, s["cycle_timer"], COLORS["default"],
+                timer_font, anchor="lm",
+            )
+
+        # Chrome — drawn as shapes so they're font-independent.
+        self._draw_lock_indicator(draw)
+        if not self.is_locked:
+            self._draw_resize_handle(draw)
+
+        return image
+
+    def _draw_row(
+        self,
+        draw: ImageDraw.ImageDraw,
+        y: int,
+        row_h: int,
+        width: int,
+        msg: str,
+        player: str,
+        timer_text: str,
+        color: str,
+        font: ImageFont.ImageFont,
+    ) -> None:
+        body_pad = 5
+        cy = y + row_h // 2
+        if timer_text:
+            self._draw_text(draw, width - body_pad - 1, cy, timer_text, color,
+                            font, anchor="rm")
+        if msg:
+            msg_w = self._draw_text(
+                draw, body_pad, cy, msg, color, font, anchor="lm",
+            )
+            if player:
+                self._draw_text(
+                    draw, body_pad + msg_w, cy, player, COLORS["player"],
+                    font, anchor="lm",
+                )
+        elif player:
+            self._draw_text(
+                draw, body_pad, cy, player, COLORS["player"], font, anchor="lm",
+            )
+
+    def _draw_text(
+        self,
+        draw: ImageDraw.ImageDraw,
+        x: int,
+        y: int,
+        text: str,
+        color: str,
+        font: ImageFont.ImageFont,
+        anchor: str = "la",
+    ) -> int:
+        """Draw text with an 8-direction dark stroke for legibility against
+        arbitrary backdrops. Always strokes — at low bg opacity the stroke
+        is what keeps text readable over game scenery; at high bg opacity
+        the stroke is visually hidden against the dark panel so the cost is
+        zero."""
+        if not text:
+            return 0
+        fill = (*_hex_to_rgb(color), 255)
+        draw.text(
+            (x, y), text, font=font, fill=fill, anchor=anchor,
+            stroke_width=1, stroke_fill=(*_STROKE_RGB, 255),
+        )
+        try:
+            bbox = draw.textbbox((x, y), text, font=font, anchor=anchor)
+            return max(0, bbox[2] - x)
+        except Exception:
+            return 0
+
+    def _draw_lock_indicator(self, draw: ImageDraw.ImageDraw) -> None:
+        """Outline circle (○) when unlocked, filled circle (●) when locked.
+
+        Drawn as PIL shapes instead of Unicode glyphs so they render the
+        same regardless of the selected font (some monospace fonts on
+        Windows ship without ●/○ in their core glyph table).
+        """
+        x1, y1, x2, y2 = self._lock_bounds()
+        # Center a 8x8 circle inside the hit rectangle.
+        cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+        r = 4
+        fg = (*_hex_to_rgb(_CHROME_FG), 255)
+        bbox = (cx - r, cy - r, cx + r, cy + r)
+        if self.is_locked:
+            draw.ellipse(bbox, fill=fg)
+        else:
+            draw.ellipse(bbox, outline=fg, width=1)
+
+    def _draw_resize_handle(self, draw: ImageDraw.ImageDraw) -> None:
+        """Lower-right diagonal triangle (◢) drawn as a polygon."""
+        x1, y1, x2, y2 = self._resize_bounds()
+        # Triangle filling the bottom-right corner of the hit rect.
+        inset = 2
+        fg = (*_hex_to_rgb(_CHROME_FG), 255)
+        draw.polygon(
+            [(x1 + inset, y2 - inset),
+             (x2 - inset, y2 - inset),
+             (x2 - inset, y1 + inset)],
+            fill=fg,
+        )

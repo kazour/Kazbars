@@ -21,6 +21,7 @@ from .live_tracker_settings import (
     save_settings,
     validate_all_settings,
 )
+from .overlay_engine import FONT_FAMILY_CHOICES
 from .settings_manager import get_setting, set_setting
 from .timer_overlay import TimerOverlay
 from .ui_helpers import (
@@ -64,7 +65,7 @@ class LiveTrackerPanel(tk.Toplevel):
     Integrates:
     - Ethram-Fal seed timer overlay
     - Combat log monitoring
-    - Overlay controls (lock, transparency, opacity, font)
+    - Overlay controls (lock, background opacity, font family, font size)
 
     Usage:
         panel = LiveTrackerPanel(parent, settings_path, game_path_getter)
@@ -193,7 +194,7 @@ class LiveTrackerPanel(tk.Toplevel):
         self.log_status_label.pack(anchor='w', pady=(PAD_BUTTON_GAP, 0))
 
     def _build_overlay_controls(self, parent):
-        """Build overlay settings (show/lock/test, transparency, opacity, font)."""
+        """Build overlay settings (show/lock/test, bg opacity, font family, font size)."""
         overlay_frame = ttk.LabelFrame(parent, text="Overlay")
         overlay_frame.configure(padding=PAD_LF)
         overlay_frame.pack(fill='x', pady=(0, PAD_LF))
@@ -221,42 +222,48 @@ class LiveTrackerPanel(tk.Toplevel):
 
         ttk.Separator(overlay_frame, orient='horizontal').pack(fill='x', pady=(PAD_XS, PAD_MID))
 
-        self.transparent_var = tk.BooleanVar(
-            value=self.timer_settings.get('transparent_bg', TIMERS_DEFAULTS['transparent_bg'])
-        )
-        self.transparent_cb = ttk.Checkbutton(
-            overlay_frame, text="Transparent background",
-            variable=self.transparent_var,
-            command=self._toggle_transparent,
-            bootstyle="success-round-toggle"
-        )
-        self.transparent_cb.pack(anchor='w', pady=(0, PAD_MID))
-        add_tooltip(self.transparent_cb, "Hide the overlay's background panel; only the text remains visible")
-
-        opacity_row = ttk.Frame(overlay_frame)
-        opacity_row.pack(fill='x', pady=(0, PAD_XS))
-        ttk.Label(opacity_row, text="Opacity:",
+        # Background-opacity slider — drives the bg fill alpha. 0% = no
+        # backdrop (numbers float over the game with their dark stroke);
+        # 100% = solid dark panel. Same semantic as the Deeps overlay.
+        bg_row = ttk.Frame(overlay_frame)
+        bg_row.pack(fill='x', pady=(0, PAD_XS))
+        ttk.Label(bg_row, text="Background:",
                   font=FONT_SMALL).pack(side='left')
-        self.opacity_var = tk.DoubleVar(
-            value=self.timer_settings.get('opacity', TIMERS_DEFAULTS['opacity'])
+        self.bg_opacity_var = tk.DoubleVar(
+            value=self.timer_settings.get('bg_opacity', TIMERS_DEFAULTS['bg_opacity'])
         )
-        self.opacity_value_label = ttk.Label(
-            opacity_row, text=f"{int(self.opacity_var.get() * 100)}%",
+        self.bg_opacity_value_label = ttk.Label(
+            bg_row, text=f"{int(self.bg_opacity_var.get() * 100)}%",
             font=FONT_SMALL, foreground=THEME_COLORS['muted'], width=4, anchor='e'
         )
-        self.opacity_value_label.pack(side='right')
-        self.opacity_slider = ttk.Scale(
-            opacity_row, from_=0.3, to=1.0,
-            variable=self.opacity_var,
+        self.bg_opacity_value_label.pack(side='right')
+        self.bg_opacity_slider = ttk.Scale(
+            bg_row, from_=0.0, to=1.0,
+            variable=self.bg_opacity_var,
             orient='horizontal', length=120,
-            command=self._on_opacity_change
+            command=self._on_bg_opacity_change
         )
-        self.opacity_slider.pack(side='left', padx=(PAD_SMALL, PAD_XS), fill='x', expand=True)
-        add_tooltip(self.opacity_slider, "Overlay opacity (30% = mostly transparent, 100% = solid)")
+        self.bg_opacity_slider.pack(side='left', padx=(PAD_SMALL, PAD_XS), fill='x', expand=True)
+        add_tooltip(self.bg_opacity_slider, "Background opacity (0% = floating text, 100% = solid panel)")
+
+        font_family_row = ttk.Frame(overlay_frame)
+        font_family_row.pack(fill='x', pady=(0, PAD_XS))
+        ttk.Label(font_family_row, text="Font:",
+                  font=FONT_SMALL).pack(side='left')
+        self.font_family_var = tk.StringVar(
+            value=self.timer_settings.get('font_family', TIMERS_DEFAULTS['font_family'])
+        )
+        self.font_family_combo = ttk.Combobox(
+            font_family_row, textvariable=self.font_family_var,
+            values=list(FONT_FAMILY_CHOICES),
+            state='readonly', width=14,
+        )
+        self.font_family_combo.pack(side='left', padx=(PAD_SMALL, PAD_XS), fill='x', expand=True)
+        self.font_family_combo.bind('<<ComboboxSelected>>', lambda _e: self._on_font_family_change())
 
         font_row = ttk.Frame(overlay_frame)
         font_row.pack(fill='x')
-        ttk.Label(font_row, text="Font size:",
+        ttk.Label(font_row, text="Size:",
                   font=FONT_SMALL).pack(side='left')
         self.font_var = tk.IntVar(
             value=self.timer_settings.get('font_size', TIMERS_DEFAULTS['font_size'])
@@ -428,14 +435,16 @@ class LiveTrackerPanel(tk.Toplevel):
     def _toggle_lock(self):
         self.overlay.toggle_lock()
 
-    def _toggle_transparent(self):
-        self.overlay.set_transparent(self.transparent_var.get())
-
-    def _on_opacity_change(self, value):
+    def _on_bg_opacity_change(self, value):
         v = float(value)
         if self.overlay:
-            self.overlay.set_opacity(v)
-        self.opacity_value_label.config(text=f"{int(v * 100)}%")
+            self.overlay.set_bg_opacity(v)
+        self.bg_opacity_value_label.config(text=f"{int(v * 100)}%")
+
+    def _on_font_family_change(self):
+        family = self.font_family_var.get()
+        if self.overlay:
+            self.overlay.set_font_family(family)
 
     def _on_font_change(self, value):
         v = int(float(value))
@@ -537,12 +546,12 @@ class LiveTrackerPanel(tk.Toplevel):
 
     def _sync_overlay_ui(self):
         """Sync overlay control widgets to current timer_settings."""
-        self.transparent_var.set(
-            self.timer_settings.get('transparent_bg', TIMERS_DEFAULTS['transparent_bg'])
+        bg_opacity = self.timer_settings.get('bg_opacity', TIMERS_DEFAULTS['bg_opacity'])
+        self.bg_opacity_var.set(bg_opacity)
+        self.bg_opacity_value_label.config(text=f"{int(bg_opacity * 100)}%")
+        self.font_family_var.set(
+            self.timer_settings.get('font_family', TIMERS_DEFAULTS['font_family'])
         )
-        opacity = self.timer_settings.get('opacity', TIMERS_DEFAULTS['opacity'])
-        self.opacity_var.set(opacity)
-        self.opacity_value_label.config(text=f"{int(opacity * 100)}%")
         font_size = self.timer_settings.get('font_size', TIMERS_DEFAULTS['font_size'])
         self.font_var.set(font_size)
         self.font_value_label.config(text=f"{font_size}pt")

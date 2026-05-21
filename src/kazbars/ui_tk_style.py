@@ -43,7 +43,15 @@ def apply_dark_titlebar(window):
 
 
 def enable_global_dark_titlebar():
-    """Monkey-patch tk.Toplevel so every popup gets a dark title bar automatically."""
+    """Monkey-patch tk.Toplevel so every popup gets a dark title bar automatically.
+
+    Toplevels can opt out by setting `self._skip_dark_titlebar = True` after
+    construction but before the first `<Map>` — pywinstyles' DWM calls modify
+    the window's extended styles (WS_EX_*), which strips `WS_EX_LAYERED` off
+    transparent overlays and breaks their `-transparentcolor` color-keying.
+    Borderless overlays (`overrideredirect(True)`) have no title bar to
+    style anyway, so the opt-out is free.
+    """
     _original_init = tk.Toplevel.__init__
 
     def _patched_init(self, *args, **kwargs):
@@ -51,6 +59,8 @@ def enable_global_dark_titlebar():
         # Defer until window is mapped so the HWND exists
         def _apply(event=None):
             self.unbind('<Map>', _map_id[0])
+            if getattr(self, '_skip_dark_titlebar', False):
+                return
             apply_dark_titlebar(self)
         _map_id = [self.bind('<Map>', _apply)]
 
