@@ -101,3 +101,75 @@ def test_console_default_is_off():
     gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0")
     main_code, _ = gen.generate()
     assert "KzGridsConsole" not in main_code
+
+
+# --------------------------------------------------------------------------
+# Cast-timer overlay toggle (include_cast_timer, derived from cast_config)
+# --------------------------------------------------------------------------
+
+
+def _cast_cfg():
+    return {
+        "enableP": True,
+        "enableT": True,
+        "playerX": 900,
+        "playerY": 600,
+        "targetX": 900,
+        "targetY": 560,
+        "bold": True,
+        "fontSize": 18,
+        "display": "both",
+        "color": "FF8800",
+    }
+
+
+def test_cast_off_emits_no_cast_refs():
+    """No cast_config (or both sides off) must reference KzGridsCastTimer —
+    MTASC would otherwise fail to resolve the class — and leave no raw tokens."""
+    gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0", cast_config=None)
+    main_code, data_code = gen.generate()
+    assert not gen.include_cast_timer
+    assert "KzGridsCastTimer" not in main_code
+    assert "castTimer" not in main_code
+    assert "{{CAST_" not in main_code
+    assert "d.CAST" not in data_code
+
+
+def test_cast_disabled_config_is_off():
+    """A cast_config with both timers off must not switch the feature on."""
+    gen = CodeGenerator(
+        [_minimal_grid()], _load_db(), "0.0.0", cast_config={"enableP": False, "enableT": False}
+    )
+    main_code, _ = gen.generate()
+    assert not gen.include_cast_timer
+    assert "KzGridsCastTimer" not in main_code
+
+
+def test_cast_on_emits_hooks_and_data():
+    gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0", cast_config=_cast_cfg())
+    main_code, data_code = gen.generate()
+    assert gen.include_cast_timer
+
+    # Instantiation + configure
+    assert "private var castTimer:KzGridsCastTimer;" in main_code
+    assert "castTimer = new KzGridsCastTimer(this, rootClip);" in main_code
+    assert "castTimer.configure(d.CAST);" in main_code
+
+    # Lifecycle hooks
+    assert "castTimer.createFields();" in main_code
+    assert "castTimer.connectPlayer(m_Player);" in main_code
+    assert "castTimer.setTarget(m_Target);" in main_code
+    assert "castTimer.previewOn();" in main_code
+    assert "castTimer.savePositions(config);" in main_code
+    assert "castTimer.cleanup();" in main_code
+
+    # Data block — color must be a numeric hex literal (Number() else NaN);
+    # font is fixed to Arial in the stub, so only bold is emitted.
+    assert "d.CAST = {" in data_code
+    assert "color: 0xFF8800" in data_code
+    assert "bold: true" in data_code
+    assert 'display: "both"' in data_code
+    assert "font:" not in data_code
+
+    # No leftover tokens
+    assert "{{CAST_" not in main_code

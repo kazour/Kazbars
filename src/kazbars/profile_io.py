@@ -33,6 +33,7 @@ def new_profile(app):
     if not app._check_unsaved_changes():
         return
     app.grids_panel.load_profile_data([])
+    app.grids_panel.load_cast_timer_config({})
     app.current_profile = None
     app.reference_resolution = None
     app.modified = False
@@ -104,6 +105,7 @@ def apply_profile_data(app, path, data, *, corrupt=False):
 
     grids = data.get('grids', [])
     missing_by_grid = app.grids_panel.load_profile_data(grids, profile_path=profile_key)
+    app.grids_panel.load_cast_timer_config(data.get('cast_timer', {}))
     if missing_by_grid:
         warn_missing_buffs(app, missing_by_grid)
 
@@ -171,6 +173,7 @@ def build_profile_payload(app):
     data = {
         'version': app.app_version,
         'grids': app.grids_panel.get_profile_data(),
+        'cast_timer': app.grids_panel.get_cast_timer_config(),
     }
     if app.reference_resolution:
         data['reference_resolution'] = app.reference_resolution

@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 from ttkbootstrap.dialogs import Messagebox
 
+from .cast_timer_strip import CastTimerStrip
 from .grid_dialogs import AddGridWizard
 from .grid_editor_panel import (
     GridEditorPanel,
@@ -88,6 +89,10 @@ class GridsPanel(ttk.Frame):
         self._slot_count_lbl = ttk.Label(toolbar, textvariable=self.slot_count_label,
                                           font=FONT_BODY, foreground=THEME_COLORS['muted'])
         self._slot_count_lbl.pack(side='right')
+
+        # Frozen cast-timer strip — pinned above the grid list, collapsed + off by default.
+        self.cast_strip = CastTimerStrip(self._normal_view, on_modified=self._mark_modified)
+        self.cast_strip.pack(fill='x', padx=PAD_TAB, pady=(0, PAD_SMALL))
 
         self._build_tip_bar()
 
@@ -395,6 +400,14 @@ class GridsPanel(ttk.Frame):
         """Return current grid configurations (save all panel values first)."""
         self.save_settings()
         return self.grids
+
+    def get_cast_timer_config(self):
+        """Return the current cast-timer overlay config (validated dict)."""
+        return self.cast_strip.get_config()
+
+    def load_cast_timer_config(self, config):
+        """Load a cast-timer overlay config into the strip (defaults if empty)."""
+        self.cast_strip.load_config(config or {})
 
     def _migrate_whitelist(self, whitelist, missing):
         """Normalize whitelist entries to primary spell IDs.

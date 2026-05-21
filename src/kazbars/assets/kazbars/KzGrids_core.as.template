@@ -478,11 +478,13 @@
     private function SlotAlive():Void {
         try {
             if (m_Player != null) disconnectP(m_Player);
+            {{CAST_DISCONNECT_P}}
             playerBuffs = new Array();
             buffIndexCache.player = {};
             m_Player = com.GameInterface.Game.Character.GetClientCharacter();
             if (m_Player != null) {
                 connectP(m_Player);
+                {{CAST_CONNECT_P}}
                 var tgt:Object = m_Player.GetOffensiveTarget();
                 if (tgt != null && tgt.GetType() != _global.Enums.TypeID.e_Type_None) SlotTargetChanged(tgt);
             }
@@ -524,6 +526,7 @@
             buffIndexCache.target = {};
             m_Target = ch;
             if (m_Target != null) { connectT(m_Target); loadTBuffs(); }
+            {{CAST_SET_TARGET}}
             markDirty("target");
             var i:Number = 0;
             while (i < grids.length) { if (grids[i].cfg.type == "target") updateGrid(grids[i]); i++; }
@@ -602,6 +605,7 @@
             preview.createOverlay(obj);
             i++;
         }
+        {{CAST_PREVIEW_ON}}
         {{CONSOLE_PREVIEW_OPEN}}
     }
 
@@ -616,8 +620,10 @@
                 j++;
             }
             {{CONSOLE_EXIT_PERSIST}}
+            {{CAST_SAVE}}
         }
         {{CONSOLE_EXIT_REMOVE}}
+        {{CAST_PREVIEW_OFF}}
         var i:Number = 0;
         while (i < grids.length) { preview.removeOverlay(grids[i]); grids[i].dirty = true; updateGrid(grids[i]); i++; }
     }
@@ -627,6 +633,7 @@
         previewMode = false;
         if (keyListener != null) { Key.removeListener(keyListener); keyListener = null; }
         {{CONSOLE_CLEANUP}}
+        {{CAST_CLEANUP}}
         playerBuffs = new Array();
         targetBuffs = new Array();
         buffIndexCache = {player: {}, target: {}};
@@ -657,6 +664,7 @@
         keyListener.onKeyUp = function() { self.handleKeyUp(); };
         Key.addListener(keyListener);
         createAllGrids();
+        {{CAST_CREATE}}
         try {
             com.GameInterface.Game.CharacterBase.SignalClientCharacterAlive.Connect(SlotAlive, this);
             m_Player = com.GameInterface.Game.Character.GetClientCharacter();
@@ -678,6 +686,7 @@
                 i++;
             }
             {{CONSOLE_LOAD_PERSIST}}
+            {{CAST_LOAD}}
         }
     }
 
@@ -690,6 +699,7 @@
                 i++;
             }
             {{CONSOLE_DEACTIVATE_PERSIST}}
+            {{CAST_SAVE}}
         }
         cleanup();
         try { com.GameInterface.Game.CharacterBase.SignalClientCharacterAlive.Disconnect(SlotAlive, this); } catch (e:Object) {}

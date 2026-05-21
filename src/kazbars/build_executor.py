@@ -30,7 +30,8 @@ AUTO_LOAD_MARKER = "# KazBars auto-load"
 LEGACY_AUTO_LOAD_MARKERS = ("# KzGrids auto-load",)
 
 
-def compile_to_staging(grids, database, assets_path, compiler, app_version, include_console=False):
+def compile_to_staging(grids, database, assets_path, compiler, app_version,
+                       include_console=False, cast_config=None):
     """Compile KazBars.swf to a temp staging dir.
 
     Returns (staging_dir, result) where result is (success_bool, message).
@@ -49,6 +50,7 @@ def compile_to_staging(grids, database, assets_path, compiler, app_version, incl
         app_version,
         assets_path=assets_path,
         include_console=include_console,
+        cast_config=cast_config,
     )
     return staging_dir, result
 

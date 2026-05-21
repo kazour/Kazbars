@@ -67,7 +67,7 @@ def blend_alpha(fg_hex: str, bg_hex: str, alpha: int) -> str:
     r = int(fr * a + br * (1 - a))
     g = int(fg * a + bg_ * (1 - a))
     b = int(fb * a + bb * (1 - a))
-    return f'#{r:02x}{g:02x}{b:02x}'
+    return f"#{r:02x}{g:02x}{b:02x}"
 
 
 def flash_status_bar(bar, color=None, steps=8, interval=30):
@@ -76,8 +76,8 @@ def flash_status_bar(bar, color=None, steps=8, interval=30):
     Settles back to TK_COLORS['status_bg']. Defaults to the success tint when
     no color is given. Swallows TclError if the bar is destroyed mid-fade.
     """
-    color = color or THEME_COLORS['success']
-    bg = TK_COLORS['status_bg']
+    color = color or THEME_COLORS["success"]
+    bg = TK_COLORS["status_bg"]
 
     def _step(i):
         try:
@@ -94,7 +94,7 @@ def flash_status_bar(bar, color=None, steps=8, interval=30):
     _step(0)
 
 
-def app_toast(widget, message, style='info', duration=6, key=None, on_click=None):
+def app_toast(widget, message, style="info", duration=6, key=None, on_click=None):
     """Show a toast via the app's runtime-attached ToastManager.
 
     Walks `widget` upward looking for a `.toast` attribute (set by
@@ -108,12 +108,11 @@ def app_toast(widget, message, style='info', duration=6, key=None, on_click=None
     """
     w = widget
     while w is not None:
-        toast = getattr(w, 'toast', None)
+        toast = getattr(w, "toast", None)
         if toast is not None:
-            toast.show(message, style=style, duration=duration,
-                       key=key, on_click=on_click)
+            toast.show(message, style=style, duration=duration, key=key, on_click=on_click)
             return
-        w = getattr(w, 'master', None)
+        w = getattr(w, "master", None)
 
 
 def create_dialog_header(parent, title_text, accent_color, width=460):
@@ -132,29 +131,36 @@ def create_dialog_header(parent, title_text, accent_color, width=460):
         The canvas widget (already packed).
     """
     height = 50
-    bg = TK_COLORS['status_bg']  # #1a1a1a
+    bg = TK_COLORS["status_bg"]  # #1a1a1a
 
-    canvas = tk.Canvas(parent, width=width, height=height, highlightthickness=0,
-                       bg=bg)
-    canvas.pack(fill='x')
+    canvas = tk.Canvas(parent, width=width, height=height, highlightthickness=0, bg=bg)
+    canvas.pack(fill="x")
 
     display_text = f"〔 {title_text} 〕"
-    scanline_color = blend_alpha('#000000', bg, SCANLINE_ALPHA)
+    scanline_color = blend_alpha("#000000", bg, SCANLINE_ALPHA)
     glow_color = blend_alpha(accent_color, bg, 25)
     mid_glow = blend_alpha(accent_color, bg, 50)
 
     def _draw(w):
-        canvas.delete('all')
-        canvas.create_rectangle(0, 0, w, 3, fill=accent_color, outline='')
+        canvas.delete("all")
+        canvas.create_rectangle(0, 0, w, 3, fill=accent_color, outline="")
         for y in range(0, height, 3):
             canvas.create_line(0, y, w, y, fill=scanline_color)
         cx, cy = w // 2, height // 2 + 2
-        canvas.create_text(cx, cy, text=display_text, anchor='center',
-                           fill=glow_color, font=FONT_DIALOG_HEADER)
-        canvas.create_text(cx, cy, text=display_text, anchor='center',
-                           fill=mid_glow, font=FONT_DIALOG_HEADER)
-        canvas.create_text(cx, cy, text=display_text, anchor='center',
-                           fill=THEME_COLORS['heading'], font=FONT_DIALOG_HEADER)
+        canvas.create_text(
+            cx, cy, text=display_text, anchor="center", fill=glow_color, font=FONT_DIALOG_HEADER
+        )
+        canvas.create_text(
+            cx, cy, text=display_text, anchor="center", fill=mid_glow, font=FONT_DIALOG_HEADER
+        )
+        canvas.create_text(
+            cx,
+            cy,
+            text=display_text,
+            anchor="center",
+            fill=THEME_COLORS["heading"],
+            font=FONT_DIALOG_HEADER,
+        )
 
     _draw(width)
     _dlg_after = [None]
@@ -170,7 +176,8 @@ def create_dialog_header(parent, title_text, accent_color, width=460):
             except (ValueError, tk.TclError):
                 pass
         _dlg_after[0] = canvas.after(33, lambda w=e.width: _draw(w))
-    canvas.bind('<Configure>', _on_dlg_configure)
+
+    canvas.bind("<Configure>", _on_dlg_configure)
 
     return canvas
 
@@ -191,31 +198,39 @@ def create_app_header(parent, title_text, accent_color):
         The canvas widget (already packed).
     """
     height = 55
-    bg = TK_COLORS['status_bg']  # #1a1a1a
+    bg = TK_COLORS["status_bg"]  # #1a1a1a
 
     canvas = tk.Canvas(parent, width=1, height=height, highlightthickness=0, bg=bg)
-    canvas.pack(fill='x')
+    canvas.pack(fill="x")
 
-    scanline_color = blend_alpha('#000000', bg, SCANLINE_ALPHA)
-    _state = {'accent': accent_color}
+    scanline_color = blend_alpha("#000000", bg, SCANLINE_ALPHA)
+    _state = {"accent": accent_color}
 
     def _draw(w, color=None):
         if color:
-            _state['accent'] = color
-        ac = _state['accent']
+            _state["accent"] = color
+        ac = _state["accent"]
         glow_color = blend_alpha(ac, bg, 25)
         mid_glow = blend_alpha(ac, bg, 50)
-        canvas.delete('all')
-        canvas.create_rectangle(0, 0, w, 4, fill=ac, outline='')
+        canvas.delete("all")
+        canvas.create_rectangle(0, 0, w, 4, fill=ac, outline="")
         for y in range(0, height, 3):
             canvas.create_line(0, y, w, y, fill=scanline_color)
         cx, cy = w // 2, height // 2 + 2
-        canvas.create_text(cx, cy, text=title_text, anchor='center',
-                           fill=glow_color, font=FONT_HEADING)
-        canvas.create_text(cx, cy, text=title_text, anchor='center',
-                           fill=mid_glow, font=FONT_HEADING)
-        canvas.create_text(cx, cy, text=title_text, anchor='center',
-                           fill=THEME_COLORS['heading'], font=FONT_HEADING)
+        canvas.create_text(
+            cx, cy, text=title_text, anchor="center", fill=glow_color, font=FONT_HEADING
+        )
+        canvas.create_text(
+            cx, cy, text=title_text, anchor="center", fill=mid_glow, font=FONT_HEADING
+        )
+        canvas.create_text(
+            cx,
+            cy,
+            text=title_text,
+            anchor="center",
+            fill=THEME_COLORS["heading"],
+            font=FONT_HEADING,
+        )
 
     _header_last_w = [0]
     canvas._redraw = _draw
@@ -226,7 +241,8 @@ def create_app_header(parent, title_text, accent_color):
             return
         _header_last_w[0] = e.width
         _draw(e.width)
-    canvas.bind('<Configure>', _on_header_configure)
+
+    canvas.bind("<Configure>", _on_header_configure)
 
     return canvas
 
@@ -240,13 +256,14 @@ def update_app_header_color(canvas, new_color):
 def create_tip_bar(parent, text):
     """Create a compact single-line tip bar replacing verbose description boxes."""
     tip_frame = ttk.Frame(parent)
-    tip_frame.pack(fill='x', padx=PAD_TAB, pady=PAD_TIP_BAR)
-    ttk.Label(tip_frame, text="?", font=FONT_SMALL_BOLD,
-              foreground=THEME_COLORS['accent'], width=2).pack(side='left')
-    ttk.Label(tip_frame, text=text, font=FONT_SMALL,
-              foreground=THEME_COLORS['muted']).pack(side='left', fill='x')
+    tip_frame.pack(fill="x", padx=PAD_TAB, pady=PAD_TIP_BAR)
+    ttk.Label(
+        tip_frame, text="?", font=FONT_SMALL_BOLD, foreground=THEME_COLORS["accent"], width=2
+    ).pack(side="left")
+    ttk.Label(tip_frame, text=text, font=FONT_SMALL, foreground=THEME_COLORS["muted"]).pack(
+        side="left", fill="x"
+    )
     return tip_frame
-
 
 
 def bind_card_events(card_border, color, hover_color=None):
@@ -261,7 +278,7 @@ def bind_card_events(card_border, color, hover_color=None):
     caller can flip the resting state (e.g. enabled -> disabled) without
     rebinding.
     """
-    _hover = hover_color or '#ffffff'
+    _hover = hover_color or "#ffffff"
     _resting = color if callable(color) else (lambda c=color: c)
 
     def _is_descendant(widget):
@@ -270,7 +287,7 @@ def bind_card_events(card_border, color, hover_color=None):
         while w is not None:
             if w is card_border:
                 return True
-            w = getattr(w, 'master', None)
+            w = getattr(w, "master", None)
         return False
 
     def on_enter(e):
@@ -286,8 +303,8 @@ def bind_card_events(card_border, color, hover_color=None):
         normal = _resting()
         card_border.config(highlightbackground=normal, highlightcolor=normal)
 
-    card_border.bind('<Enter>', on_enter)
-    card_border.bind('<Leave>', on_leave)
+    card_border.bind("<Enter>", on_enter)
+    card_border.bind("<Leave>", on_leave)
 
 
 def add_tooltip(widget, text):
@@ -295,10 +312,20 @@ def add_tooltip(widget, text):
     _InAppToolTip(widget, text)
 
 
-def labeled_spinbox(parent, label, var, *, from_, to, width=5,
-                    tooltip=None, on_change=None,
-                    label_font=FONT_FORM_LABEL, label_color=None,
-                    padx=0):
+def labeled_spinbox(
+    parent,
+    label,
+    var,
+    *,
+    from_,
+    to,
+    width=5,
+    tooltip=None,
+    on_change=None,
+    label_font=FONT_FORM_LABEL,
+    label_color=None,
+    padx=0,
+):
     """Labeled spinbox with key-validation and focus-out clamp.
 
     `var` is a caller-owned StringVar or IntVar; the helper reads its type
@@ -308,10 +335,10 @@ def labeled_spinbox(parent, label, var, *, from_, to, width=5,
     lbl = ttk.Label(parent, text=label, font=label_font)
     if label_color:
         lbl.configure(foreground=label_color)
-    lbl.pack(side='left')
+    lbl.pack(side="left")
 
     def _validate(value):
-        if value in ('', '-'):
+        if value in ("", "-"):
             return True
         try:
             int(value)
@@ -319,10 +346,18 @@ def labeled_spinbox(parent, label, var, *, from_, to, width=5,
         except ValueError:
             return False
 
-    vcmd = (parent.register(_validate), '%P')
-    spin = ttk.Spinbox(parent, from_=from_, to=to, textvariable=var, width=width,
-                       validate='key', validatecommand=vcmd, command=on_change or '')
-    spin.pack(side='left', padx=padx)
+    vcmd = (parent.register(_validate), "%P")
+    spin = ttk.Spinbox(
+        parent,
+        from_=from_,
+        to=to,
+        textvariable=var,
+        width=width,
+        validate="key",
+        validatecommand=vcmd,
+        command=on_change or "",
+    )
+    spin.pack(side="left", padx=padx)
 
     is_str_var = isinstance(var, tk.StringVar)
 
@@ -336,28 +371,28 @@ def labeled_spinbox(parent, label, var, *, from_, to, width=5,
         if on_change is not None:
             on_change()
 
-    spin.bind('<FocusOut>', _clamp)
+    spin.bind("<FocusOut>", _clamp)
     if tooltip:
         add_tooltip(spin, tooltip)
     return spin
 
 
-def labeled_combobox(parent, label, var, values, *, width=11,
-                     tooltip=None, padx=0, label_font=FONT_FORM_LABEL):
+def labeled_combobox(
+    parent, label, var, values, *, width=11, tooltip=None, padx=0, label_font=FONT_FORM_LABEL
+):
     """Labeled readonly combobox. Returns the Combobox widget."""
-    ttk.Label(parent, text=label, font=label_font).pack(side='left')
-    combo = ttk.Combobox(parent, textvariable=var, values=values,
-                         width=width, state='readonly')
-    combo.pack(side='left', padx=padx)
+    ttk.Label(parent, text=label, font=label_font).pack(side="left")
+    combo = ttk.Combobox(parent, textvariable=var, values=values, width=width, state="readonly")
+    combo.pack(side="left", padx=padx)
     if tooltip:
         add_tooltip(combo, tooltip)
     return combo
 
 
-def draw_grid_cells(canvas, rows, cols, type_color, area_w, area_h, tag='cells'):
+def draw_grid_cells(canvas, rows, cols, type_color, area_w, area_h, tag="cells"):
     """Draw a miniature grid of colored rectangles on *canvas*."""
     canvas.delete(tag)
-    cell_border = TK_COLORS['separator']
+    cell_border = TK_COLORS["separator"]
     display_rows = min(rows, 5)
     display_cols = min(cols, 5)
     cell = CELL_PX_LARGE if rows == 1 and cols == 1 else CELL_PX
@@ -374,8 +409,9 @@ def draw_grid_cells(canvas, rows, cols, type_color, area_w, area_h, tag='cells')
         for c in range(display_cols):
             x = sx + c * (cell + gap)
             y = sy + r * (cell + gap)
-            canvas.create_rectangle(x, y, x + cell, y + cell,
-                                    fill=type_color, outline=cell_border, tags=tag)
+            canvas.create_rectangle(
+                x, y, x + cell, y + cell, fill=type_color, outline=cell_border, tags=tag
+            )
 
 
 class _InAppToolTip:
@@ -389,9 +425,9 @@ class _InAppToolTip:
         self.text = text
         self._tip_frame = None
         self._after_id = None
-        widget.bind('<Enter>', self._schedule, add='+')
-        widget.bind('<Leave>', self._cancel, add='+')
-        widget.bind('<ButtonPress>', self._cancel, add='+')
+        widget.bind("<Enter>", self._schedule, add="+")
+        widget.bind("<Leave>", self._cancel, add="+")
+        widget.bind("<ButtonPress>", self._cancel, add="+")
 
     def _schedule(self, event=None):
         self._cancel()
@@ -406,12 +442,23 @@ class _InAppToolTip:
     def _show(self):
         self._hide()
         root = self.widget.winfo_toplevel()
-        tip = tk.Frame(root, bg=TK_COLORS['input_bg'], highlightthickness=1,
-                       highlightbackground=TK_COLORS['border'])
-        lbl = tk.Label(tip, text=self.text() if callable(self.text) else self.text, bg=TK_COLORS['input_bg'],
-                       fg=THEME_COLORS['body'], font=FONT_SMALL,
-                       wraplength=260, justify='left',
-                       padx=self.PAD, pady=self.PAD)
+        tip = tk.Frame(
+            root,
+            bg=TK_COLORS["input_bg"],
+            highlightthickness=1,
+            highlightbackground=TK_COLORS["border"],
+        )
+        lbl = tk.Label(
+            tip,
+            text=self.text() if callable(self.text) else self.text,
+            bg=TK_COLORS["input_bg"],
+            fg=THEME_COLORS["body"],
+            font=FONT_SMALL,
+            wraplength=260,
+            justify="left",
+            padx=self.PAD,
+            pady=self.PAD,
+        )
         lbl.pack()
         self._tip_frame = tip
 
@@ -447,12 +494,13 @@ class _InAppToolTip:
             self._tip_frame = None
 
 
-def bind_button_press_effect(button, bootstyle='primary'):
+def bind_button_press_effect(button, bootstyle="primary"):
     """Add a subtle press micro-interaction to a ttk.Button.
 
     On press, briefly switches to outline variant. Restores on release.
     bootstyle must be passed explicitly (not retrievable via cget).
     """
+
     def _on_press(e):
         try:
             button.configure(bootstyle=f"{bootstyle}-outline")
@@ -465,8 +513,8 @@ def bind_button_press_effect(button, bootstyle='primary'):
         except tk.TclError:
             pass
 
-    button.bind('<ButtonPress-1>', _on_press, add='+')
-    button.bind('<ButtonRelease-1>', _on_release, add='+')
+    button.bind("<ButtonPress-1>", _on_press, add="+")
+    button.bind("<ButtonRelease-1>", _on_release, add="+")
 
 
 def bind_label_hover_colors(label, normal_color, hover_color):
@@ -476,10 +524,10 @@ def bind_label_hover_colors(label, normal_color, hover_color):
     (delete ×, dismiss ×, etc.) so hover and keyboard-focus visuals stay
     consistent.
     """
-    label.bind('<Enter>',    lambda e: label.config(foreground=hover_color))
-    label.bind('<Leave>',    lambda e: label.config(foreground=normal_color))
-    label.bind('<FocusIn>',  lambda e: label.config(foreground=hover_color))
-    label.bind('<FocusOut>', lambda e: label.config(foreground=normal_color))
+    label.bind("<Enter>", lambda e: label.config(foreground=hover_color))
+    label.bind("<Leave>", lambda e: label.config(foreground=normal_color))
+    label.bind("<FocusIn>", lambda e: label.config(foreground=hover_color))
+    label.bind("<FocusOut>", lambda e: label.config(foreground=normal_color))
 
 
 def bind_label_press_effect(label, press_color=None):
@@ -488,18 +536,146 @@ def bind_label_press_effect(label, press_color=None):
     On ButtonPress the foreground snaps to press_color (default: accent),
     then restores on ButtonRelease. Pairs with existing Enter/Leave hover.
     """
-    _color = press_color or THEME_COLORS['accent']
+    _color = press_color or THEME_COLORS["accent"]
 
     def _on_press(e):
-        label._pre_press_fg = label.cget('foreground')
+        label._pre_press_fg = label.cget("foreground")
         label.configure(foreground=_color)
 
     def _on_release(e):
-        fg = getattr(label, '_pre_press_fg', THEME_COLORS['body'])
+        fg = getattr(label, "_pre_press_fg", THEME_COLORS["body"])
         label.configure(foreground=fg)
 
-    label.bind('<ButtonPress-1>', _on_press, add='+')
-    label.bind('<ButtonRelease-1>', _on_release, add='+')
+    label.bind("<ButtonPress-1>", _on_press, add="+")
+    label.bind("<ButtonRelease-1>", _on_release, add="+")
+
+
+def create_rounded_rect(canvas, x1, y1, x2, y2, radius, **kwargs):
+    """Draw a rounded rectangle on a tkinter Canvas (smoothed polygon)."""
+    if radius <= 0:
+        return canvas.create_rectangle(x1, y1, x2, y2, **kwargs)
+    r = min(radius, (x2 - x1) / 2, (y2 - y1) / 2)
+    points = [
+        x1 + r,
+        y1,
+        x2 - r,
+        y1,
+        x2,
+        y1,
+        x2,
+        y1 + r,
+        x2,
+        y2 - r,
+        x2,
+        y2,
+        x2 - r,
+        y2,
+        x1 + r,
+        y2,
+        x1,
+        y2,
+        x1,
+        y2 - r,
+        x1,
+        y1 + r,
+        x1,
+        y1,
+    ]
+    return canvas.create_polygon(points, smooth=True, **kwargs)
+
+
+class ColorSwatch(tk.Canvas):
+    """Rounded color swatch with hover + click-to-pick via ttkbootstrap's themed
+    ColorChooserDialog (the dark picker — not the white OS dialog). Handles
+    RRGGBB / #RRGGBB / 0xRRGGBB. `on_change(hex)` fires when the user picks.
+    """
+
+    WIDTH = 34
+    HEIGHT = 22
+    RADIUS = 3
+
+    def __init__(self, parent, color_var=None, on_change=None, initial_color="#FFFFFF", **kwargs):
+        kwargs.setdefault("highlightthickness", 0)
+        kwargs.setdefault("cursor", "hand2")
+        kwargs.setdefault("takefocus", True)
+        super().__init__(parent, width=self.WIDTH, height=self.HEIGHT, **kwargs)
+        self.configure(bg=TK_COLORS["bg"])
+        self._border_idle = TK_COLORS["border"]
+        self._border_hover = THEME_COLORS["muted"]
+        self._color_var = color_var
+        self._on_change = on_change
+        self._color = initial_color
+
+        self.bind("<Enter>", lambda e: self._draw(self._border_hover))
+        self.bind("<Leave>", lambda e: self._draw(self._border_idle))
+        for seq in ("<Button-1>", "<Return>", "<space>"):
+            self.bind(seq, self._on_click)
+        self.bind("<FocusIn>", lambda e: self._draw(THEME_COLORS["accent"]))
+        self.bind("<FocusOut>", lambda e: self._draw(self._border_idle))
+
+        if color_var:
+            color_var.trace_add("write", lambda *_: self._sync_from_var())
+            self._sync_from_var()
+        else:
+            self._draw(self._border_idle)
+
+    def set_color(self, hex_color):
+        """Programmatically update the displayed color."""
+        self._color = self._normalize(hex_color)
+        self._draw(self._border_idle)
+
+    def get_color(self):
+        """Return the current displayed color as #RRGGBB."""
+        return self._color
+
+    def _sync_from_var(self):
+        raw = self._color_var.get().strip()
+        if raw:
+            self._color = self._normalize(raw)
+            self._draw(self._border_idle)
+
+    @staticmethod
+    def _normalize(raw):
+        """Accept RRGGBB / #RRGGBB / 0xRRGGBB → #RRGGBB."""
+        raw = raw.strip()
+        if raw.startswith(("0x", "0X")):
+            return "#" + raw[2:]
+        if not raw.startswith("#"):
+            return "#" + raw
+        return raw
+
+    def _draw(self, border_color):
+        self.delete("all")
+        create_rounded_rect(
+            self,
+            1,
+            1,
+            self.WIDTH - 1,
+            self.HEIGHT - 1,
+            self.RADIUS,
+            fill=self._color,
+            outline=border_color,
+        )
+
+    def _on_click(self, event):
+        from ttkbootstrap.dialogs import ColorChooserDialog
+
+        cd = ColorChooserDialog(initialcolor=self._color, title="Timer Color")
+        # Build first so _toplevel exists, then force topmost before showing.
+        cd.build()
+        cd._locate()
+        try:
+            cd._toplevel.attributes("-topmost", True)
+        except (AttributeError, tk.TclError):
+            pass
+        cd._toplevel.deiconify()
+        cd._toplevel.grab_set()
+        cd._toplevel.wait_window()
+        if cd.result:
+            self._color = cd.result.hex
+            self._draw(self._border_hover)
+            if self._on_change:
+                self._on_change(self._color)
 
 
 class CollapsibleSection(ttk.Frame):
@@ -516,8 +692,15 @@ class CollapsibleSection(ttk.Frame):
         ttk.Label(section.content, text="Settings go here").pack()
     """
 
-    def __init__(self, parent, title="", accent_color=None, initially_open=False,
-                 badge_text=None, badge_color=None):
+    def __init__(
+        self,
+        parent,
+        title="",
+        accent_color=None,
+        initially_open=False,
+        badge_text=None,
+        badge_color=None,
+    ):
         """Initialize a collapsible section with a clickable header and togglable content area."""
         super().__init__(parent)
         self._is_open = initially_open
@@ -527,99 +710,105 @@ class CollapsibleSection(ttk.Frame):
 
         # --- Header bar (always visible) ---
         self.header_frame = ttk.Frame(self)
-        self.header_frame.pack(fill='x')
+        self.header_frame.pack(fill="x")
 
         # Clickable left side: arrow + accent + title + badge + summary
         left = ttk.Frame(self.header_frame)
-        left.pack(side='left', fill='x', expand=True)
+        left.pack(side="left", fill="x", expand=True)
         clickable = [left]
 
         arrow_text = "▼" if initially_open else "▶"
         self._arrow_label = ttk.Label(
-            left, text=arrow_text, font=FONT_SMALL,
-            foreground=THEME_COLORS['muted'], width=2
+            left, text=arrow_text, font=FONT_SMALL, foreground=THEME_COLORS["muted"], width=2
         )
-        self._arrow_label.pack(side='left')
+        self._arrow_label.pack(side="left")
         clickable.append(self._arrow_label)
 
         self._accent_canvas = None
         if accent_color:
-            self._accent_canvas = tk.Canvas(left, width=3, height=16,
-                                             highlightthickness=0, bg=accent_color)
-            self._accent_canvas.pack(side='left', padx=(0, PAD_MID))
+            self._accent_canvas = tk.Canvas(
+                left, width=3, height=16, highlightthickness=0, bg=accent_color
+            )
+            self._accent_canvas.pack(side="left", padx=(0, PAD_MID))
 
         self._title_label = ttk.Label(
-            left, text=title, font=FONT_SECTION,
-            foreground=THEME_COLORS['heading']
+            left, text=title, font=FONT_SECTION, foreground=THEME_COLORS["heading"]
         )
-        self._title_label.pack(side='left')
+        self._title_label.pack(side="left")
         clickable.append(self._title_label)
 
         self._badge_label = None
         if badge_text:
             self._badge_label = ttk.Label(
-                left, text=badge_text, font=FONT_SMALL,
-                foreground=badge_color or THEME_COLORS['muted']
+                left,
+                text=badge_text,
+                font=FONT_SMALL,
+                foreground=badge_color or THEME_COLORS["muted"],
             )
-            self._badge_label.pack(side='left', padx=(PAD_LF, 0))
+            self._badge_label.pack(side="left", padx=(PAD_LF, 0))
             clickable.append(self._badge_label)
 
         # Optional summary label (shown when collapsed, hidden when expanded)
         self._summary_label = ttk.Label(
-            left, text="", font=FONT_SMALL,
-            foreground=THEME_COLORS['muted']
+            left, text="", font=FONT_SMALL, foreground=THEME_COLORS["muted"]
         )
-        self._summary_label.pack(side='left', padx=(PAD_TAB, 0))
+        self._summary_label.pack(side="left", padx=(PAD_TAB, 0))
         clickable.append(self._summary_label)
 
         # Keyboard accessibility — left frame is focusable
         left.configure(takefocus=True)
-        left.bind('<Return>', lambda e: self.toggle())
-        left.bind('<space>', lambda e: self.toggle())
+        left.bind("<Return>", lambda e: self.toggle())
+        left.bind("<space>", lambda e: self.toggle())
+
         def _on_focus_in(e):
-            focus_color = THEME_COLORS['muted'] if self._dimmed else THEME_COLORS['accent']
+            focus_color = THEME_COLORS["muted"] if self._dimmed else THEME_COLORS["accent"]
             self._arrow_label.config(foreground=focus_color)
             self._title_label.config(foreground=focus_color)
+
         def _on_focus_out(e):
-            self._arrow_label.config(foreground=THEME_COLORS['muted'])
+            self._arrow_label.config(foreground=THEME_COLORS["muted"])
             self._title_label.config(foreground=self._resting_title_color())
-        left.bind('<FocusIn>', _on_focus_in)
-        left.bind('<FocusOut>', _on_focus_out)
+
+        left.bind("<FocusIn>", _on_focus_in)
+        left.bind("<FocusOut>", _on_focus_out)
 
         # Bind click on all header elements
         for widget in clickable:
-            widget.bind('<Button-1>', lambda e: self.toggle())
+            widget.bind("<Button-1>", lambda e: self.toggle())
 
         # Hover highlight on the container frame — avoids flicker when
         # moving between child widgets by checking winfo_containing on Leave
         _left = left
+
         def _on_header_enter(e):
-            self._arrow_label.config(foreground=THEME_COLORS['heading'])
+            self._arrow_label.config(foreground=THEME_COLORS["heading"])
+
         def _on_header_leave(e):
             try:
                 w = _left.winfo_containing(e.x_root, e.y_root)
                 while w is not None:
                     if w is _left:
                         return
-                    w = getattr(w, 'master', None)
+                    w = getattr(w, "master", None)
             except (tk.TclError, RuntimeError):
                 pass
-            self._arrow_label.config(foreground=THEME_COLORS['muted'])
-        _left.bind('<Enter>', _on_header_enter)
-        _left.bind('<Leave>', _on_header_leave)
+            self._arrow_label.config(foreground=THEME_COLORS["muted"])
+
+        _left.bind("<Enter>", _on_header_enter)
+        _left.bind("<Leave>", _on_header_leave)
 
         # --- Content area (toggled) ---
         self._content_wrapper = ttk.Frame(self)
         if badge_color:
-            tint = blend_alpha(badge_color, TK_COLORS['bg'], 8)
+            tint = blend_alpha(badge_color, TK_COLORS["bg"], 8)
             style_name = f"Tint_{tint.replace('#', '')}.TFrame"
             ttk.Style().configure(style_name, background=tint)
             self.content = ttk.Frame(self._content_wrapper, style=style_name)
         else:
             self.content = ttk.Frame(self._content_wrapper)
-        self.content.pack(side='left', fill='x', expand=True)
+        self.content.pack(side="left", fill="x", expand=True)
         if initially_open:
-            self._content_wrapper.pack(fill='x', padx=(PAD_COLLAPSE_INDENT, 0), pady=(PAD_XS, 0))
+            self._content_wrapper.pack(fill="x", padx=(PAD_COLLAPSE_INDENT, 0), pady=(PAD_XS, 0))
 
     def toggle(self):
         if self._is_open:
@@ -631,7 +820,7 @@ class CollapsibleSection(ttk.Frame):
         if not self._is_open:
             self._is_open = True
             self._arrow_label.config(text="▼")
-            self._content_wrapper.pack(fill='x', padx=(PAD_COLLAPSE_INDENT, 0), pady=(PAD_XS, 0))
+            self._content_wrapper.pack(fill="x", padx=(PAD_COLLAPSE_INDENT, 0), pady=(PAD_XS, 0))
             self._summary_label.pack_forget()
 
     def collapse(self):
@@ -639,14 +828,13 @@ class CollapsibleSection(ttk.Frame):
             self._is_open = False
             self._arrow_label.config(text="▶")
             self._content_wrapper.pack_forget()
-            self._summary_label.pack(side='left', padx=(PAD_TAB, 0),
-                                     in_=self._title_label.master)
+            self._summary_label.pack(side="left", padx=(PAD_TAB, 0), in_=self._title_label.master)
 
     def set_title(self, text):
         self._title_label.config(text=text)
 
     def _resting_title_color(self):
-        return TK_COLORS['dim_text'] if self._dimmed else THEME_COLORS['heading']
+        return TK_COLORS["dim_text"] if self._dimmed else THEME_COLORS["heading"]
 
     def set_dimmed(self, dimmed):
         """Mark the section as inactive: title, badge, and accent strips drop to greys.
@@ -660,12 +848,16 @@ class CollapsibleSection(ttk.Frame):
         self._dimmed = bool(dimmed)
         self._title_label.config(foreground=self._resting_title_color())
         if self._badge_label is not None:
-            badge_fg = TK_COLORS['dim_text'] if self._dimmed else (
-                self._badge_color or THEME_COLORS['muted'])
+            badge_fg = (
+                TK_COLORS["dim_text"]
+                if self._dimmed
+                else (self._badge_color or THEME_COLORS["muted"])
+            )
             self._badge_label.config(foreground=badge_fg)
         if self._accent_canvas is not None:
             self._accent_canvas.config(
-                bg=TK_COLORS['border'] if self._dimmed else self._accent_color)
+                bg=TK_COLORS["border"] if self._dimmed else self._accent_color
+            )
 
     def set_summary(self, text):
         self._summary_label.config(text=text)
