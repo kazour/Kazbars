@@ -55,6 +55,25 @@ live_tracker_settings  ← boss_timer
                        ← live_tracker_panel  (orchestrator)
 ```
 
+### Deeps (isolated — no other panel imports from it)
+```
+deeps_parsers         ← deeps_trackers       ← deeps_meter ← deeps_panel
+deeps_rolling_window  ← deeps_trackers
+deeps_settings                               ←              deeps_panel
+                                                deeps_meter ← deeps_overlay  ← deeps_panel
+                                                              (MeterSnapshot only)
+```
+Real-time meter showing five numbers — DPS out, DPS in, HPS out, HPS in, and
+ΔHP in (HPS in − DPS in). Mirrors the Live Tracker shape (data layer →
+background tail thread → transparent overlay → configuration panel) but stays
+a separate cluster — `tests/test_cluster_isolation.py` enforces that neither
+cluster imports the other. `deeps_parsers` is pure (no Tk, no threading); the
+damage/heal regexes are byte-identical to `Deeps/rust/aoc-damage` and
+`Deeps/rust/aoc-heal` and the parity test in `tests/test_deeps_parity.py` locks
+their totals against the Rust source-of-truth (`Deeps/rust/parity-dump/`). Pet
+damage is the one intentional divergence: KazBars counts only the logger's own
+pet (`Your`-prefixed lines), not team-mates' pets of the same kind.
+
 ### kazbars-only satellites (extracted from KazBarsApp)
 ```
 src/kazbars/app.py  → profile_io, game_folder, game_resolution, build_action, buff_display_editor, first_launch, custom_menu_bar, update_check
@@ -84,7 +103,7 @@ These modules are consumed only by `src/kazbars/app.py` by design — they hold 
   - Window geometry → `window_position`
   - Settings read/write → `settings_manager` (don't re-introduce UI-layer state)
   - Root-window logic (new menu action, new app-state flow) → extract to a new `src/kazbars/<concern>.py` taking `app` as first arg, add a one-line delegator on `KazBarsApp` if it has internal callers. Don't grow `src/kazbars/app.py`.
-- **Cluster isolation:** the Live Tracker cluster must not be imported from outside itself (except `app.py`), and its members must not import other panels (cluster + shared infrastructure only). Enforced by `tests/test_cluster_isolation.py`.
+- **Cluster isolation:** the Live Tracker cluster AND the Deeps cluster each must not be imported from outside themselves (except `app.py`), and their members must not import other panels (cluster + shared infrastructure only). The two clusters also must not cross-import each other. Enforced by `tests/test_cluster_isolation.py` (parametrised over both).
 - **Toasts:** every toast goes through `app_toast(widget, message, style, duration=, key=, on_click=)` in `ui_widgets`. The walker resolves `.toast` from the widget's ancestry, so callers don't need a direct `ToastManager` reference. Pass `key=` for any emitter that can fire repeatedly in a short burst (spinbox auto-repeat is the canonical case) — same key replaces the live toast in place instead of stacking. Don't reintroduce `obj.toast.show(...)` direct calls — they bypass the walker, fragment defaults, and force a `toast=` constructor seam.
 
 ## Smoke tests
@@ -95,7 +114,14 @@ Plain-Python pytest cases guard the failure modes we've actually hit.
 - **`tests/test_data_integrity.py`** — validates every buff reference in `assets/kazbars/Default.json` (whitelists + slot assignments) resolves to a `Database.json` entry, and that `Database.json.default` matches `Database.json` byte-for-byte.
 - **`tests/test_buff_xml.py`** — round-trips the pure XML helpers in `buff_xml.py`: attribute extraction, surgical attribute replacement (other bytes preserved verbatim), the KZ_OFF on/off comment-wrap toggle, the filter whitespace normaliser, and the no-`<BuffListView>` guard. Covers the regex contract since the module deliberately uses no XML parser. Imports only `kazbars.buff_xml` — no Tk required.
 - **`tests/test_grids_generator.py`** — asserts `CodeGenerator(include_console=False)` produces zero `console.` / `KzGridsConsole` substrings (so MTASC won't fail to resolve a missing class) and `include_console=True` reproduces the original hooks (instantiation, log calls, preview wiring, persistence keys). Belt-and-suspenders test that the default is `False`. Imports `BuffDatabase` from the pure `kazbars.buff_database` — no Tk required.
-- **`tests/test_cluster_isolation.py`** — static-import guard for the Live Tracker cluster. Walks every `src/kazbars/*.py` via `ast.parse`. Asserts (a) no module outside the cluster (except `app.py`) imports a cluster member, and (b) cluster members import only stdlib + cluster + shared infrastructure (`ui_*`, `settings_manager`, `window_position`, `paths`, `custom_menu_bar`). Makes the cluster isolation rule load-bearing.
+- **`tests/test_cluster_isolation.py`** — static-import guard for the Live Tracker AND Deeps clusters. Walks every `src/kazbars/*.py` via `ast.parse`. Asserts (a) no module outside a cluster (except `app.py`) imports a cluster member, (b) cluster members import only stdlib + cluster + shared infrastructure (`ui_*`, `settings_manager`, `window_position`, `paths`, `custom_menu_bar`, `overlay_engine`), and (c) the two clusters never cross-import. Parametrised over both clusters.
+- **`tests/test_deeps_parsers.py`** — 163 behavior-table cases ported from `Deeps/rust/aoc-damage` and `aoc-heal` test files. Covers heal-verb filter, self-damage filter, the own-pet `Your`-gate (team-mates' pets excluded), the three heal classifications, and the timestamp stripper.
+- **`tests/test_deeps_parity.py`** — 9 cases comparing Python parser totals against the Rust source-of-truth output on a real ~531k-line CombatLog. Ground truth lives in `tests/fixtures/deeps_parity/expected_totals.json`, regenerated by `Deeps/rust/parity-dump/`. Four categories match Rust byte-for-byte; `pet_damage` is the documented own-pet-only exception. Skips locally when the log isn't present (`DEEPS_PARITY_LOG=<path>` overrides). The load-bearing accuracy gate.
+- **`tests/test_deeps_rolling_window.py`** — 13 cases on the rolling-window primitive (record/prune/sum_since/count_since/first_event, decay during silence, exact-boundary inclusion).
+- **`tests/test_deeps_trackers.py`** — 28 cases on the four trackers + Snapshot. Warm-up boundaries, decay, reset re-anchor, pet damage feeding the outgoing window, and the per-bucket warm-up rule for heals.
+- **`tests/test_deeps_settings.py`** — 52 cases on defaults, per-key validation, file I/O round-trip, corrupt/partial-file fallback.
+- **`tests/test_deeps_meter.py`** — 32 cases on `newest_combat_log` selection, `MeterSnapshot` shape, `_process_line` dispatch (own-pet gate + pet-toggle), lifecycle (start/stop/restart), `OLD_LOG` detection on stale files, and a Windows-only end-to-end `TAILING` check using a held-open file.
+- **`tests/test_deeps_overlay.py`** — 23 cases on the pure helpers (`_format_rate`, `_format_signed_int`, `_lerp_color`) plus the five-cell IDs and labels. Visual behaviour is covered by manual `/smoke`.
 
 Run before every commit touching code or data:
 ```bash
@@ -145,5 +171,23 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/ui_tk_style.py` | 57 | Raw-tk widget styling + dark titlebar |
 | `tests/test_imports.py` | 33 | Import-graph smoke test |
 | `tests/test_grids_generator.py` | 103 | `CodeGenerator.include_console` on/off output checks |
-| `tests/test_cluster_isolation.py` | 101 | Static-import guard for the Live Tracker cluster (no inbound except `app.py`; cluster imports stdlib + cluster + shared infrastructure only) |
+| `tests/test_cluster_isolation.py` | 178 | Static-import guard for the Live Tracker AND Deeps clusters (no inbound except `app.py`; cluster imports stdlib + cluster + shared infrastructure only; no cross-import) |
 | `tests/test_resolution_scaling.py` | 93 | Anchor-formula regression test (`scale_grid_position` predictions for 1080p → 1440p / 4K against `Default.json`) |
+| `src/kazbars/deeps_panel.py` | 801 | `DeepsPanel` Toplevel — status row, Start/Stop, Lock + Layout, appearance (font + size/background sliders), Alarm & Tints thresholds, 5-cell visibility picker, pet toggle. Owns the meter + overlay + 100 ms UI tick + alarm hysteresis state machine |
+| `src/kazbars/deeps_meter.py` | 526 | `DeepsMeter` daemon thread — tail loop, log rotation detection, AoC focus polling via `CreateToolhelp32Snapshot`, `is_live` probe via `CreateFile` exclusive-share. Publishes `MeterSnapshot` |
+| `src/kazbars/deeps_overlay.py` | 527 | Five-cell numbers display (DPS out/in, HPS out/in, ΔHP in). Two layouts (horizontal/vertical), 8-direction stroke text, 2 Hz alarm pulse on DPS-out, net-HP tints, click-through lock |
+| `src/kazbars/overlay_engine.py` | 540 | Shared PIL + win32 layered-window engine (`LayeredOverlay`, `load_font`, `FONT_FAMILY_CHOICES`) — per-pixel-alpha overlay used by BOTH the Deeps and Live Tracker overlays |
+| `src/kazbars/deeps_parsers.py` | 408 | Pure parsers (no Tk, no threading). 5 entry points: `parse_outgoing_damage`, `parse_incoming_damage`, `parse_incoming_heal`, `parse_outgoing_heal`, `parse_pet_hit` (own-pet only). Damage/heal regexes byte-identical to `Deeps/rust/aoc-damage` + `aoc-heal` |
+| `src/kazbars/deeps_trackers.py` | 221 | `DamageOutTracker`, `DamageInTracker`, `HealsInTracker` (3-bucket per-bucket warm-up), `HealsOutTracker`, `TrackerSnapshot` |
+| `src/kazbars/deeps_settings.py` | 211 | `deeps_settings.json` defaults, per-key validation, load/save |
+| `src/kazbars/deeps_rolling_window.py` | 81 | `RollingWindow` data structure — record/prune/sum_since/count_since/first_event |
+| `src/kazbars/assets/deeps/pets.json` | 81 | Pet-name registry — lifted from `Deeps/rust/aoc-damage/data/pets.json` |
+| `tests/test_deeps_parsers.py` | 544 | 163 behavior-table cases from Deeps's Rust tests + the own-pet gate |
+| `tests/test_deeps_meter.py` | 355 | 32 cases — file selection, lifecycle, `_process_line` dispatch, held-open-file end-to-end |
+| `tests/test_deeps_trackers.py` | 288 | 28 cases — warm-up, decay, reset, per-bucket warm-up for heals |
+| `tests/test_deeps_settings.py` | 270 | 52 cases — defaults, validation, round-trip, corrupt-file fallback |
+| `tests/test_deeps_parity.py` | 170 | 9 cases — Python vs Rust totals over a real CombatLog (the accuracy gate) |
+| `tests/test_deeps_rolling_window.py` | 169 | 13 cases — primitive smoke + decay-during-silence |
+| `tests/test_deeps_overlay.py` | 143 | 23 cases — pure helpers + 5-cell IDs/labels (visual behaviour is `/smoke`) |
+| `tools/deeps_parity_dump.py` | — | Python parity harness for ad-hoc inspection of any log |
+| `Deeps/rust/parity-dump/` | — | Rust source-of-truth dumper, regenerates `tests/fixtures/deeps_parity/expected_totals.json` |

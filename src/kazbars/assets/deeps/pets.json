@@ -1,0 +1,81 @@
+{
+  "pets": [
+    { "name": "Life-stealer",          "class": "Necromancer",      "type": "melee",   "notes": "default melee pet" },
+    { "name": "Blighted One",          "class": "Necromancer",      "type": "melee",   "notes": "melee pet variant" },
+    { "name": "Mutilator",             "class": "Necromancer",      "type": "melee",   "notes": "melee pet variant" },
+    { "name": "Harvester",             "class": "Necromancer",      "type": "melee",   "notes": "melee pet variant — MISSING in v1" },
+    { "name": "Frozen Hatred",         "class": "Necromancer",      "type": "melee",   "notes": "melee pet variant (frost spec)" },
+    { "name": "Parasitic Soul",        "class": "Necromancer",      "type": "melee",   "notes": "melee pet variant" },
+    { "name": "Corruptor",             "class": "Necromancer",      "type": "caster",  "notes": "caster pet" },
+    { "name": "Arcanist",              "class": "Necromancer",      "type": "caster",  "notes": "caster pet — also standalone ability name" },
+    { "name": "Blood Arcanist",        "class": "Necromancer",      "type": "caster",  "notes": "caster pet variant" },
+    { "name": "Magus",                 "class": "Necromancer",      "type": "caster",  "notes": "caster pet variant" },
+    { "name": "Archmagus",             "class": "Necromancer",      "type": "caster",  "notes": "caster pet variant (AA tier)" },
+    { "name": "Deathlord",             "class": "Necromancer",      "type": "caster",  "notes": "caster pet variant" },
+    { "name": "Necrotic Bomb",         "class": "Necromancer",      "type": "summon",  "notes": "temporary summon, has Bone Horde + Necrotic Pustule" },
+    { "name": "Slaughter Wraith",      "class": "Necromancer",      "type": "summon",  "notes": "temporary summon, has Bone Horde" },
+    { "name": "Unearthly Apprentice",  "class": "Necromancer",      "type": "summon",  "notes": "AA summon pet with multiple abilities" },
+    { "name": "Undead Sorcerer",       "class": "Necromancer",      "type": "summon",  "notes": "undead minion" },
+    { "name": "Undead Warlord",        "class": "Necromancer",      "type": "summon",  "notes": "undead minion" },
+    { "name": "Undead Swordsman",      "class": "Necromancer",      "type": "summon",  "notes": "undead minion" },
+    { "name": "Undead Axeman",         "class": "Necromancer",      "type": "summon",  "notes": "undead minion" },
+    { "name": "Furious Spirit",        "class": "shared",           "type": "pet",     "notes": "spirit pet — usable by all classes (Khitai faction)" },
+
+    { "name": "Cacodemon",             "class": "Demonologist",     "type": "pet",     "notes": "main demon pet" },
+    { "name": "Demon Avenger",         "class": "Demonologist",     "type": "pet",     "notes": "AA demon pet variant" },
+    { "name": "Demon Warlord",         "class": "Demonologist",     "type": "pet",     "notes": "AA demon pet variant" },
+    { "name": "Demon Guardian",        "class": "Demonologist",     "type": "pet",     "notes": "defensive demon pet" },
+    { "name": "Demon Familiar",        "class": "Demonologist",     "type": "pet",     "notes": "familiar pet" },
+    { "name": "Demon Slave",           "class": "Demonologist",     "type": "summon",  "notes": "temporary summon" },
+    { "name": "Chaotic Imp",           "class": "Demonologist",     "type": "summon",  "notes": "imp summon" },
+    { "name": "Living Firestorm",      "class": "Demonologist",     "type": "summon",  "notes": "fire elemental summon" },
+    { "name": "Living Thunderstorm",   "class": "Demonologist",     "type": "summon",  "notes": "lightning elemental summon" },
+    { "name": "Abyssal Flameweaver",   "class": "Demonologist",     "type": "summon",  "notes": "fire summon variant" },
+    { "name": "Astrologer",            "class": "Demonologist",     "type": "summon",  "notes": "support summon" },
+    { "name": "Golden Lotus",          "class": "Demonologist",     "type": "summon",  "notes": "golden lotus summon" },
+
+    { "name": "Idol of Set",           "class": "Tempest of Set",   "type": "pet",     "notes": "stationary idol" },
+    { "name": "Idol of Dark Rejuvenation", "class": "Tempest of Set", "type": "pet",   "notes": "healing idol variant" },
+    { "name": "The Restoring Standard", "class": "Conqueror",        "type": "pet",     "notes": "healing standard — group-wide effect, Conqueror ability" },
+    { "name": "Legendary Heroic Call", "class": "Conqueror",        "type": "pet",     "notes": "healing standard — group-wide effect, Conqueror ability" },
+    { "name": "Vengeful Idol of Set",  "class": "Tempest of Set",   "type": "pet",     "notes": "offensive idol variant" },
+
+    { "name": "Banner",                "class": "Conqueror",        "type": "pet",     "notes": "generic banner pet" },
+    { "name": "The Burning Standard",   "class": "Conqueror",        "type": "pet",     "notes": "fire damage banner" },
+    { "name": "The Fortifying Standard", "class": "Conqueror",       "type": "pet",     "notes": "defensive banner" },
+    { "name": "Heroic Banner",         "class": "Conqueror",        "type": "pet",     "notes": "heroic banner" },
+
+    { "name": "Dread Shadow",          "class": "Dark Templar",     "type": "pet",     "notes": "DT shadow pet" },
+
+     { "name": "Blood Pit",          "class": "Herald of Xotli",     "type": "pet",     "notes": "healing pet" },
+
+    { "name": "Enraged Dog",           "class": "unknown",          "type": "unknown", "notes": "REVIEW: only seen in Sin logs (319x), has Rabies sub-ability. Not confirmed as Sin pet — could be NPC/add/zone mob" },
+
+    { "name": "Vaaghasan War Cat",     "class": "shared",           "type": "pet",     "notes": "Khitai pet — usable by multiple classes" },
+    { "name": "Vaaghasan Stalker",     "class": "shared",           "type": "pet",     "notes": "Khitai pet — usable by multiple classes" },
+    { "name": "Vaaghasan Adolescent",  "class": "shared",           "type": "pet",     "notes": "Khitai pet — usable by multiple classes" },
+    { "name": "Ghost Bear",            "class": "shared",           "type": "pet",     "notes": "Khitai pet — usable by multiple classes" },
+    { "name": "Wolf Adolescent",       "class": "shared",           "type": "pet",     "notes": "Khitai pet — usable by multiple classes" },
+    { "name": "Bloodstained Ursine Rager", "class": "shared",       "type": "pet",     "notes": "Khitai pet — usable by multiple classes" },
+    { "name": "Terrifying Bone Golem", "class": "shared",           "type": "pet",     "notes": "Khitai pet — usable by multiple classes" },
+    { "name": "Golden Lion",           "class": "shared",           "type": "pet",     "notes": "Khitai pet — usable by multiple classes" },
+    { "name": "Spectral Child of Yig", "class": "shared",           "type": "pet",     "notes": "Khitai pet — usable by multiple classes" },
+    { "name": "Archfiend of Gore",     "class": "shared",           "type": "pet",     "notes": "Khitai pet — usable by multiple classes" },
+    { "name": "Grey Lotus",            "class": "shared",           "type": "pet",     "notes": "Khitai pet — usable by multiple classes" },
+    { "name": "Yellow Lotus",          "class": "shared",           "type": "pet",     "notes": "Khitai pet — usable by multiple classes" },
+    { "name": "War Machine",           "class": "shared",           "type": "pet",     "notes": "Khitai pet — usable by multiple classes" },
+
+    { "name": "Maltese Vaaghasan War Cat", "class": "shared",       "type": "pet",     "notes": "Khitai pet variant" },
+    { "name": "Obliterator",           "class": "shared",           "type": "pet",     "notes": "pet — confirmed by user, source TBD" },
+    { "name": "Protective Spirit",           "class": "shared",           "type": "pet",     "notes": "BS PET?" },
+    { "name": "Companion Spirit",           "class": "shared",           "type": "pet",     "notes": "BS PET?" }
+    
+  ],
+  "_notes": {
+    "matching": "Case-insensitive substring match on the ability/source slot in the log line.",
+    "attribution": "Damage from a pet is credited to its owner. The pet is tagged [pet] in grammar report output.",
+    "extensibility": "Add new pets here as they are discovered.",
+    "shared_pets": "Khitai faction pets are usable by any class. They should NOT contribute to class signature scoring.",
+    "v2_changes": "Added 49 new pets vs v1 (6 pets). Major additions: Necro melee variants (Harvester, Frozen Hatred, Parasitic Soul), Necro caster pets, Necro summons, Demo pet variants, ToS idols, DT Dread Shadow, shared Khitai pets, Obliterator."
+  }
+}

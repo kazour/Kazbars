@@ -32,3 +32,10 @@ profiles/*.json
 .claude/
 CLAUDE.md
 help_tab_text.txt
+
+# Sibling Rust project with its own git repo — the Deeps port reads from
+# it for source-of-truth parity but the source isn't part of KazBars's
+# release surface. Regenerate the parity fixture via Deeps/rust/parity-dump/.
+# Root-anchored (leading /) so case-insensitive Windows git doesn't also
+# ignore the bundled `src/kazbars/assets/deeps/` registry.
+/Deeps/

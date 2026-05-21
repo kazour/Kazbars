@@ -16,6 +16,9 @@ a = Analysis(
         (str(ASSETS / "kazbars"), "kazbars/assets/kazbars"),
         (str(ASSETS / "compiler"), "kazbars/assets/compiler"),
         (str(ASSETS / "common_stubs"), "kazbars/assets/common_stubs"),
+        # Deeps cluster: bundled pet-name registry consumed lazily by
+        # `kazbars.deeps_parsers._pet_names()` on first call.
+        (str(ASSETS / "deeps"), "kazbars/assets/deeps"),
     ],
     hiddenimports=[],
     hookspath=[],

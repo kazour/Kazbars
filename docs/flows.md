@@ -290,3 +290,45 @@ Steps:
 9. `app_toast()` — src/kazbars/ui_widgets.py — success toast `"Scaled grids: {old_res} → {new_w}×{new_h}"` (or `"Resolution set to {...}"` if the scaler short-circuited)
 
 End state: `game_resolution` persisted; all loaded grids re-anchored to the new screen size; editor X/Y spinbox max picks up the new bounds on next panel rebuild; profile marked modified so the user is prompted on close
+
+---
+
+## 17. open Deeps panel and start monitoring
+
+Trigger: User clicks the `⚔ Deeps` button in the bottom bar, then clicks `Start Monitoring` in the panel that opens.
+
+Steps:
+1. `KazBarsApp._open_deeps_panel()` — src/kazbars/app.py — one-line delegator to `open_deeps_panel(self)`. Mirrors `_open_boss_timer`.
+2. `open_deeps_panel(app)` — src/kazbars/deeps_panel.py — single-instance gate: if `app.deeps_panel` exists and `winfo_exists()`, deiconify + lift + focus + `restore_overlay()` and return. Otherwise construct a fresh `DeepsPanel`.
+3. `DeepsPanel.__init__()` — src/kazbars/deeps_panel.py — `restore_window_position("deeps", …)`; loads `deeps_settings.json` via `load_settings()`; constructs `DeepsMeter()` (not started); passes `include_pet_damage` from settings into the meter; builds the UI (CRT header, status row, Start/Stop, Overlay row with Lock + layout radio, Appearance LabelFrame with font combobox + size & background sliders, Overlay-cells picker with 5 checkboxes, Alarm & Tints LabelFrame with 3 Spinboxes, pet checkbox + note); calls `_create_overlay()` to build the hidden `DeepsOverlay`; renders the initial idle status line.
+4. User clicks Start Monitoring → `_on_start_stop_click()` → `_start_monitoring()`:
+   - `meter.set_include_pet_damage(self._pet_var.get())` — propagate the current checkbox state
+   - `meter.start(game_path)` — `DeepsMeter` resets trackers, spawns the `deeps-meter` daemon thread, returns
+   - `_refresh_start_button()` — swap to "Stop Monitoring" + danger bootstyle
+   - `_begin_tick()` — schedule `self.after(100, self._tick)`
+5. **Meter thread** — src/kazbars/deeps_meter.py — outer loop scans `game_folder` for the newest `CombatLog-*.txt`; `is_live(path)` probes via Windows `CreateFile(share_mode=0)` (sharing violation = AoC holds it). On live: enters the tail loop, reads lines from EOF, strips timestamp, dispatches to all five parsers (outgoing/incoming damage, incoming/outgoing heal, own-pet hit); matches go into the four trackers under the shared lock. On 100 ms tick: polls `aoc_is_foreground()` via `CreateToolhelp32Snapshot`; rebuilds `_snapshot`.
+6. **UI tick** (every 100 ms on the Tk main thread) — `DeepsPanel._tick()`:
+   - `meter.snapshot()` — read latest `MeterSnapshot` under the meter's lock
+   - `_render_status(snapshot)` — colored line per status (idle/waiting/old/tailing)
+   - `_update_alarm_state(snapshot)` — hysteresis: on at `dps >= alarm_threshold`, off at `dps < alarm_threshold * 0.9`
+   - `_update_overlay(snapshot)` — if `aoc_in_focus`: `overlay.show()` + `overlay.paint(snapshot, time.monotonic())`; else `overlay.hide()`
+   - Reschedule via `after(100, self._tick)`
+7. **Overlay paint** — src/kazbars/deeps_overlay.py — `paint()` renders a PIL RGBA bitmap (pushed to the win32 layered window by `overlay_engine.LayeredOverlay`) with the visible cells in the chosen layout (horizontal row or vertical stack), each a single number with an 8-direction dark stroke. The five cells are DPS out, DPS in, HPS out, HPS in, and ΔHP in. The DPS-out cell is white by default; if alarm-active, lerps to red via a 2 Hz sine wave on `now`. The HPS-in cell (and ΔHP in) tints sage green when `net > hpis_green_threshold`; the DPS-in cell (and ΔHP in) tints warm orange when `-net > dpis_yellow_threshold`. Otherwise cells stay white.
+
+End state: meter daemon thread is parsing combat log; overlay shows numbers when AoC is the foreground window; panel status row reads "Tailing CombatLog-…" in green; alarm pulses + tints animate based on live data. The panel can be closed (withdraw) without stopping monitoring — the overlay keeps updating in-game.
+
+---
+
+## 18. Deeps overlay auto-hide on AoC focus loss
+
+Trigger: User alt-tabs away from AoC (to a browser, Discord, KazBars, anything else).
+
+Steps:
+1. **Meter thread** — src/kazbars/deeps_meter.py — every 100 ms tick calls `aoc_is_foreground()`. On focus change away from AoC + away from this process's own windows, `aoc_in_focus` flips to False under the lock.
+2. **UI tick** — src/kazbars/deeps_panel.py — `_update_overlay(snapshot)` reads `snapshot.aoc_in_focus = False` and calls `self.overlay.hide()`.
+3. `DeepsOverlay.hide()` — src/kazbars/deeps_overlay.py — delegates to `self._engine.hide()` (the `overlay_engine.LayeredOverlay` win32 layered window). The overlay comes off-screen; the meter keeps tailing.
+4. User alt-tabs back to AoC → meter detects focus → `_update_overlay` calls `overlay.show()` + `overlay.paint(...)` → overlay reappears with the current numbers.
+
+Subtle: clicking on the overlay itself (to drag when unlocked) DOES count as "in focus" — `aoc_is_foreground()` checks against `GetCurrentProcessId()` first, so any window owned by KazBars (the overlay, the panel, the main app) keeps the show-gate open. That's what makes drag-to-position work without the overlay disappearing mid-drag.
+
+End state: overlay visibility tracks AoC focus 1:1, with a tick of latency (≤100 ms). Lock state, position, and tracker data are all preserved across the hide/show — nothing is destroyed or reset.

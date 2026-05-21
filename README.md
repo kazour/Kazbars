@@ -33,6 +33,7 @@ Up to **64 slots total** across all your grids.
 - **Stacking** — show stack counts over icons for multi-stack effects
 - **Timers and flash warnings** — optional remaining-duration text and pulse-on-low-time
 - **Ethram-Fal Seed Timer** — always-on-top overlay for the Viscous Seed / Lotus Fixation / Syphon cycle
+- **Deeps** — real-time combat overlay showing DPS out, DPS in, HPS out, HPS in, and ΔHP in, with a pulsing alarm when your DPS-out climbs above a user threshold and net-HP tints on the cells
 - **Default Buff Bars editor** — edit the in-game HUD `<BuffListView />` widgets (icon size, spacing, columns, friendly/hostile filter) without hand-editing XML
 
 ## Requirements

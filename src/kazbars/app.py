@@ -112,6 +112,7 @@ class KazBarsApp(ttkb.Window):
         self.current_view = 'grids'
         self._building = False
         self.boss_timer_panel = None
+        self.deeps_panel = None
 
         # Single game folder + Aoc.exe preference (set via first-launch prompt)
         self._migrate_legacy_clients()
@@ -305,6 +306,13 @@ class KazBarsApp(ttkb.Window):
         tracker_btn.pack(side='right', pady=PAD_SMALL)
         add_tooltip(tracker_btn, "Open the Ethram-Fal Seed Timer")
 
+        deeps_btn = ttkb.Button(
+            self.bottom_bar, text="⚔ Deeps", bootstyle="outline",
+            command=self._open_deeps_panel
+        )
+        deeps_btn.pack(side='right', padx=(0, PAD_SMALL), pady=PAD_SMALL)
+        add_tooltip(deeps_btn, "Open the Deeps DPS / DPIS / HPS meter")
+
         self._refresh_game_path_label()
 
     def _create_menu_bar(self):
@@ -441,6 +449,11 @@ class KazBarsApp(ttkb.Window):
         self.boss_timer_panel = LiveTrackerPanel(
             self, self.settings_path, lambda: self.game_path
         )
+
+    def _open_deeps_panel(self):
+        """Open the Deeps panel (single-instance) — mirrors _open_boss_timer."""
+        from .deeps_panel import open_deeps_panel
+        open_deeps_panel(self)
 
     # ========================================================================
     # GAME FOLDER MANAGEMENT

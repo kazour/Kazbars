@@ -116,6 +116,7 @@ SCANLINE_ALPHA = 12
 MODULE_COLORS = {
     'grids':        '#3498db',   # Blue
     'live_tracker': '#3498db',   # Blue — Live Tracker editor panel header
+    'deeps':        '#3498db',   # Blue — Deeps panel header (sibling to live_tracker)
 }
 
 # Retro/CRT decorative colors — DECORATIVE ONLY.
