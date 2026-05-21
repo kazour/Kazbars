@@ -332,3 +332,17 @@ Steps:
 Subtle: clicking on the overlay itself (to drag when unlocked) DOES count as "in focus" — `aoc_is_foreground()` checks against `GetCurrentProcessId()` first, so any window owned by KazBars (the overlay, the panel, the main app) keeps the show-gate open. That's what makes drag-to-position work without the overlay disappearing mid-drag.
 
 End state: overlay visibility tracks AoC focus 1:1, with a tick of latency (≤100 ms). Lock state, position, and tracker data are all preserved across the hide/show — nothing is destroyed or reset.
+
+---
+
+## 19. backup & restore game settings
+
+Trigger: User selects Game > Backup & restore game settings... from the menu, then clicks Back up… or Restore… in the dialog that opens.
+
+Steps:
+1. `KazBarsApp._open_backup_dialog()` — src/kazbars/app.py — one-line delegator to `open_backup_dialog(self)`. Mirrors `_open_deeps_panel`.
+2. `open_backup_dialog(app)` — src/kazbars/settings_backup.py — builds a modal `Toplevel`; `locate_funcom_prefs()` resolves `%LOCALAPPDATA%\Funcom\Conan\Prefs`; `_funcom_summary()` returns the account names (the prefs dir's immediate subfolders), the character count (`Char*` subfolders across all accounts), and total size; counts `*.json` under `app.profiles_path`; renders the "What's included" lines (account names listed, KazBars settings noted as app/Deeps/Live Tracker), the "Close AoC first" warning, and Back up… / Restore… / Close buttons.
+3a. **Back up** → `backup_settings(app, dialog)` — `filedialog.asksaveasfilename` (default `KazBars_Backup_{date}.zip`) → `write_backup_zip()` archives the Funcom prefs tree under `funcom/` + `app.profiles_path` under `kazbars/profiles/` + the whole `app.settings_path` dir (`kazbars_settings.json` + `deeps_settings.json` + `live_tracker_settings.json`) under `kazbars/settings/`, skipping `*.tmp` and writing `manifest.json` last → dialog closes → `app_toast()` success with the file counts.
+3b. **Restore** → `restore_settings(app, dialog)` — `filedialog.askopenfilename` → `read_manifest()` rejects anything that isn't a KazBars backup → `Messagebox.yesno` confirm (+ AoC-closed warning) → best-effort pre-restore snapshot via `write_backup_zip()` to `app.app_path/KazBars_PreRestore_{timestamp}.zip` → `restore_zip()` extracts each section to its destination (`funcom_prefs_path()` for `funcom/`, `app.app_path` for `kazbars/`), creating dirs as needed and skipping zip-slip entries → `app.settings.reload()` (src/kazbars/settings_manager.py) resyncs in-memory settings from disk so the restored file isn't clobbered on exit → `Messagebox.show_info` reports the restored counts + snapshot path.
+
+End state: backup writes a single portable zip (AoC prefs + KazBars profiles/settings); restore replaces both in place after snapshotting the prior state, with a KazBars restart recommended to fully apply the restored window/game-folder settings.

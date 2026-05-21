@@ -340,6 +340,8 @@ class KazBarsApp(ttkb.Window):
         self._menubar.add_cascade(label="Game", menu_def=[
             {'type': 'command', 'label': 'Default buff bars...',
              'command': self._open_buff_display_editor},
+            {'type': 'command', 'label': 'Backup & restore game settings...',
+             'command': self._open_backup_dialog},
             {'type': 'separator'},
             {'type': 'command', 'label': 'Change game folder...',
              'command': self._change_game_folder},
@@ -454,6 +456,11 @@ class KazBarsApp(ttkb.Window):
         """Open the Deeps panel (single-instance) — mirrors _open_boss_timer."""
         from .deeps_panel import open_deeps_panel
         open_deeps_panel(self)
+
+    def _open_backup_dialog(self):
+        """Open the Backup & Restore settings dialog."""
+        from .settings_backup import open_backup_dialog
+        open_backup_dialog(self)
 
     # ========================================================================
     # GAME FOLDER MANAGEMENT

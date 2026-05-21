@@ -69,6 +69,11 @@ class SettingsManager:
         except Exception as e:
             logger.error("Error saving settings: %s", e)
 
+    def reload(self):
+        """Re-read settings from disk, replacing in-memory state. Used after a
+        restore overwrites the settings file underneath the running app."""
+        self.data = _safe_load_json(self.filepath)
+
     def get(self, key, default=None):
         return self.data.get(key, default)
 
