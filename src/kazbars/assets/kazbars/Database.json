@@ -3274,6 +3274,14 @@
       ],
       "category": "#Crowd Control",
       "type": "misc"
+    },
+    {
+      "name": "Ice Strike E (Slow)",
+      "ids": [
+        5077873
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
     }
   ]
 }
