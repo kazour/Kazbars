@@ -2337,6 +2337,14 @@
       "type": "misc"
     },
     {
+      "name": "Ice Cloak E (Slow)",
+      "ids": [
+        5077888
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
       "name": "Ice Storm L (Slow)",
       "ids": [
         5077955

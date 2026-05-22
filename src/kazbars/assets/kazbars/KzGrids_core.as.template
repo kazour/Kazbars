@@ -103,18 +103,42 @@
         }
     }
 
+    // Attaches a baked symbol from base.swf (per-buff custom icons, or the shared IcoNull fallback)
+    // at the SLOT level, depth 8 -- above the slot mask's clipDepth 7, below the frame at depth 9.
+    // Scaleform paints nothing for content attached into the clip-depth-masked m_icon, so we attach
+    // as a sibling; the rounded crop is baked into the art (no runtime mask).
+    private function attachBaked(obj:Object, si:Number, s:MovieClip, sym:String):Void {
+        if (s._lastIco == sym && s.cust != null) return;
+        s._lastIco = sym;
+        obj.loading[si] = false;
+        try { s.m_icon.unloadMovie(); } catch (e:Object) {}
+        s.m_icon._visible = true;
+        if (s.cust != null) s.cust.removeMovieClip();
+        s.attachMovie(sym, "cust", 8);
+    }
+
     private function loadIcon(obj:Object, si:Number, entry:Object):Void {
-        if (entry == null || entry.buff == null || entry.buff.m_Icon == null) return;
+        if (entry == null) return;
         var s:MovieClip = obj.slots[si];
         if (s == null || s.m_icon == null) return;
+
+        // 1. Explicit per-buff baked icon (ice-gem slows AoC serves with a null icon).
+        var sym:String = CUSTOMICON[entry.id];
+        if (sym != null && sym != undefined) { attachBaked(obj, si, s, sym); return; }
+
+        // 2. No game icon at all -> shared IcoNull placeholder (instead of a blank slot).
+        if (entry.buff == null || entry.buff.m_Icon == null) { attachBaked(obj, si, s, "IcoNull"); return; }
         var inst:Number;
-        try { inst = entry.buff.m_Icon.GetInstance(); } catch (e:Object) { return; }
-        if (inst == null || inst == undefined || inst == 0) return;
+        try { inst = entry.buff.m_Icon.GetInstance(); } catch (e:Object) { attachBaked(obj, si, s, "IcoNull"); return; }
+        if (inst == null || inst == undefined || inst == 0) { attachBaked(obj, si, s, "IcoNull"); return; }
+
+        // 3. Real game icon -> load from the RDB.
         if (s._lastIco == inst && s.m_icon._visible) return;
         obj.loading[si] = false;
         s._lastIco = inst;
         obj.loading[si] = true;
         s.m_icon._visible = false;
+        if (s.cust != null) s.cust.removeMovieClip();
         try { s.m_icon.unloadMovie(); } catch (e:Object) {}
         try {
             com.Utils.ImageLoader.RequestRDBImage(new com.Utils.ID32(1010008, inst), obj, "cb" + si);
@@ -360,6 +384,7 @@
         if (s.tmrShadow != null) s.tmrShadow.text = "";
         if (s.stk != null) s.stk.text = "";
         if (s.stkShadow != null) s.stkShadow.text = "";
+        if (s.cust != null) s.cust.removeMovieClip();
         if (s.m_icon != null) { s.m_icon._visible = false; try { s.m_icon.unloadMovie(); } catch (e:Object) {} }
     }
 

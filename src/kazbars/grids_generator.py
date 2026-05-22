@@ -17,6 +17,18 @@ from .grid_model import MAX_TOTAL_SLOTS
 logger = logging.getLogger(__name__)
 
 
+# AoC serves these buff IDs with a null icon; we attach a baked %-label symbol from
+# base.swf instead of the (empty) game icon. Same-% gems share one symbol.
+CUSTOM_ICON_LINKAGE = {
+    5077953: "IcoSlow30",  # Ice Storm E
+    5077873: "IcoSlow40",  # Ice Strike E
+    5077888: "IcoSlow40",  # Ice Cloak E  (placeholder ID — verify in-game)
+    5077955: "IcoSlow45",  # Ice Storm L
+    5077874: "IcoSlow60",  # Ice Strike L
+    5077889: "IcoSlow60",  # Ice Cloak L
+}
+
+
 _template_cache = {}
 
 
@@ -143,6 +155,7 @@ class CodeGenerator:
     private var ISDEB:Object;
     private var BUFFTYPE:Object;
     private var STACK_LEVEL:Object;
+    private var CUSTOMICON:Object;
 
     // OPTIMIZATION: Alpha flash lookup table (100 pre-calculated values)
     private var AFLASH:Array;
@@ -271,7 +284,8 @@ class CodeGenerator:
         WL = d.WL;
         ISDEB = d.ISDEB;
         BUFFTYPE = d.BUFFTYPE;
-        STACK_LEVEL = d.STACK_LEVEL;{cast_cfg}
+        STACK_LEVEL = d.STACK_LEVEL;
+        CUSTOMICON = d.CUSTOMICON;{cast_cfg}
     }}"""
 
     def _cast_data_block(self):
@@ -304,6 +318,7 @@ class CodeGenerator:
         d.ISDEB = {};
         d.BUFFTYPE = {};
         d.STACK_LEVEL = {};
+        d.CUSTOMICON = {};
         var i:Number;
 """
         ]
@@ -331,6 +346,8 @@ class CodeGenerator:
                 stack_level = self._stack_labels.get(bid)
                 if stack_level is not None:
                     lines.append(f"        d.STACK_LEVEL[{bid}] = {stack_level};")
+                if bid in CUSTOM_ICON_LINKAGE:
+                    lines.append(f'        d.CUSTOMICON[{bid}] = "{CUSTOM_ICON_LINKAGE[bid]}";')
 
         lines.append("        return d;")
         lines.append("    }")

@@ -47,6 +47,8 @@ build_utils  ← grids_generator
 build_loading  ← build_action, first_launch
 ```
 
+**Null-icon custom icons.** Some AoC buffs return `m_Icon.GetInstance()==0` (no game icon → the slot rendered blank). `grids_generator.CUSTOM_ICON_LINKAGE` maps such buff IDs → baked symbol linkage names in `base.swf` (`IcoSlow30/40/45/60` for the ice-gem slows), emitted into `KzGridsData.CUSTOMICON`. `KzGrids_core.as.template`'s `loadIcon` routes through `attachBaked` to attach the symbol at **slot-level depth 8** (above the slot mask's clipDepth 7, below the frame at depth 9), with a shared **`IcoNull`** fallback for any other no-icon buff — so no tracked buff shows a blank slot. The rounded crop is baked into the art (PNG inset ~56×56 in a 64×64 canvas), **not masked** at runtime: AoC's Scaleform renderer applies masks only to `loadClip` content (the RDB game icons), never to `attachMovie`'d content.
+
 ### Live Tracker (isolated — no other panel imports from it)
 ```
 live_tracker_settings  ← boss_timer
@@ -148,7 +150,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/live_tracker_panel.py` | 575 | Live Tracker Toplevel orchestrator |
 | `src/kazbars/timer_overlay.py` | 542 | In-game transparent timer overlay (two-canvas docked layout, stroke rendering, click-through lock) |
 | `src/kazbars/ui_components.py` | 451 | `ToastManager` (coalesce-by-key, in-place text update), `DragReorderManager`, scrollable frame |
-| `src/kazbars/grids_generator.py` | 562 | AS2 code generation from grid configs (optional console hooks via `include_console`; optional cast-timer overlay hooks + `d.CAST` block via `cast_config` → `include_cast_timer`) |
+| `src/kazbars/grids_generator.py` | 579 | AS2 code generation from grid configs (optional console hooks via `include_console`; optional cast-timer overlay hooks + `d.CAST` block via `cast_config` → `include_cast_timer`). Also holds `CUSTOM_ICON_LINKAGE` (null-icon buff IDs → baked `base.swf` symbol names), emitted into `KzGridsData.CUSTOMICON` |
 | `src/kazbars/boss_timer.py` | 381 | Boss timer state + UI |
 | `src/kazbars/instructions_panel.py` | 403 | Help/instructions view |
 | `src/kazbars/first_launch.py` | 364 | First-launch dialog + post-dialog orchestrator (`run_first_launch`) |
