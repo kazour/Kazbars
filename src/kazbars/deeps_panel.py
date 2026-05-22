@@ -325,11 +325,12 @@ class DeepsPanel(tk.Toplevel):
             self.overlay.set_bg_opacity(pct / 100.0)
 
     def _build_cells_picker(self, parent: ttk.Frame) -> None:
-        """LabelFrame with one checkbox per overlay cell (5 total).
+        """LabelFrame with one checkbox per overlay cell (5 total): the four
+        rate cells in one row, with ΔHP in on a second row beneath them.
 
-        Order matches the overlay's fixed render order; the user controls only
-        which cells are shown, not the sequence. Labels come from the shared
-        `CELL_LABELS` so the picker and overlay always agree.
+        The checkbox arrangement is cosmetic — the overlay's render order is
+        fixed by `ALL_CELL_IDS`; the user controls only which cells are shown.
+        Labels come from the shared `CELL_LABELS` so picker and overlay agree.
         """
         lf = ttk.LabelFrame(
             parent, text="Overlay cells",
@@ -338,12 +339,16 @@ class DeepsPanel(tk.Toplevel):
         )
         lf.pack(fill="x", pady=(PAD_SMALL, PAD_ROW))
 
-        for cid in _ALL_CELL_IDS:
-            ttk.Checkbutton(
-                lf, text=CELL_LABELS[cid],
-                variable=self._cell_vars[cid],
-                command=self._on_cells_change,
-            ).pack(anchor="w", pady=PAD_XS)
+        # Row 1: the four rate cells; row 2: ΔHP in on its own.
+        for row_ids in (("dps", "dpis", "hps", "hps-out"), ("net",)):
+            row = ttk.Frame(lf)
+            row.pack(anchor="w", fill="x", pady=PAD_XS)
+            for cid in row_ids:
+                ttk.Checkbutton(
+                    row, text=CELL_LABELS[cid],
+                    variable=self._cell_vars[cid],
+                    command=self._on_cells_change,
+                ).pack(side="left", padx=(0, PAD_SMALL))
 
     def _on_cells_change(self) -> None:
         """Push the current visible-cells selection to the overlay + save."""
