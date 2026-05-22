@@ -11,19 +11,33 @@ from .settings_manager import get_setting, set_setting
 
 
 def clamp_to_screen(x, y, width, height):
-    """Clamp window coordinates so the window stays within screen bounds."""
+    """Clamp (x, y) to the work area of the monitor nearest the target rect.
+
+    Multi-monitor aware: positions on secondary monitors are preserved, and a
+    position on a now-disconnected monitor snaps to the nearest live one. Uses
+    the monitor work area so a window never opens under the taskbar. Falls back
+    to a primary-screen clamp if win32 is unavailable.
+    """
     try:
-        root = tk._default_root
-        if root:
-            screen_w = root.winfo_screenwidth()
-            screen_h = root.winfo_screenheight()
-        else:
+        import win32api
+        import win32con
+
+        rect = (int(x), int(y), int(x + width), int(y + height))
+        hmon = win32api.MonitorFromRect(rect, win32con.MONITOR_DEFAULTTONEAREST)
+        left, top, right, bottom = win32api.GetMonitorInfo(hmon)["Work"]
+        x = max(left, min(x, right - width))
+        y = max(top, min(y, bottom - height))
+        return x, y
+    except Exception:
+        try:
+            root = tk._default_root
+            screen_w = root.winfo_screenwidth() if root else 1920
+            screen_h = root.winfo_screenheight() if root else 1080
+        except (tk.TclError, AttributeError):
             screen_w, screen_h = 1920, 1080
-    except (tk.TclError, AttributeError):
-        screen_w, screen_h = 1920, 1080
-    x = max(0, min(x, screen_w - width))
-    y = max(0, min(y, screen_h - height - 50))
-    return x, y
+        x = max(0, min(x, screen_w - width))
+        y = max(0, min(y, screen_h - height - 50))
+        return x, y
 
 
 def save_window_position(window_name, x, y, width=None, height=None):
@@ -36,8 +50,13 @@ def save_window_position(window_name, x, y, width=None, height=None):
     set_setting(f'window_pos_{window_name}', pos_data)
 
 
-def restore_window_position(window, window_name, default_width, default_height, parent=None, resizable=True):
-    """Restore a window's saved position and size, or center it as a fallback."""
+def restore_window_position(window, window_name, default_width, default_height, parent=None, resizable=True, offset=(0, 0)):
+    """Restore a window's saved position and size, or center it as a fallback.
+
+    `offset` nudges the first-launch centered position (no effect once a
+    position is saved) — used to stagger sibling panels so they don't spawn
+    exactly on top of each other.
+    """
     pos_data = get_setting(f'window_pos_{window_name}')
 
     if pos_data:
@@ -48,8 +67,8 @@ def restore_window_position(window, window_name, default_width, default_height, 
     else:
         width, height = default_width, default_height
         if parent:
-            x = parent.winfo_rootx() + (parent.winfo_width() - width) // 2
-            y = parent.winfo_rooty() + (parent.winfo_height() - height) // 2
+            x = parent.winfo_rootx() + (parent.winfo_width() - width) // 2 + offset[0]
+            y = parent.winfo_rooty() + (parent.winfo_height() - height) // 2 + offset[1]
         else:
             try:
                 screen_w = window.winfo_screenwidth()

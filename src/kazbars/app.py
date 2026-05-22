@@ -607,5 +607,13 @@ class KazBarsApp(ttkb.Window):
         if bt := self._boss_timer_if_alive():
             bt.cleanup()
             bt.destroy()
+        dp = self.deeps_panel
+        if dp is not None:
+            try:
+                if dp.winfo_exists():
+                    dp.cleanup()
+                    dp.destroy()
+            except tk.TclError:
+                pass
 
         self.destroy()

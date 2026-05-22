@@ -171,7 +171,7 @@ Trigger: User clicks the "⏱ Ethram-Fal" button in the bottom bar (right side, 
 
 Steps:
 1. `_open_boss_timer()` — src/kazbars/app.py:412 — checks `_boss_timer_if_alive()`; if a panel exists, deiconifies/lifts/restores the overlay; otherwise constructs a new `LiveTrackerPanel`
-2. `LiveTrackerPanel.__init__()` — src/kazbars/live_tracker_panel.py:74 — runs the one-shot `_migrate_window_position_key()` (renames legacy `window_pos_boss_timer` → `window_pos_live_tracker`); restores window position; calls `load_settings()`; builds UI; creates overlay; constructs `BossTimer` and `CombatLogMonitor`; auto-detects log path
+2. `LiveTrackerPanel.__init__()` — src/kazbars/live_tracker_panel.py:74 — runs the one-shot `_migrate_window_position_key()` (renames legacy `window_pos_boss_timer` → `window_pos_live_tracker`); sets `transient(parent)`; restores window position; calls `load_settings()`; builds UI; creates overlay; starts the overlay focus-gate (`_focus_tick`, runs every `FOCUS_TICK_MS` for the panel's whole life and hides the overlay whenever neither KazBars nor AoC is foreground); constructs `BossTimer` and `CombatLogMonitor`; auto-detects log path
 3. `load_settings()` — src/kazbars/live_tracker_settings.py:119 — runs the one-shot `_migrate_legacy_filename()` (renames legacy `timers_settings.json` → `live_tracker_settings.json`); reads `live_tracker_settings.json` from the settings folder; returns dict validated against `TIMERS_DEFAULTS` and `TIMERS_RANGES`
 4. `BossTimer.__init__()` — src/kazbars/boss_timer.py:53 — initializes cycle state fields and `_last_phase = None` (the source-side dedupe cache); stores `LiveTrackerPanel._dispatch_overlay_update` (src/kazbars/live_tracker_panel.py:121) as `_update_callback` — that method hops cross-thread updates onto the Tk main loop via `self.after(0, partial(_apply_overlay_update, phase))` (src/kazbars/live_tracker_panel.py:127)
 5. `CombatLogMonitor.__init__()` — src/kazbars/combat_monitor.py:34 — initializes daemon thread state; stores the `boss_timer` reference
@@ -179,7 +179,7 @@ Steps:
 7. `LiveTrackerPanel._update_log_path()` — src/kazbars/live_tracker_panel.py:297 — calls `combat_monitor.set_log_folder()` with the current game path
 8. `CombatLogMonitor.set_log_folder()` — src/kazbars/combat_monitor.py:51 — finds latest `CombatLog*.txt` in the game folder; records file end position as `last_position`
 
-End state: `LiveTrackerPanel` window visible; `TimerOverlay` shown; `CombatLogMonitor` ready with log file path set; overlay shows monitor + log status
+End state: `LiveTrackerPanel` window visible; `TimerOverlay` shown (auto-hidden by `_focus_tick` while neither KazBars nor AoC is the foreground window — `overlay_engine.app_or_game_foreground()` gate, mirroring the Deeps overlay); `CombatLogMonitor` ready with log file path set; overlay shows monitor + log status
 
 ---
 

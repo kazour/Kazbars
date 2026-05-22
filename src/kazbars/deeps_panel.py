@@ -58,7 +58,7 @@ from .ui_helpers import (
     THEME_COLORS,
 )
 from .ui_widgets import create_dialog_header
-from .window_position import restore_window_position, save_window_position
+from .window_position import bind_window_position_save, restore_window_position
 
 logger = logging.getLogger(__name__)
 
@@ -92,12 +92,14 @@ class DeepsPanel(tk.Toplevel):
         super().__init__(parent)
         self.title("Deeps — KazBars")
         self.resizable(False, False)
+        self.transient(parent)
 
         restore_window_position(
             self, "deeps",
             _PANEL_DEFAULT_WIDTH, _PANEL_PROVISIONAL_HEIGHT,
             parent, resizable=False,
         )
+        bind_window_position_save(self, "deeps", save_size=False)
 
         self.settings_folder = str(settings_path)
         self.game_path_getter = game_path_getter
@@ -736,13 +738,9 @@ class DeepsPanel(tk.Toplevel):
         """Close button → withdraw (single-instance pattern).
 
         Monitoring keeps running so the overlay continues to update during
-        play; the user reopens the panel from the bottom-bar button. Window
-        position is saved on every withdraw so it sticks across sessions.
+        play; the user reopens the panel from the bottom-bar button. Position
+        is persisted live by bind_window_position_save (wired in __init__).
         """
-        try:
-            save_window_position(self, "deeps")
-        except Exception:
-            logger.debug("Failed to save Deeps window position", exc_info=True)
         self.withdraw()
 
     def cleanup(self) -> None:

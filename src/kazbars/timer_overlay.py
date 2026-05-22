@@ -223,6 +223,13 @@ class TimerOverlay:
         if notify:
             self._notify_settings_changed()
 
+    def set_focus_suppressed(self, suppressed: bool) -> None:
+        """Hide while neither KazBars nor the game is focused, without
+        disturbing the user's `is_visible` preference. Repaints on focus
+        return only if the user has the overlay visible."""
+        if self._engine.set_suppressed(suppressed) and not suppressed and self.is_visible:
+            self._engine.paint()
+
     def destroy(self) -> None:
         self._engine.destroy()
 

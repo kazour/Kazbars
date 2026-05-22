@@ -95,6 +95,89 @@ _user32 = ctypes.WinDLL("user32", use_last_error=True)
 _gdi32 = ctypes.WinDLL("gdi32", use_last_error=True)
 
 
+# --------------------------------------------------------------------------- #
+# Foreground detection — the overlay visibility gate                          #
+# --------------------------------------------------------------------------- #
+# Intentionally mirrors `deeps_meter.aoc_is_foreground` instead of importing
+# it: the Deeps and Live Tracker clusters must not cross-import (enforced by
+# tests/test_cluster_isolation.py), and `overlay_engine` is the shared layer
+# both reach through.
+_TH32CS_SNAPPROCESS = 0x00000002
+_INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
+_AOC_EXE_NAMES = ("AgeOfConan.exe", "AgeOfConanDX10.exe")
+
+
+class _PROCESSENTRY32W(ctypes.Structure):
+    _fields_ = (
+        ("dwSize", wintypes.DWORD),
+        ("cntUsage", wintypes.DWORD),
+        ("th32ProcessID", wintypes.DWORD),
+        ("th32DefaultHeapID", ctypes.c_void_p),
+        ("th32ModuleID", wintypes.DWORD),
+        ("cntThreads", wintypes.DWORD),
+        ("th32ParentProcessID", wintypes.DWORD),
+        ("pcPriClassBase", wintypes.LONG),
+        ("dwFlags", wintypes.DWORD),
+        ("szExeFile", wintypes.WCHAR * 260),
+    )
+
+
+_kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+_kernel32.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
+_kernel32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+_kernel32.Process32FirstW.argtypes = [wintypes.HANDLE, ctypes.POINTER(_PROCESSENTRY32W)]
+_kernel32.Process32FirstW.restype = wintypes.BOOL
+_kernel32.Process32NextW.argtypes = [wintypes.HANDLE, ctypes.POINTER(_PROCESSENTRY32W)]
+_kernel32.Process32NextW.restype = wintypes.BOOL
+_kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+_kernel32.CloseHandle.restype = wintypes.BOOL
+_kernel32.GetCurrentProcessId.restype = wintypes.DWORD
+
+_user32.GetForegroundWindow.restype = wintypes.HWND
+_user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+_user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+
+
+def app_or_game_foreground() -> bool:
+    """True iff KazBars (this process) or Age of Conan owns the foreground
+    window — the gate for overlay visibility. Any probe failure returns True
+    so a transient error never hides a working overlay.
+
+    Mirrors `deeps_meter.aoc_is_foreground`; kept separate to honor the
+    Deeps / Live Tracker cluster isolation.
+    """
+    try:
+        hwnd = _user32.GetForegroundWindow()
+        if not hwnd:
+            return False
+        pid = wintypes.DWORD(0)
+        _user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        pid_val = pid.value
+        if pid_val == 0:
+            return False
+        if pid_val == _kernel32.GetCurrentProcessId():
+            return True  # any KazBars window (panel, overlay) keeps the gate open
+
+        snap = _kernel32.CreateToolhelp32Snapshot(_TH32CS_SNAPPROCESS, 0)
+        if snap == _INVALID_HANDLE_VALUE or snap is None:
+            return True
+        try:
+            entry = _PROCESSENTRY32W()
+            entry.dwSize = ctypes.sizeof(_PROCESSENTRY32W)
+            if not _kernel32.Process32FirstW(snap, ctypes.byref(entry)):
+                return True
+            while True:
+                if entry.th32ProcessID == pid_val:
+                    return entry.szExeFile in _AOC_EXE_NAMES
+                if not _kernel32.Process32NextW(snap, ctypes.byref(entry)):
+                    return False
+        finally:
+            _kernel32.CloseHandle(snap)
+    except OSError:
+        logger.debug("app_or_game_foreground probe failed", exc_info=True)
+        return True
+
+
 class _POINT(ctypes.Structure):
     _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
 
@@ -234,6 +317,7 @@ class LayeredOverlay:
         self._x = 0
         self._y = 0
         self._locked = False
+        self._suppressed = False  # focus gate: hold the surface blank when off-focus
         self._drag_dx = 0
         self._drag_dy = 0
 
@@ -335,6 +419,19 @@ class LayeredOverlay:
         except Exception:
             logger.debug("hide() failed to push transparent bitmap", exc_info=True)
 
+    def set_suppressed(self, suppressed: bool) -> bool:
+        """Focus gate: while suppressed, hold the surface blank regardless of
+        paint() calls. Returns True if the state changed, so the caller can
+        decide whether to repaint on un-suppress (it knows if its consumer
+        wants the overlay visible)."""
+        suppressed = bool(suppressed)
+        if suppressed == self._suppressed:
+            return False
+        self._suppressed = suppressed
+        if suppressed:
+            self.hide()
+        return True
+
     def destroy(self) -> None:
         """Tear down the Toplevel. Safe to call multiple times."""
         try:
@@ -403,7 +500,13 @@ class LayeredOverlay:
         self.root.bind("<ButtonRelease-1>", self._on_drag_release)
 
     def paint(self) -> None:
-        """Invoke the render callback and push the resulting bitmap."""
+        """Invoke the render callback and push the resulting bitmap.
+
+        While suppressed (neither app nor game focused) the surface is held
+        blank: paint() no-ops so incoming content updates can't un-hide it.
+        """
+        if self._suppressed:
+            return
         try:
             image = self._render_callback(self._width, self._height)
         except Exception:

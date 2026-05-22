@@ -21,7 +21,7 @@ from .live_tracker_settings import (
     save_settings,
     validate_all_settings,
 )
-from .overlay_engine import FONT_FAMILY_CHOICES
+from .overlay_engine import FONT_FAMILY_CHOICES, app_or_game_foreground
 from .settings_manager import get_setting, set_setting
 from .timer_overlay import TimerOverlay
 from .ui_helpers import (
@@ -38,10 +38,11 @@ from .ui_helpers import (
     THEME_COLORS,
 )
 from .ui_widgets import add_tooltip, app_toast, create_dialog_header, create_tip_bar
-from .window_position import restore_window_position
+from .window_position import bind_window_position_save, restore_window_position
 
 # Game-loop tick (ms) — drives both the schedule cadence and the reschedule.
 GAME_TICK_MS = 50
+FOCUS_TICK_MS = 250  # overlay focus-gate poll: hide when neither app nor game is foreground
 
 # Test-cycle timing (ms)
 TEST_FIXATION_DELAY_MS = 4000
@@ -82,9 +83,13 @@ class LiveTrackerPanel(tk.Toplevel):
         super().__init__(parent)
         self.title("Ethram-Fal Seed Timer \u2014 KazBars")
         self.resizable(False, False)
+        self.transient(parent)
 
         _migrate_window_position_key()
-        restore_window_position(self, 'live_tracker', 460, 470, parent, resizable=False)
+        restore_window_position(
+            self, 'live_tracker', 460, 470, parent, resizable=False, offset=(48, 40)
+        )
+        bind_window_position_save(self, 'live_tracker', save_size=False)
 
         self.settings_folder = str(settings_path)
         self.game_path_getter = game_path_getter
@@ -95,6 +100,7 @@ class LiveTrackerPanel(tk.Toplevel):
         # State
         self.overlay = None
         self._game_loop_id = None
+        self._focus_watch_id = None
         self._monitoring = False
         self._test_fix_id = None
         self._test_reset_id = None
@@ -109,6 +115,7 @@ class LiveTrackerPanel(tk.Toplevel):
         # Build UI, then the overlay (which configures visibility/lock buttons)
         self._build_ui()
         self._create_overlay()
+        self._focus_tick()  # start the overlay focus-visibility gate (runs for the panel's life)
 
         # Auto-detect log path and push idle status to overlay
         self._update_log_path()
@@ -420,6 +427,20 @@ class LiveTrackerPanel(tk.Toplevel):
             self.after_cancel(self._game_loop_id)
             self._game_loop_id = None
 
+    def _focus_tick(self):
+        """Gate overlay visibility on focus, for the panel's whole life.
+
+        Hides the overlay whenever neither KazBars nor AoC is the foreground
+        window, so it never floats over a browser or other app. Runs while
+        idle, while monitoring, and after the panel is withdrawn (monitoring
+        keeps going). Self-reschedules; guarded against teardown races.
+        """
+        if not self.winfo_exists():
+            return
+        if self.overlay:
+            self.overlay.set_focus_suppressed(not app_or_game_foreground())
+        self._focus_watch_id = self.after(FOCUS_TICK_MS, self._focus_tick)
+
     # =========================================================================
     # OVERLAY CONTROLS
     # =========================================================================
@@ -560,11 +581,10 @@ class LiveTrackerPanel(tk.Toplevel):
             self.visibility_btn.config(text="Hide" if self.overlay.is_visible else "Show")
 
     def _on_withdraw(self):
-        """Hide panel and overlay, stop monitoring."""
-        if self._monitoring:
-            self._stop_monitoring()
-        if self.overlay:
-            self.overlay.hide()
+        """Hide the panel only — monitoring keeps running so the seed-timer
+        overlay stays live during play. Reopen from the bottom-bar button;
+        use Stop Monitoring to actually halt tracking. Mirrors Deeps.
+        """
         self.withdraw()
 
     def restore_overlay(self):
@@ -577,6 +597,9 @@ class LiveTrackerPanel(tk.Toplevel):
         """Stop monitoring and save settings. Call before destroying the window."""
         self.combat_monitor.stop_monitoring()
         self._stop_game_loop()
+        if self._focus_watch_id is not None:
+            self.after_cancel(self._focus_watch_id)
+            self._focus_watch_id = None
         self._cancel_test_callbacks()
         self.save_settings()
         if self.overlay:
