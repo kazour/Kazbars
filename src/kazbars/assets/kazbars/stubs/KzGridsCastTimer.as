@@ -286,8 +286,8 @@ class KzGridsCastTimer {
 
     public function previewOn():Void {
         previewMode = true;
-        if (m_PlayerClip != null) showPreview(m_PlayerClip, 0x0066FF);
-        if (m_TargetClip != null) showPreview(m_TargetClip, 0xFF0066);
+        if (m_PlayerClip != null) showPreview(m_PlayerClip, 0x0066FF, "Player Cast");
+        if (m_TargetClip != null) showPreview(m_TargetClip, 0xFF0066, "Target Cast");
     }
 
     public function previewOff():Void {
@@ -296,23 +296,30 @@ class KzGridsCastTimer {
         hidePreview(m_TargetClip, targetData.casting);
     }
 
-    private function showPreview(clip:MovieClip, col:Number):Void {
+    private function showPreview(clip:MovieClip, col:Number, title:String):Void {
         clip._visible = true;
         setText(clip, placeholder());
         if (clip._ov != null) clip._ov.removeMovieClip();
         var w:Number = 96;
-        var h:Number = SIZE + 26;
+        var top:Number = -32;          // box top -- the title sits above the timer text (anchored at y=0)
+        var bot:Number = SIZE + 28;    // box bottom -- below the coords row
         var ov:MovieClip = clip.createEmptyMovieClip("_ov", clip.getNextHighestDepth());
         ov.lineStyle(2, 0xFFFFFF, 80);
         ov.beginFill(col, 20);
-        ov.moveTo(-w / 2, -12); ov.lineTo(w / 2, -12); ov.lineTo(w / 2, h - 12); ov.lineTo(-w / 2, h - 12); ov.lineTo(-w / 2, -12);
+        ov.moveTo(-w / 2, top); ov.lineTo(w / 2, top); ov.lineTo(w / 2, bot); ov.lineTo(-w / 2, bot); ov.lineTo(-w / 2, top);
         ov.endFill();
-        var cf:TextField = ov.createTextField("co", ov.getNextHighestDepth(), -w / 2, h - 24, w, 14);
+        // Title -- same style as the grid preview label (white Arial 14 bold, centered at top).
+        var tl:TextField = ov.createTextField("tl", ov.getNextHighestDepth(), -w / 2, top + 4, w, 18);
+        tl.selectable = false; tl.embedFonts = false; tl.text = title; tl.textColor = 0xFFFFFF;
+        var tfmt:TextFormat = new TextFormat();
+        tfmt.font = "Arial"; tfmt.size = 14; tfmt.bold = true; tfmt.align = "center";
+        tl.setTextFormat(tfmt);
+        var cf:TextField = ov.createTextField("co", ov.getNextHighestDepth(), -w / 2, bot - 18, w, 14);
         cf.selectable = false; cf.embedFonts = false; cf.textColor = 0xFFFF00;
         var self:KzGridsCastTimer = this;
-        ov._clip = clip; ov._cf = cf; ov._self = self; ov._hw = w / 2; ov.useHandCursor = true;
+        ov._clip = clip; ov._cf = cf; ov._self = self; ov._hw = w / 2; ov._top = top; ov._bot = bot; ov.useHandCursor = true;
         ov.onPress = function() {
-            this._clip.startDrag(false, this._hw, 12, Stage.width - this._hw, Stage.height - 12);
+            this._clip.startDrag(false, this._hw, -this._top, Stage.width - this._hw, Stage.height - this._bot);
             this.onMouseMove = function() { this._self.updCoord(this._cf, this._clip); };
         };
         ov.onRelease = ov.onReleaseOutside = function() { this._clip.stopDrag(); delete this.onMouseMove; this._self.updCoord(this._cf, this._clip); };

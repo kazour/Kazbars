@@ -104,9 +104,11 @@
     }
 
     // Attaches a baked symbol from base.swf (per-buff custom icons, or the shared IcoNull fallback)
-    // at the SLOT level, depth 8 -- above the slot mask's clipDepth 7, below the frame at depth 9.
-    // Scaleform paints nothing for content attached into the clip-depth-masked m_icon, so we attach
-    // as a sibling; the rounded crop is baked into the art (no runtime mask).
+    // as a SLOT-level sibling at dynamic depth 8. The slot's authored art (bg/icoMask/m_icon/frame)
+    // is timeline content in the negative reserved depth range, so depth 8 sits above all of it;
+    // timer/stack text use depths 10-13 (KzGridsSlot) to stay above the icon. Scaleform paints
+    // nothing for content attached into the clip-depth-masked m_icon, so we attach as a sibling and
+    // bake the rounded crop into the art (no runtime mask).
     private function attachBaked(obj:Object, si:Number, s:MovieClip, sym:String):Void {
         if (s._lastIco == sym && s.cust != null) return;
         s._lastIco = sym;
@@ -490,7 +492,9 @@
             s.tmr.textColor = (rem > 0 && rem <= threshold) ? 0xFF3333 : 0xFFFFFF;
         }
         if (s.m_icon != null && !s.m_icon._visible) loadIcon(obj, si, e);
-        var tgt:MovieClip = (s.m_icon != null) ? s.m_icon : s;
+        // Baked custom icons live in s.cust (m_icon is empty for them), so flash that; otherwise
+        // flash the RDB-icon container m_icon, falling back to the slot itself.
+        var tgt:MovieClip = (s.cust != null) ? s.cust : ((s.m_icon != null) ? s.m_icon : s);
         // PER-GRID FLASHING: Respect enableFlashing config and threshold
         if (obj.cfg.enableFlashing && rem > 0 && rem <= threshold) {
             // MATH CACHING: Use pre-calculated alpha lookup instead of Math.sin

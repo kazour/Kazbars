@@ -11,8 +11,11 @@ class KzGridsSlot {
     // Creates timer TextFields (main + shadow) on a slot
     public function createTimerTF(s:MovieClip, fs:Number, yOffset:Number):Void {
         var tmrY:Number = NATIVE_SIZE - fs - 4 + yOffset;
+        // Fixed depths 10-13 keep timer/stack text above the baked custom icon (attached at slot
+        // depth 8 in KzGrids.attachBaked). The slot's authored art (bg/icoMask/m_icon/frame) is
+        // timeline content in the negative reserved depth range, so it stays below all of these.
         // Shadow TextField (created first so it's behind)
-        var tfShadow:TextField = s.createTextField("tmrShadow", s.getNextHighestDepth(), 1, tmrY + 1, NATIVE_SIZE, fs + 4);
+        var tfShadow:TextField = s.createTextField("tmrShadow", 10, 1, tmrY + 1, NATIVE_SIZE, fs + 4);
         tfShadow.selectable = false;
         tfShadow.embedFonts = false;
         tfShadow.textColor = 0x000000;
@@ -23,7 +26,7 @@ class KzGridsSlot {
         fmtShadow.align = "center";
         tfShadow.setNewTextFormat(fmtShadow);
         // Main timer TextField
-        var tf:TextField = s.createTextField("tmr", s.getNextHighestDepth(), 0, tmrY, NATIVE_SIZE, fs + 4);
+        var tf:TextField = s.createTextField("tmr", 11, 0, tmrY, NATIVE_SIZE, fs + 4);
         tf.selectable = false;
         tf.embedFonts = false;
         tf.textColor = 0xFFFFFF;
@@ -43,7 +46,7 @@ class KzGridsSlot {
         var stkX:Number = NATIVE_SIZE - stkWidth - stkMargin;
         var stkY:Number = stkMargin;
         // Shadow TextField
-        var stkShadow:TextField = s.createTextField("stkShadow", s.getNextHighestDepth(), stkX + 1, stkY + 1, stkWidth, stkSize + 2);
+        var stkShadow:TextField = s.createTextField("stkShadow", 12, stkX + 1, stkY + 1, stkWidth, stkSize + 2);
         stkShadow.selectable = false;
         stkShadow.embedFonts = false;
         stkShadow.textColor = 0x000000;
@@ -54,7 +57,7 @@ class KzGridsSlot {
         stkFmtShadow.align = "right";
         stkShadow.setNewTextFormat(stkFmtShadow);
         // Main stack counter
-        var stk:TextField = s.createTextField("stk", s.getNextHighestDepth(), stkX, stkY, stkWidth, stkSize + 2);
+        var stk:TextField = s.createTextField("stk", 13, stkX, stkY, stkWidth, stkSize + 2);
         stk.selectable = false;
         stk.embedFonts = false;
         stk.textColor = 0xFFFFFF;
