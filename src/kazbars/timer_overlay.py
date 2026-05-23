@@ -56,6 +56,7 @@ _BG_FILL_RGB = (10, 10, 10)             # near-black backdrop fill
 _BG_BORDER_RGB = (51, 51, 51)           # 1 px frame border (only visible with bg)
 _STROKE_RGB = (10, 10, 10)              # text outline
 _CHROME_FG = TK_COLORS["border"]        # lock indicator + resize handle color
+_CORNER_RADIUS = 5                      # rounded backdrop corners (matches Deeps)
 
 # Chrome hit-test rectangles in overlay-local coordinates.
 _CHROME_HIT_W = 16
@@ -379,12 +380,14 @@ class TimerOverlay:
         # carries legibility. At 1.0 the panel is fully opaque.
         if self.bg_opacity > 0.0:
             alpha = round(self.bg_opacity * 255)
-            draw.rectangle((0, 0, width - 1, height - 1),
-                           fill=(*_BG_FILL_RGB, alpha))
+            draw.rounded_rectangle((0, 0, width - 1, height - 1),
+                                   radius=_CORNER_RADIUS,
+                                   fill=(*_BG_FILL_RGB, alpha))
             # Hairline border at the same alpha — gives a subtle frame edge
             # without competing with the bg fill.
-            draw.rectangle((0, 0, width - 1, height - 1),
-                           outline=(*_BG_BORDER_RGB, alpha), width=1)
+            draw.rounded_rectangle((0, 0, width - 1, height - 1),
+                                   radius=_CORNER_RADIUS,
+                                   outline=(*_BG_BORDER_RGB, alpha), width=1)
 
         # Layout dimensions (mirrors the pre-port _redraw_text_canvas math).
         body_pad = 5

@@ -70,7 +70,7 @@ def test_invalid_numeric_falls_back_to_default():
 def test_bold_and_display_sanitized():
     assert validate_config({"bold": 0})["bold"] is False
     assert validate_config({"bold": 1})["bold"] is True
-    assert validate_config({"display": "weird"})["display"] == "both"
+    assert validate_config({"display": "weird"})["display"] == CAST_TIMER_DEFAULTS["display"]
     assert validate_config({"display": "total"})["display"] == "total"
 
 

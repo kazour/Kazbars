@@ -40,6 +40,7 @@ from .ui_helpers import (
     THEME_COLORS,
     TK_COLORS,
 )
+from .ui_tk_style import apply_dark_titlebar
 from .ui_widgets import CollapsibleSection, app_toast, create_dialog_header
 from .window_position import bind_window_position_save, restore_window_position
 
@@ -429,8 +430,19 @@ class BuffDisplayDialog(tk.Toplevel):
         # closes (X button, Cancel, Escape).
         self.protocol('WM_DELETE_WINDOW', self._on_close)
 
+        # Re-assert the dark title bar on every (re)map. The global one-shot
+        # patch in enable_global_dark_titlebar() fires once on first map, but
+        # this dialog is the only resizable Toplevel — Windows can drop the DWM
+        # dark caption when a resizable window re-maps, so we reapply per-map.
+        self.bind('<Map>', self._reassert_dark_titlebar, add='+')
+
         # after_idle so the toggle widget is fully realized before grabbing focus.
         self.after_idle(self._set_initial_focus)
+
+    def _reassert_dark_titlebar(self, event):
+        """Reapply the dark title bar when the dialog itself (re)maps."""
+        if event.widget is self:
+            apply_dark_titlebar(self)
 
     def _set_initial_focus(self):
         for s in self.sections:

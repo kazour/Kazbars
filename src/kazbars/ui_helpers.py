@@ -138,6 +138,11 @@ GRID_TYPE_COLORS = {
     'target': '#e67e22',   # Orange
 }
 
+# Cast-timer strip identity. A muted dusty rose — the hue furthest from the
+# blue Player / orange Target / purple Database palette, so the frozen strip
+# reads as clearly its own thing among the grid cards it sits among.
+CAST_TIMER_ACCENT = '#CF6F93'
+
 
 # ============================================================================
 # CUSTOM TTK STYLES

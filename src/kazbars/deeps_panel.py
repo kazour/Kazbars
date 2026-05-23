@@ -57,7 +57,7 @@ from .ui_helpers import (
     PAD_XS,
     THEME_COLORS,
 )
-from .ui_widgets import create_dialog_header
+from .ui_widgets import create_dialog_header, create_tip_bar
 from .window_position import bind_window_position_save, restore_window_position
 
 logger = logging.getLogger(__name__)
@@ -69,9 +69,10 @@ _UI_TICK_MS = 100
 # Alarm hysteresis multiplier — turn-off threshold = on-threshold * 0.9.
 _ALARM_HYSTERESIS = 0.9
 
-# Header dimensions
-_HEADER_WIDTH = 360
-_PANEL_DEFAULT_WIDTH = 360
+# Header dimensions — width matched to the Live Tracker panel so the two
+# sibling config windows read as a set.
+_HEADER_WIDTH = 440
+_PANEL_DEFAULT_WIDTH = 440
 # Provisional height — the panel auto-tightens to its natural reqheight after
 # `_build_ui` so adding controls never clips the bottom of the window.
 _PANEL_PROVISIONAL_HEIGHT = 380
@@ -165,6 +166,7 @@ class DeepsPanel(tk.Toplevel):
         controls → thresholds → pet toggle."""
         # CRT dialog header — brand-defining strip, same pattern as Live Tracker.
         create_dialog_header(self, "Deeps", MODULE_COLORS["deeps"], width=_HEADER_WIDTH)
+        create_tip_bar(self, "Live DPS, HPS, and net-HP readout from your combat log.")
 
         body = ttk.Frame(self, padding=(PAD_TAB, PAD_LF))
         body.pack(fill="both", expand=True)
@@ -453,6 +455,7 @@ class DeepsPanel(tk.Toplevel):
         self.overlay = DeepsOverlay(
             self, self.settings,
             on_position_changed=self._on_overlay_position_changed,
+            on_lock_changed=self._on_overlay_lock_changed,
         )
         # Push the latest thresholds so initial tints react correctly.
         self.overlay.update_thresholds(
@@ -467,6 +470,13 @@ class DeepsPanel(tk.Toplevel):
         self.settings["overlay_y"] = y
         self.settings["overlay_positioned"] = positioned
         save_settings(self.settings_folder, self.settings)
+
+    def _on_overlay_lock_changed(self, locked: bool) -> None:
+        """The overlay's own lock indicator was clicked — persist + resync the
+        panel's Lock button so both surfaces agree."""
+        self.settings["overlay_locked"] = locked
+        save_settings(self.settings_folder, self.settings)
+        self._refresh_lock_button()
 
     # ------------------------------------------------------------------ #
     # Start / Stop                                                       #

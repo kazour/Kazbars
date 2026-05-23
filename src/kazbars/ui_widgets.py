@@ -748,12 +748,11 @@ class CollapsibleSection(ttk.Frame):
             self._badge_label.pack(side="left", padx=(PAD_LF, 0))
             clickable.append(self._badge_label)
 
-        # Optional summary label (shown when collapsed, hidden when expanded)
-        self._summary_label = ttk.Label(
-            left, text="", font=FONT_SMALL, foreground=THEME_COLORS["muted"]
-        )
-        self._summary_label.pack(side="left", padx=(PAD_TAB, 0))
-        clickable.append(self._summary_label)
+        # Optional summary (shown when collapsed, hidden when expanded). A frame
+        # so it can hold one or more independently-colored segments.
+        self._summary_frame = ttk.Frame(left)
+        self._summary_frame.pack(side="left", padx=(PAD_TAB, 0))
+        clickable.append(self._summary_frame)
 
         # Keyboard accessibility — left frame is focusable
         left.configure(takefocus=True)
@@ -821,14 +820,14 @@ class CollapsibleSection(ttk.Frame):
             self._is_open = True
             self._arrow_label.config(text="▼")
             self._content_wrapper.pack(fill="x", padx=(PAD_COLLAPSE_INDENT, 0), pady=(PAD_XS, 0))
-            self._summary_label.pack_forget()
+            self._summary_frame.pack_forget()
 
     def collapse(self):
         if self._is_open:
             self._is_open = False
             self._arrow_label.config(text="▶")
             self._content_wrapper.pack_forget()
-            self._summary_label.pack(side="left", padx=(PAD_TAB, 0), in_=self._title_label.master)
+            self._summary_frame.pack(side="left", padx=(PAD_TAB, 0), in_=self._title_label.master)
 
     def set_title(self, text):
         self._title_label.config(text=text)
@@ -859,8 +858,23 @@ class CollapsibleSection(ttk.Frame):
                 bg=TK_COLORS["border"] if self._dimmed else self._accent_color
             )
 
-    def set_summary(self, text):
-        self._summary_label.config(text=text)
+    def set_summary(self, text, color=None):
+        """Single-segment collapsed summary (color None → muted)."""
+        self.set_summary_segments([(text, color)] if text else [])
+
+    def set_summary_segments(self, segments):
+        """Render the collapsed summary as one or more independently-colored
+        segments. `segments`: iterable of (text, color); color None → muted.
+        Each segment toggles the section on click, like the rest of the header."""
+        for child in self._summary_frame.winfo_children():
+            child.destroy()
+        for seg_text, seg_color in segments:
+            lbl = ttk.Label(
+                self._summary_frame, text=seg_text, font=FONT_SMALL,
+                foreground=seg_color or THEME_COLORS["muted"],
+            )
+            lbl.pack(side="left")
+            lbl.bind("<Button-1>", lambda e: self.toggle())
 
     @property
     def is_open(self):

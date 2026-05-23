@@ -87,7 +87,7 @@ class LiveTrackerPanel(tk.Toplevel):
 
         _migrate_window_position_key()
         restore_window_position(
-            self, 'live_tracker', 460, 470, parent, resizable=False, offset=(48, 40)
+            self, 'live_tracker', 440, 470, parent, resizable=False, offset=(48, 40)
         )
         bind_window_position_save(self, 'live_tracker', save_size=False)
 
@@ -139,7 +139,7 @@ class LiveTrackerPanel(tk.Toplevel):
 
     def _build_ui(self):
         """Build the panel UI."""
-        create_dialog_header(self, "Ethram-Fal Seed Timer", MODULE_COLORS['live_tracker'])
+        create_dialog_header(self, "Ethram-Fal Seed Timer", MODULE_COLORS['live_tracker'], width=440)
         create_tip_bar(
             self,
             "Tracks the Viscous Seed cycle in real time to help coordinate scorpion kills."
@@ -148,16 +148,18 @@ class LiveTrackerPanel(tk.Toplevel):
         main_frame = ttk.Frame(self)
         main_frame.pack(fill='both', expand=True, padx=PAD_TAB, pady=PAD_SMALL)
 
+        # Cards fill the panel width (matches the Deeps panel) rather than
+        # centering to their content width.
         center_panel = ttk.Frame(main_frame)
-        center_panel.pack(anchor='center', fill='y')
+        center_panel.pack(fill='both', expand=True)
 
         self._build_seed_timer_section(center_panel)
         self._build_overlay_controls(center_panel)
 
     def _build_seed_timer_section(self, parent):
         """Build seed timer monitoring controls with status display."""
-        seed_frame = ttk.LabelFrame(parent, text="Combat Log Monitor")
-        seed_frame.configure(padding=PAD_LF)
+        seed_frame = ttk.LabelFrame(parent, text="Combat Log Monitor",
+                                    style="Card.TLabelframe", padding=PAD_LF)
         seed_frame.pack(fill='x', pady=(0, PAD_LF))
 
         monitor_frame = ttk.Frame(seed_frame)
@@ -202,8 +204,8 @@ class LiveTrackerPanel(tk.Toplevel):
 
     def _build_overlay_controls(self, parent):
         """Build overlay settings (show/lock/test, bg opacity, font family, font size)."""
-        overlay_frame = ttk.LabelFrame(parent, text="Overlay")
-        overlay_frame.configure(padding=PAD_LF)
+        overlay_frame = ttk.LabelFrame(parent, text="Overlay",
+                                       style="Card.TLabelframe", padding=PAD_LF)
         overlay_frame.pack(fill='x', pady=(0, PAD_LF))
 
         btn_row = ttk.Frame(overlay_frame)

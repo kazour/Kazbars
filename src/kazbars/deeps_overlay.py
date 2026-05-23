@@ -40,16 +40,20 @@ logger = logging.getLogger(__name__)
 # =========================================================================== #
 
 _BASE_FONT_SIZE = 22
-_LABEL_FONT_SIZE = 8
+_LABEL_FONT_SIZE = 11         # cell title below each number (was 8 — too small)
 
 # Layout dimensions at the baseline 22 pt font. Each value scales linearly
 # with `_font_size / _BASE_FONT_SIZE` so font changes resize the overlay.
-_PAD_OUTER = 8
-_H_CELL_WIDTH = 84            # one number + label below
-_H_HEIGHT = 56
-_V_CELL_WIDTH = 84
-_V_ROW_HEIGHT = 38
+# Tightened from the original (84/56/84/38) to read as a compact cluster.
+_PAD_OUTER = 6
+_H_CELL_WIDTH = 68            # one number + title below
+_H_HEIGHT = 50
+_V_CELL_WIDTH = 68
+_V_ROW_HEIGHT = 30
 _V_SEP_HEIGHT = 1
+
+# Rounded backdrop corners (overlay px, unscaled) — matches the Live Tracker.
+_CORNER_RADIUS = 5
 
 # Alarm pulse — 2 Hz sine wave on the DPS cell when active.
 _ALARM_BLINK_HZ = 2.0
@@ -57,6 +61,13 @@ _ALARM_BLINK_HZ = 2.0
 # Bg fill — solid dark, the alpha channel does the work. Premultiplied at
 # `_draw_background`.
 _BG_FILL_RGB = (10, 10, 10)
+_BG_BORDER_RGB = (51, 51, 51)        # 1 px frame edge (only visible with bg)
+_CHROME_FG = (68, 68, 68)            # lock indicator (TK_COLORS['border'])
+
+# Chrome hit-test box in overlay-local coords — mirrors the Live Tracker.
+_CHROME_HIT_W = 16
+_CHROME_HIT_H = 16
+_CHROME_PAD = 2
 
 
 # =========================================================================== #
@@ -205,12 +216,13 @@ def _draw_solo_cell(
     x, y, w, h = bounds
     cx = x + w // 2
     if show_label and label:
-        cy_number = y + round(h * 0.42)
-        cy_label = y + round(h * 0.78)
+        cy_number = y + round(h * 0.40)
+        cy_label = y + round(h * 0.80)
         _draw_stroked_text(draw, (cx, cy_number), text, ctx.font, color)
         draw.text(
             (cx, cy_label), label, font=ctx.label_font,
             fill=_Palette.LABEL, anchor="mm",
+            stroke_width=1, stroke_fill=_Palette.STROKE,
         )
     else:
         cy = y + h // 2
@@ -300,6 +312,7 @@ class DeepsOverlay:
         root: tk.Misc,
         settings: dict,
         on_position_changed: Callable[[int, int, bool], None] | None = None,
+        on_lock_changed: Callable[[bool], None] | None = None,
     ) -> None:
         # Mutable state
         self._layout: str = settings.get("layout", "horizontal")
@@ -324,6 +337,7 @@ class DeepsOverlay:
         )
 
         self._on_position_changed_external = on_position_changed
+        self._on_lock_changed = on_lock_changed
 
         # Compute initial pane size from the current layout + font.
         w, h = self._compute_size()
@@ -334,7 +348,16 @@ class DeepsOverlay:
             width=w,
             height=h,
         )
-        self._engine.bind_drag_to_move(on_drag_end=self._on_drag_end)
+
+        # Custom input — click the lock indicator to toggle, drag elsewhere to
+        # move. Mirrors the Live Tracker overlay (minus the resize handle, since
+        # the Deeps overlay auto-sizes from its font + visible cells).
+        self._drag_mode: str | None = None  # None | "move"
+        self._drag_anchor_x = 0
+        self._drag_anchor_y = 0
+        self._engine.root.bind("<Button-1>", self._on_press)
+        self._engine.root.bind("<B1-Motion>", self._on_drag)
+        self._engine.root.bind("<ButtonRelease-1>", self._on_release)
 
         if self._positioned:
             self._engine.set_position(self._x, self._y)
@@ -441,12 +464,54 @@ class DeepsOverlay:
         self._y = 50
         self._engine.set_position(self._x, self._y)
 
-    def _on_drag_end(self, x: int, y: int) -> None:
-        self._x = x
-        self._y = y
+    def _hit_test(self, x: int, y: int) -> str:
+        """Map a click in overlay-local coords to an interaction zone."""
+        if self._engine.is_locked():
+            return "none"
+        lx1, ly1, lx2, ly2 = self._lock_bounds(self._engine.width, self._engine.height)
+        if lx1 <= x <= lx2 and ly1 <= y <= ly2:
+            return "lock"
+        return "move"
+
+    def _on_press(self, event: tk.Event) -> None:
+        if self._engine.is_locked():
+            return
+        local_x = event.x_root - self._engine._x
+        local_y = event.y_root - self._engine._y
+        if self._hit_test(local_x, local_y) == "lock":
+            self._drag_mode = None
+            self._toggle_lock_from_overlay()
+            return
+        self._drag_mode = "move"
+        self._drag_anchor_x = event.x_root
+        self._drag_anchor_y = event.y_root
+
+    def _on_drag(self, event: tk.Event) -> None:
+        if self._engine.is_locked() or self._drag_mode != "move":
+            return
+        dx = event.x_root - self._drag_anchor_x
+        dy = event.y_root - self._drag_anchor_y
+        self._engine.set_position(self._engine._x + dx, self._engine._y + dy)
+        self._drag_anchor_x = event.x_root
+        self._drag_anchor_y = event.y_root
+
+    def _on_release(self, _event: tk.Event) -> None:
+        if self._drag_mode != "move":
+            return
+        self._drag_mode = None
+        self._x = self._engine._x
+        self._y = self._engine._y
         self._positioned = True
         if self._on_position_changed_external is not None:
-            self._on_position_changed_external(x, y, True)
+            self._on_position_changed_external(self._x, self._y, True)
+
+    def _toggle_lock_from_overlay(self) -> None:
+        """Lock indicator clicked — flip lock, notify the panel, repaint."""
+        new_state = not self._engine.is_locked()
+        self._engine.set_locked(new_state)
+        if self._on_lock_changed is not None:
+            self._on_lock_changed(new_state)
+        self._engine.paint()
 
     # ------------------------------------------------------------------ #
     # The render callback — produces the bitmap                          #
@@ -457,11 +522,16 @@ class DeepsOverlay:
         draw = ImageDraw.Draw(image)
 
         # Bg backdrop — true per-pixel alpha, smooth across the 0.0-1.0 range.
+        # Rounded corners + a hairline frame border mirror the Live Tracker.
         if self._bg_opacity > 0.0:
             alpha = round(self._bg_opacity * 255)
-            draw.rectangle(
-                (0, 0, width, height),
+            draw.rounded_rectangle(
+                (0, 0, width - 1, height - 1), radius=_CORNER_RADIUS,
                 fill=(*_BG_FILL_RGB, alpha),
+            )
+            draw.rounded_rectangle(
+                (0, 0, width - 1, height - 1), radius=_CORNER_RADIUS,
+                outline=(*_BG_BORDER_RGB, alpha), width=1,
             )
 
         # Build the render context once per frame.
@@ -487,7 +557,30 @@ class DeepsOverlay:
         else:
             self._render_vertical(draw, width, height, ctx)
 
+        # Lock indicator (○ unlocked / ● locked), drawn last so it sits above
+        # the numbers — same affordance as the Live Tracker overlay.
+        self._draw_lock_indicator(draw, width, height)
+
         return image
+
+    def _lock_bounds(self, width: int, height: int) -> tuple[int, int, int, int]:
+        """(x1, y1, x2, y2) hit zone for the lock indicator, bottom-right."""
+        x2 = width - _CHROME_PAD
+        y2 = height - _CHROME_PAD
+        return (x2 - _CHROME_HIT_W, y2 - _CHROME_HIT_H, x2, y2)
+
+    def _draw_lock_indicator(self, draw: ImageDraw.ImageDraw, width: int, height: int) -> None:
+        """Outline circle when unlocked, filled when locked. PIL shapes (not
+        glyphs) so they render identically regardless of the selected font."""
+        x1, y1, x2, y2 = self._lock_bounds(width, height)
+        cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+        r = 4
+        fg = (*_CHROME_FG, 255)
+        bbox = (cx - r, cy - r, cx + r, cy + r)
+        if self._engine.is_locked():
+            draw.ellipse(bbox, fill=fg)
+        else:
+            draw.ellipse(bbox, outline=fg, width=1)
 
     def _render_horizontal(
         self, draw: ImageDraw.ImageDraw, width: int, height: int, ctx: _RenderContext,

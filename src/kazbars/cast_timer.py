@@ -36,8 +36,8 @@ CAST_TIMER_DEFAULTS = {
     "targetX": 910,
     "targetY": 560,
     "bold": True,
-    "fontSize": 16,
-    "display": "both",
+    "fontSize": 12,
+    "display": "elapsed",
     "color": "FFFFFF",
 }
 
@@ -47,7 +47,7 @@ _CLAMP = {
     "playerY": (620, 0, SCREEN_MAX_Y),
     "targetX": (910, 0, SCREEN_MAX_X),
     "targetY": (560, 0, SCREEN_MAX_Y),
-    "fontSize": (16, 8, 48),
+    "fontSize": (12, 8, 48),
 }
 
 
@@ -82,7 +82,7 @@ def validate_config(config):
         if key in ("enableP", "enableT", "bold"):
             result[key] = bool(value)
         elif key == "display":
-            result[key] = value if value in DISPLAY_MODES else "both"
+            result[key] = value if value in DISPLAY_MODES else CAST_TIMER_DEFAULTS["display"]
         elif key == "color":
             result[key] = validate_color(value)
         elif key in _CLAMP:
