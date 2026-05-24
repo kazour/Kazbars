@@ -23,7 +23,6 @@ from .grid_model import (
 from .ui_helpers import (
     BTN_MEDIUM,
     FONT_BODY_LG,
-    FONT_FORM_LABEL,
     FONT_SMALL,
     FONT_SMALL_BOLD,
     FONT_SYMBOL,
@@ -49,6 +48,7 @@ from .ui_widgets import (
     draw_grid_cells,
     labeled_combobox,
     labeled_spinbox,
+    position_entry,
 )
 
 
@@ -137,37 +137,17 @@ class GridEditorPanel(ttk.Frame):
         pos_frame = ttk.Frame(header)
         pos_frame.pack(side='right', padx=(0, PAD_LF))
         self.x_var = tk.StringVar(value=str(cfg.get('x', 0)))
-        self._add_position_entry(pos_frame, "X:", self.x_var, 0, max_x,
-                                 "Horizontal position on screen (pixels from left edge)",
-                                 padx=(PAD_MICRO, PAD_MID))
+        position_entry(pos_frame, "X:", self.x_var, lo=0, hi=max_x,
+                       tooltip="Horizontal position on screen (pixels from left edge)",
+                       label_color=THEME_COLORS['muted'], padx=(PAD_MICRO, PAD_MID))
         self.y_var = tk.StringVar(value=str(cfg.get('y', 0)))
-        self._add_position_entry(pos_frame, "Y:", self.y_var, 0, max_y,
-                                 "Vertical position on screen (pixels from top edge)",
-                                 padx=(PAD_MICRO, 0))
+        position_entry(pos_frame, "Y:", self.y_var, lo=0, hi=max_y,
+                       tooltip="Vertical position on screen (pixels from top edge)",
+                       label_color=THEME_COLORS['muted'], padx=(PAD_MICRO, 0))
 
         ttk.Button(header, text="Tracked Buffs...",
                    command=self._on_mode_btn_click, width=BTN_MEDIUM,
                    bootstyle='info-outline').pack(side='right', padx=(0, PAD_LF))  # type: ignore[call-arg]
-
-    def _add_position_entry(self, parent, label, var, lo, hi, tooltip, padx):
-        """Entry for screen-pixel coordinates: spinbox stepping doesn't fit thousands of px."""
-        ttk.Label(parent, text=label, font=FONT_FORM_LABEL,
-                  foreground=THEME_COLORS['muted']).pack(side='left')
-        vcmd = (self.register(lambda P, lo=lo, hi=hi: self._validate_spinbox(P, lo, hi)), '%P')
-        entry = ttk.Entry(parent, textvariable=var, width=5,
-                          validate='key', validatecommand=vcmd, justify='right')
-        entry.pack(side='left', padx=padx)
-        entry.bind('<FocusOut>',
-                   lambda e, v=var, l=lo, h=hi: self._clamp_str_int(v, l, h))
-        add_tooltip(entry, tooltip)
-
-    @staticmethod
-    def _clamp_str_int(var, lo, hi):
-        try:
-            v = int(var.get())
-        except (ValueError, tk.TclError):
-            v = lo
-        var.set(str(max(lo, min(v, hi))))
 
     def _build_top_row(self, parent):
         """Pack the Name + Rows + Cols controls."""
@@ -299,16 +279,6 @@ class GridEditorPanel(ttk.Frame):
             [label for _, label in _LAYOUT_OPTIONS], width=11,
             tooltip="In Buffs First and Debuffs First, misc effects always lead. In Mixed, all buffs sort together by time.",
             padx=(PAD_BUTTON_GAP, 0))
-
-    @staticmethod
-    def _validate_spinbox(value, from_, to):
-        if value == '' or value == '-':
-            return True
-        try:
-            int(value)
-            return True
-        except ValueError:
-            return False
 
     def load_from_config(self):
         """Populate all editor widgets from the current grid configuration dict."""

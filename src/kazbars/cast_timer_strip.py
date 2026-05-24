@@ -3,10 +3,12 @@ KazBars — Cast Timer strip.
 
 A frozen, collapsible card pinned above the grid list. Edits the cast-timer
 overlay config (the timer-only Flash overlay for player/target cast time).
-Collapsed and disabled by default — both timers off, so nothing is compiled
-into the SWF until the user turns one on.
+Collapsed and disabled by default — the master enable is off, so nothing is
+compiled into the SWF until the user turns it on.
 
-Per-side controls (Enable + X + Y) plus shared Bold / Size / Display / Color.
+The header carries one master Enabled toggle plus title-adjacent Player/Target
+status indicators; the body holds one settings row (independent Player/Target
+X/Y plus the shared Bold / Size / Display / Color controls) and a sample preview.
 Font is fixed to Arial (the only embedded face in base.swf; see cast_timer.py).
 X/Y are baked into the build: on `/loadclip` default clients they are the only
 positions that survive relaunch; aoc.exe clients additionally persist
@@ -15,6 +17,7 @@ preview-drag positions via the config archive (see cast_timer.py).
 
 import logging
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import ttk
 
 from .cast_timer import (
@@ -24,18 +27,28 @@ from .cast_timer import (
 from .grid_model import SCREEN_MAX_X, SCREEN_MAX_Y
 from .ui_helpers import (
     CAST_TIMER_ACCENT,
+    FONT_BODY_LG,
     FONT_FORM_LABEL,
     FONT_SMALL,
+    FONT_SYMBOL,
+    GRID_PREVIEW_PX,
     GRID_TYPE_COLORS,
     PAD_BUTTON_GAP,
     PAD_LF,
     PAD_MICRO,
     PAD_MID,
     PAD_ROW,
+    PAD_XS,
     THEME_COLORS,
     TK_COLORS,
 )
-from .ui_widgets import CollapsibleSection, ColorSwatch, add_tooltip, labeled_spinbox
+from .ui_widgets import (
+    CollapsibleSection,
+    ColorSwatch,
+    add_tooltip,
+    labeled_spinbox,
+    position_entry,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,14 +56,18 @@ _DISPLAY_LABELS = [("Elapsed", "elapsed"), ("Total", "total"), ("Both", "both")]
 _DISPLAY_TO_LABEL = {v: k for k, v in _DISPLAY_LABELS}
 _LABEL_TO_DISPLAY = {k: v for k, v in _DISPLAY_LABELS}
 
-# Right inset that lands the Player X/Y + toggle in the same column as a grid
-# stripe's X/Y + Enabled rail. With the matching card border + PAD_ROW content
-# inset (see _build), this strip's content edge differs from a grid card's only
-# by the scrollable list's scrollbar gutter (~16px); a grid card also reserves a
-# × delete column (~25px) right of its Enabled toggle, which this strip has none
-# of. Summed and applied as the Player toggle's right padding. Eyeball-tuned —
-# nudge if the rails drift after a layout change.
-_GRID_RAIL_INSET = 40
+# Grid cards reserve a × delete column right of their Enabled toggle and sit
+# inside the scrolled list, losing the scrollbar gutter on the right; this pinned
+# strip has neither. To land its Enabled toggle in the grid Enabled column, the
+# header mirrors the grid's trailing structure: an invisible twin of the × column
+# (an exact-spec ttk.Label, so the width tracks the real × instead of guessing it)
+# plus this padding standing in for the scrollbar the grid loses. Eyeball-tuned;
+# nudge if the toggle still drifts left/right of the grid toggles.
+_SCROLLBAR_GUTTER_PX = 11
+
+# Extra vertical padding on the (invisible) gutter so the collapsed strip matches
+# the grid cards' taller headers. Eyeball-tuned; nudge if the heights drift.
+_CARD_HEIGHT_PAD = 8
 
 
 class CastTimerStrip(ttk.Frame):
@@ -62,8 +79,7 @@ class CastTimerStrip(ttk.Frame):
         self._loading = False
         self._color = get_default_config()["color"]
 
-        self.enable_p = tk.BooleanVar()
-        self.enable_t = tk.BooleanVar()
+        self.enabled_var = tk.BooleanVar()
         self.px = tk.StringVar()
         self.py = tk.StringVar()
         self.tx = tk.StringVar()
@@ -77,9 +93,9 @@ class CastTimerStrip(ttk.Frame):
 
     # ------------------------------------------------------------------ build
     def _build(self):
-        # Bordered card, like a grid stripe — turquoise when a timer is on,
-        # neutral when both are off (matching the grid card's enabled/disabled
-        # border). Content is inset by PAD_ROW so it doesn't touch the border.
+        # Bordered card, like a grid stripe — rose when the master enable is on,
+        # neutral when off (matching the grid card's enabled/disabled border).
+        # Content is inset by PAD_ROW so it doesn't touch the border.
         self._card = tk.Frame(
             self,
             highlightbackground=CAST_TIMER_ACCENT,
@@ -88,54 +104,114 @@ class CastTimerStrip(ttk.Frame):
         )
         self._card.pack(fill="x")
 
+        # Reserve the gutter the grid cards spend on their ☰ reorder handle, so
+        # this pinned strip's title lines up with the grid titles below. The
+        # strip can't be reordered, so the slot stays empty: the same glyph + font
+        # claims the identical width without hardcoding font metrics, rendered in
+        # the card's own (live-read) colour so the glyph stays invisible whatever
+        # the surface resolves to. `ipady` also lifts the collapsed card to the
+        # grid cards' height (their headers are taller — button + spinboxes — than
+        # this strip's toggle); the gutter spans fill="y" so the section centres.
+        gutter = ttk.Label(self._card, text=" ☰ ", font=FONT_BODY_LG,
+                           foreground=self._card.cget("background"))
+        gutter.pack(side="left", fill="y", padx=(PAD_MICRO, 0), ipady=_CARD_HEIGHT_PAD)
+
         self.section = CollapsibleSection(
             self._card,
             "Cast Timer",
-            accent_color=CAST_TIMER_ACCENT,
             initially_open=False,
-            badge_text="overlay",  # stays muted — color lives on the strip + summary
         )
-        self.section.pack(fill="x", padx=PAD_ROW, pady=(PAD_BUTTON_GAP, PAD_ROW))
+        self.section.pack(side="left", fill="x", expand=True,
+                          padx=PAD_ROW, pady=(PAD_BUTTON_GAP, PAD_ROW))
 
-        # Per-side enable + X/Y live in the always-visible header so positions
-        # stay tweakable while the card is collapsed — same affordance as the
-        # grid stripes. Shared appearance controls stay in the content area.
-        self._build_header_controls(self.section.header_frame)
+        # Title-adjacent status: Player / Target light their grid-type colour
+        # when that side is live, followed by a muted "overlay" tag — so which
+        # sides are on reads at a glance without expanding. Clicking toggles the
+        # card like the rest of the header. Identity colour also rides the border.
+        # Anchor before the (empty, unused) summary frame so the tags sit flush
+        # after the title; PAD_LF leading matches a grid card's title→badge gap.
+        hl = self.section.header_left
+        anchor = self.section.summary_frame
+        self._ind_player = ttk.Label(hl, text="Player", font=FONT_SMALL)
+        self._ind_player.pack(side="left", padx=(PAD_LF, 0), before=anchor)
+        self._ind_target = ttk.Label(hl, text="Target", font=FONT_SMALL)
+        self._ind_target.pack(side="left", padx=(PAD_MID, 0), before=anchor)
+        overlay_tag = ttk.Label(hl, text="overlay", font=FONT_SMALL,
+                                foreground=THEME_COLORS["muted"])
+        overlay_tag.pack(side="left", padx=(PAD_LF, 0), before=anchor)
+        for w in (self._ind_player, self._ind_target, overlay_tag):
+            w.bind("<Button-1>", lambda e: self.section.toggle())
 
-        c = self.section.content
-
-        shared = ttk.Frame(c)
-        shared.pack(fill="x")
+        # Master Enabled toggle in the right rail, like a grid card's. To land it
+        # in the grid Enabled column, mirror the grid's trailing structure: an
+        # invisible twin of the × delete column (same widget spec → same width as
+        # the real ×) plus the scrollbar gutter the grid loses but this strip
+        # doesn't. The twin is rendered in the card colour so it stays unseen.
+        header = self.section.header_frame
+        x_twin = ttk.Label(header, text="×", font=FONT_SYMBOL,
+                           foreground=self._card.cget("background"),
+                           padding=(PAD_XS, PAD_MICRO))
+        x_twin.pack(side="right", padx=(PAD_XS, _SCROLLBAR_GUTTER_PX))
         ttk.Checkbutton(
-            shared,
-            text="Bold",
-            variable=self.bold_var,
-            command=self._changed,
+            header,
+            text="Enabled",
+            variable=self.enabled_var,
+            command=self._on_master_toggle,
+            bootstyle="success-round-toggle",  # type: ignore[call-arg]
+        ).pack(side="right", padx=(0, PAD_XS))
+
+        # Content mirrors a grid card: settings on the left, a square preview on
+        # the right. The preview shows a sample of the timer text in the chosen
+        # colour/size/weight, so the card's right edge reads like the grid cards'
+        # mini grid preview.
+        c = self.section.content
+        content_wrapper = ttk.Frame(c)
+        content_wrapper.pack(fill="x")
+        settings_col = ttk.Frame(content_wrapper)
+        settings_col.pack(side="left", fill="x", expand=True)
+        self._preview_canvas = tk.Canvas(
+            content_wrapper, width=GRID_PREVIEW_PX, height=GRID_PREVIEW_PX,
+            bg=TK_COLORS["bg"], highlightthickness=0,
+        )
+        self._preview_canvas.pack(side="right", padx=(PAD_XS, 0), pady=PAD_XS)
+
+        # All settings on one row: independent Player / Target positions, then
+        # the shared appearance controls. The master Enabled toggle (header)
+        # turns both sides on together; X/Y grey out when it's off.
+        row = ttk.Frame(settings_col)
+        row.pack(fill="x")
+        self._xy_entries = []
+        for label, x_var, y_var in (
+            ("Player", self.px, self.py),
+            ("Target", self.tx, self.ty),
+        ):
+            ttk.Label(row, text=label, font=FONT_FORM_LABEL,
+                      foreground=THEME_COLORS["muted"]).pack(side="left", padx=(0, PAD_XS))
+            self._xy_entries += [
+                position_entry(row, "X:", x_var, lo=0, hi=SCREEN_MAX_X,
+                               label_color=THEME_COLORS["muted"], on_change=self._changed,
+                               padx=(PAD_MICRO, PAD_MID)),
+                position_entry(row, "Y:", y_var, lo=0, hi=SCREEN_MAX_Y,
+                               label_color=THEME_COLORS["muted"], on_change=self._changed,
+                               padx=(PAD_MICRO, PAD_LF)),
+            ]
+
+        ttk.Checkbutton(
+            row, text="Bold", variable=self.bold_var, command=self._changed,
             bootstyle="success-round-toggle",  # type: ignore[call-arg]
         ).pack(side="left", padx=(0, PAD_MID))
 
         labeled_spinbox(
-            shared,
-            "Size:",
-            self.size_var,
-            from_=8,
-            to=48,
-            width=3,
-            tooltip="Timer text size in pixels (8-48)",
-            on_change=self._changed,
-            label_color=THEME_COLORS["muted"],
-            padx=(0, PAD_MID),
+            row, "Size:", self.size_var, from_=8, to=48, width=3,
+            tooltip="Timer text size in pixels (8-48)", on_change=self._changed,
+            label_color=THEME_COLORS["muted"], padx=(0, PAD_MID),
         )
 
-        ttk.Label(
-            shared, text="Show:", font=FONT_FORM_LABEL, foreground=THEME_COLORS["muted"]
-        ).pack(side="left")
+        ttk.Label(row, text="Show:", font=FONT_FORM_LABEL,
+                  foreground=THEME_COLORS["muted"]).pack(side="left")
         disp_cb = ttk.Combobox(
-            shared,
-            textvariable=self.display_var,
-            values=[lbl for lbl, _ in _DISPLAY_LABELS],
-            state="readonly",
-            width=8,
+            row, textvariable=self.display_var,
+            values=[lbl for lbl, _ in _DISPLAY_LABELS], state="readonly", width=8,
         )
         disp_cb.pack(side="left", padx=(PAD_MICRO, PAD_MID))
         disp_cb.bind("<<ComboboxSelected>>", lambda e: self._changed())
@@ -144,111 +220,38 @@ class CastTimerStrip(ttk.Frame):
             "Elapsed = count up (1.2). Total = estimated cast length (2.5). Both = 1.2 / 2.5.",
         )
 
-        ttk.Label(
-            shared, text="Color:", font=FONT_FORM_LABEL, foreground=THEME_COLORS["muted"]
-        ).pack(side="left")
-        self._swatch = ColorSwatch(
-            shared, initial_color=f"#{self._color}", on_change=self._on_color
-        )
+        ttk.Label(row, text="Color:", font=FONT_FORM_LABEL,
+                  foreground=THEME_COLORS["muted"]).pack(side="left")
+        self._swatch = ColorSwatch(row, initial_color=f"#{self._color}", on_change=self._on_color)
         self._swatch.pack(side="left", padx=(PAD_MICRO, 0))
         add_tooltip(self._swatch, "Timer text color (click to change)")
 
         # Description sits at the bottom of the card, like a grid card's info line.
         ttk.Label(
-            c,
+            settings_col,
             font=FONT_SMALL,
             foreground=THEME_COLORS["muted"],
             text="Cast time for player/target. Drag in-game with Shift+Ctrl+Alt "
             "to reposition.",
         ).pack(anchor="w", pady=(PAD_ROW, 0))
 
-    def _build_header_controls(self, header):
-        """One-line right-rail in the always-visible header: per-side X/Y
-        spinboxes + enable toggle. Player is rightmost (packed first) so it
-        lands in the same column as a grid stripe's X/Y + Enabled toggle;
-        Target sits to its left. So, left → right:
-        Target X/Y · Target toggle · Player X/Y · Player toggle."""
-        self._player_xy = self._side_controls(
-            header, "Player", self.enable_p, self.px, self.py,
-            trailing_pad=_GRID_RAIL_INSET,
-        )
-        self._target_xy = self._side_controls(
-            header, "Target", self.enable_t, self.tx, self.ty,
-            trailing_pad=PAD_LF,
-        )
-
-    def _side_controls(self, header, label, enable_var, x_var, y_var, trailing_pad):
-        """Pack one side's X/Y spinboxes + enable toggle (right-aligned).
-        Returns [x_entry, y_entry] so the toggle can grey them when off.
-        Geometry mirrors the grid stripe's pos_frame + Enabled rail."""
-        # width=7 pads "Player"/"Target" to the same field width as a grid
-        # stripe's "Enabled" toggle, so the X/Y column to its left lines up too.
-        ttk.Checkbutton(
-            header,
-            text=label,
-            width=7,
-            variable=enable_var,
-            command=self._on_toggle,
-            bootstyle="success-round-toggle",  # type: ignore[call-arg]
-        ).pack(side="right", padx=(0, trailing_pad))
-        pos = ttk.Frame(header)
-        pos.pack(side="right", padx=(0, PAD_LF))
-        return [self._pos_entry(pos, "X:", x_var), self._pos_entry(pos, "Y:", y_var)]
-
-    def _pos_entry(self, parent, label, var):
-        """Screen-pixel coordinate entry (spinbox stepping doesn't fit thousands
-        of px), validated to int and clamped to screen bounds on focus-out.
-        Padding mirrors the grid stripe's X/Y entries so the columns line up."""
-        hi = SCREEN_MAX_X if label == "X:" else SCREEN_MAX_Y
-        ttk.Label(
-            parent, text=label, font=FONT_FORM_LABEL, foreground=THEME_COLORS["muted"]
-        ).pack(side="left")
-        vcmd = (self.register(self._validate_int), "%P")
-        entry = ttk.Entry(
-            parent, textvariable=var, width=5, justify="right", validate="key", validatecommand=vcmd
-        )
-        entry.pack(side="left", padx=(PAD_MICRO, PAD_MID) if label == "X:" else (PAD_MICRO, 0))
-        entry.bind("<FocusOut>", lambda e, v=var, h=hi: self._clamp(v, h))
-        return entry
-
     # --------------------------------------------------------------- handlers
-    @staticmethod
-    def _validate_int(value):
-        if value in ("", "-"):
-            return True
-        try:
-            int(value)
-            return True
-        except ValueError:
-            return False
-
-    def _clamp(self, var, hi):
-        try:
-            v = int(var.get())
-        except (ValueError, tk.TclError):
-            v = 0
-        var.set(str(max(0, min(v, hi))))
-        self._changed()
-
-    def _on_toggle(self):
+    def _on_master_toggle(self):
         self._sync_enabled_state()
         self._changed()
 
     def _sync_enabled_state(self):
-        """Grey out a side's X/Y when that side's timer is off, and dim the
-        whole card when neither timer is on (the 'disabled' resting state)."""
-        for entries, on in (
-            (self._player_xy, self.enable_p.get()),
-            (self._target_xy, self.enable_t.get()),
-        ):
-            for entry in entries:
-                entry.configure(state="normal" if on else "disabled")
-        any_on = self.enable_p.get() or self.enable_t.get()
-        self.section.set_dimmed(not any_on)
-        # Border tracks the dim state: turquoise identity when active, neutral
-        # when both timers are off (mirrors a grid card's enabled/disabled border).
-        border = CAST_TIMER_ACCENT if any_on else TK_COLORS["border"]
+        """The master enable gates the strip: every X/Y is live only when it's
+        on; the card border + title dim when it's off."""
+        master = self.enabled_var.get()
+        for entry in self._xy_entries:
+            entry.configure(state="normal" if master else "disabled")
+        self.section.set_dimmed(not master)
+        # Border tracks the master: rose identity when on, neutral when off
+        # (mirrors a grid card's enabled/disabled border).
+        border = CAST_TIMER_ACCENT if master else TK_COLORS["border"]
         self._card.configure(highlightbackground=border, highlightcolor=border)
+        self._update_indicators()
 
     def _on_color(self, hex_str):
         """ColorSwatch picked a color (#RRGGBB) — store as bare hex and mark dirty."""
@@ -258,31 +261,53 @@ class CastTimerStrip(ttk.Frame):
     def _changed(self):
         if self._loading:
             return
-        self._update_summary()
+        self._update_indicators()
+        self._update_preview()
         if self.on_modified:
             self.on_modified()
 
-    def _update_summary(self):
-        """Collapsed-state summary, each side tinted by its grid-type color
-        (Player blue / Target orange) to match the cards below."""
-        p, t = self.enable_p.get(), self.enable_t.get()
-        pc, tc = GRID_TYPE_COLORS["player"], GRID_TYPE_COLORS["target"]
-        if p and t:
-            self.section.set_summary_segments([("Player", pc), (" + ", None), ("Target", tc)])
-        elif p:
-            self.section.set_summary_segments([("Player", pc)])
-        elif t:
-            self.section.set_summary_segments([("Target", tc)])
-        else:
-            self.section.set_summary("Off")
+    def _update_preview(self):
+        """Draw a sample of the timer text in the chosen colour/size/weight.
+        Arial mirrors the only face embedded in base.swf; the font shrinks to
+        fit the square canvas so large sizes still read as a single sample."""
+        canvas = self._preview_canvas
+        canvas.delete("sample")
+        disp = _LABEL_TO_DISPLAY.get(self.display_var.get(), "both")
+        sample = {"elapsed": "1.2", "total": "2.5"}.get(disp, "1.2 / 2.5")
+        try:
+            size = int(self.size_var.get())
+        except (ValueError, tk.TclError):
+            size = 18
+        font = tkfont.Font(family="Arial", size=size,
+                           weight="bold" if self.bold_var.get() else "normal")
+        while size > 7 and font.measure(sample) > GRID_PREVIEW_PX - 8:
+            size -= 1
+            font.configure(size=size)
+        canvas.create_text(
+            GRID_PREVIEW_PX // 2, GRID_PREVIEW_PX // 2,
+            text=sample, fill=f"#{self._color}", font=font, anchor="center", tags="sample",
+        )
+
+    def _update_indicators(self):
+        """Title-adjacent Player/Target tags light their grid-type colour
+        (Player blue / Target orange) when the master is on — both sides run
+        together — and grey when it's off. Matches the card colours below."""
+        master = self.enabled_var.get()
+        self._ind_player.configure(
+            foreground=GRID_TYPE_COLORS["player"] if master else TK_COLORS["dim_text"])
+        self._ind_target.configure(
+            foreground=GRID_TYPE_COLORS["target"] if master else TK_COLORS["dim_text"])
 
     # ------------------------------------------------------------ config I/O
     def get_config(self):
-        """Read widget state into a validated cast-timer config dict."""
+        """Read widget state into a validated cast-timer config dict. The master
+        Enabled toggle drives both sides together (enableP == enableT == enabled)."""
+        enabled = self.enabled_var.get()
         return validate_config(
             {
-                "enableP": self.enable_p.get(),
-                "enableT": self.enable_t.get(),
+                "enabled": enabled,
+                "enableP": enabled,
+                "enableT": enabled,
                 "playerX": self._int(self.px),
                 "playerY": self._int(self.py),
                 "targetX": self._int(self.tx),
@@ -300,8 +325,7 @@ class CastTimerStrip(ttk.Frame):
         cfg = validate_config(config)
         self._loading = True
         try:
-            self.enable_p.set(cfg["enableP"])
-            self.enable_t.set(cfg["enableT"])
+            self.enabled_var.set(cfg["enabled"])
             self.px.set(str(cfg["playerX"]))
             self.py.set(str(cfg["playerY"]))
             self.tx.set(str(cfg["targetX"]))
@@ -312,7 +336,7 @@ class CastTimerStrip(ttk.Frame):
             self._color = cfg["color"]
             self._swatch.set_color(f"#{self._color}")
             self._sync_enabled_state()
-            self._update_summary()
+            self._update_preview()
         finally:
             self._loading = False
 

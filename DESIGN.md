@@ -235,7 +235,7 @@ State colors. Semantic, never decorative.
 - **Signal Danger** (`#e74c3c`): errors, destructive confirmations, build failures.
 - **Database Nav Purple** (`#9b59b6`): the Database top-nav tab accent. One of the only places purple appears; reserved for that one role.
 - **Target Orange** (`#e67e22`): the Target grid type, paired with Player Cyan to differentiate player-vs-target grids at a glance.
-- **Cast Timer Rose** (`#CF6F93`): identity accent for the frozen Cast Timer strip pinned above the grid list (1px border + 3px strip + colored collapsed summary). A muted dusty rose, the hue furthest from the Player/Target/Database palette, so the strip reads apart from the grid cards it sits among; greys to the neutral border when both timers are off. The `overlay` badge stays muted (not tinted).
+- **Cast Timer Rose** (`#CF6F93`): identity accent for the frozen Cast Timer strip pinned above the grid list, carried by its 1px card border (greys to the neutral border via `set_dimmed` when the master enable is off). A muted dusty rose, the hue furthest from the Player/Target/Database palette, so the strip reads as its own thing among the grid cards. The **Player**/**Target** tags next to the title light in `player-cyan`/`target-orange` when the master enable is on (both sides run together) and grey when off; the `overlay` tag after them stays muted (a category label, not identity).
 
 ### Tertiary (live tracker semantics)
 

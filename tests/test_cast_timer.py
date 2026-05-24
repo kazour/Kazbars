@@ -17,6 +17,7 @@ from kazbars.grid_model import SCREEN_MAX_X, SCREEN_MAX_Y
 
 def test_defaults_disabled():
     cfg = get_default_config()
+    assert cfg["enabled"] is False
     assert cfg["enableP"] is False
     assert cfg["enableT"] is False
     assert not is_enabled(cfg)
@@ -25,11 +26,27 @@ def test_defaults_disabled():
     assert CAST_TIMER_DEFAULTS["enableP"] is False
 
 
-def test_is_enabled_either_side():
+def test_is_enabled_legacy_either_side():
+    # Configs that predate the master enable: derive from the sides.
     assert is_enabled({"enableP": True, "enableT": False})
     assert is_enabled({"enableP": False, "enableT": True})
     assert not is_enabled({"enableP": False, "enableT": False})
     assert not is_enabled({})
+
+
+def test_is_enabled_gated_by_master():
+    # With the master present, both the master and a side must be on.
+    assert is_enabled({"enabled": True, "enableP": True, "enableT": False})
+    assert not is_enabled({"enabled": False, "enableP": True, "enableT": True})
+    assert not is_enabled({"enabled": True, "enableP": False, "enableT": False})
+
+
+def test_validate_migrates_master_from_sides():
+    # No 'enabled' key → master derived from the sides.
+    assert validate_config({"enableP": True})["enabled"] is True
+    assert validate_config({"enableP": False, "enableT": False})["enabled"] is False
+    # Explicit 'enabled' is respected, not overwritten.
+    assert validate_config({"enabled": False, "enableP": True})["enabled"] is False
 
 
 def test_validate_fills_missing_and_drops_unknown():

@@ -148,7 +148,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | File | Lines | Role |
 |---|---:|---|
 | `src/kazbars/grids_panel.py` | 628 | `GridsPanel` container, toolbar, scrollable list, anchor-based `scale_to_resolution`, frozen `CastTimerStrip` pinned above the list. Per-row card lives in `grid_editor_panel.py` |
-| `src/kazbars/grid_editor_panel.py` | 647 | `GridEditorPanel` (per-row collapsible card) + module-level `_FILL_*`/`_LAYOUT_*`/`_SORT_*` option maps; X/Y spinbox bounds pulled from `game_resolution` setting |
+| `src/kazbars/grid_editor_panel.py` | 617 | `GridEditorPanel` (per-row collapsible card) + module-level `_FILL_*`/`_LAYOUT_*`/`_SORT_*` option maps; X/Y bounds pulled from `game_resolution` setting; X/Y fields built via shared `ui_widgets.position_entry` |
 | `src/kazbars/database_editor.py` | 750 | Buff DB UI (treeview, dialogs, category management). Pure data layer in `buff_database.py` |
 | `src/kazbars/grid_dialogs.py` | 874 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
 | `src/kazbars/build_loading.py` | 797 | Build-progress screen + welcome/about popups |
@@ -156,7 +156,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/buff_xml.py` | 215 | AoC HUD XML helpers (regex-only). Pure — no Tk/ttkbootstrap, importable from CI without UI extra |
 | `src/kazbars/buff_database.py` | 140 | `BuffDatabase` class — JSON load/save, in-memory indexes, search. Pure — no Tk |
 | `src/kazbars/app.py` | 611 | Entry point + `KazBarsApp` root window (widgets, menu, lifecycle) |
-| `src/kazbars/ui_widgets.py` | 867 | Widget builders, tooltips, bindings, `CollapsibleSection` (with `set_dimmed`), `ColorSwatch` (rounded swatch + themed `ColorChooserDialog`) + `create_rounded_rect`, `blend_alpha`, `flash_status_bar`, `app_toast`, `labeled_spinbox`/`labeled_combobox`, `draw_grid_cells` |
+| `src/kazbars/ui_widgets.py` | 1027 | Widget builders, tooltips, bindings, `CollapsibleSection` (with `set_dimmed`), `ColorSwatch` (rounded swatch + themed `ColorChooserDialog`) + `create_rounded_rect`, `blend_alpha`, `flash_status_bar`, `app_toast`, `labeled_spinbox`/`labeled_combobox`/`position_entry`, `draw_grid_cells` |
 | `src/kazbars/live_tracker_panel.py` | 575 | Live Tracker Toplevel orchestrator |
 | `src/kazbars/timer_overlay.py` | 542 | In-game transparent timer overlay (two-canvas docked layout, stroke rendering, click-through lock) |
 | `src/kazbars/ui_components.py` | 451 | `ToastManager` (coalesce-by-key, in-place text update), `DragReorderManager`, scrollable frame |
@@ -166,7 +166,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/first_launch.py` | 364 | First-launch dialog + post-dialog orchestrator (`run_first_launch`) |
 | `src/kazbars/custom_menu_bar.py` | 402 | Canvas-based dark menu bar (active-cascade phosphor underline; ttkb-safe Canvas spacers; supports `command`, `separator`, `checkbutton` entries) |
 | `src/kazbars/combat_monitor.py` | 294 | Combat log parser feeding the tracker |
-| `src/kazbars/cast_timer_strip.py` | 278 | Frozen `CastTimerStrip` card (collapsed + off by default): per-side Enable + X/Y, shared Bold/Size/Display/Color (font fixed to Arial) for the cast-timer overlay |
+| `src/kazbars/cast_timer_strip.py` | 348 | Frozen `CastTimerStrip` card (collapsed + master-off by default) for the cast-timer overlay. Header: one master Enabled toggle + title-adjacent Player/Target status tags + muted `overlay`. Body: a single settings row (independent Player/Target X/Y + Bold/Size/Display/Color, font fixed to Arial) + right-side sample preview. Master enables both sides together (`enableP == enableT == enabled`); X/Y grey out when off. Chrome mirrors a grid card — reserved handle gutter, shared `position_entry`, rose card border |
 | `src/kazbars/build_executor.py` | 240 | MTASC compile + deploy |
 | `build.py` | 225 | PyInstaller build driver |
 | `src/kazbars/profile_io.py` | 228 | Profile load (read+apply split, with auto-anchor-scale on resolution mismatch) / save (build+write+commit, `silent=` for piggyback saves) / new / open + missing-buff warning. Persists the `cast_timer` block alongside `grids` |

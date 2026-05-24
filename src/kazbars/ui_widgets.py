@@ -393,6 +393,64 @@ def labeled_combobox(
     return combo
 
 
+def position_entry(
+    parent,
+    label,
+    var,
+    *,
+    lo,
+    hi,
+    width=5,
+    tooltip=None,
+    on_change=None,
+    label_font=FONT_FORM_LABEL,
+    label_color=None,
+    padx=0,
+):
+    """Screen-pixel coordinate field: a label + right-justified Entry.
+
+    Spinbox stepping doesn't fit thousands of pixels, so this is a plain Entry
+    that key-validates to int (allowing transient '' / '-') and clamps to
+    [lo, hi] on focus-out. Shared by the grid cards and the cast-timer strip so
+    their X/Y columns are built identically. `on_change`, if given, fires after
+    the clamp. Returns the Entry so callers can grey it when disabled.
+    """
+    lbl = ttk.Label(parent, text=label, font=label_font)
+    if label_color:
+        lbl.configure(foreground=label_color)
+    lbl.pack(side="left")
+
+    def _validate(value):
+        if value in ("", "-"):
+            return True
+        try:
+            int(value)
+            return True
+        except ValueError:
+            return False
+
+    vcmd = (parent.register(_validate), "%P")
+    entry = ttk.Entry(
+        parent, textvariable=var, width=width, justify="right",
+        validate="key", validatecommand=vcmd,
+    )
+    entry.pack(side="left", padx=padx)
+
+    def _clamp(_evt=None):
+        try:
+            v = int(var.get())
+        except (ValueError, tk.TclError):
+            v = lo
+        var.set(str(max(lo, min(hi, v))))
+        if on_change is not None:
+            on_change()
+
+    entry.bind("<FocusOut>", _clamp)
+    if tooltip:
+        add_tooltip(entry, tooltip)
+    return entry
+
+
 def draw_grid_cells(canvas, rows, cols, type_color, area_w, area_h, tag="cells"):
     """Draw a miniature grid of colored rectangles on *canvas*."""
     canvas.delete(tag)
@@ -716,9 +774,12 @@ class CollapsibleSection(ttk.Frame):
         self.header_frame = ttk.Frame(self)
         self.header_frame.pack(fill="x")
 
-        # Clickable left side: arrow + accent + title + badge + summary
+        # Clickable left side: arrow + accent + title + badge + summary.
+        # Exposed as `header_left` so callers can pack always-visible widgets
+        # (e.g. status indicators) right after the title.
         left = ttk.Frame(self.header_frame)
         left.pack(side="left", fill="x", expand=True)
+        self.header_left = left
         clickable = [left]
 
         arrow_text = "▼" if initially_open else "▶"
@@ -753,9 +814,12 @@ class CollapsibleSection(ttk.Frame):
             clickable.append(self._badge_label)
 
         # Optional summary (shown when collapsed, hidden when expanded). A frame
-        # so it can hold one or more independently-colored segments.
+        # so it can hold one or more independently-colored segments. Exposed as
+        # `summary_frame` so callers packing into `header_left` can anchor their
+        # widgets before it (`pack(before=...)`) to sit flush after the title.
         self._summary_frame = ttk.Frame(left)
         self._summary_frame.pack(side="left", padx=(PAD_TAB, 0))
+        self.summary_frame = self._summary_frame
         clickable.append(self._summary_frame)
 
         # Keyboard accessibility — left frame is focusable

@@ -29,6 +29,10 @@ logger = logging.getLogger(__name__)
 DISPLAY_MODES = ("elapsed", "total", "both")
 
 CAST_TIMER_DEFAULTS = {
+    # Master on/off for the whole overlay. Per-side enableP/enableT pick which
+    # sides show when the master is on. Off by default — nothing compiles until
+    # the user turns it on.
+    "enabled": False,
     "enableP": False,
     "enableT": False,
     "playerX": 910,
@@ -79,7 +83,7 @@ def validate_config(config):
         if key not in config:
             continue
         value = config[key]
-        if key in ("enableP", "enableT", "bold"):
+        if key in ("enabled", "enableP", "enableT", "bold"):
             result[key] = bool(value)
         elif key == "display":
             result[key] = value if value in DISPLAY_MODES else CAST_TIMER_DEFAULTS["display"]
@@ -91,11 +95,19 @@ def validate_config(config):
                 result[key] = max(lo, min(int(value), hi))
             except (ValueError, TypeError):
                 result[key] = _default
+    # Migrate profiles that predate the master enable: derive it from the sides
+    # so an existing player/target-on config keeps rendering after the upgrade.
+    if "enabled" not in config:
+        result["enabled"] = bool(config.get("enableP")) or bool(config.get("enableT"))
     return result
 
 
 def is_enabled(config):
-    """True iff the overlay would emit any timer (player or target enabled).
-    Drives the build-time `include_cast_timer` gate — when False, no cast-timer
-    code is compiled into the SWF."""
-    return bool(config.get("enableP")) or bool(config.get("enableT"))
+    """True iff the overlay would emit any timer: the master enable is on AND at
+    least one side is on. Legacy configs that predate the master enable (no
+    `enabled` key) fall back to "any side on". Drives the build-time
+    `include_cast_timer` gate — when False, no cast-timer code is compiled."""
+    sides = bool(config.get("enableP")) or bool(config.get("enableT"))
+    if "enabled" not in config:
+        return sides
+    return bool(config.get("enabled")) and sides
