@@ -3290,6 +3290,14 @@
       ],
       "category": "#Crowd Control",
       "type": "misc"
+    },
+    {
+      "name": "Focus of the Masochis (Honorguard)",
+      "ids": [
+        5014793
+      ],
+      "category": "#T5",
+      "type": "debuff"
     }
   ]
 }
