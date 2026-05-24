@@ -1,6 +1,6 @@
 # Architectural Map
 
-**Current as of:** 2026-05-04 (after the audit-cleanup pass: pure data layer extracted (`buff_database.py` + `buff_xml.py`) so `tests/test_buff_xml.py` and `tests/test_grids_generator.py` collect without `ttkbootstrap`; `GridEditorPanel` extracted to its own module with the private `_FILL_*`/`_LAYOUT_*`/`_SORT_*` option maps; new `labeled_spinbox`, `labeled_combobox`, `draw_grid_cells` helpers in `ui_widgets` consolidating the three labeled-widget patterns from `grids_panel`; `combat_monitor` lock now actually covers `log_path`/`last_position`/`file_handle` writes; `pywinstyles` declared in deps; `update_check` URLs rebranded; `MAX_TOTAL_SLOTS` deduped; `CodeGenerator.app_version` made required; `build_grids` exception path now logs traceback. New `tests/test_cluster_isolation.py` makes the Live Tracker isolation rule load-bearing rather than aspirational.)
+**Current as of:** 2026-05-25 (after the overlay-consolidation pass: both overlays unified onto a shared `overlay_engine.HudOverlay` + `OverlayConfig`; one app-owned `focus_watcher.ForegroundWatcher` replaced the per-cluster focus polls; the foreground probe moved to a pure `foreground.py`; `paths.py` centralizes asset/app-path resolution. Inventory line counts + file list resynced against the tree, and the new `foreground`/`focus_watcher`/`paths` modules + `test_overlay_config`/`test_focus_watcher`/`test_foreground`/`test_timer_sizing`/`test_toggle_button_state`/`test_log_name` tests added to the inventory below.)
 **Purpose:** Module topology, dependencies, and coupling hotspots. Updated alongside code changes — if you edit this file, commit it with the code. `CLAUDE.md` has the short version; this file has the detail that doesn't fit there.
 
 ## Dependency clusters
@@ -79,12 +79,12 @@ pet (`Your`-prefixed lines), not team-mates' pets of the same kind.
 ### Shared overlay layer (both clusters reach through it)
 ```
 foreground       (pure ctypes probe — app_or_game_foreground)
-  ← focus_watcher (ForegroundWatcher: app-owned tick, fan-out suppression)
-  ← deeps_meter
+  ← focus_watcher (ForegroundWatcher: app-owned tick, fan-out suppression)  ← app.py
 overlay_engine   (LayeredOverlay win32 blit ← HudOverlay chrome/drag/lock/visibility ← OverlayConfig)
-  ← deeps_overlay, timer_overlay  (thin render_content + measure consumers)
+  ← deeps_overlay, timer_overlay        (thin render_content + measure consumers)
+  ← deeps_settings, live_tracker_settings  (FONT_FAMILY_CHOICES + OverlayConfig adapters)
 ```
-Both overlays render on one `HudOverlay` over the untouched `LayeredOverlay` blit; each consumer supplies a `render_content(draw, w, h)` + a `measure()` and reads/writes a shared `OverlayConfig` (per-cluster settings adapters map disk keys, which are **not** renamed). Focus-gating is a single app-owned `ForegroundWatcher` (constructed in `KazBarsApp.__init__`, stopped in `_on_close`); overlays `register`/`unregister` and expose `set_focus_suppressed`. The foreground probe lives once in pure `foreground.py` (no Tk/PIL), shared by the watcher and the Deeps meter — `MeterSnapshot` no longer carries `aoc_in_focus`. Both overlays follow **Hide-on-Stop** (visible only while monitoring) and the timer overlay **auto-sizes** from its font (no resize handle).
+Both overlays render on one `HudOverlay` over the untouched `LayeredOverlay` blit; each consumer supplies a `render_content(draw, w, h)` + a `measure()` and reads/writes a shared `OverlayConfig` (per-cluster settings adapters map disk keys, which are **not** renamed). Focus-gating is a single app-owned `ForegroundWatcher` (constructed in `KazBarsApp.__init__`, stopped in `_on_close`); overlays `register`/`unregister` and expose `set_focus_suppressed`. The foreground probe lives once in pure `foreground.py` (no Tk/PIL); only the `ForegroundWatcher` consumes it now — the Deeps meter no longer probes focus (`MeterSnapshot` dropped `aoc_in_focus`). Both overlays follow **Hide-on-Stop** (visible only while monitoring) and the timer overlay **auto-sizes** from its font (no resize handle).
 
 ### kazbars-only satellites (extracted from KazBarsApp)
 ```
@@ -99,10 +99,10 @@ These modules are consumed only by `src/kazbars/app.py` by design — they hold 
 | 15 | `ui_helpers` | Pure tokens — high fan-in is expected for shared constants. Keep the surface small. |
 | 12 | `ui_widgets` | Widest builder surface. Keep new helpers focused; don't expand unchecked. |
 |  5 | `window_position`, `settings_manager` | Small stable APIs. |
-|  4 | `ui_tk_style`, `ui_components` | Narrow surface — ripple is contained. |
-|  3 | `grid_model`, `build_utils`, `build_executor`, `build_loading`, `live_tracker_settings` | Cluster leaves. |
+|  4 | `ui_tk_style`, `ui_components`, `overlay_engine` | Narrow surface — ripple is contained. `overlay_engine` feeds both overlays + both settings adapters. |
+|  3 | `grid_model`, `build_utils`, `build_executor`, `build_loading`, `live_tracker_settings`, `paths` | Cluster leaves. `paths` is imported directly by `app.py`, `build_utils`, `deeps_parsers` (everyone else gets paths via the `app` object). |
 |  2 | `grids_generator` | |
-|  1 | `grids_panel`, `custom_menu_bar`, `profile_io`, `game_folder`, `game_resolution`, `build_action`, `database_editor`, `instructions_panel`, `first_launch`, `live_tracker_panel`, `grid_dialogs`, `boss_timer`, `timer_overlay`, `combat_monitor`, `update_check`, `settings_backup` | Each consumed by exactly one parent — low blast radius by design. |
+|  1 | `grids_panel`, `custom_menu_bar`, `profile_io`, `game_folder`, `game_resolution`, `build_action`, `database_editor`, `instructions_panel`, `first_launch`, `live_tracker_panel`, `grid_dialogs`, `boss_timer`, `timer_overlay`, `combat_monitor`, `update_check`, `settings_backup`, `foreground`, `focus_watcher` | Each consumed by exactly one parent — low blast radius by design. (`foreground` ← `focus_watcher`; `focus_watcher` ← `app.py`.) |
 
 ## Conventions
 
@@ -135,6 +135,14 @@ Plain-Python pytest cases guard the failure modes we've actually hit.
 - **`tests/test_deeps_settings.py`** — 52 cases on defaults, per-key validation, file I/O round-trip, corrupt/partial-file fallback.
 - **`tests/test_deeps_meter.py`** — 32 cases on `newest_combat_log` selection, `MeterSnapshot` shape, `_process_line` dispatch (own-pet gate + pet-toggle), lifecycle (start/stop/restart), `OLD_LOG` detection on stale files, and a Windows-only end-to-end `TAILING` check using a held-open file.
 - **`tests/test_deeps_overlay.py`** — 23 cases on the pure helpers (`_format_rate`, `_format_signed_int`, `_lerp_color`) plus the five-cell IDs and labels. Visual behaviour is covered by manual `/smoke`.
+- **`tests/test_resolution_scaling.py`** — anchor-formula regression: `grid_model.scale_grid_position` predictions for 1080p → 1440p / 4K against `Default.json` (X center-anchored, Y bottom-anchored).
+- **`tests/test_settings_backup.py`** — `settings_backup` pure layer: backup→restore byte-identity (incl. Deeps + Live Tracker settings), `*.tmp` exclusion, manifest accept/reject, prefs locator, zip-slip guard.
+- **`tests/test_overlay_config.py`** — `OverlayConfig` dataclass + per-cluster adapters (Deeps `overlay_*` keys ↔ Live Tracker bare keys) round-trip without dropping fields.
+- **`tests/test_focus_watcher.py`** — `ForegroundWatcher` tick + fan-out: registered overlays get `set_focus_suppressed` flips driven by an injected probe (no display required).
+- **`tests/test_foreground.py`** — `app_or_game_foreground`: own-process gate (any KazBars window keeps the gate open), AoC match, and the show-on-probe-failure default.
+- **`tests/test_timer_sizing.py`** — Live Tracker overlay font-derived auto-size (`_measure`) bounds across font sizes.
+- **`tests/test_toggle_button_state.py`** — pure `toggle_button_state` label/bootstyle flip shared by both panels' single Start↔Stop toggle.
+- **`tests/test_log_name.py`** — `sanitize_log_name` trims a CombatLog filename to `CombatLog_HHMM`.
 
 Run before every commit touching code or data:
 ```bash
@@ -151,21 +159,21 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/grid_editor_panel.py` | 617 | `GridEditorPanel` (per-row collapsible card) + module-level `_FILL_*`/`_LAYOUT_*`/`_SORT_*` option maps; X/Y bounds pulled from `game_resolution` setting; X/Y fields built via shared `ui_widgets.position_entry` |
 | `src/kazbars/database_editor.py` | 750 | Buff DB UI (treeview, dialogs, category management). Pure data layer in `buff_database.py` |
 | `src/kazbars/grid_dialogs.py` | 874 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
-| `src/kazbars/build_loading.py` | 797 | Build-progress screen + welcome/about popups |
-| `src/kazbars/buff_display_editor.py` | 563 | Default Buff Bars dialog (UI). Pure XML helpers in `buff_xml.py` |
+| `src/kazbars/build_loading.py` | 806 | Build-progress screen + welcome/about popups |
+| `src/kazbars/buff_display_editor.py` | 575 | Default Buff Bars dialog (UI). Pure XML helpers in `buff_xml.py` |
 | `src/kazbars/buff_xml.py` | 215 | AoC HUD XML helpers (regex-only). Pure — no Tk/ttkbootstrap, importable from CI without UI extra |
 | `src/kazbars/buff_database.py` | 140 | `BuffDatabase` class — JSON load/save, in-memory indexes, search. Pure — no Tk |
-| `src/kazbars/app.py` | 611 | Entry point + `KazBarsApp` root window (widgets, menu, lifecycle) |
-| `src/kazbars/ui_widgets.py` | 1027 | Widget builders, tooltips, bindings, `CollapsibleSection` (with `set_dimmed`), `ColorSwatch` (rounded swatch + themed `ColorChooserDialog`) + `create_rounded_rect`, `blend_alpha`, `flash_status_bar`, `app_toast`, `labeled_spinbox`/`labeled_combobox`/`position_entry`, `draw_grid_cells` |
-| `src/kazbars/live_tracker_panel.py` | 575 | Live Tracker Toplevel orchestrator |
-| `src/kazbars/timer_overlay.py` | 542 | In-game transparent timer overlay (two-canvas docked layout, stroke rendering, click-through lock) |
-| `src/kazbars/ui_components.py` | 451 | `ToastManager` (coalesce-by-key, in-place text update), `DragReorderManager`, scrollable frame |
+| `src/kazbars/app.py` | 627 | Entry point + `KazBarsApp` root window (widgets, menu, lifecycle) |
+| `src/kazbars/ui_widgets.py` | 1033 | Widget builders, tooltips, bindings, `CollapsibleSection` (with `set_dimmed`), `ColorSwatch` (rounded swatch + themed `ColorChooserDialog`) + `create_rounded_rect`, `blend_alpha`, `flash_status_bar`, `app_toast`, `labeled_spinbox`/`labeled_combobox`/`position_entry`, `draw_grid_cells` |
+| `src/kazbars/live_tracker_panel.py` | 533 | Live Tracker Toplevel orchestrator |
+| `src/kazbars/timer_overlay.py` | 387 | In-game transparent Live Tracker overlay — a `HudOverlay` consumer (`_render_content`: two text rows + cycle-timer dock with 8-direction stroke; `_measure`: font-derived auto-size, no resize handle) |
+| `src/kazbars/ui_components.py` | 454 | `ToastManager` (coalesce-by-key, in-place text update), `DragReorderManager`, scrollable frame |
 | `src/kazbars/grids_generator.py` | 579 | AS2 code generation from grid configs (optional console hooks via `include_console`; optional cast-timer overlay hooks + `d.CAST` block via `cast_config` → `include_cast_timer`). Also holds `CUSTOM_ICON_LINKAGE` (null-icon buff IDs → baked `base.swf` symbol names), emitted into `KzGridsData.CUSTOMICON` |
-| `src/kazbars/boss_timer.py` | 381 | Boss timer state + UI |
+| `src/kazbars/boss_timer.py` | 399 | Boss timer state + UI |
 | `src/kazbars/instructions_panel.py` | 403 | Help/instructions view |
 | `src/kazbars/first_launch.py` | 364 | First-launch dialog + post-dialog orchestrator (`run_first_launch`) |
 | `src/kazbars/custom_menu_bar.py` | 402 | Canvas-based dark menu bar (active-cascade phosphor underline; ttkb-safe Canvas spacers; supports `command`, `separator`, `checkbutton` entries) |
-| `src/kazbars/combat_monitor.py` | 294 | Combat log parser feeding the tracker |
+| `src/kazbars/combat_monitor.py` | 289 | Combat log parser feeding the tracker |
 | `src/kazbars/cast_timer_strip.py` | 348 | Frozen `CastTimerStrip` card (collapsed + master-off by default) for the cast-timer overlay. Header: one master Enabled toggle + title-adjacent Player/Target status tags + muted `overlay`. Body: a single settings row (independent Player/Target X/Y + Bold/Size/Display/Color, font fixed to Arial) + right-side sample preview. Master enables both sides together (`enableP == enableT == enabled`); X/Y grey out when off. Chrome mirrors a grid card — reserved handle gutter, shared `position_entry`, rose card border |
 | `src/kazbars/build_executor.py` | 240 | MTASC compile + deploy |
 | `build.py` | 225 | PyInstaller build driver |
@@ -173,35 +181,44 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/game_folder.py` | 192 | Game folder UI + Aoc.exe bypass (with install/remove reconciler) + uninstall |
 | `src/kazbars/game_resolution.py` | 104 | Game resolution dialog + anchor-rescale all loaded grids on apply |
 | `src/kazbars/settings_backup.py` | 394 | Backup & Restore dialog + pure zip layer (`write_backup_zip`/`read_manifest`/`restore_zip`, `funcom_prefs_path`, `_funcom_summary`) — bundles `%LOCALAPPDATA%\Funcom\Conan\Prefs` + KazBars `profiles/` + the whole `settings/` dir (app + Deeps + Live Tracker) into one zip; restore snapshots first, guards zip-slip, resyncs settings. Isolated satellite, no cross-imports |
-| `tests/test_buff_xml.py` | 175 | Round-trip smoke test for `buff_display_editor` XML helpers |
+| `tests/test_buff_xml.py` | 142 | Round-trip smoke test for `buff_display_editor` XML helpers |
 | `src/kazbars/build_action.py` | 170 | Build & Install flow |
-| `src/kazbars/ui_helpers.py` | 193 | Design tokens + `setup_custom_styles` + `style_treeview_heading` |
-| `src/kazbars/live_tracker_settings.py` | 168 | Tracker persistence (with one-shot legacy filename migration) |
+| `src/kazbars/ui_helpers.py` | 200 | Design tokens + `setup_custom_styles` + `style_treeview_heading` |
+| `src/kazbars/live_tracker_settings.py` | 246 | Tracker persistence (with one-shot legacy filename migration) |
 | `src/kazbars/grid_model.py` | 150 | Grid dataclasses, `parse_resolution`, `get_game_resolution_or_default`, anchor-based `scale_grid_position` (X center / Y bottom anchored) |
-| `tests/test_data_integrity.py` | 103 | Buff-ref resolution smoke test |
+| `tests/test_data_integrity.py` | 97 | Buff-ref resolution smoke test |
 | `src/kazbars/build_utils.py` | 98 | Compiler discovery + path helpers |
-| `src/kazbars/cast_timer.py` | 101 | Cast-timer overlay config (pure data): defaults, validation, `is_enabled` gate. No Tk |
-| `src/kazbars/window_position.py` | 91 | Window geometry save/restore |
+| `src/kazbars/cast_timer.py` | 113 | Cast-timer overlay config (pure data): defaults, validation, `is_enabled` gate. No Tk |
+| `src/kazbars/window_position.py` | 110 | Window geometry save/restore |
 | `src/kazbars/settings_manager.py` | 104 | `SettingsManager` (incl. `reload()` to resync in-memory state from disk after a restore), JSON helpers, settings proxy |
 | `src/kazbars/update_check.py` | 69 | Background GitHub release check + named main-thread toast dispatcher |
-| `src/kazbars/ui_tk_style.py` | 57 | Raw-tk widget styling + dark titlebar |
+| `src/kazbars/ui_tk_style.py` | 67 | Raw-tk widget styling + dark titlebar |
+| `src/kazbars/foreground.py` | 111 | Pure ctypes foreground probe (`app_or_game_foreground`) — no Tk/PIL. Shared by both clusters + the `ForegroundWatcher`; defaults to "show" on any probe failure |
+| `src/kazbars/focus_watcher.py` | 85 | `ForegroundWatcher` — one app-owned ~250 ms tick that probes foreground once and fans `set_focus_suppressed` out to every registered overlay. Replaced the per-cluster focus polls |
+| `src/kazbars/paths.py` | 47 | Path constants: `PACKAGE_ROOT`/`ASSETS`/`KAZBARS_ASSETS` (bundled read-only assets, dev + frozen) + `app_path()` (user-writable runtime root next to the .exe) |
 | `tests/test_imports.py` | 33 | Import-graph smoke test |
 | `tests/test_grids_generator.py` | 175 | `CodeGenerator.include_console` AND `include_cast_timer` (via `cast_config`) on/off output checks |
-| `tests/test_cast_timer.py` | 80 | `cast_timer` config defaults, clamping, color/enum sanitization, `is_enabled` build gate |
-| `tests/test_cluster_isolation.py` | 178 | Static-import guard for the Live Tracker AND Deeps clusters (no inbound except `app.py`; cluster imports stdlib + cluster + shared infrastructure only; no cross-import) |
+| `tests/test_cast_timer.py` | 97 | `cast_timer` config defaults, clamping, color/enum sanitization, `is_enabled` build gate |
+| `tests/test_cluster_isolation.py` | 180 | Static-import guard for the Live Tracker AND Deeps clusters (no inbound except `app.py`; cluster imports stdlib + cluster + shared infrastructure only; no cross-import) |
 | `tests/test_resolution_scaling.py` | 93 | Anchor-formula regression test (`scale_grid_position` predictions for 1080p → 1440p / 4K against `Default.json`) |
 | `tests/test_settings_backup.py` | 135 | `settings_backup` pure layer — backup→restore byte-identity (incl. Deeps + Live Tracker settings), `*.tmp` exclusion, manifest accept/reject, prefs locator, zip-slip guard |
-| `src/kazbars/deeps_panel.py` | 801 | `DeepsPanel` Toplevel — status row, Start/Stop, Lock + Layout, appearance (font + size/background sliders), Alarm & Tints thresholds, 5-cell visibility picker, pet toggle. Owns the meter + overlay + 100 ms UI tick + alarm hysteresis state machine |
-| `src/kazbars/deeps_meter.py` | 526 | `DeepsMeter` daemon thread — tail loop, log rotation detection, AoC focus polling via `CreateToolhelp32Snapshot`, `is_live` probe via `CreateFile` exclusive-share. Publishes `MeterSnapshot` |
-| `src/kazbars/deeps_overlay.py` | 527 | Five-cell numbers display (DPS out/in, HPS out/in, ΔHP in). Two layouts (horizontal/vertical), 8-direction stroke text, 2 Hz alarm pulse on DPS-out, net-HP tints, click-through lock |
-| `src/kazbars/overlay_engine.py` | 540 | Shared PIL + win32 layered-window engine (`LayeredOverlay`, `load_font`, `FONT_FAMILY_CHOICES`) — per-pixel-alpha overlay used by BOTH the Deeps and Live Tracker overlays |
+| `tests/test_overlay_config.py` | 102 | `OverlayConfig` dataclass + per-cluster adapters (Deeps `overlay_*` keys / Live Tracker bare keys) round-trip |
+| `tests/test_focus_watcher.py` | 96 | `ForegroundWatcher` tick + fan-out suppression with an injected probe (no display needed) |
+| `tests/test_foreground.py` | 95 | `app_or_game_foreground` probe — own-process gate, AoC match, show-on-probe-failure default |
+| `tests/test_timer_sizing.py` | 41 | Live Tracker overlay font-derived auto-size (`_measure`) bounds |
+| `tests/test_toggle_button_state.py` | 41 | Pure `toggle_button_state` label/bootstyle flip shared by both panels' Start↔Stop toggle |
+| `tests/test_log_name.py` | 22 | `sanitize_log_name` CombatLog filename trimming (`CombatLog-2026-05-16_2152` → `CombatLog_2152`) |
+| `src/kazbars/deeps_panel.py` | 742 | `DeepsPanel` Toplevel — status row, Start/Stop, Lock + Layout, appearance (font + size/background sliders), Alarm & Tints thresholds, 5-cell visibility picker, pet toggle. Owns the meter + overlay + 100 ms UI tick + alarm hysteresis state machine |
+| `src/kazbars/deeps_meter.py` | 426 | `DeepsMeter` daemon thread — tail loop, log rotation detection, `is_live` probe via `CreateFile` exclusive-share. Publishes `MeterSnapshot` (focus is no longer probed here — the shared `ForegroundWatcher` owns it) |
+| `src/kazbars/deeps_overlay.py` | 477 | Five-cell numbers display (DPS out/in, HPS out/in, ΔHP in). Two layouts (horizontal/vertical), 8-direction stroke text, 2 Hz alarm pulse on DPS-out, net-HP tints, click-through lock |
+| `src/kazbars/overlay_engine.py` | 830 | Shared PIL + win32 overlay engine: `LayeredOverlay` (per-pixel-alpha win32 blit) + `HudOverlay` (shared backdrop / lock chrome / drag / visibility) + `OverlayConfig` (geometry+appearance dataclass) + `load_font`/`FONT_FAMILY_CHOICES`. Both the Deeps and Live Tracker overlays are thin `render_content` + `measure` consumers |
 | `src/kazbars/deeps_parsers.py` | 408 | Pure parsers (no Tk, no threading). 5 entry points: `parse_outgoing_damage`, `parse_incoming_damage`, `parse_incoming_heal`, `parse_outgoing_heal`, `parse_pet_hit` (own-pet only). Damage/heal regexes byte-identical to `Deeps/rust/aoc-damage` + `aoc-heal` |
 | `src/kazbars/deeps_trackers.py` | 221 | `DamageOutTracker`, `DamageInTracker`, `HealsInTracker` (3-bucket per-bucket warm-up), `HealsOutTracker`, `TrackerSnapshot` |
-| `src/kazbars/deeps_settings.py` | 211 | `deeps_settings.json` defaults, per-key validation, load/save |
+| `src/kazbars/deeps_settings.py` | 242 | `deeps_settings.json` defaults, per-key validation, load/save |
 | `src/kazbars/deeps_rolling_window.py` | 81 | `RollingWindow` data structure — record/prune/sum_since/count_since/first_event |
 | `src/kazbars/assets/deeps/pets.json` | 81 | Pet-name registry — lifted from `Deeps/rust/aoc-damage/data/pets.json` |
 | `tests/test_deeps_parsers.py` | 544 | 163 behavior-table cases from Deeps's Rust tests + the own-pet gate |
-| `tests/test_deeps_meter.py` | 355 | 32 cases — file selection, lifecycle, `_process_line` dispatch, held-open-file end-to-end |
+| `tests/test_deeps_meter.py` | 354 | 32 cases — file selection, lifecycle, `_process_line` dispatch, held-open-file end-to-end |
 | `tests/test_deeps_trackers.py` | 288 | 28 cases — warm-up, decay, reset, per-bucket warm-up for heals |
 | `tests/test_deeps_settings.py` | 270 | 52 cases — defaults, validation, round-trip, corrupt-file fallback |
 | `tests/test_deeps_parity.py` | 170 | 9 cases — Python vs Rust totals over a real CombatLog (the accuracy gate) |
