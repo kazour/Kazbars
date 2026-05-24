@@ -14,6 +14,7 @@ from .ui_helpers import (
     CELL_GAP,
     CELL_PX,
     CELL_PX_LARGE,
+    FONT_BODY,
     FONT_DIALOG_HEADER,
     FONT_FORM_LABEL,
     FONT_HEADING,
@@ -21,8 +22,11 @@ from .ui_helpers import (
     FONT_SMALL,
     FONT_SMALL_BOLD,
     PAD_COLLAPSE_INDENT,
+    PAD_INNER,
     PAD_LF,
     PAD_MID,
+    PAD_ROW,
+    PAD_SMALL,
     PAD_TAB,
     PAD_TIP_BAR,
     PAD_XS,
@@ -879,3 +883,87 @@ class CollapsibleSection(ttk.Frame):
     @property
     def is_open(self):
         return self._is_open
+
+
+# =========================================================================== #
+# Settings-panel builders (shared by the Deeps + Live Tracker config panels)  #
+# =========================================================================== #
+
+def create_card(parent, title, padding=PAD_INNER):
+    """A titled section card. Thin wrapper over the `Card.TLabelframe` style so
+    both config panels group options identically."""
+    return ttk.LabelFrame(parent, text=title, style="Card.TLabelframe", padding=padding)
+
+
+def create_status_block(parent, title="Status", wraplength=0):
+    """Two-line status: a small muted title above a colored body line.
+
+    Returns the body `ttk.Label` for the caller to update via
+    `.configure(text=..., foreground=...)`.
+    """
+    ttk.Label(
+        parent, text=title, font=FONT_SMALL, foreground=THEME_COLORS["muted"],
+    ).pack(anchor="w", pady=(0, PAD_XS))
+    body = ttk.Label(
+        parent, text="", font=FONT_BODY, foreground=THEME_COLORS["body"],
+        wraplength=wraplength,
+    )
+    body.pack(anchor="w", pady=(0, PAD_ROW))
+    return body
+
+
+def create_slider_row(parent, label_text, from_, to, initial, suffix, on_drag, on_commit):
+    """One row: descriptor label · ttk.Scale · live value label.
+
+    `on_drag(value)` fires continuously while dragging (refresh the label + push
+    live, but do NOT persist); `on_commit()` fires on button/key release so a
+    drag is a single write. Returns `(scale, value_label)` — keep the scale to
+    move it programmatically (e.g. on profile load).
+    """
+    row = ttk.Frame(parent)
+    row.pack(fill="x", pady=PAD_XS)
+    ttk.Label(
+        row, text=label_text, font=FONT_BODY, foreground=THEME_COLORS["body"],
+    ).pack(side="left")
+    value_label = ttk.Label(
+        row, text=f"{initial}{suffix}", font=FONT_SMALL,
+        foreground=THEME_COLORS["muted"], width=5, anchor="e",
+    )
+    value_label.pack(side="right")
+    scale = ttk.Scale(
+        row, from_=from_, to=to, value=initial, orient="horizontal", command=on_drag,
+    )
+    scale.pack(side="left", fill="x", expand=True, padx=PAD_SMALL)
+    scale.bind("<ButtonRelease-1>", lambda _e: on_commit())
+    scale.bind("<KeyRelease>", lambda _e: on_commit())
+    return scale, value_label
+
+
+def toggle_button_state(
+    running, enabled=True, *,
+    start_label="Start Monitoring",
+    stop_label="Stop Monitoring",
+    disabled_label=None,
+):
+    """Pure mapping `(running, enabled) -> (text, bootstyle, state)` for a single
+    Start/Stop toggle button. Kept pure so it can be unit-tested without Tk."""
+    if not enabled:
+        return (disabled_label or start_label, "secondary", "disabled")
+    if running:
+        return (stop_label, "danger", "normal")
+    return (start_label, "success", "normal")
+
+
+def create_toggle_action_button(parent, command, width=None):
+    """The headline Start/Stop button (one toggle, not two buttons). Style/label
+    are applied by `refresh_toggle_button` via `toggle_button_state`."""
+    btn = ttk.Button(parent, text="Start Monitoring", bootstyle="success", command=command)
+    if width is not None:
+        btn.configure(width=width)
+    return btn
+
+
+def refresh_toggle_button(btn, running, enabled=True, **labels):
+    """Apply `toggle_button_state` to a toggle button (text + color + enabled)."""
+    text, bootstyle, state = toggle_button_state(running, enabled, **labels)
+    btn.configure(text=text, bootstyle=bootstyle, state=state)

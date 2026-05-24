@@ -25,11 +25,37 @@ import os
 import tkinter as tk
 from collections.abc import Callable
 from ctypes import wintypes
+from dataclasses import dataclass
 from functools import lru_cache
 
-from PIL import Image, ImageChops, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 logger = logging.getLogger(__name__)
+
+
+# =========================================================================== #
+# Shared overlay config                                                       #
+# =========================================================================== #
+
+@dataclass
+class OverlayConfig:
+    """The surface state every overlay's chrome + persistence layer needs.
+
+    Geometry + lock + appearance — the fields `HudOverlay` owns and persists.
+    Cluster-specific *content* (Deeps cells/thresholds, the timer's phase text)
+    stays in the consumer; it's not the engine's concern. Each settings module
+    provides adapters to/from this so the on-disk JSON schemas (which use
+    different key names) are never renamed.
+    """
+
+    x: int = 0
+    y: int = 50
+    positioned: bool = False
+    locked: bool = False
+    font_family: str = "Segoe UI"
+    font_size: int = 22
+    bg_opacity: float = 0.0
+    visible: bool = True
 
 
 # =========================================================================== #
@@ -93,89 +119,6 @@ _BI_RGB = 0
 
 _user32 = ctypes.WinDLL("user32", use_last_error=True)
 _gdi32 = ctypes.WinDLL("gdi32", use_last_error=True)
-
-
-# --------------------------------------------------------------------------- #
-# Foreground detection — the overlay visibility gate                          #
-# --------------------------------------------------------------------------- #
-# Intentionally mirrors `deeps_meter.aoc_is_foreground` instead of importing
-# it: the Deeps and Live Tracker clusters must not cross-import (enforced by
-# tests/test_cluster_isolation.py), and `overlay_engine` is the shared layer
-# both reach through.
-_TH32CS_SNAPPROCESS = 0x00000002
-_INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
-_AOC_EXE_NAMES = ("AgeOfConan.exe", "AgeOfConanDX10.exe")
-
-
-class _PROCESSENTRY32W(ctypes.Structure):
-    _fields_ = (
-        ("dwSize", wintypes.DWORD),
-        ("cntUsage", wintypes.DWORD),
-        ("th32ProcessID", wintypes.DWORD),
-        ("th32DefaultHeapID", ctypes.c_void_p),
-        ("th32ModuleID", wintypes.DWORD),
-        ("cntThreads", wintypes.DWORD),
-        ("th32ParentProcessID", wintypes.DWORD),
-        ("pcPriClassBase", wintypes.LONG),
-        ("dwFlags", wintypes.DWORD),
-        ("szExeFile", wintypes.WCHAR * 260),
-    )
-
-
-_kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-_kernel32.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
-_kernel32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
-_kernel32.Process32FirstW.argtypes = [wintypes.HANDLE, ctypes.POINTER(_PROCESSENTRY32W)]
-_kernel32.Process32FirstW.restype = wintypes.BOOL
-_kernel32.Process32NextW.argtypes = [wintypes.HANDLE, ctypes.POINTER(_PROCESSENTRY32W)]
-_kernel32.Process32NextW.restype = wintypes.BOOL
-_kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
-_kernel32.CloseHandle.restype = wintypes.BOOL
-_kernel32.GetCurrentProcessId.restype = wintypes.DWORD
-
-_user32.GetForegroundWindow.restype = wintypes.HWND
-_user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
-_user32.GetWindowThreadProcessId.restype = wintypes.DWORD
-
-
-def app_or_game_foreground() -> bool:
-    """True iff KazBars (this process) or Age of Conan owns the foreground
-    window — the gate for overlay visibility. Any probe failure returns True
-    so a transient error never hides a working overlay.
-
-    Mirrors `deeps_meter.aoc_is_foreground`; kept separate to honor the
-    Deeps / Live Tracker cluster isolation.
-    """
-    try:
-        hwnd = _user32.GetForegroundWindow()
-        if not hwnd:
-            return False
-        pid = wintypes.DWORD(0)
-        _user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-        pid_val = pid.value
-        if pid_val == 0:
-            return False
-        if pid_val == _kernel32.GetCurrentProcessId():
-            return True  # any KazBars window (panel, overlay) keeps the gate open
-
-        snap = _kernel32.CreateToolhelp32Snapshot(_TH32CS_SNAPPROCESS, 0)
-        if snap == _INVALID_HANDLE_VALUE or snap is None:
-            return True
-        try:
-            entry = _PROCESSENTRY32W()
-            entry.dwSize = ctypes.sizeof(_PROCESSENTRY32W)
-            if not _kernel32.Process32FirstW(snap, ctypes.byref(entry)):
-                return True
-            while True:
-                if entry.th32ProcessID == pid_val:
-                    return entry.szExeFile in _AOC_EXE_NAMES
-                if not _kernel32.Process32NextW(snap, ctypes.byref(entry)):
-                    return False
-        finally:
-            _kernel32.CloseHandle(snap)
-    except OSError:
-        logger.debug("app_or_game_foreground probe failed", exc_info=True)
-        return True
 
 
 class _POINT(ctypes.Structure):
@@ -470,6 +413,14 @@ class LayeredOverlay:
     def height(self) -> int:
         return self._height
 
+    @property
+    def x(self) -> int:
+        return self._x
+
+    @property
+    def y(self) -> int:
+        return self._y
+
     def set_locked(self, locked: bool) -> None:
         """Toggle OS-level click-through via `WS_EX_TRANSPARENT`."""
         self._locked = bool(locked)
@@ -641,3 +592,239 @@ class LayeredOverlay:
             _gdi32.DeleteObject(hbm)
             _gdi32.DeleteDC(mem_dc)
             _user32.ReleaseDC(None, screen_dc)
+
+
+# =========================================================================== #
+# HudOverlay — shared chrome over LayeredOverlay                              #
+# =========================================================================== #
+
+# Rounded backdrop + chrome geometry. Shared by every HUD overlay so the two
+# clusters render identical frames, lock dots, and hit zones.
+_HUD_CORNER_RADIUS = 5
+_HUD_BG_FILL_RGB = (10, 10, 10)          # near-black backdrop fill
+_HUD_BG_BORDER_RGB = (51, 51, 51)        # hairline frame border (only with bg)
+_HUD_CHROME_FG_RGB = (68, 68, 68)        # lock indicator (== TK_COLORS["border"])
+_HUD_CHROME_HIT_W = 16
+_HUD_CHROME_HIT_H = 16
+_HUD_CHROME_PAD = 2
+
+
+class HudOverlay:
+    """Shared HUD layer over `LayeredOverlay`.
+
+    Owns everything the two overlays used to reimplement in parallel: the
+    rounded backdrop, the lock indicator + drag/lock hit-testing, position
+    persistence, and the visibility model. The consumer supplies only:
+
+      - `render_content(draw, w, h)` — draws its own content on top of the
+        backdrop (the engine creates the image and composites the lock dot).
+      - `measure() -> (w, h)` — its self-sizing (font/content-derived).
+
+    Visibility is two independent booleans: `is_visible` (wanted — Start shows,
+    Stop hides) and the engine's focus suppression (set by the shared
+    `ForegroundWatcher`). Content paints only when visible AND not suppressed.
+
+    Lock-UX: while locked the window is OS-level click-through
+    (`WS_EX_TRANSPARENT`), so the lock dot cannot be clicked — we therefore draw
+    NO interactive chrome when locked and rely on the panel's Unlock button.
+    """
+
+    def __init__(
+        self,
+        parent: tk.Misc,
+        config: OverlayConfig,
+        *,
+        render_content: Callable[[ImageDraw.ImageDraw, int, int], None],
+        measure: Callable[[], tuple[int, int]],
+        on_config_changed: Callable[[OverlayConfig], None] | None = None,
+    ) -> None:
+        self._config = config
+        self._render_content = render_content
+        self._measure = measure
+        self._on_config_changed = on_config_changed
+        self._is_visible = False
+        self._drag_mode: str | None = None  # None | "move"
+        self._drag_anchor_x = 0
+        self._drag_anchor_y = 0
+
+        w, h = self._measure()
+        self._engine = LayeredOverlay(parent, render_callback=self._render, width=w, height=h)
+        self._engine.root.bind("<Button-1>", self._on_press)
+        self._engine.root.bind("<B1-Motion>", self._on_drag)
+        self._engine.root.bind("<ButtonRelease-1>", self._on_release)
+
+        if config.positioned:
+            self._engine.set_position(config.x, config.y)
+        else:
+            self._center_on_screen()
+        self._engine.set_locked(config.locked)
+
+    # ------------------------------------------------------------------ #
+    # Public API                                                          #
+    # ------------------------------------------------------------------ #
+
+    @property
+    def config(self) -> OverlayConfig:
+        return self._config
+
+    @property
+    def x(self) -> int:
+        return self._engine.x
+
+    @property
+    def y(self) -> int:
+        return self._engine.y
+
+    @property
+    def is_visible(self) -> bool:
+        return self._is_visible
+
+    def show(self) -> None:
+        self._is_visible = True
+        self._engine.show()
+
+    def hide(self) -> None:
+        self._is_visible = False
+        self._engine.hide()
+
+    def set_focus_suppressed(self, suppressed: bool) -> None:
+        """Focus gate (driven by the shared ForegroundWatcher). Holds the
+        surface blank while suppressed; repaints on un-suppress only if the
+        overlay is wanted-visible."""
+        if self._engine.set_suppressed(suppressed) and not suppressed and self._is_visible:
+            self._engine.paint()
+
+    def request_paint(self) -> None:
+        """Repaint now — only if wanted-visible. No-ops while hidden or
+        focus-suppressed, so a content update (e.g. a new phase dict) can never
+        un-hide the overlay."""
+        if self._is_visible:
+            self._engine.paint()
+
+    def resize(self) -> None:
+        """Re-measure, resize the surface, repaint. Consumers call this after a
+        content or appearance change that affects size."""
+        w, h = self._measure()
+        self._engine.set_size(w, h)
+        self._engine.set_position(self._engine.x, self._engine.y)
+        self._engine.paint()
+
+    def set_locked(self, locked: bool) -> None:
+        """Set lock state (quiet — does NOT fire on_config_changed). Used by the
+        panel Lock button, which persists separately."""
+        self._config.locked = bool(locked)
+        self._engine.set_locked(self._config.locked)
+        self._engine.paint()
+
+    def is_locked(self) -> bool:
+        return self._engine.is_locked()
+
+    def set_position(self, x: int, y: int) -> None:
+        self._config.x = int(x)
+        self._config.y = int(y)
+        self._engine.set_position(x, y)
+
+    def destroy(self) -> None:
+        self._engine.destroy()
+
+    # ------------------------------------------------------------------ #
+    # Input — drag to move, click the dot to lock                         #
+    # ------------------------------------------------------------------ #
+
+    def _lock_bounds(self) -> tuple[int, int, int, int]:
+        x2 = self._engine.width - _HUD_CHROME_PAD
+        y2 = self._engine.height - _HUD_CHROME_PAD
+        return (x2 - _HUD_CHROME_HIT_W, y2 - _HUD_CHROME_HIT_H, x2, y2)
+
+    def _hit_test(self, x: int, y: int) -> str:
+        if self._engine.is_locked():
+            return "none"
+        lx1, ly1, lx2, ly2 = self._lock_bounds()
+        if lx1 <= x <= lx2 and ly1 <= y <= ly2:
+            return "lock"
+        return "move"
+
+    def _on_press(self, event: tk.Event) -> None:
+        if self._engine.is_locked():
+            return
+        local_x = event.x_root - self._engine.x
+        local_y = event.y_root - self._engine.y
+        if self._hit_test(local_x, local_y) == "lock":
+            self._drag_mode = None
+            self._toggle_lock()
+            return
+        self._drag_mode = "move"
+        self._drag_anchor_x = event.x_root
+        self._drag_anchor_y = event.y_root
+
+    def _on_drag(self, event: tk.Event) -> None:
+        if self._engine.is_locked() or self._drag_mode != "move":
+            return
+        dx = event.x_root - self._drag_anchor_x
+        dy = event.y_root - self._drag_anchor_y
+        self.set_position(self._engine.x + dx, self._engine.y + dy)
+        self._drag_anchor_x = event.x_root
+        self._drag_anchor_y = event.y_root
+
+    def _on_release(self, _event: tk.Event) -> None:
+        if self._drag_mode != "move":
+            return
+        self._drag_mode = None
+        self._config.x = self._engine.x
+        self._config.y = self._engine.y
+        self._config.positioned = True
+        self._notify()
+
+    def _toggle_lock(self) -> None:
+        self._config.locked = not self._engine.is_locked()
+        self._engine.set_locked(self._config.locked)
+        self._engine.paint()
+        self._notify()
+
+    def _notify(self) -> None:
+        if self._on_config_changed is not None:
+            self._on_config_changed(self._config)
+
+    def _center_on_screen(self) -> None:
+        try:
+            screen_w = self._engine.root.winfo_screenwidth()
+        except tk.TclError:
+            screen_w = 1920
+        self._config.x = screen_w // 2 - self._engine.width // 2
+        self._config.y = 50
+        self._engine.set_position(self._config.x, self._config.y)
+
+    # ------------------------------------------------------------------ #
+    # Render — backdrop, consumer content, lock dot                       #
+    # ------------------------------------------------------------------ #
+
+    def _render(self, width: int, height: int) -> Image.Image:
+        image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(image)
+
+        # Shared backdrop — per-pixel alpha; rounded corners + hairline border.
+        if self._config.bg_opacity > 0.0:
+            alpha = round(self._config.bg_opacity * 255)
+            draw.rounded_rectangle(
+                (0, 0, width - 1, height - 1), radius=_HUD_CORNER_RADIUS,
+                fill=(*_HUD_BG_FILL_RGB, alpha),
+            )
+            draw.rounded_rectangle(
+                (0, 0, width - 1, height - 1), radius=_HUD_CORNER_RADIUS,
+                outline=(*_HUD_BG_BORDER_RGB, alpha), width=1,
+            )
+
+        self._render_content(draw, width, height)
+
+        # Lock dot last (above content). Only when unlocked — a locked overlay
+        # is click-through, so a drawn dot would be a dead button.
+        if not self._engine.is_locked():
+            self._draw_lock_indicator(draw)
+        return image
+
+    def _draw_lock_indicator(self, draw: ImageDraw.ImageDraw) -> None:
+        x1, y1, x2, y2 = self._lock_bounds()
+        cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+        r = 4
+        draw.ellipse((cx - r, cy - r, cx + r, cy + r),
+                     outline=(*_HUD_CHROME_FG_RGB, 255), width=1)

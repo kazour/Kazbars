@@ -5,9 +5,10 @@ Defines Live Tracker overlay settings, defaults, and validation.
 
 import json
 import logging
+import re
 from pathlib import Path
 
-from .overlay_engine import FONT_FAMILY_CHOICES
+from .overlay_engine import FONT_FAMILY_CHOICES, OverlayConfig
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ TIMERS_RANGES = {
     "width":      {"min": 150,  "max": 600,   "step": 1},
     "height":     {"min": 60,   "max": 300,   "step": 1},
     "bg_opacity": {"min": 0.0,  "max": 1.0,   "step": 0.05},
-    "font_size":  {"min": 8,    "max": 20,    "step": 1},
+    "font_size":  {"min": 12,   "max": 48,    "step": 1},
 }
 
 
@@ -57,6 +58,23 @@ TIMERS_RANGES = {
 def get_default_settings():
     """Return a copy of the default timers settings."""
     return dict(TIMERS_DEFAULTS)
+
+
+_LOG_NAME_RE = re.compile(r"^(CombatLog)-\d{4}-\d{2}-\d{2}_(\d{4})(?:\.\w+)?$")
+
+
+def sanitize_log_name(name):
+    """Trim a combat-log filename for display.
+
+    'CombatLog-2026-05-16_2152.txt' -> 'CombatLog_2152' (drop the date, keep
+    the time). Accepts a bare name or a full path. Anything that doesn't match
+    the AoC pattern falls back to the stem (no directory, no extension).
+    """
+    base = Path(name).name
+    m = _LOG_NAME_RE.match(base)
+    if m:
+        return f"{m.group(1)}_{m.group(2)}"
+    return Path(base).stem
 
 
 def validate_setting(key, value):
@@ -165,6 +183,34 @@ def load_settings(settings_folder):
         logger.debug("Could not load live tracker settings: %s", e)
 
     return get_default_settings()
+
+
+def overlay_config_from_timer(settings):
+    """Build an `OverlayConfig` from the Live Tracker bare keys."""
+    return OverlayConfig(
+        x=int(settings.get("x", TIMERS_DEFAULTS["x"])),
+        y=int(settings.get("y", TIMERS_DEFAULTS["y"])),
+        positioned=bool(settings.get("positioned", False)),
+        locked=bool(settings.get("locked", False)),
+        font_family=str(settings.get("font_family", TIMERS_DEFAULTS["font_family"])),
+        font_size=int(settings.get("font_size", TIMERS_DEFAULTS["font_size"])),
+        bg_opacity=float(settings.get("bg_opacity", TIMERS_DEFAULTS["bg_opacity"])),
+        visible=bool(settings.get("visible", TIMERS_DEFAULTS["visible"])),
+    )
+
+
+def overlay_config_to_timer(cfg):
+    """Project an `OverlayConfig` onto the Live Tracker bare keys."""
+    return {
+        "x": cfg.x,
+        "y": cfg.y,
+        "positioned": cfg.positioned,
+        "locked": cfg.locked,
+        "font_family": cfg.font_family,
+        "font_size": cfg.font_size,
+        "bg_opacity": cfg.bg_opacity,
+        "visible": cfg.visible,
+    }
 
 
 def save_settings(settings_folder, settings):

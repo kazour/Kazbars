@@ -171,15 +171,15 @@ Trigger: User clicks the "⏱ Ethram-Fal" button in the bottom bar (right side, 
 
 Steps:
 1. `_open_boss_timer()` — src/kazbars/app.py:412 — checks `_boss_timer_if_alive()`; if a panel exists, deiconifies/lifts/restores the overlay; otherwise constructs a new `LiveTrackerPanel`
-2. `LiveTrackerPanel.__init__()` — src/kazbars/live_tracker_panel.py:74 — runs the one-shot `_migrate_window_position_key()` (renames legacy `window_pos_boss_timer` → `window_pos_live_tracker`); sets `transient(parent)`; restores window position; calls `load_settings()`; builds UI; creates overlay; starts the overlay focus-gate (`_focus_tick`, runs every `FOCUS_TICK_MS` for the panel's whole life and hides the overlay whenever neither KazBars nor AoC is foreground); constructs `BossTimer` and `CombatLogMonitor`; auto-detects log path
+2. `LiveTrackerPanel.__init__()` — src/kazbars/live_tracker_panel.py — runs the one-shot `_migrate_window_position_key()` (renames legacy `window_pos_boss_timer` → `window_pos_live_tracker`); sets `transient(parent)`; restores window position; calls `load_settings()`; builds UI; creates overlay and **registers it with the app's `ForegroundWatcher`** (the single shared focus gate, owned by `KazBarsApp`, that hides every overlay whenever neither KazBars nor AoC is foreground); constructs `BossTimer` and `CombatLogMonitor`; auto-detects log path
 3. `load_settings()` — src/kazbars/live_tracker_settings.py:119 — runs the one-shot `_migrate_legacy_filename()` (renames legacy `timers_settings.json` → `live_tracker_settings.json`); reads `live_tracker_settings.json` from the settings folder; returns dict validated against `TIMERS_DEFAULTS` and `TIMERS_RANGES`
 4. `BossTimer.__init__()` — src/kazbars/boss_timer.py:53 — initializes cycle state fields and `_last_phase = None` (the source-side dedupe cache); stores `LiveTrackerPanel._dispatch_overlay_update` (src/kazbars/live_tracker_panel.py:121) as `_update_callback` — that method hops cross-thread updates onto the Tk main loop via `self.after(0, partial(_apply_overlay_update, phase))` (src/kazbars/live_tracker_panel.py:127)
 5. `CombatLogMonitor.__init__()` — src/kazbars/combat_monitor.py:34 — initializes daemon thread state; stores the `boss_timer` reference
-6. `TimerOverlay.__init__()` — src/kazbars/timer_overlay.py:62 — creates always-on-top `Toplevel` with configured opacity and position; calls `_build_ui()` which packs a two-canvas docked layout (top `text_canvas` for rows 1+2, 1px separator frame, bottom fixed-height `cycle_timer_canvas` hosting cycle timer + lock indicator (●/○, clickable to lock; click-through blocks the unlock direction) + resize handle); auto-centers on first run when `positioned=False`; auto-shows on launch via `show(notify=False)` (preserves any saved `visible=False` preference)
-7. `LiveTrackerPanel._update_log_path()` — src/kazbars/live_tracker_panel.py:297 — calls `combat_monitor.set_log_folder()` with the current game path
+6. `TimerOverlay.__init__()` — src/kazbars/timer_overlay.py — builds an `OverlayConfig` from settings and constructs a `HudOverlay` (shared backdrop + lock dot + drag over `LayeredOverlay`); supplies `_render_content` (two text rows + cycle-timer dock; an 8-direction stroke keeps text legible) and `_measure` (font-derived auto-size — no resize handle). Hidden on open (Hide-on-Stop) — Start shows it
+7. `LiveTrackerPanel._update_log_path()` — src/kazbars/live_tracker_panel.py — calls `combat_monitor.set_log_folder()` with the current game path; sets the overlay's waiting-state footer to the sanitized log name (`CombatLog_2152`)
 8. `CombatLogMonitor.set_log_folder()` — src/kazbars/combat_monitor.py:51 — finds latest `CombatLog*.txt` in the game folder; records file end position as `last_position`
 
-End state: `LiveTrackerPanel` window visible; `TimerOverlay` shown (auto-hidden by `_focus_tick` while neither KazBars nor AoC is the foreground window — `overlay_engine.app_or_game_foreground()` gate, mirroring the Deeps overlay); `CombatLogMonitor` ready with log file path set; overlay shows monitor + log status
+End state: `LiveTrackerPanel` window visible; `TimerOverlay` hidden until Start (focus-gated by the app-owned `ForegroundWatcher` via `foreground.app_or_game_foreground()`, shared with the Deeps overlay); `CombatLogMonitor` ready with log folder set; panel shows monitor + sanitized log status
 
 ---
 
@@ -188,7 +188,7 @@ End state: `LiveTrackerPanel` window visible; `TimerOverlay` shown (auto-hidden 
 Trigger: User clicks "Start Monitoring" button in `LiveTrackerPanel`
 
 Steps:
-1. `LiveTrackerPanel._start_monitoring()` — src/kazbars/live_tracker_panel.py:349 — re-runs `_update_log_path()` (which calls `combat_monitor.set_log_folder()` to refresh `log_path` and `last_position`); toasts a warning if no log file is found; disables the Test Cycle button so the two modes are mutually exclusive
+1. `LiveTrackerPanel._start_monitoring()` — src/kazbars/live_tracker_panel.py — re-runs `_update_log_path()`; calls `combat_monitor.start_monitoring()` (needs only a game folder — it waits for a log if AoC hasn't created today's yet, so no "no log" bail); shows the overlay; disables Test Cycle so the two modes are mutually exclusive. Reached via the single Start↔Stop toggle (`_on_start_stop_click`)
 2. `CombatLogMonitor.start_monitoring()` — src/kazbars/combat_monitor.py:122 — sets `monitoring=True`; spawns the `CombatLogMonitor` daemon thread running `_monitor_loop()`
 3. `BossTimer.push_waiting_state()` — src/kazbars/boss_timer.py:199 — builds the idle phase dict via `_phase()`, caches it on `_last_phase`, and fires `_update_callback(phase)`
 4. `LiveTrackerPanel._dispatch_overlay_update()` — src/kazbars/live_tracker_panel.py:121 — named cross-thread dispatcher; queues `partial(_apply_overlay_update, phase)` on the Tk main loop via `self.after(0, ...)`. `_apply_overlay_update()` (src/kazbars/live_tracker_panel.py:127) calls `self.overlay.update_display(phase)` if the overlay still exists
@@ -204,7 +204,7 @@ End state: `CombatLogMonitor` daemon thread running; 50ms UI poll active; overla
 Trigger: `CombatLogMonitor` daemon thread reads a new log line containing "Viscous Seed", "Lotus Fixation", or "Syphon hits"
 
 Steps:
-1. `CombatLogMonitor._monitor_loop()` — src/kazbars/combat_monitor.py:196 — polls log file every 100ms; checks every 30s for a newer log file; handles truncation/rotation; reads bytes since `last_position`; dispatches matching lines to `_process_line()`
+1. `CombatLogMonitor._monitor_loop()` — src/kazbars/combat_monitor.py — polls the log every 100ms; checks every ~3s for a newer log file (auto-switches, dropping the stale one); waits (scanning) if no log exists yet; handles truncation/rotation; reads bytes since `last_position`; dispatches matching lines to `_process_line()`
 2. `CombatLogMonitor._process_line()` — src/kazbars/combat_monitor.py:245 — identifies trigger type (Syphon → `start_syphon`, Viscous Seed from Ethram-Fal → `start_cycle`, Lotus Fixation from Emerald Lotus → `update_fixation`); extracts player name (or "YOU") from the line text via `_extract_player()`
 3. `BossTimer.start_cycle()` — src/kazbars/boss_timer.py:85 — calls `_reset_cycle_state()` then sets `timer_active=True`; records `cycle_start_time` and `seed_player`; detects double-seed (P4) when called 5–12s after the previous seed for the same player
 4. `BossTimer.update_display()` — src/kazbars/boss_timer.py:186 — called from the 50 ms UI loop; calls `get_current_phase()`; compares the result to the cached `_last_phase` and short-circuits if equal (skips ~19 of every 20 ticks once the integer second is steady), otherwise fires `_update_callback(phase)` with the new dict
@@ -300,18 +300,19 @@ Trigger: User clicks the `⚔ Deeps` button in the bottom bar, then clicks `Star
 Steps:
 1. `KazBarsApp._open_deeps_panel()` — src/kazbars/app.py — one-line delegator to `open_deeps_panel(self)`. Mirrors `_open_boss_timer`.
 2. `open_deeps_panel(app)` — src/kazbars/deeps_panel.py — single-instance gate: if `app.deeps_panel` exists and `winfo_exists()`, deiconify + lift + focus + `restore_overlay()` and return. Otherwise construct a fresh `DeepsPanel`.
-3. `DeepsPanel.__init__()` — src/kazbars/deeps_panel.py — `restore_window_position("deeps", …)`; loads `deeps_settings.json` via `load_settings()`; constructs `DeepsMeter()` (not started); passes `include_pet_damage` from settings into the meter; builds the UI (CRT header, status row, Start/Stop, Overlay row with Lock + layout radio, Appearance LabelFrame with font combobox + size & background sliders, Overlay-cells picker with 5 checkboxes, Alarm & Tints LabelFrame with 3 Spinboxes, pet checkbox + note); calls `_create_overlay()` to build the hidden `DeepsOverlay`; renders the initial idle status line.
+3. `DeepsPanel.__init__()` — src/kazbars/deeps_panel.py — `restore_window_position("deeps", …)`; loads `deeps_settings.json` via `load_settings()`; constructs `DeepsMeter()` (not started); passes `include_pet_damage` from settings into the meter; builds the UI via the shared `ui_widgets` builders (CRT header, status block, single Start↔Stop toggle, Overlay row with Lock + layout radio, Appearance card with size & background sliders — font is fixed to Segoe UI, no picker — Overlay-cells picker, Alarm & Tints card with 3 Spinboxes, pet checkbox + note); calls `_create_overlay()` to build the hidden `DeepsOverlay` and **register it with the app's `ForegroundWatcher`**; renders the initial idle status line.
 4. User clicks Start Monitoring → `_on_start_stop_click()` → `_start_monitoring()`:
    - `meter.set_include_pet_damage(self._pet_var.get())` — propagate the current checkbox state
    - `meter.start(game_path)` — `DeepsMeter` resets trackers, spawns the `deeps-meter` daemon thread, returns
-   - `_refresh_start_button()` — swap to "Stop Monitoring" + danger bootstyle
+   - `overlay.show()` — wanted-visible (the `ForegroundWatcher` still gates on focus)
+   - `_refresh_start_button()` — swap to "Stop Monitoring" + danger bootstyle (via shared `refresh_toggle_button`)
    - `_begin_tick()` — schedule `self.after(100, self._tick)`
-5. **Meter thread** — src/kazbars/deeps_meter.py — outer loop scans `game_folder` for the newest `CombatLog-*.txt`; `is_live(path)` probes via Windows `CreateFile(share_mode=0)` (sharing violation = AoC holds it). On live: enters the tail loop, reads lines from EOF, strips timestamp, dispatches to all five parsers (outgoing/incoming damage, incoming/outgoing heal, own-pet hit); matches go into the four trackers under the shared lock. On 100 ms tick: polls `aoc_is_foreground()` via `CreateToolhelp32Snapshot`; rebuilds `_snapshot`.
+5. **Meter thread** — src/kazbars/deeps_meter.py — outer loop scans `game_folder` for the newest `CombatLog-*.txt`; `is_live(path)` probes via Windows `CreateFile(share_mode=0)` (sharing violation = AoC holds it). On live: enters the tail loop, reads lines from EOF, strips timestamp, dispatches to all five parsers (outgoing/incoming damage, incoming/outgoing heal, own-pet hit); matches go into the four trackers under the shared lock. On 100 ms tick: rebuilds `_snapshot` (the meter no longer probes focus — the shared `ForegroundWatcher` owns that).
 6. **UI tick** (every 100 ms on the Tk main thread) — `DeepsPanel._tick()`:
    - `meter.snapshot()` — read latest `MeterSnapshot` under the meter's lock
    - `_render_status(snapshot)` — colored line per status (idle/waiting/old/tailing)
    - `_update_alarm_state(snapshot)` — hysteresis: on at `dps >= alarm_threshold`, off at `dps < alarm_threshold * 0.9`
-   - `_update_overlay(snapshot)` — if `aoc_in_focus`: `overlay.show()` + `overlay.paint(snapshot, time.monotonic())`; else `overlay.hide()`
+   - `_update_overlay(snapshot)` — pushes alarm + a single `overlay.paint(snapshot, time.monotonic())` (no focus branch; `paint()` no-ops while the watcher has it focus-suppressed)
    - Reschedule via `after(100, self._tick)`
 7. **Overlay paint** — src/kazbars/deeps_overlay.py — `paint()` renders a PIL RGBA bitmap (pushed to the win32 layered window by `overlay_engine.LayeredOverlay`) with the visible cells in the chosen layout (horizontal row or vertical stack), each a single number with an 8-direction dark stroke. The five cells are DPS out, DPS in, HPS out, HPS in, and ΔHP in. The DPS-out cell is white by default; if alarm-active, lerps to red via a 2 Hz sine wave on `now`. The HPS-in cell (and ΔHP in) tints sage green when `net > hpis_green_threshold`; the DPS-in cell (and ΔHP in) tints warm orange when `-net > dpis_yellow_threshold`. Otherwise cells stay white.
 
@@ -323,15 +324,17 @@ End state: meter daemon thread is parsing combat log; overlay shows numbers when
 
 Trigger: User alt-tabs away from AoC (to a browser, Discord, KazBars, anything else).
 
+This is now a shared mechanism — the same `ForegroundWatcher` gates the Ethram-Fal overlay identically.
+
 Steps:
-1. **Meter thread** — src/kazbars/deeps_meter.py — every 100 ms tick calls `aoc_is_foreground()`. On focus change away from AoC + away from this process's own windows, `aoc_in_focus` flips to False under the lock.
-2. **UI tick** — src/kazbars/deeps_panel.py — `_update_overlay(snapshot)` reads `snapshot.aoc_in_focus = False` and calls `self.overlay.hide()`.
-3. `DeepsOverlay.hide()` — src/kazbars/deeps_overlay.py — delegates to `self._engine.hide()` (the `overlay_engine.LayeredOverlay` win32 layered window). The overlay comes off-screen; the meter keeps tailing.
-4. User alt-tabs back to AoC → meter detects focus → `_update_overlay` calls `overlay.show()` + `overlay.paint(...)` → overlay reappears with the current numbers.
+1. **ForegroundWatcher tick** — src/kazbars/focus_watcher.py — the app-owned watcher ticks every ~250 ms on the Tk main loop, calling `foreground.app_or_game_foreground()` once. On focus change away from AoC + away from this process's own windows, the probe returns False.
+2. The watcher calls `set_focus_suppressed(True)` on every registered overlay. `DeepsOverlay.set_focus_suppressed()` (src/kazbars/deeps_overlay.py) forwards to `HudOverlay`, which is state-guarded: it blanks the surface exactly once (one transparent `LayeredOverlay` blit), not every tick.
+3. The Deeps meter keeps tailing; the 100 ms UI tick keeps calling `paint()`, which no-ops while suppressed (so no work + no re-blank spam).
+4. User alt-tabs back to AoC → next watcher tick → `set_focus_suppressed(False)` → `HudOverlay` repaints if the overlay is wanted-visible → it reappears with the current numbers.
 
-Subtle: clicking on the overlay itself (to drag when unlocked) DOES count as "in focus" — `aoc_is_foreground()` checks against `GetCurrentProcessId()` first, so any window owned by KazBars (the overlay, the panel, the main app) keeps the show-gate open. That's what makes drag-to-position work without the overlay disappearing mid-drag.
+Subtle: clicking the overlay itself (to drag when unlocked) DOES count as "in focus" — `foreground.app_or_game_foreground()` checks `GetCurrentProcessId()` first, so any KazBars window keeps the gate open and drag-to-position never self-hides.
 
-End state: overlay visibility tracks AoC focus 1:1, with a tick of latency (≤100 ms). Lock state, position, and tracker data are all preserved across the hide/show — nothing is destroyed or reset.
+End state: overlay visibility tracks focus with ≤250 ms latency, for both overlays, from one probe. Lock state, position, and tracker data are preserved across hide/show — nothing is destroyed or reset.
 
 ---
 

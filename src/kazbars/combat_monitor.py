@@ -10,6 +10,14 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+# How often (seconds) the monitor re-scans the folder for a newer CombatLog
+# while running. Matches the Deeps meter's snappy cadence so a fresh session's
+# log is picked up within a few seconds with no manual rescan.
+_NEWER_LOG_CHECK_SEC = 3.0
+# Sleep between scans while waiting for a log to appear (started before AoC
+# created today's file).
+_SCAN_SLEEP = 1.0
+
 
 class CombatLogMonitor:
     """
@@ -68,29 +76,6 @@ class CombatLogMonitor:
                 self.last_position = new_pos
         return latest
 
-    def rescan_log(self):
-        """
-        Manually rescan for the latest combat log file.
-        Resets the file handle and position to the end of the new log.
-
-        Returns:
-            str: Path to latest log file, or None if not found
-        """
-        latest = self._find_latest_log()
-        if latest:
-            p = Path(latest)
-            new_pos = p.stat().st_size if p.exists() else 0
-            with self._lock:
-                if self.file_handle:
-                    try:
-                        self.file_handle.close()
-                    except OSError:
-                        pass
-                    self.file_handle = None
-                self.log_path = latest
-                self.last_position = new_pos
-        return latest
-
     def _find_latest_log(self):
         """
         Find the most recently modified CombatLog*.txt file.
@@ -125,7 +110,10 @@ class CombatLogMonitor:
             bool: True if started, False if no valid log path
         """
         with self._lock:
-            if not self.log_path or not Path(self.log_path).exists():
+            # A folder is enough — the loop scans for (and waits on) a live
+            # CombatLog itself, so monitoring can begin before AoC has even
+            # created today's log.
+            if not self.log_folder:
                 return False
             if self.monitoring:
                 return True  # Already running
@@ -162,7 +150,7 @@ class CombatLogMonitor:
         """
         try:
             current_time = time.time()
-            if current_time - self.last_file_check < 30:
+            if current_time - self.last_file_check < _NEWER_LOG_CHECK_SEC:
                 return False
             self.last_file_check = current_time
 
@@ -197,6 +185,12 @@ class CombatLogMonitor:
         while self.monitoring:
             try:
                 self._check_for_newer_log()
+
+                # No log yet (started before AoC created today's file) — keep
+                # scanning until one appears, then tail it.
+                if not self.log_path:
+                    time.sleep(_SCAN_SLEEP)
+                    continue
 
                 # Handle log file truncation/rotation
                 log = Path(self.log_path)

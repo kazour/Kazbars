@@ -73,6 +73,11 @@ class BossTimer:
         self.double_seed_mode = False
         self.second_seed_active = False
 
+        # Second line shown under "Waiting for Seed..." — the panel sets this to
+        # the sanitized tracked-log name so the overlay confirms what it's reading
+        # while idle (the Hide-on-Stop overlay is only up while monitoring).
+        self._waiting_footer = ""
+
     def _reset_cycle_state(self):
         """Reset cycle state. Caller must hold self._lock."""
         self.timer_active = False
@@ -196,9 +201,22 @@ class BossTimer:
         if self._update_callback:
             self._update_callback(phase)
 
+    def set_waiting_footer(self, text):
+        """Set the second line shown in the idle/waiting state (the tracked-log
+        name). Refreshes the waiting display if it's the current phase."""
+        text = text or ""
+        if text == self._waiting_footer:
+            return
+        self._waiting_footer = text
+        if not self.timer_active and not self.syphon_active:
+            self.push_waiting_state()
+
     def push_waiting_state(self):
         """Push the idle/waiting display state."""
-        phase = self._phase("Waiting for Seed...", COLORS["default"], "")
+        phase = self._phase(
+            "Waiting for Seed...", COLORS["default"], "",
+            row2_msg=self._waiting_footer, row2_color=COLORS["default"],
+        )
         self._last_phase = phase
         if self._update_callback:
             self._update_callback(phase)

@@ -26,10 +26,11 @@ import math
 import tkinter as tk
 from collections.abc import Callable
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import ImageDraw, ImageFont
 
 from .deeps_meter import MeterSnapshot
-from .overlay_engine import LayeredOverlay, load_font
+from .deeps_settings import overlay_config_from_deeps
+from .overlay_engine import HudOverlay, load_font
 from .ui_helpers import THEME_COLORS
 
 logger = logging.getLogger(__name__)
@@ -52,22 +53,8 @@ _V_CELL_WIDTH = 68
 _V_ROW_HEIGHT = 30
 _V_SEP_HEIGHT = 1
 
-# Rounded backdrop corners (overlay px, unscaled) — matches the Live Tracker.
-_CORNER_RADIUS = 5
-
 # Alarm pulse — 2 Hz sine wave on the DPS cell when active.
 _ALARM_BLINK_HZ = 2.0
-
-# Bg fill — solid dark, the alpha channel does the work. Premultiplied at
-# `_draw_background`.
-_BG_FILL_RGB = (10, 10, 10)
-_BG_BORDER_RGB = (51, 51, 51)        # 1 px frame edge (only visible with bg)
-_CHROME_FG = (68, 68, 68)            # lock indicator (TK_COLORS['border'])
-
-# Chrome hit-test box in overlay-local coords — mirrors the Live Tracker.
-_CHROME_HIT_W = 16
-_CHROME_HIT_H = 16
-_CHROME_PAD = 2
 
 
 # =========================================================================== #
@@ -299,12 +286,12 @@ def _cell_width(scale: float, layout: str) -> int:
 # =========================================================================== #
 
 class DeepsOverlay:
-    """Owns the per-pixel-alpha overlay surface for the Deeps cluster.
+    """Deeps numbers overlay — a `HudOverlay` consumer.
 
-    Thin wrapper around `LayeredOverlay` — holds the per-snapshot state
-    (current numbers, alarm flag, thresholds, layout, font, bg-opacity)
-    and exposes a render closure to the engine. The panel's UI tick
-    drives `paint(snapshot, now)` at ~10 Hz.
+    Holds the per-snapshot content state (numbers, alarm flag, thresholds,
+    layout, visible cells) and draws it; `HudOverlay` owns the backdrop, lock
+    chrome, drag, focus-suppression, and position persistence. The panel's UI
+    tick drives `paint(snapshot, now)` at ~10 Hz.
     """
 
     def __init__(
@@ -314,88 +301,65 @@ class DeepsOverlay:
         on_position_changed: Callable[[int, int, bool], None] | None = None,
         on_lock_changed: Callable[[bool], None] | None = None,
     ) -> None:
-        # Mutable state
+        # Geometry + appearance + lock live in the shared OverlayConfig.
+        self._config = overlay_config_from_deeps(settings)
+
+        # Content state owned by this consumer.
         self._layout: str = settings.get("layout", "horizontal")
-        self._x: int = int(settings.get("overlay_x", 0))
-        self._y: int = int(settings.get("overlay_y", 50))
-        self._positioned: bool = bool(settings.get("overlay_positioned", False))
-        self._font_family: str = str(settings.get("overlay_font_family", "Segoe UI"))
-        self._font_size: int = int(settings.get("overlay_font_size", _BASE_FONT_SIZE))
-        self._bg_opacity: float = float(settings.get("overlay_bg_opacity", 0.0))
-
-        self._alarm_threshold: float = 2000.0
-        self._hpis_green: float = 50.0
-        self._dpis_yellow: float = 300.0
-        self._alarm_active: bool = False
-
-        self._snapshot: MeterSnapshot = MeterSnapshot.empty()
-        self._now: float = 0.0
-        # User-selected subset of `ALL_CELL_IDS`. Defaults to all visible.
         raw_visible = settings.get("visible_cells", ALL_CELL_IDS)
         self._visible: frozenset[str] = frozenset(
             c for c in raw_visible if c in ALL_CELL_IDS
         )
+        self._alarm_threshold: float = 2000.0
+        self._hpis_green: float = 50.0
+        self._dpis_yellow: float = 300.0
+        self._alarm_active: bool = False
+        self._snapshot: MeterSnapshot = MeterSnapshot.empty()
+        self._now: float = 0.0
 
         self._on_position_changed_external = on_position_changed
         self._on_lock_changed = on_lock_changed
 
-        # Compute initial pane size from the current layout + font.
-        w, h = self._compute_size()
-
-        self._engine = LayeredOverlay(
-            root,
-            render_callback=self._render,
-            width=w,
-            height=h,
+        self._hud = HudOverlay(
+            root, self._config,
+            render_content=self._render_content,
+            measure=self._measure,
+            on_config_changed=self._on_hud_config_changed,
         )
-
-        # Custom input — click the lock indicator to toggle, drag elsewhere to
-        # move. Mirrors the Live Tracker overlay (minus the resize handle, since
-        # the Deeps overlay auto-sizes from its font + visible cells).
-        self._drag_mode: str | None = None  # None | "move"
-        self._drag_anchor_x = 0
-        self._drag_anchor_y = 0
-        self._engine.root.bind("<Button-1>", self._on_press)
-        self._engine.root.bind("<B1-Motion>", self._on_drag)
-        self._engine.root.bind("<ButtonRelease-1>", self._on_release)
-
-        if self._positioned:
-            self._engine.set_position(self._x, self._y)
-        else:
-            self._center_on_screen()
-
-        self._engine.set_locked(bool(settings.get("overlay_locked", False)))
 
     # ------------------------------------------------------------------ #
     # Public API (mirrors the previous Toplevel-based shape)              #
     # ------------------------------------------------------------------ #
 
     def show(self) -> None:
-        self._engine.show()
+        self._hud.show()
 
     def hide(self) -> None:
-        self._engine.hide()
+        self._hud.hide()
+
+    def set_focus_suppressed(self, suppressed: bool) -> None:
+        self._hud.set_focus_suppressed(suppressed)
 
     def destroy(self) -> None:
-        self._engine.destroy()
+        self._hud.destroy()
 
     def set_layout(self, layout: str) -> None:
         if layout not in ("horizontal", "vertical") or layout == self._layout:
             return
         self._layout = layout
-        self._resize_for_current()
+        self._hud.resize()
 
     def set_font(self, family: str, size: int) -> None:
         size = max(12, min(int(size), 48))
-        if family == self._font_family and size == self._font_size:
+        if family == self._config.font_family and size == self._config.font_size:
             return
-        self._font_family = family
-        self._font_size = size
-        self._resize_for_current()
+        self._config.font_family = family
+        self._config.font_size = size
+        self._hud.resize()
 
     def set_bg_opacity(self, opacity: float) -> None:
-        self._bg_opacity = max(0.0, min(float(opacity), 1.0))
-        # No resize needed; next paint reflects the new alpha.
+        self._config.bg_opacity = max(0.0, min(float(opacity), 1.0))
+        self._hud.request_paint()
 
     def set_visible_cells(self, cells: list[str] | tuple[str, ...] | set[str]) -> None:
         """Set which cells are visible. Unknown IDs are ignored defensively."""
@@ -403,13 +367,13 @@ class DeepsOverlay:
         if new == self._visible:
             return
         self._visible = new
-        self._resize_for_current()
+        self._hud.resize()
 
     def set_locked(self, locked: bool) -> None:
-        self._engine.set_locked(locked)
+        self._hud.set_locked(locked)
 
     def is_locked(self) -> bool:
-        return self._engine.is_locked()
+        return self._hud.is_locked()
 
     def update_thresholds(self, alarm: float, green: float, yellow: float) -> None:
         self._alarm_threshold = float(alarm)
@@ -420,19 +384,27 @@ class DeepsOverlay:
         self._alarm_active = bool(active)
 
     def paint(self, snapshot: MeterSnapshot, now: float) -> None:
-        """Called by the panel's tick. Snapshots the state, delegates to engine."""
+        """Called by the panel's tick. Snapshots the state, repaints."""
         self._snapshot = snapshot
         self._now = now
-        self._engine.paint()
+        self._hud.request_paint()
 
     # ------------------------------------------------------------------ #
     # Internals                                                           #
     # ------------------------------------------------------------------ #
 
-    def _font_scale(self) -> float:
-        return self._font_size / _BASE_FONT_SIZE
+    def _on_hud_config_changed(self, cfg) -> None:
+        """Drag-end or lock-toggle from the overlay — persist via the panel's
+        existing position/lock callbacks (the panel owns the deeps_settings keys)."""
+        if self._on_position_changed_external is not None:
+            self._on_position_changed_external(cfg.x, cfg.y, cfg.positioned)
+        if self._on_lock_changed is not None:
+            self._on_lock_changed(cfg.locked)
 
-    def _compute_size(self) -> tuple[int, int]:
+    def _font_scale(self) -> float:
+        return self._config.font_size / _BASE_FONT_SIZE
+
+    def _measure(self) -> tuple[int, int]:
         scale = self._font_scale()
         n = len(visible_cells_in_order(self._visible))
         if self._layout == "horizontal":
@@ -444,101 +416,13 @@ class DeepsOverlay:
             h = n * row_h + max(0, n - 1) * _V_SEP_HEIGHT + 2 * _PAD_OUTER
         return (max(1, w), max(1, h))
 
-    def _resize_for_current(self) -> None:
-        w, h = self._compute_size()
-        self._engine.set_size(w, h)
-        # Re-apply position (set_size keeps it but be explicit).
-        self._engine.set_position(self._x, self._y)
-        # Trigger a repaint immediately if visible.
-        try:
-            self._engine.paint()
-        except Exception:
-            logger.debug("Repaint after resize raised", exc_info=True)
-
-    def _center_on_screen(self) -> None:
-        try:
-            screen_w = self._engine.root.winfo_screenwidth()
-        except tk.TclError:
-            screen_w = 1920
-        self._x = screen_w // 2 - self._engine.width // 2
-        self._y = 50
-        self._engine.set_position(self._x, self._y)
-
-    def _hit_test(self, x: int, y: int) -> str:
-        """Map a click in overlay-local coords to an interaction zone."""
-        if self._engine.is_locked():
-            return "none"
-        lx1, ly1, lx2, ly2 = self._lock_bounds(self._engine.width, self._engine.height)
-        if lx1 <= x <= lx2 and ly1 <= y <= ly2:
-            return "lock"
-        return "move"
-
-    def _on_press(self, event: tk.Event) -> None:
-        if self._engine.is_locked():
-            return
-        local_x = event.x_root - self._engine._x
-        local_y = event.y_root - self._engine._y
-        if self._hit_test(local_x, local_y) == "lock":
-            self._drag_mode = None
-            self._toggle_lock_from_overlay()
-            return
-        self._drag_mode = "move"
-        self._drag_anchor_x = event.x_root
-        self._drag_anchor_y = event.y_root
-
-    def _on_drag(self, event: tk.Event) -> None:
-        if self._engine.is_locked() or self._drag_mode != "move":
-            return
-        dx = event.x_root - self._drag_anchor_x
-        dy = event.y_root - self._drag_anchor_y
-        self._engine.set_position(self._engine._x + dx, self._engine._y + dy)
-        self._drag_anchor_x = event.x_root
-        self._drag_anchor_y = event.y_root
-
-    def _on_release(self, _event: tk.Event) -> None:
-        if self._drag_mode != "move":
-            return
-        self._drag_mode = None
-        self._x = self._engine._x
-        self._y = self._engine._y
-        self._positioned = True
-        if self._on_position_changed_external is not None:
-            self._on_position_changed_external(self._x, self._y, True)
-
-    def _toggle_lock_from_overlay(self) -> None:
-        """Lock indicator clicked — flip lock, notify the panel, repaint."""
-        new_state = not self._engine.is_locked()
-        self._engine.set_locked(new_state)
-        if self._on_lock_changed is not None:
-            self._on_lock_changed(new_state)
-        self._engine.paint()
-
-    # ------------------------------------------------------------------ #
-    # The render callback — produces the bitmap                          #
-    # ------------------------------------------------------------------ #
-
-    def _render(self, width: int, height: int) -> Image.Image:
-        image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(image)
-
-        # Bg backdrop — true per-pixel alpha, smooth across the 0.0-1.0 range.
-        # Rounded corners + a hairline frame border mirror the Live Tracker.
-        if self._bg_opacity > 0.0:
-            alpha = round(self._bg_opacity * 255)
-            draw.rounded_rectangle(
-                (0, 0, width - 1, height - 1), radius=_CORNER_RADIUS,
-                fill=(*_BG_FILL_RGB, alpha),
-            )
-            draw.rounded_rectangle(
-                (0, 0, width - 1, height - 1), radius=_CORNER_RADIUS,
-                outline=(*_BG_BORDER_RGB, alpha), width=1,
-            )
-
-        # Build the render context once per frame.
+    def _render_content(self, draw: ImageDraw.ImageDraw, width: int, height: int) -> None:
+        """Draw the cells. `HudOverlay` has already drawn the backdrop and will
+        composite the lock dot on top."""
         scale = self._font_scale()
-        font = load_font(self._font_family, self._font_size, bold=True)
+        font = load_font(self._config.font_family, self._config.font_size, bold=True)
         label_size = max(6, round(_LABEL_FONT_SIZE * scale))
-        label_font = load_font(self._font_family, label_size, bold=False)
+        label_font = load_font(self._config.font_family, label_size, bold=False)
         ctx = _RenderContext(
             snapshot=self._snapshot,
             now=self._now,
@@ -550,37 +434,10 @@ class DeepsOverlay:
             dpis_yellow=self._dpis_yellow,
             scale=scale,
         )
-
-        # Layout + paint each cell.
         if self._layout == "horizontal":
             self._render_horizontal(draw, width, height, ctx)
         else:
             self._render_vertical(draw, width, height, ctx)
-
-        # Lock indicator (○ unlocked / ● locked), drawn last so it sits above
-        # the numbers — same affordance as the Live Tracker overlay.
-        self._draw_lock_indicator(draw, width, height)
-
-        return image
-
-    def _lock_bounds(self, width: int, height: int) -> tuple[int, int, int, int]:
-        """(x1, y1, x2, y2) hit zone for the lock indicator, bottom-right."""
-        x2 = width - _CHROME_PAD
-        y2 = height - _CHROME_PAD
-        return (x2 - _CHROME_HIT_W, y2 - _CHROME_HIT_H, x2, y2)
-
-    def _draw_lock_indicator(self, draw: ImageDraw.ImageDraw, width: int, height: int) -> None:
-        """Outline circle when unlocked, filled when locked. PIL shapes (not
-        glyphs) so they render identically regardless of the selected font."""
-        x1, y1, x2, y2 = self._lock_bounds(width, height)
-        cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
-        r = 4
-        fg = (*_CHROME_FG, 255)
-        bbox = (cx - r, cy - r, cx + r, cy + r)
-        if self._engine.is_locked():
-            draw.ellipse(bbox, fill=fg)
-        else:
-            draw.ellipse(bbox, outline=fg, width=1)
 
     def _render_horizontal(
         self, draw: ImageDraw.ImageDraw, width: int, height: int, ctx: _RenderContext,

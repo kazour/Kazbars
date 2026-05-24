@@ -92,7 +92,6 @@ def test_meter_snapshot_empty() -> None:
     assert s.dpis is None
     assert s.hps is None
     assert s.hps_out is None
-    assert s.aoc_in_focus is False
     assert s.status is Status.NOT_STARTED
     assert s.log_filename is None
 

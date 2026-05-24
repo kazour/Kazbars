@@ -34,7 +34,6 @@ from .deeps_meter import DeepsMeter, MeterSnapshot, Status
 from .deeps_overlay import ALL_CELL_IDS as _ALL_CELL_IDS
 from .deeps_overlay import CELL_LABELS, DeepsOverlay
 from .deeps_settings import (
-    FONT_FAMILY_CHOICES,
     get_default_settings,
     load_settings,
     save_settings,
@@ -47,7 +46,6 @@ from .ui_helpers import (
     FONT_SECTION,
     FONT_SMALL,
     INPUT_WIDTH_NUM,
-    INPUT_WIDTH_TYPE,
     MODULE_COLORS,
     PAD_INNER,
     PAD_LF,
@@ -57,7 +55,16 @@ from .ui_helpers import (
     PAD_XS,
     THEME_COLORS,
 )
-from .ui_widgets import create_dialog_header, create_tip_bar
+from .ui_widgets import (
+    add_tooltip,
+    create_card,
+    create_dialog_header,
+    create_slider_row,
+    create_status_block,
+    create_tip_bar,
+    create_toggle_action_button,
+    refresh_toggle_button,
+)
 from .window_position import bind_window_position_save, restore_window_position
 
 logger = logging.getLogger(__name__)
@@ -115,6 +122,7 @@ class DeepsPanel(tk.Toplevel):
         self.overlay: DeepsOverlay | None = None
         self._tick_id: str | None = None
         self._alarm_active: bool = False
+        self._focus_watcher = getattr(parent, "focus_watcher", None)
 
         # tk vars for two-way binding with widgets
         self._alarm_var = tk.StringVar(value=str(int(self.settings["alarm_threshold"])))
@@ -180,27 +188,18 @@ class DeepsPanel(tk.Toplevel):
         self._build_pet_toggle(body)
 
     def _build_status_block(self, parent: ttk.Frame) -> None:
-        """Two-line status: small 'Status:' label + colored body line."""
-        ttk.Label(
-            parent, text="Status", font=FONT_SMALL,
-            foreground=THEME_COLORS["muted"],
-        ).pack(anchor="w", pady=(0, PAD_XS))
-        self._status_label = ttk.Label(
-            parent, text="", font=FONT_BODY,
-            foreground=THEME_COLORS["body"],
-            wraplength=_PANEL_DEFAULT_WIDTH - 2 * PAD_TAB,
+        """Two-line status: small 'Status' label + colored body line."""
+        self._status_label = create_status_block(
+            parent, "Status", wraplength=_PANEL_DEFAULT_WIDTH - 2 * PAD_TAB,
         )
-        self._status_label.pack(anchor="w", pady=(0, PAD_ROW))
 
     def _build_primary_action(self, parent: ttk.Frame) -> None:
         """Big Start / Stop button — the headline interaction."""
-        self._start_btn = ttk.Button(
-            parent, text="Start Monitoring",
-            width=BTN_LARGE,
-            bootstyle="success",  # type: ignore[call-arg]
-            command=self._on_start_stop_click,
+        self._start_btn = create_toggle_action_button(
+            parent, self._on_start_stop_click, width=BTN_LARGE,
         )
         self._start_btn.pack(anchor="w", pady=(0, PAD_ROW))
+        add_tooltip(self._start_btn, "Start or stop reading your combat log")
 
     def _build_overlay_row(self, parent: ttk.Frame) -> None:
         """Overlay group: section header + lock button + layout radio."""
@@ -232,83 +231,25 @@ class DeepsPanel(tk.Toplevel):
         ).pack(side="left")
 
     def _build_appearance(self, parent: ttk.Frame) -> None:
-        """LabelFrame with font family dropdown + size and background sliders."""
-        lf = ttk.LabelFrame(
-            parent, text="Appearance",
-            style="Card.TLabelframe",
-            padding=PAD_INNER,
-        )
+        """Card with size + background sliders. Font family is fixed to
+        Segoe UI — there is no font picker."""
+        lf = create_card(parent, "Appearance")
         lf.pack(fill="x", pady=(PAD_SMALL, PAD_ROW))
-
-        # Font family — curated dropdown (FONT_FAMILY_CHOICES). Combobox is
-        # readonly so the user can't type an off-list name.
-        font_row = ttk.Frame(lf)
-        font_row.pack(fill="x", pady=PAD_XS)
-        ttk.Label(
-            font_row, text="Font:", font=FONT_BODY,
-            foreground=THEME_COLORS["body"],
-        ).pack(side="left")
-        font_combo = ttk.Combobox(
-            font_row, textvariable=self._font_family_var,
-            values=list(FONT_FAMILY_CHOICES),
-            state="readonly",
-            width=INPUT_WIDTH_TYPE + 4,
-        )
-        font_combo.pack(side="left", padx=(PAD_SMALL, 0))
-        font_combo.bind("<<ComboboxSelected>>", lambda _e: self._on_appearance_change())
 
         # Font size — slider 12-48 pt. The live label tracks the drag; the
         # setting persists on release so one drag is a single write.
-        self._size_value_label = self._build_slider_row(
-            lf, "Size:", from_=12, to=48,
-            initial=int(self.settings["overlay_font_size"]),
-            suffix="pt", on_drag=self._on_size_slider,
+        _, self._size_value_label = create_slider_row(
+            lf, "Size:", 12, 48,
+            int(self.settings["overlay_font_size"]), "pt",
+            self._on_size_slider, self._on_appearance_change,
         )
 
-        # Background opacity — slider 0-100 %, mapped to smooth per-pixel alpha
-        # in the overlay. 0 keeps the bg fully transparent.
-        self._opacity_value_label = self._build_slider_row(
-            lf, "Background:", from_=0, to=100,
-            initial=round(float(self.settings["overlay_bg_opacity"]) * 100),
-            suffix="%", on_drag=self._on_opacity_slider,
+        # Background opacity — slider 0-100 %, mapped to smooth per-pixel alpha.
+        _, self._opacity_value_label = create_slider_row(
+            lf, "Background:", 0, 100,
+            round(float(self.settings["overlay_bg_opacity"]) * 100), "%",
+            self._on_opacity_slider, self._on_appearance_change,
         )
-
-    def _build_slider_row(
-        self,
-        parent: tk.Misc,
-        label_text: str,
-        from_: int,
-        to: int,
-        initial: int,
-        suffix: str,
-        on_drag: Callable[[str], None],
-    ) -> ttk.Label:
-        """One row: descriptor label · ttk.Scale · live value label.
-
-        `on_drag(value)` fires continuously while dragging — it refreshes the
-        value label and pushes live to the overlay, but does NOT save. The
-        setting persists on button/key release so a drag is a single write.
-        Returns the value label for the drag handler to update.
-        """
-        row = ttk.Frame(parent)
-        row.pack(fill="x", pady=PAD_XS)
-        ttk.Label(
-            row, text=label_text, font=FONT_BODY,
-            foreground=THEME_COLORS["body"],
-        ).pack(side="left")
-        value_label = ttk.Label(
-            row, text=f"{initial}{suffix}", font=FONT_SMALL,
-            foreground=THEME_COLORS["muted"], width=5, anchor="e",
-        )
-        value_label.pack(side="right")
-        scale = ttk.Scale(
-            row, from_=from_, to=to, value=initial,
-            orient="horizontal", command=on_drag,
-        )
-        scale.pack(side="left", fill="x", expand=True, padx=PAD_SMALL)
-        scale.bind("<ButtonRelease-1>", lambda _e: self._on_appearance_change())
-        scale.bind("<KeyRelease>", lambda _e: self._on_appearance_change())
-        return value_label
 
     def _on_size_slider(self, value: str) -> None:
         """Live font-size drag: refresh label + push to overlay (no save)."""
@@ -457,6 +398,8 @@ class DeepsPanel(tk.Toplevel):
             on_position_changed=self._on_overlay_position_changed,
             on_lock_changed=self._on_overlay_lock_changed,
         )
+        if self._focus_watcher:
+            self._focus_watcher.register(self.overlay)
         # Push the latest thresholds so initial tints react correctly.
         self.overlay.update_thresholds(
             float(self.settings["alarm_threshold"]),
@@ -497,6 +440,8 @@ class DeepsPanel(tk.Toplevel):
         self.meter.set_include_pet_damage(bool(self._pet_var.get()))
         self.meter.start(game)
         self._alarm_active = False
+        if self.overlay is not None:
+            self.overlay.show()  # wanted-visible; the watcher gates on focus
         self._refresh_start_button()
         self._begin_tick()
 
@@ -517,27 +462,12 @@ class DeepsPanel(tk.Toplevel):
         """Sync Start/Stop button label, color, and enabled-state."""
         if self._start_btn is None:
             return
-        game = self.game_path_getter()
         running = self.meter.is_running()
-        if not game and not running:
-            self._start_btn.configure(
-                text="Set game folder first",
-                state="disabled",
-                bootstyle="secondary",  # type: ignore[call-arg]
-            )
-            return
-        if running:
-            self._start_btn.configure(
-                text="Stop Monitoring",
-                state="normal",
-                bootstyle="danger",  # type: ignore[call-arg]
-            )
-        else:
-            self._start_btn.configure(
-                text="Start Monitoring",
-                state="normal",
-                bootstyle="success",  # type: ignore[call-arg]
-            )
+        enabled = bool(self.game_path_getter()) or running
+        refresh_toggle_button(
+            self._start_btn, running=running, enabled=enabled,
+            disabled_label="Set game folder first",
+        )
 
     # ------------------------------------------------------------------ #
     # Lock                                                               #
@@ -728,17 +658,17 @@ class DeepsPanel(tk.Toplevel):
             self.overlay.update_alarm_active(self._alarm_active)
 
     def _update_overlay(self, snapshot: MeterSnapshot) -> None:
-        """Show/hide based on AoC focus; paint if shown."""
+        """Push the latest snapshot to the overlay (single paint per tick).
+
+        Focus-gating is the shared ForegroundWatcher's job now
+        (`set_focus_suppressed`); visibility follows Start/Stop. `paint()`
+        no-ops while focus-suppressed, so calling it every tick is safe and the
+        alarm pulse still gets a fresh frame whenever the overlay is visible.
+        """
         if self.overlay is None:
             return
-        # Always push the latest alarm state in case it didn't transition
-        # this tick (the pulse cadence depends on a fresh paint every tick).
         self.overlay.update_alarm_active(self._alarm_active)
-        if snapshot.aoc_in_focus:
-            self.overlay.show()
-            self.overlay.paint(snapshot, time.monotonic())
-        else:
-            self.overlay.hide()
+        self.overlay.paint(snapshot, time.monotonic())
 
     # ------------------------------------------------------------------ #
     # Window lifecycle                                                   #
@@ -763,6 +693,8 @@ class DeepsPanel(tk.Toplevel):
         if self.meter.is_running():
             self.meter.stop()
         if self.overlay is not None:
+            if self._focus_watcher:
+                self._focus_watcher.unregister(self.overlay)
             self.overlay.destroy()
             self.overlay = None
 

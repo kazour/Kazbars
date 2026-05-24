@@ -26,6 +26,7 @@ from kazbars.build_loading import show_about_popup
 from kazbars.custom_menu_bar import CustomMenuBar
 from kazbars.database_editor import DatabaseEditorTab
 from kazbars.first_launch import run_first_launch
+from kazbars.focus_watcher import ForegroundWatcher
 from kazbars.game_resolution import change_game_resolution
 from kazbars.grids_panel import GridsPanel
 from kazbars.instructions_panel import InstructionsPanel
@@ -113,6 +114,12 @@ class KazBarsApp(ttkb.Window):
         self._building = False
         self.boss_timer_panel = None
         self.deeps_panel = None
+
+        # One shared focus gate for every overlay: hides them whenever neither
+        # KazBars nor AoC owns the foreground window. Overlays register on
+        # create / unregister on cleanup; the watcher ticks for the app's life.
+        self.focus_watcher = ForegroundWatcher(self)
+        self.focus_watcher.start()
 
         # Single game folder + Aoc.exe preference (set via first-launch prompt)
         self._migrate_legacy_clients()
@@ -604,6 +611,7 @@ class KazBarsApp(ttkb.Window):
         """Handle window close with unsaved changes check."""
         if not self._check_unsaved_changes():
             return
+        self.focus_watcher.stop()
         if bt := self._boss_timer_if_alive():
             bt.cleanup()
             bt.destroy()

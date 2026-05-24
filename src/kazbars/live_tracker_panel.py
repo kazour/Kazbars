@@ -14,20 +14,18 @@ logger = logging.getLogger(__name__)
 from .boss_timer import BossTimer
 from .combat_monitor import CombatLogMonitor
 from .live_tracker_settings import (
-    COLORS,
     TIMERS_DEFAULTS,
     get_default_settings,
     load_settings,
+    sanitize_log_name,
     save_settings,
     validate_all_settings,
 )
-from .overlay_engine import FONT_FAMILY_CHOICES, app_or_game_foreground
 from .settings_manager import get_setting, set_setting
 from .timer_overlay import TimerOverlay
 from .ui_helpers import (
     BTN_SMALL,
     FONT_SMALL,
-    FONT_SMALL_BOLD,
     MODULE_COLORS,
     PAD_BUTTON_GAP,
     PAD_LF,
@@ -37,12 +35,21 @@ from .ui_helpers import (
     PAD_XS,
     THEME_COLORS,
 )
-from .ui_widgets import add_tooltip, app_toast, create_dialog_header, create_tip_bar
+from .ui_widgets import (
+    add_tooltip,
+    app_toast,
+    create_card,
+    create_dialog_header,
+    create_slider_row,
+    create_status_block,
+    create_tip_bar,
+    create_toggle_action_button,
+    refresh_toggle_button,
+)
 from .window_position import bind_window_position_save, restore_window_position
 
 # Game-loop tick (ms) — drives both the schedule cadence and the reschedule.
 GAME_TICK_MS = 50
-FOCUS_TICK_MS = 250  # overlay focus-gate poll: hide when neither app nor game is foreground
 
 # Test-cycle timing (ms)
 TEST_FIXATION_DELAY_MS = 4000
@@ -100,11 +107,10 @@ class LiveTrackerPanel(tk.Toplevel):
         # State
         self.overlay = None
         self._game_loop_id = None
-        self._focus_watch_id = None
+        self._focus_watcher = getattr(parent, "focus_watcher", None)
         self._monitoring = False
         self._test_fix_id = None
         self._test_reset_id = None
-        self._log_state = "default"
 
         # Wire timer + monitor first so guards aren't needed downstream.
         # _dispatch_overlay_update hops from the combat-monitor thread to the
@@ -115,7 +121,6 @@ class LiveTrackerPanel(tk.Toplevel):
         # Build UI, then the overlay (which configures visibility/lock buttons)
         self._build_ui()
         self._create_overlay()
-        self._focus_tick()  # start the overlay focus-visibility gate (runs for the panel's life)
 
         # Auto-detect log path and push idle status to overlay
         self._update_log_path()
@@ -157,71 +162,36 @@ class LiveTrackerPanel(tk.Toplevel):
         self._build_overlay_controls(center_panel)
 
     def _build_seed_timer_section(self, parent):
-        """Build seed timer monitoring controls with status display."""
-        seed_frame = ttk.LabelFrame(parent, text="Combat Log Monitor",
-                                    style="Card.TLabelframe", padding=PAD_LF)
+        """Combat-log monitor: one Start/Stop toggle + status. Logs are picked
+        up automatically (no manual rescan)."""
+        seed_frame = create_card(parent, "Combat Log Monitor", padding=PAD_LF)
         seed_frame.pack(fill='x', pady=(0, PAD_LF))
 
-        monitor_frame = ttk.Frame(seed_frame)
-        monitor_frame.pack(fill='x', pady=(0, PAD_XS))
+        self.start_btn = create_toggle_action_button(seed_frame, self._on_start_stop_click)
+        self.start_btn.pack(anchor='w', pady=(0, PAD_MID))
+        add_tooltip(self.start_btn, "Start or stop watching the combat log for the Viscous Seed cycle")
 
-        self.start_btn = ttk.Button(
-            monitor_frame, text="Start Monitoring",
-            command=self._start_monitoring,
-            bootstyle="success"
-        )
-        self.start_btn.pack(side='left', padx=(0, PAD_SMALL))
-        add_tooltip(self.start_btn, "Start watching the combat log for the Viscous Seed cycle")
-
-        self.stop_btn = ttk.Button(
-            monitor_frame, text="Stop Monitoring",
-            command=self._stop_monitoring,
-            state='disabled'
-        )
-        self.stop_btn.pack(side='left')
-        add_tooltip(self.stop_btn, "Stop watching the combat log")
-
-        self.scan_btn = ttk.Button(
-            monitor_frame, text="Scan Log",
-            command=self._rescan_log
-        )
-        self.scan_btn.pack(side='left', padx=(PAD_SMALL, 0))
-        add_tooltip(self.scan_btn, "Re-scan for a newer combat log file")
-
-        ttk.Separator(seed_frame, orient='horizontal').pack(fill='x', pady=(PAD_XS, PAD_MID))
-
-        status_frame = ttk.Frame(seed_frame)
-        status_frame.pack(fill='x', pady=(0, PAD_BUTTON_GAP))
-        ttk.Label(status_frame, text="Monitor:",
-                  font=FONT_SMALL, foreground=THEME_COLORS['body']).pack(side='left')
-        self.status_label = ttk.Label(status_frame, text="Stopped",
-                  font=FONT_SMALL_BOLD, foreground=THEME_COLORS['body'])
-        self.status_label.pack(side='left', padx=(PAD_XS, 0))
+        self.status_label = create_status_block(seed_frame, "Monitor")
+        self.status_label.configure(text="Stopped")
 
         self.log_status_label = ttk.Label(seed_frame, text="No game path set",
                   font=FONT_SMALL, foreground=THEME_COLORS['muted'])
         self.log_status_label.pack(anchor='w', pady=(PAD_BUTTON_GAP, 0))
 
     def _build_overlay_controls(self, parent):
-        """Build overlay settings (show/lock/test, bg opacity, font family, font size)."""
-        overlay_frame = ttk.LabelFrame(parent, text="Overlay",
-                                       style="Card.TLabelframe", padding=PAD_LF)
+        """Overlay settings: lock + test buttons, background + size sliders.
+        (Font family is fixed to Segoe UI; visibility follows Start/Stop.)"""
+        overlay_frame = create_card(parent, "Overlay", padding=PAD_LF)
         overlay_frame.pack(fill='x', pady=(0, PAD_LF))
 
         btn_row = ttk.Frame(overlay_frame)
         btn_row.pack(fill='x', pady=(0, PAD_MID))
 
-        self.visibility_btn = ttk.Button(
-            btn_row, text="Show", command=self._toggle_overlay, width=BTN_SMALL
-        )
-        self.visibility_btn.pack(side='left', padx=(0, PAD_XS))
-        add_tooltip(self.visibility_btn, "Show or hide the seed timer overlay")
-
         self.lock_btn = ttk.Button(
             btn_row, text="Lock", command=self._toggle_lock, width=BTN_SMALL
         )
         self.lock_btn.pack(side='left', padx=(0, PAD_XS))
-        add_tooltip(self.lock_btn, "Lock the overlay so it can't be moved or resized")
+        add_tooltip(self.lock_btn, "Lock the overlay so it can't be moved (unlock here too)")
 
         self.test_btn = ttk.Button(
             btn_row, text="Test Cycle", command=self._toggle_test
@@ -231,79 +201,34 @@ class LiveTrackerPanel(tk.Toplevel):
 
         ttk.Separator(overlay_frame, orient='horizontal').pack(fill='x', pady=(PAD_XS, PAD_MID))
 
-        # Background-opacity slider — drives the bg fill alpha. 0% = no
-        # backdrop (numbers float over the game with their dark stroke);
-        # 100% = solid dark panel. Same semantic as the Deeps overlay.
-        bg_row = ttk.Frame(overlay_frame)
-        bg_row.pack(fill='x', pady=(0, PAD_XS))
-        ttk.Label(bg_row, text="Background:",
-                  font=FONT_SMALL).pack(side='left')
-        self.bg_opacity_var = tk.DoubleVar(
-            value=self.timer_settings.get('bg_opacity', TIMERS_DEFAULTS['bg_opacity'])
+        # Background-opacity slider — 0% = floating text, 100% = solid panel.
+        # Same 0-100 % control as the Deeps overlay.
+        self.bg_opacity_scale, self.bg_opacity_value_label = create_slider_row(
+            overlay_frame, "Background:", 0, 100,
+            round(self.timer_settings.get('bg_opacity', TIMERS_DEFAULTS['bg_opacity']) * 100),
+            "%", self._on_bg_opacity_change, self._on_overlay_settings_changed,
         )
-        self.bg_opacity_value_label = ttk.Label(
-            bg_row, text=f"{int(self.bg_opacity_var.get() * 100)}%",
-            font=FONT_SMALL, foreground=THEME_COLORS['muted'], width=4, anchor='e'
-        )
-        self.bg_opacity_value_label.pack(side='right')
-        self.bg_opacity_slider = ttk.Scale(
-            bg_row, from_=0.0, to=1.0,
-            variable=self.bg_opacity_var,
-            orient='horizontal', length=120,
-            command=self._on_bg_opacity_change
-        )
-        self.bg_opacity_slider.pack(side='left', padx=(PAD_SMALL, PAD_XS), fill='x', expand=True)
-        add_tooltip(self.bg_opacity_slider, "Background opacity (0% = floating text, 100% = solid panel)")
 
-        font_family_row = ttk.Frame(overlay_frame)
-        font_family_row.pack(fill='x', pady=(0, PAD_XS))
-        ttk.Label(font_family_row, text="Font:",
-                  font=FONT_SMALL).pack(side='left')
-        self.font_family_var = tk.StringVar(
-            value=self.timer_settings.get('font_family', TIMERS_DEFAULTS['font_family'])
+        # Size slider 12-48 pt (matches Deeps) — the only size control; the
+        # overlay auto-sizes to the font.
+        self.font_scale, self.font_value_label = create_slider_row(
+            overlay_frame, "Size:", 12, 48,
+            self.timer_settings.get('font_size', TIMERS_DEFAULTS['font_size']),
+            "pt", self._on_font_change, self._on_overlay_settings_changed,
         )
-        self.font_family_combo = ttk.Combobox(
-            font_family_row, textvariable=self.font_family_var,
-            values=list(FONT_FAMILY_CHOICES),
-            state='readonly', width=14,
-        )
-        self.font_family_combo.pack(side='left', padx=(PAD_SMALL, PAD_XS), fill='x', expand=True)
-        self.font_family_combo.bind('<<ComboboxSelected>>', lambda _e: self._on_font_family_change())
-
-        font_row = ttk.Frame(overlay_frame)
-        font_row.pack(fill='x')
-        ttk.Label(font_row, text="Size:",
-                  font=FONT_SMALL).pack(side='left')
-        self.font_var = tk.IntVar(
-            value=self.timer_settings.get('font_size', TIMERS_DEFAULTS['font_size'])
-        )
-        self.font_value_label = ttk.Label(
-            font_row, text=f"{self.font_var.get()}pt",
-            font=FONT_SMALL, foreground=THEME_COLORS['muted'], width=4, anchor='e'
-        )
-        self.font_value_label.pack(side='right')
-        self.font_slider = ttk.Scale(
-            font_row, from_=8, to=20,
-            variable=self.font_var,
-            orient='horizontal', length=120,
-            command=self._on_font_change
-        )
-        self.font_slider.pack(side='left', padx=(PAD_SMALL, PAD_XS), fill='x', expand=True)
-        add_tooltip(self.font_slider, "Timer text size in the overlay (8-20 pt)")
 
     def _create_overlay(self):
-        """Create the overlay window."""
+        """Create the overlay window (hidden until Start — Hide-on-Stop model)."""
         root = self.winfo_toplevel()
         self.overlay = TimerOverlay(
             root,
             self.timer_settings,
             on_settings_changed=self._on_overlay_settings_changed
         )
-        # Always show the overlay when the tracker panel is launched,
-        # regardless of any previously-saved hidden state. notify=False so
-        # this UI nudge doesn't overwrite the persisted visibility preference.
-        self.overlay.show(notify=False)
-        self.visibility_btn.config(text="Hide")
+        if self._focus_watcher:
+            self._focus_watcher.register(self.overlay)
+        # Hidden on open — Start shows it, Stop hides it.
+        self.overlay.hide(notify=False)
         self.lock_btn.config(text="Unlock" if self.overlay.is_locked else "Lock")
 
     # =========================================================================
@@ -311,104 +236,88 @@ class LiveTrackerPanel(tk.Toplevel):
     # =========================================================================
 
     def _update_log_path(self):
-        """Update combat log path from current game path."""
+        """Refresh the combat-log folder + the status label + the overlay's
+        waiting-state footer (the sanitized tracked-log name)."""
         game_path = self.game_path_getter()
 
         if not game_path:
             self._set_log_status("Set a game folder in the main window first", "no_path")
+            self.boss_timer.set_waiting_footer("")
             return
 
         if not Path(game_path).exists():
             self._set_log_status(f"Game folder not found: {game_path}", "no_folder")
+            self.boss_timer.set_waiting_footer("")
             return
 
         latest = self.combat_monitor.set_log_folder(game_path)
 
         if latest:
-            self._set_log_status(f"Found: {Path(latest).name}", "found")
+            name = sanitize_log_name(latest)
+            self._set_log_status(f"Found: {name}", "found")
+            self.boss_timer.set_waiting_footer(name)
         else:
             self._set_log_status("No combat logs found. Type /logcombat on in game.", "missing")
+            self.boss_timer.set_waiting_footer("Waiting for combat log…")
 
-        self._update_overlay_idle()
-
-    # Per log-state: (label foreground key in THEME_COLORS, overlay color key in COLORS).
-    _LOG_STATE_STYLE = {
-        "found":     ('success', 'active'),
-        "missing":   ('warning', 'warning'),
-        "no_path":   ('warning', 'warning'),
-        "no_folder": ('danger',  'alert'),
-        "default":   ('muted',   'default'),
+    # Per log-state: label foreground key in THEME_COLORS.
+    _LOG_STATE_FG = {
+        "found": "success",
+        "missing": "warning",
+        "no_path": "warning",
+        "no_folder": "danger",
+        "default": "muted",
     }
 
     def _set_log_status(self, text, state):
-        """Update the log status label and remember its semantic state."""
-        self._log_state = state
-        fg_key, _ = self._LOG_STATE_STYLE.get(state, self._LOG_STATE_STYLE["default"])
+        """Update the log status label colored by its semantic state."""
+        fg_key = self._LOG_STATE_FG.get(state, "muted")
         self.log_status_label.config(text=text, foreground=THEME_COLORS[fg_key])
 
-    def _update_overlay_idle(self):
-        """Push monitor + combat log status to overlay when not actively tracking."""
-        if not self.overlay or self._monitoring:
-            return
-
-        log_text = self.log_status_label.cget('text')
-        _, overlay_key = self._LOG_STATE_STYLE.get(self._log_state, self._LOG_STATE_STYLE["default"])
-
-        self.overlay.update_display({
-            'row1_msg': "Monitor: Stopped", 'row1_player': "", 'row1_timer': "",
-            'row1_color': COLORS["default"],
-            'row2_msg': log_text, 'row2_player': "", 'row2_timer': "",
-            'row2_color': COLORS[overlay_key],
-            'cycle_timer': "",
-        })
+    def _on_start_stop_click(self):
+        if self._monitoring:
+            self._stop_monitoring()
+        else:
+            self._start_monitoring()
 
     def _start_monitoring(self):
-        """Start combat log monitoring."""
+        """Start combat log monitoring. Logs are auto-detected, so this can
+        start before AoC has created today's log (the monitor waits)."""
         self._update_log_path()
 
-        if not self.combat_monitor.log_path:
-            app_toast(self, "Can't start: no combat log. Set game path and run /logcombat on", 'warning', 8)
+        if not self.combat_monitor.start_monitoring():
+            app_toast(self, "Can't start: set a game folder in the main window first.", 'warning', 8)
             return
 
-        if self.combat_monitor.start_monitoring():
-            self._monitoring = True
-            self.status_label.config(text="Running", foreground=THEME_COLORS['success'])
-            self.start_btn.config(state='disabled')
-            self.stop_btn.config(state='normal')
-            self.test_btn.config(state='disabled')
-            self.boss_timer.push_waiting_state()
-            self._start_game_loop()
-            if self.overlay and not self.overlay.is_visible:
-                self.overlay.show()
-                self.visibility_btn.config(text="Hide")
-        else:
-            app_toast(self, "Couldn't start monitoring. Try /logcombat off, then /logcombat on", 'error', 10)
+        self._monitoring = True
+        self.status_label.config(text="Running", foreground=THEME_COLORS['success'])
+        self._refresh_monitor_button()
+        self.test_btn.config(state='disabled')
+        self.boss_timer.push_waiting_state()
+        self._start_game_loop()
+        if self.overlay:
+            self.overlay.show()
 
     def _stop_monitoring(self):
-        """Stop combat log monitoring."""
+        """Stop combat log monitoring and hide the overlay (Hide-on-Stop)."""
         self.combat_monitor.stop_monitoring()
         self.boss_timer.stop_cycle()
         self._monitoring = False
         self._stop_game_loop()
         self.status_label.config(text="Stopped", foreground=THEME_COLORS['body'])
-        self.start_btn.config(state='normal')
-        self.stop_btn.config(state='disabled')
+        self._refresh_monitor_button()
         self.test_btn.config(state='normal')
+        if self.overlay:
+            self.overlay.hide()
         self._update_log_path()
-        self._update_overlay_idle()
 
-    def _rescan_log(self):
-        """Manually rescan for a newer combat log file."""
-        if not self.combat_monitor.log_folder:
-            self._update_log_path()
-            return
-
-        latest = self.combat_monitor.rescan_log()
-        if latest:
-            self._set_log_status(f"Found: {Path(latest).name}", "found")
-        else:
-            self._set_log_status("No combat logs found. Type /logcombat on in game.", "missing")
-        self._update_overlay_idle()
+    def _refresh_monitor_button(self):
+        """Sync the Start/Stop toggle label, color, and enabled-state."""
+        enabled = bool(self.game_path_getter()) or self._monitoring
+        refresh_toggle_button(
+            self.start_btn, running=self._monitoring, enabled=enabled,
+            disabled_label="Set game folder first",
+        )
 
     def _start_game_loop(self):
         """Start the update loop."""
@@ -429,69 +338,46 @@ class LiveTrackerPanel(tk.Toplevel):
             self.after_cancel(self._game_loop_id)
             self._game_loop_id = None
 
-    def _focus_tick(self):
-        """Gate overlay visibility on focus, for the panel's whole life.
-
-        Hides the overlay whenever neither KazBars nor AoC is the foreground
-        window, so it never floats over a browser or other app. Runs while
-        idle, while monitoring, and after the panel is withdrawn (monitoring
-        keeps going). Self-reschedules; guarded against teardown races.
-        """
-        if not self.winfo_exists():
-            return
-        if self.overlay:
-            self.overlay.set_focus_suppressed(not app_or_game_foreground())
-        self._focus_watch_id = self.after(FOCUS_TICK_MS, self._focus_tick)
-
     # =========================================================================
     # OVERLAY CONTROLS
     # =========================================================================
-
-    def _toggle_overlay(self):
-        if self.overlay.is_visible:
-            self.overlay.hide()
-            self.visibility_btn.config(text="Show")
-        else:
-            self.overlay.show()
-            self.visibility_btn.config(text="Hide")
 
     def _toggle_lock(self):
         self.overlay.toggle_lock()
 
     def _on_bg_opacity_change(self, value):
-        v = float(value)
+        """Live drag: push to overlay + refresh label, no save (commit persists)."""
+        pct = round(float(value))
         if self.overlay:
-            self.overlay.set_bg_opacity(v)
-        self.bg_opacity_value_label.config(text=f"{int(v * 100)}%")
-
-    def _on_font_family_change(self):
-        family = self.font_family_var.get()
-        if self.overlay:
-            self.overlay.set_font_family(family)
+            self.overlay.set_bg_opacity(pct / 100.0, notify=False)
+        self.bg_opacity_value_label.config(text=f"{pct}%")
 
     def _on_font_change(self, value):
+        """Live drag: push to overlay + refresh label, no save (commit persists)."""
         v = int(float(value))
         if self.overlay:
-            self.overlay.set_font_size(v)
+            self.overlay.set_font_size(v, notify=False)
         self.font_value_label.config(text=f"{v}pt")
 
     def _toggle_test(self):
-        """Toggle test mode (simulate a seed cycle)."""
+        """Toggle test mode (simulate a seed cycle). Shows the overlay for the
+        test, hides it again when the test ends (Hide-on-Stop)."""
         if self.boss_timer.timer_active:
             self.boss_timer.stop_cycle()
             self.test_btn.config(text="Test Cycle")
-            self.start_btn.config(state='normal')
+            self._refresh_monitor_button()
             self._stop_game_loop()
             self._cancel_test_callbacks()
+            if self.overlay and not self._monitoring:
+                self.overlay.hide()
         else:
             self._cancel_test_callbacks()
             self.boss_timer.start_cycle("TestPlayer")
             self.test_btn.config(text="Stop Test")
             self.start_btn.config(state='disabled')
             self._start_game_loop()
-            if self.overlay and not self.overlay.is_visible:
+            if self.overlay:
                 self.overlay.show()
-                self.visibility_btn.config(text="Hide")
             self._test_fix_id = self.after(TEST_FIXATION_DELAY_MS,
                                            self._test_trigger_fixation)
             self._test_reset_id = self.after(TEST_RESET_DELAY_MS,
@@ -509,8 +395,10 @@ class LiveTrackerPanel(tk.Toplevel):
         if not self.boss_timer.timer_active:
             self._test_reset_id = None
             self.test_btn.config(text="Test Cycle")
-            self.start_btn.config(state='normal')
+            self._refresh_monitor_button()
             self._stop_game_loop()
+            if self.overlay and not self._monitoring:
+                self.overlay.hide()
         else:
             self._test_reset_id = self.after(TEST_RESET_POLL_MS,
                                              self._test_check_reset)
@@ -570,17 +458,13 @@ class LiveTrackerPanel(tk.Toplevel):
     def _sync_overlay_ui(self):
         """Sync overlay control widgets to current timer_settings."""
         bg_opacity = self.timer_settings.get('bg_opacity', TIMERS_DEFAULTS['bg_opacity'])
-        self.bg_opacity_var.set(bg_opacity)
+        self.bg_opacity_scale.set(round(bg_opacity * 100))
         self.bg_opacity_value_label.config(text=f"{int(bg_opacity * 100)}%")
-        self.font_family_var.set(
-            self.timer_settings.get('font_family', TIMERS_DEFAULTS['font_family'])
-        )
         font_size = self.timer_settings.get('font_size', TIMERS_DEFAULTS['font_size'])
-        self.font_var.set(font_size)
+        self.font_scale.set(font_size)
         self.font_value_label.config(text=f"{font_size}pt")
         if self.overlay:
             self.lock_btn.config(text="Unlock" if self.overlay.is_locked else "Lock")
-            self.visibility_btn.config(text="Hide" if self.overlay.is_visible else "Show")
 
     def _on_withdraw(self):
         """Hide the panel only — monitoring keeps running so the seed-timer
@@ -590,20 +474,19 @@ class LiveTrackerPanel(tk.Toplevel):
         self.withdraw()
 
     def restore_overlay(self):
-        """Always show the overlay when the panel is re-opened."""
-        if self.overlay:
+        """Re-show the overlay on panel reopen only while monitoring is active
+        (Hide-on-Stop — visibility follows Start/Stop)."""
+        if self.overlay and self._monitoring:
             self.overlay.show()
-            self.visibility_btn.config(text="Hide")
 
     def cleanup(self):
         """Stop monitoring and save settings. Call before destroying the window."""
         self.combat_monitor.stop_monitoring()
         self._stop_game_loop()
-        if self._focus_watch_id is not None:
-            self.after_cancel(self._focus_watch_id)
-            self._focus_watch_id = None
         self._cancel_test_callbacks()
         self.save_settings()
         if self.overlay:
+            if self._focus_watcher:
+                self._focus_watcher.unregister(self.overlay)
             self.overlay.destroy()
             self.overlay = None

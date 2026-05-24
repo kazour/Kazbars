@@ -8,8 +8,9 @@ worker thread that:
      `CreateFile` exclusive-share trick).
   3. Tails the file, parsing every new line and recording matches into
      the three trackers.
-  4. On a 100 ms tick, polls AoC focus and refreshes the snapshot the
-     panel/overlay reads.
+  4. On a 100 ms tick, refreshes the snapshot the panel/overlay reads.
+     (Focus-gating is the app-owned `ForegroundWatcher`'s job, not the
+     meter's — it no longer probes the foreground window.)
   5. Detects log rotation (truncation or a newer file appearing) and
      resets the trackers for a clean re-tail.
 
@@ -23,12 +24,10 @@ panel/UI tick, not here — matches Deeps's split (main.rs owns alarm
 state) and keeps this module focused on parsing + I/O.
 """
 
-import ctypes
 import logging
 import sys
 import threading
 import time
-from ctypes import wintypes
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -73,15 +72,13 @@ class MeterSnapshot:
     """Frozen view of the meter state, read by the UI tick.
 
     Rates carry the trackers' rolling values (None during warm-up, 0.0
-    during post-warm-up silence, a number otherwise). `aoc_in_focus` is the
-    auto-hide gate.
+    during post-warm-up silence, a number otherwise).
     """
 
     dps: float | None
     dpis: float | None
     hps: float | None
     hps_out: float | None
-    aoc_in_focus: bool
     status: Status
     log_filename: str | None
 
@@ -92,111 +89,16 @@ class MeterSnapshot:
             dpis=None,
             hps=None,
             hps_out=None,
-            aoc_in_focus=False,
             status=Status.NOT_STARTED,
             log_filename=None,
         )
 
 
 # =========================================================================== #
-# Windows API bindings (focus poll + live-log probe)                          #
+# Windows API bindings (live-log probe)                                       #
 # =========================================================================== #
 
 _IS_WINDOWS = sys.platform == "win32"
-
-if _IS_WINDOWS:
-    _TH32CS_SNAPPROCESS = 0x00000002
-    _INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
-
-    class _PROCESSENTRY32W(ctypes.Structure):
-        _fields_ = (
-            ("dwSize", wintypes.DWORD),
-            ("cntUsage", wintypes.DWORD),
-            ("th32ProcessID", wintypes.DWORD),
-            ("th32DefaultHeapID", ctypes.c_void_p),
-            ("th32ModuleID", wintypes.DWORD),
-            ("cntThreads", wintypes.DWORD),
-            ("th32ParentProcessID", wintypes.DWORD),
-            ("pcPriClassBase", wintypes.LONG),
-            ("dwFlags", wintypes.DWORD),
-            ("szExeFile", wintypes.WCHAR * 260),
-        )
-
-    _kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    _kernel32.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
-    _kernel32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
-    _kernel32.Process32FirstW.argtypes = [
-        wintypes.HANDLE,
-        ctypes.POINTER(_PROCESSENTRY32W),
-    ]
-    _kernel32.Process32FirstW.restype = wintypes.BOOL
-    _kernel32.Process32NextW.argtypes = [
-        wintypes.HANDLE,
-        ctypes.POINTER(_PROCESSENTRY32W),
-    ]
-    _kernel32.Process32NextW.restype = wintypes.BOOL
-    _kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
-    _kernel32.CloseHandle.restype = wintypes.BOOL
-    _kernel32.GetCurrentProcessId.restype = wintypes.DWORD
-
-    _user32 = ctypes.WinDLL("user32", use_last_error=True)
-    _user32.GetForegroundWindow.restype = wintypes.HWND
-    _user32.GetWindowThreadProcessId.argtypes = [
-        wintypes.HWND,
-        ctypes.POINTER(wintypes.DWORD),
-    ]
-    _user32.GetWindowThreadProcessId.restype = wintypes.DWORD
-
-
-def aoc_is_foreground() -> bool:
-    """True iff AoC (or this process itself) is the foreground window.
-
-    Mirrors `Deeps/rust/deeps/src/platform_win.rs::aoc_is_foreground` —
-    `GetForegroundWindow` → `GetWindowThreadProcessId` → match the PID
-    against `AgeOfConan.exe` / `AgeOfConanDX10.exe` via
-    `CreateToolhelp32Snapshot` (which doesn't require `OpenProcess`
-    access on the target).
-
-    The own-process branch is the "overlay drag doesn't hide overlay"
-    trick — any window owned by KazBars counts as AoC focus, so the
-    Deeps panel and the overlay itself keep the show-gate open.
-    """
-    if not _IS_WINDOWS:
-        return True  # non-Windows stub: always show
-
-    try:
-        hwnd = _user32.GetForegroundWindow()
-        if not hwnd:
-            return False
-        pid = wintypes.DWORD(0)
-        _user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-        pid_val = pid.value
-        if pid_val == 0:
-            return False
-        # Our own process counts as AoC for the show-gate.
-        if pid_val == _kernel32.GetCurrentProcessId():
-            return True
-
-        snap = _kernel32.CreateToolhelp32Snapshot(_TH32CS_SNAPPROCESS, 0)
-        if snap == _INVALID_HANDLE_VALUE or snap is None:
-            return False
-        try:
-            entry = _PROCESSENTRY32W()
-            entry.dwSize = ctypes.sizeof(_PROCESSENTRY32W)
-            if not _kernel32.Process32FirstW(snap, ctypes.byref(entry)):
-                return False
-            while True:
-                if entry.th32ProcessID == pid_val:
-                    name = entry.szExeFile
-                    return name in ("AgeOfConan.exe", "AgeOfConanDX10.exe")
-                if not _kernel32.Process32NextW(snap, ctypes.byref(entry)):
-                    return False
-        finally:
-            _kernel32.CloseHandle(snap)
-    except OSError:
-        # Failing the probe should not hide the overlay — default to show.
-        logger.debug("aoc_is_foreground probe failed", exc_info=True)
-        return True
 
 
 def is_live(path: Path) -> bool:
@@ -295,7 +197,6 @@ class DeepsMeter:
         # State updated only under `_lock`.
         self._status: Status = Status.NOT_STARTED
         self._log_filename: str | None = None
-        self._aoc_in_focus = False
         self._snapshot: MeterSnapshot = MeterSnapshot.empty()
 
     # ------------------------------------------------------------------ #
@@ -483,20 +384,20 @@ class DeepsMeter:
                     self._heals_out_tracker.record(now, amount)
 
     def _tick(self, now: float) -> None:
-        """100 ms housekeeping: poll AoC focus, refresh the snapshot."""
-        in_focus = aoc_is_foreground()
+        """100 ms housekeeping: refresh the snapshot the UI reads.
+
+        Focus is no longer probed here — the shared `ForegroundWatcher`
+        (owned by the app) gates overlay visibility for every overlay at once.
+        """
         with self._lock:
-            self._aoc_in_focus = in_focus
             self._snapshot = self._build_snapshot_locked(now)
 
     def _update_state(self, status: Status, log_filename: str | None) -> None:
         """Set status + log filename and rebuild the snapshot accordingly."""
-        in_focus = aoc_is_foreground()
         now = time.monotonic()
         with self._lock:
             self._status = status
             self._log_filename = log_filename
-            self._aoc_in_focus = in_focus
             self._snapshot = self._build_snapshot_locked(now)
 
     def _build_snapshot_locked(self, now: float) -> MeterSnapshot:
@@ -506,7 +407,6 @@ class DeepsMeter:
             dpis=self._in_tracker.rolling_rate(now),
             hps=self._heals_tracker.rolling_rate(now),
             hps_out=self._heals_out_tracker.rolling_rate(now),
-            aoc_in_focus=self._aoc_in_focus,
             status=self._status,
             log_filename=self._log_filename,
         )

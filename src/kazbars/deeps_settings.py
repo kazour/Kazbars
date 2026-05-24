@@ -20,7 +20,7 @@ import json
 import logging
 from pathlib import Path
 
-from .overlay_engine import FONT_FAMILY_CHOICES
+from .overlay_engine import FONT_FAMILY_CHOICES, OverlayConfig
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +31,11 @@ __all__ = [
     "DEEPS_RANGES",
     "FONT_FAMILY_CHOICES",
     "SETTINGS_FILENAME",
+    "apply_overlay_config_to_deeps",
     "get_default_settings",
     "get_settings_path",
     "load_settings",
+    "overlay_config_from_deeps",
     "save_settings",
     "validate_all_settings",
     "validate_setting",
@@ -162,6 +164,35 @@ def validate_all_settings(settings: dict) -> dict:
         if key in DEEPS_DEFAULTS:
             result[key] = validate_setting(key, value)
     return result
+
+
+# =========================================================================== #
+# Shared OverlayConfig adapters (no disk-key renames)                         #
+# =========================================================================== #
+
+def overlay_config_from_deeps(settings: dict) -> OverlayConfig:
+    """Build an `OverlayConfig` from the Deeps `overlay_*` keys."""
+    return OverlayConfig(
+        x=int(settings.get("overlay_x", DEEPS_DEFAULTS["overlay_x"])),
+        y=int(settings.get("overlay_y", DEEPS_DEFAULTS["overlay_y"])),
+        positioned=bool(settings.get("overlay_positioned", False)),
+        locked=bool(settings.get("overlay_locked", False)),
+        font_family=str(settings.get("overlay_font_family", DEEPS_DEFAULTS["overlay_font_family"])),
+        font_size=int(settings.get("overlay_font_size", DEEPS_DEFAULTS["overlay_font_size"])),
+        bg_opacity=float(settings.get("overlay_bg_opacity", DEEPS_DEFAULTS["overlay_bg_opacity"])),
+        visible=True,  # Deeps visibility follows Start/Stop, not a persisted flag
+    )
+
+
+def apply_overlay_config_to_deeps(settings: dict, cfg: OverlayConfig) -> None:
+    """Write an `OverlayConfig` back into the Deeps `overlay_*` keys (in place)."""
+    settings["overlay_x"] = cfg.x
+    settings["overlay_y"] = cfg.y
+    settings["overlay_positioned"] = cfg.positioned
+    settings["overlay_locked"] = cfg.locked
+    settings["overlay_font_family"] = cfg.font_family
+    settings["overlay_font_size"] = cfg.font_size
+    settings["overlay_bg_opacity"] = cfg.bg_opacity
 
 
 # =========================================================================== #

@@ -66,6 +66,8 @@ INFRASTRUCTURE = {
     "ui_tk_style",
     "custom_menu_bar",
     "overlay_engine",
+    "foreground",
+    "focus_watcher",
 }
 
 
