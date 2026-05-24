@@ -53,9 +53,10 @@ Developer setup. End users should download a release.
 git clone https://github.com/kazour/Kazbars.git
 cd Kazbars
 
-# 2. Install (uv recommended; pip works too)
+# 2. Install + enable git hooks (uv recommended; pip works too)
 uv sync --extra dev --extra build
 # or:  pip install -e ".[dev,build]"
+uv run pre-commit install   # one-time per clone (pip users: drop "uv run"); runs ruff lint + pytest on every commit
 
 # 3. Run from source
 uv run python -m kazbars
@@ -63,9 +64,8 @@ uv run python -m kazbars
 # 4. Tests
 uv run pytest
 
-# 5. Lint + format
+# 5. Lint  (formatting is intentionally not enforced — see .pre-commit-config.yaml)
 uv run ruff check src tests
-uv run ruff format src tests
 
 # 6. Build a distributable .exe
 uv run pyinstaller kazbars.spec
