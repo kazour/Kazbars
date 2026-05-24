@@ -19,15 +19,15 @@ logger = logging.getLogger(__name__)
 TIMERS_DEFAULTS = {
     # Overlay position and size
     "x": 0,                     # Will be centered on first run
-    "y": 50,                    # Near top of screen
+    "y": 150,                   # Below the top edge
     "width": 269,
     "height": 104,
 
     # Overlay state
     "locked": False,
-    "bg_opacity": 0.0,          # 0.0 transparent → 1.0 solid dark
+    "bg_opacity": 0.66,         # 0.0 transparent → 1.0 solid dark
     "font_family": "Segoe UI",  # one of overlay_engine.FONT_FAMILY_CHOICES
-    "font_size": 22,            # matches Deeps overlay_font_size default; range 12-48
+    "font_size": 20,            # range 12-48
 
     # Visibility (remember if user hid the overlay)
     "visible": True,

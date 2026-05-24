@@ -31,14 +31,14 @@ from kazbars.deeps_settings import (
 def test_defaults_match_locked_decisions() -> None:
     """The three threshold defaults are the user-locked numbers."""
     d = get_default_settings()
-    assert d["alarm_threshold"] == 2000.0
+    assert d["alarm_threshold"] == 2500.0
     assert d["hpis_green_threshold"] == 50.0
     assert d["dpis_yellow_threshold"] == 300.0
 
 
-def test_pet_damage_default_off() -> None:
-    """Pet damage toggle starts OFF per the locked decision."""
-    assert get_default_settings()["include_pet_damage"] is False
+def test_pet_damage_default_on() -> None:
+    """Pet damage toggle starts ON by default."""
+    assert get_default_settings()["include_pet_damage"] is True
 
 
 def test_layout_default_horizontal() -> None:
@@ -52,11 +52,11 @@ def test_overlay_starts_unlocked_unpositioned() -> None:
 
 
 def test_overlay_appearance_defaults() -> None:
-    """Font is the design-system default; bg is fully transparent on first run."""
+    """Font is the design-system default; bg has a partial backdrop on first run."""
     d = get_default_settings()
     assert d["overlay_font_family"] == "Segoe UI"
     assert d["overlay_font_size"] == 22
-    assert d["overlay_bg_opacity"] == 0.0
+    assert d["overlay_bg_opacity"] == 0.66
 
 
 def test_font_family_choices_includes_default() -> None:
@@ -69,8 +69,8 @@ def test_get_default_settings_returns_fresh_copy() -> None:
     d1 = get_default_settings()
     d1["alarm_threshold"] = 9999.0
     d2 = get_default_settings()
-    assert d2["alarm_threshold"] == 2000.0
-    assert DEEPS_DEFAULTS["alarm_threshold"] == 2000.0
+    assert d2["alarm_threshold"] == 2500.0
+    assert DEEPS_DEFAULTS["alarm_threshold"] == 2500.0
 
 
 # =========================================================================== #
@@ -128,7 +128,7 @@ class TestValidateSetting:
 
     def test_unparsable_falls_back_to_default(self) -> None:
         """Garbage in a numeric field → use the default, don't crash."""
-        assert validate_setting("alarm_threshold", "not a number") == 2000.0
+        assert validate_setting("alarm_threshold", "not a number") == 2500.0
         assert validate_setting("overlay_x", "junk") == 0
 
     def test_unknown_key_passes_through(self) -> None:

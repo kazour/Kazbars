@@ -29,8 +29,8 @@ CLAMP_SPECS = {
     'iconSize': (56, 8, 128), 'gap': (-1, -5, 10),
     'x': (100, 0, SCREEN_MAX_X), 'y': (400, 0, SCREEN_MAX_Y),
     'timerFontSize': (18, 8, 48), 'timerFlashThreshold': (6, 0, 11),
-    'timerYOffset': (0, -10, 10),
-    'stackFontSize': (14, 8, 24),
+    'timerYOffset': (-3, -10, 10),
+    'stackFontSize': (16, 8, 24),
 }
 # key → (default, valid_values)
 ENUM_SPECS = {
@@ -71,8 +71,8 @@ def create_default_grid(grid_type="player", rows=1, cols=10, mode="dynamic", gri
         'showTimers': True,
         'timerFontSize': 18,
         'timerFlashThreshold': 6,
-        'timerYOffset': 0,
-        'stackFontSize': 14,
+        'timerYOffset': -3,
+        'stackFontSize': 16,
         'enableFlashing': True,
         'fillDirection': fill_dir,
         'sortOrder': 'longest',

@@ -7,7 +7,7 @@ files stay consistent in shape and behavior.
 Persisted state:
   - Three user-configurable thresholds (alarm DPS, HPIS green deadband,
     DPIS yellow threshold) — set from the panel.
-  - Pet-damage toggle — off by default (locked decision).
+  - Pet-damage toggle — included by default.
   - Overlay layout choice (`horizontal` | `vertical`) — radio in panel.
   - Overlay window state — position, lock state, positioned-once flag.
 
@@ -48,12 +48,12 @@ __all__ = [
 
 DEEPS_DEFAULTS = {
     # Thresholds — set from the panel by the user.
-    "alarm_threshold": 2000.0,           # red-flash alarm activates at this 5s DPS
+    "alarm_threshold": 2500.0,           # red-flash alarm activates at this 5s DPS
     "hpis_green_threshold": 50.0,        # HPS cell tints green when net > +N/s
     "dpis_yellow_threshold": 300.0,      # DPIS cell tints yellow when -net > +N/s
 
-    # Behavior toggle — pet damage is off by default.
-    "include_pet_damage": False,
+    # Behavior toggle — pet damage included by default.
+    "include_pet_damage": True,
 
     # Overlay layout — radio in panel, "horizontal" or "vertical".
     "layout": "horizontal",
@@ -66,18 +66,18 @@ DEEPS_DEFAULTS = {
     # via the PIL overlay engine).
     "overlay_font_family": "Segoe UI",
     "overlay_font_size": 22,
-    "overlay_bg_opacity": 0.0,
+    "overlay_bg_opacity": 0.66,
 
     # Overlay window state.
     "overlay_x": 0,                      # will be centered on first run
-    "overlay_y": 50,
+    "overlay_y": 150,
     "overlay_locked": False,
     "overlay_positioned": False,         # gates one-time centering pass
 
     # Overlay cell visibility — list of IDs in `deeps_overlay.ALL_CELL_IDS`.
     # Render order is fixed; the user picks WHICH cells are shown via the
     # Deeps-panel checkboxes.
-    "visible_cells": ["dps", "dpis", "hps", "hps-out", "net"],
+    "visible_cells": ["dps", "dpis", "hps"],
 }
 
 
