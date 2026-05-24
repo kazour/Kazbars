@@ -8,7 +8,7 @@ Toplevel windows — no brief white flash on open, no native titlebar to style.
 
 import tkinter as tk
 
-from .ui_helpers import FONT_BODY, FONT_SMALL, THEME_COLORS, TK_COLORS, _RETRO_COLORS
+from .ui_helpers import _RETRO_COLORS, FONT_BODY, FONT_SMALL, THEME_COLORS, TK_COLORS
 
 # ============================================================================
 # CUSTOM DARK MENU BAR
