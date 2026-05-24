@@ -351,10 +351,27 @@ class LiveTrackerPanel(tk.Toplevel):
         """One iteration of the boss-timer update loop. Re-schedules itself."""
         try:
             self.boss_timer.update_display()
+            self._sync_monitor_log()
         except Exception as e:
             logger.error("Timer loop error: %s", e)
         finally:
             self._game_loop_id = self.after(GAME_TICK_MS, self._run_game_tick)
+
+    def _sync_monitor_log(self):
+        """Reflect the monitor's current log in the status line while monitoring.
+        The combat monitor switches to a newer CombatLog in its background thread
+        on a new game session; without this the panel would keep showing the log
+        found at Start (Deeps stays live because it reads the meter snapshot).
+        Change-guarded so it only re-renders on an actual switch."""
+        if not self._monitoring:
+            return
+        current = self.combat_monitor.current_log_path()
+        name = Path(current).name if current else None
+        if name == self._latest_log:
+            return
+        self._latest_log = name
+        self.boss_timer.set_waiting_footer(sanitize_log_name(current) if current else "")
+        self._render_status()
 
     def _stop_game_loop(self):
         """Stop the update loop."""

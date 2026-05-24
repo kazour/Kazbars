@@ -11,9 +11,9 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 # How often (seconds) the monitor re-scans the folder for a newer CombatLog
-# while running. Matches the Deeps meter's snappy cadence so a fresh session's
-# log is picked up within a few seconds with no manual rescan.
-_NEWER_LOG_CHECK_SEC = 3.0
+# while running, so a fresh game session's log is picked up automatically with
+# no manual rescan. Kept short so the switch is near-instant, like the Deeps meter.
+_NEWER_LOG_CHECK_SEC = 1.0
 # Sleep between scans while waiting for a log to appear (started before AoC
 # created today's file).
 _SCAN_SLEEP = 1.0
@@ -140,14 +140,16 @@ class CombatLogMonitor:
                 pass
             self.file_handle = None
 
-    def _check_for_newer_log(self):
-        """
-        Check for a newer log file every 30 seconds.
-        Switches to new log if found.
+    def current_log_path(self):
+        """The combat log currently being tailed, or None. Thread-safe read for
+        the panel's status display: the monitor thread can switch this to a
+        newer log (new game session) without the panel knowing otherwise."""
+        with self._lock:
+            return self.log_path
 
-        Returns:
-            bool: True if switched to a new log
-        """
+    def _check_for_newer_log(self):
+        """Re-scan for a newer CombatLog (throttled to _NEWER_LOG_CHECK_SEC) and
+        switch to it if one appeared. Returns True if it switched."""
         try:
             current_time = time.time()
             if current_time - self.last_file_check < _NEWER_LOG_CHECK_SEC:
