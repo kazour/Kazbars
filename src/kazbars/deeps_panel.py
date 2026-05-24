@@ -40,14 +40,12 @@ from .deeps_settings import (
     validate_setting,
 )
 from .ui_helpers import (
-    BTN_DIALOG,
     BTN_LARGE,
+    BTN_SMALL,
     FONT_BODY,
-    FONT_SECTION,
     FONT_SMALL,
     INPUT_WIDTH_NUM,
     MODULE_COLORS,
-    PAD_INNER,
     PAD_LF,
     PAD_ROW,
     PAD_SMALL,
@@ -98,7 +96,7 @@ class DeepsPanel(tk.Toplevel):
         game_path_getter: Callable[[], str | None],
     ) -> None:
         super().__init__(parent)
-        self.title("Deeps — KazBars")
+        self.title("Deeps - KazBars")
         self.resizable(False, False)
         self.transient(parent)
 
@@ -122,6 +120,9 @@ class DeepsPanel(tk.Toplevel):
         self.overlay: DeepsOverlay | None = None
         self._tick_id: str | None = None
         self._alarm_active: bool = False
+        # Last (text, color) painted to the status label — lets _render_status
+        # skip redundant configures on the 100 ms tick when nothing changed.
+        self._last_status: tuple[str, str] | None = None
         self._focus_watcher = getattr(parent, "focus_watcher", None)
 
         # tk vars for two-way binding with widgets
@@ -202,22 +203,20 @@ class DeepsPanel(tk.Toplevel):
         add_tooltip(self._start_btn, "Start or stop reading your combat log")
 
     def _build_overlay_row(self, parent: ttk.Frame) -> None:
-        """Overlay group: section header + lock button + layout radio."""
-        ttk.Label(
-            parent, text="Overlay", font=FONT_SECTION,
-            foreground=THEME_COLORS["body"],
-        ).pack(anchor="w", pady=(PAD_SMALL, PAD_XS))
+        """Overlay group card: lock button + layout radio."""
+        lf = create_card(parent, "Overlay")
+        lf.pack(fill="x", pady=(PAD_SMALL, PAD_ROW))
 
-        row = ttk.Frame(parent)
-        row.pack(anchor="w", fill="x", pady=(0, PAD_XS))
+        row = ttk.Frame(lf)
+        row.pack(anchor="w", fill="x")
 
         self._lock_btn = ttk.Button(
-            row, text="Lock Overlay",
-            width=BTN_DIALOG + 4,
+            row, text="Lock", width=BTN_SMALL,
             bootstyle="secondary",  # type: ignore[call-arg]
             command=self._on_lock_click,
         )
         self._lock_btn.pack(side="left", padx=(0, PAD_TAB))
+        add_tooltip(self._lock_btn, "Lock the overlay so it can't be moved (unlock here too)")
 
         ttk.Radiobutton(
             row, text="Horizontal", value="horizontal",
@@ -270,18 +269,14 @@ class DeepsPanel(tk.Toplevel):
             self.overlay.set_bg_opacity(pct / 100.0)
 
     def _build_cells_picker(self, parent: ttk.Frame) -> None:
-        """LabelFrame with one checkbox per overlay cell (5 total): the four
+        """Card with one checkbox per overlay cell (5 total): the four
         rate cells in one row, with ΔHP in on a second row beneath them.
 
         The checkbox arrangement is cosmetic — the overlay's render order is
         fixed by `ALL_CELL_IDS`; the user controls only which cells are shown.
         Labels come from the shared `CELL_LABELS` so picker and overlay agree.
         """
-        lf = ttk.LabelFrame(
-            parent, text="Overlay cells",
-            style="Card.TLabelframe",
-            padding=PAD_INNER,
-        )
+        lf = create_card(parent, "Overlay Cells")
         lf.pack(fill="x", pady=(PAD_SMALL, PAD_ROW))
 
         # Row 1: the four rate cells; row 2: ΔHP in on its own.
@@ -304,12 +299,8 @@ class DeepsPanel(tk.Toplevel):
             self.overlay.set_visible_cells(visible)
 
     def _build_thresholds(self, parent: ttk.Frame) -> None:
-        """LabelFrame with the three threshold spinboxes."""
-        lf = ttk.LabelFrame(
-            parent, text="Alarm & Tints",
-            style="Card.TLabelframe",
-            padding=PAD_INNER,
-        )
+        """Card with the three threshold spinboxes."""
+        lf = create_card(parent, "Alarm & Tints")
         lf.pack(fill="x", pady=(PAD_SMALL, PAD_ROW))
 
         self._build_threshold_row(
@@ -486,9 +477,9 @@ class DeepsPanel(tk.Toplevel):
         if self._lock_btn is None or self.overlay is None:
             return
         if self.overlay.is_locked():
-            self._lock_btn.configure(text="Unlock Overlay")
+            self._lock_btn.configure(text="Unlock")
         else:
-            self._lock_btn.configure(text="Lock Overlay")
+            self._lock_btn.configure(text="Lock")
 
     # ------------------------------------------------------------------ #
     # Layout (overlay)                                                   #
@@ -612,9 +603,9 @@ class DeepsPanel(tk.Toplevel):
         if not running:
             if not game:
                 text = "No game folder set in KazBars main window."
-                color = THEME_COLORS["danger"]
+                color = THEME_COLORS["danger_text"]
             else:
-                text = "Not monitoring — click Start to begin."
+                text = "Not monitoring. Click Start to begin."
                 color = THEME_COLORS["muted"]
         elif snapshot.status is Status.NOT_STARTED:
             # Brief transition window — meter is spinning up.
@@ -636,6 +627,11 @@ class DeepsPanel(tk.Toplevel):
             text = ""
             color = THEME_COLORS["body"]
 
+        # Skip the configure when nothing changed — the 100 ms tick calls this
+        # every frame, but the status line rarely moves while tailing.
+        if (text, color) == self._last_status:
+            return
+        self._last_status = (text, color)
         self._status_label.configure(text=text, foreground=color)
 
     def _update_alarm_state(self, snapshot: MeterSnapshot) -> None:

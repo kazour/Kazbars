@@ -34,7 +34,8 @@ THEME_COLORS = {
     'muted':      '#B0B0B0',   # Hints, placeholders (~6.0:1 on #222)
     'accent':     '#3498db',   # Links, emphasis
     'warning':    '#f39c12',   # Warnings
-    'danger':     '#e74c3c',   # Errors
+    'danger':     '#e74c3c',   # Errors — fills/borders/dots (~4.2:1 on #222, below AA for text)
+    'danger_text': '#f06a5d',  # Error text on #222 (~5.3:1 AA) — use for readable danger labels
     'success':    '#00bc8c',   # Success
     'info_value': '#3498db',   # Info display values
     'purple':     '#9b59b6',   # Database nav accent

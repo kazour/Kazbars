@@ -24,15 +24,13 @@ from .live_tracker_settings import (
 from .settings_manager import get_setting, set_setting
 from .timer_overlay import TimerOverlay
 from .ui_helpers import (
+    BTN_LARGE,
     BTN_SMALL,
-    FONT_SMALL,
     MODULE_COLORS,
-    PAD_BUTTON_GAP,
     PAD_LF,
     PAD_MID,
     PAD_SMALL,
     PAD_TAB,
-    PAD_XS,
     THEME_COLORS,
 )
 from .ui_widgets import (
@@ -50,6 +48,14 @@ from .window_position import bind_window_position_save, restore_window_position
 
 # Game-loop tick (ms) — drives both the schedule cadence and the reschedule.
 GAME_TICK_MS = 50
+
+# Header + panel dimensions — width matched to the Deeps panel so the two
+# sibling config windows read as a set. Height is provisional: the panel
+# auto-tightens to its natural reqheight after _build_ui (resizable=False
+# ignores the saved height anyway), so adding controls never clips the bottom.
+_HEADER_WIDTH = 440
+_PANEL_DEFAULT_WIDTH = 440
+_PANEL_PROVISIONAL_HEIGHT = 470
 
 # Test-cycle timing (ms)
 TEST_FIXATION_DELAY_MS = 4000
@@ -88,13 +94,14 @@ class LiveTrackerPanel(tk.Toplevel):
             game_path_getter: Callable that returns the current AoC game path (str)
         """
         super().__init__(parent)
-        self.title("Ethram-Fal Seed Timer \u2014 KazBars")
+        self.title("Ethram-Fal Seed Timer - KazBars")
         self.resizable(False, False)
         self.transient(parent)
 
         _migrate_window_position_key()
         restore_window_position(
-            self, 'live_tracker', 440, 470, parent, resizable=False, offset=(48, 40)
+            self, 'live_tracker', _PANEL_DEFAULT_WIDTH, _PANEL_PROVISIONAL_HEIGHT,
+            parent, resizable=False, offset=(48, 40),
         )
         bind_window_position_save(self, 'live_tracker', save_size=False)
 
@@ -111,6 +118,10 @@ class LiveTrackerPanel(tk.Toplevel):
         self._monitoring = False
         self._test_fix_id = None
         self._test_reset_id = None
+        # Full filename of the detected combat log (None when none found) —
+        # feeds the single-line _render_status. The sanitized short name goes
+        # only to the overlay footer.
+        self._latest_log = None
 
         # Wire timer + monitor first so guards aren't needed downstream.
         # _dispatch_overlay_update hops from the combat-monitor thread to the
@@ -124,6 +135,12 @@ class LiveTrackerPanel(tk.Toplevel):
 
         # Auto-detect log path and push idle status to overlay
         self._update_log_path()
+
+        # Tighten the panel to the natural height of its packed content (mirrors
+        # DeepsPanel). resizable=False ignores the saved height, so this is where
+        # geometry is locked in; saved-position runs keep their x/y, height only.
+        self.update_idletasks()
+        self.geometry(f"{_PANEL_DEFAULT_WIDTH}x{self.winfo_reqheight()}")
 
         self.protocol("WM_DELETE_WINDOW", self._on_withdraw)
 
@@ -143,78 +160,82 @@ class LiveTrackerPanel(tk.Toplevel):
             self.overlay.update_display(phase)
 
     def _build_ui(self):
-        """Build the panel UI."""
-        create_dialog_header(self, "Ethram-Fal Seed Timer", MODULE_COLORS['live_tracker'], width=440)
+        """Compose the panel to mirror DeepsPanel: header → tip → status block →
+        primary action → Overlay card → Appearance card. The seed-timer's own
+        Test Cycle sits where Deeps puts its thresholds/cells."""
+        create_dialog_header(
+            self, "Ethram-Fal Seed Timer", MODULE_COLORS['live_tracker'], width=_HEADER_WIDTH
+        )
         create_tip_bar(
             self,
             "Tracks the Viscous Seed cycle in real time to help coordinate scorpion kills."
         )
 
-        main_frame = ttk.Frame(self)
-        main_frame.pack(fill='both', expand=True, padx=PAD_TAB, pady=PAD_SMALL)
+        body = ttk.Frame(self, padding=(PAD_TAB, PAD_LF))
+        body.pack(fill='both', expand=True)
 
-        # Cards fill the panel width (matches the Deeps panel) rather than
-        # centering to their content width.
-        center_panel = ttk.Frame(main_frame)
-        center_panel.pack(fill='both', expand=True)
+        self._build_status_block(body)
+        self._build_primary_action(body)
+        self._build_overlay_controls(body)
+        self._build_appearance(body)
 
-        self._build_seed_timer_section(center_panel)
-        self._build_overlay_controls(center_panel)
+    def _build_status_block(self, parent):
+        """Single 'Status' label + one colored status line above the Start
+        button — the same shape DeepsPanel uses. The line folds monitoring
+        state and the detected log into one message (see _render_status)."""
+        self.status_label = create_status_block(
+            parent, "Status", wraplength=_PANEL_DEFAULT_WIDTH - 2 * PAD_TAB,
+        )
 
-    def _build_seed_timer_section(self, parent):
-        """Combat-log monitor: one Start/Stop toggle + status. Logs are picked
-        up automatically (no manual rescan)."""
-        seed_frame = create_card(parent, "Combat Log Monitor", padding=PAD_LF)
-        seed_frame.pack(fill='x', pady=(0, PAD_LF))
-
-        self.start_btn = create_toggle_action_button(seed_frame, self._on_start_stop_click)
+    def _build_primary_action(self, parent):
+        """Big Start / Stop monitoring toggle — the headline interaction."""
+        self.start_btn = create_toggle_action_button(
+            parent, self._on_start_stop_click, width=BTN_LARGE,
+        )
         self.start_btn.pack(anchor='w', pady=(0, PAD_MID))
         add_tooltip(self.start_btn, "Start or stop watching the combat log for the Viscous Seed cycle")
 
-        self.status_label = create_status_block(seed_frame, "Monitor")
-        self.status_label.configure(text="Stopped")
-
-        self.log_status_label = ttk.Label(seed_frame, text="No game path set",
-                  font=FONT_SMALL, foreground=THEME_COLORS['muted'])
-        self.log_status_label.pack(anchor='w', pady=(PAD_BUTTON_GAP, 0))
-
     def _build_overlay_controls(self, parent):
-        """Overlay settings: lock + test buttons, background + size sliders.
-        (Font family is fixed to Segoe UI; visibility follows Start/Stop.)"""
-        overlay_frame = create_card(parent, "Overlay", padding=PAD_LF)
-        overlay_frame.pack(fill='x', pady=(0, PAD_LF))
+        """Overlay group card: lock + test-cycle buttons (mirrors Deeps' Overlay
+        card, which holds lock + layout). Visibility follows Start/Stop."""
+        lf = create_card(parent, "Overlay")
+        lf.pack(fill='x', pady=(PAD_SMALL, PAD_MID))
 
-        btn_row = ttk.Frame(overlay_frame)
-        btn_row.pack(fill='x', pady=(0, PAD_MID))
+        row = ttk.Frame(lf)
+        row.pack(anchor='w', fill='x')
 
         self.lock_btn = ttk.Button(
-            btn_row, text="Lock", command=self._toggle_lock, width=BTN_SMALL
+            row, text="Lock", command=self._toggle_lock, width=BTN_SMALL,
+            bootstyle="secondary",  # type: ignore[call-arg]
         )
-        self.lock_btn.pack(side='left', padx=(0, PAD_XS))
+        self.lock_btn.pack(side='left', padx=(0, PAD_TAB))
         add_tooltip(self.lock_btn, "Lock the overlay so it can't be moved (unlock here too)")
 
         self.test_btn = ttk.Button(
-            btn_row, text="Test Cycle", command=self._toggle_test
+            row, text="Test Cycle", command=self._toggle_test,
+            bootstyle="secondary",  # type: ignore[call-arg]
         )
         self.test_btn.pack(side='left')
         add_tooltip(self.test_btn, "Simulate a full Viscous Seed cycle (~40 s) for visual testing")
 
-        ttk.Separator(overlay_frame, orient='horizontal').pack(fill='x', pady=(PAD_XS, PAD_MID))
+    def _build_appearance(self, parent):
+        """Appearance card: size + background sliders, same order as Deeps. Font
+        family is fixed to Segoe UI, so there is no font picker."""
+        lf = create_card(parent, "Appearance")
+        lf.pack(fill='x', pady=(PAD_SMALL, PAD_MID))
 
-        # Background-opacity slider — 0% = floating text, 100% = solid panel.
-        # Same 0-100 % control as the Deeps overlay.
-        self.bg_opacity_scale, self.bg_opacity_value_label = create_slider_row(
-            overlay_frame, "Background:", 0, 100,
-            round(self.timer_settings.get('bg_opacity', TIMERS_DEFAULTS['bg_opacity']) * 100),
-            "%", self._on_bg_opacity_change, self._on_overlay_settings_changed,
-        )
-
-        # Size slider 12-48 pt (matches Deeps) — the only size control; the
-        # overlay auto-sizes to the font.
+        # Size slider 12-48 pt (matches Deeps); the overlay auto-sizes to the font.
         self.font_scale, self.font_value_label = create_slider_row(
-            overlay_frame, "Size:", 12, 48,
+            lf, "Size:", 12, 48,
             self.timer_settings.get('font_size', TIMERS_DEFAULTS['font_size']),
             "pt", self._on_font_change, self._on_overlay_settings_changed,
+        )
+
+        # Background opacity 0-100 %: 0 = floating text, 100 = solid panel.
+        self.bg_opacity_scale, self.bg_opacity_value_label = create_slider_row(
+            lf, "Background:", 0, 100,
+            round(self.timer_settings.get('bg_opacity', TIMERS_DEFAULTS['bg_opacity']) * 100),
+            "%", self._on_bg_opacity_change, self._on_overlay_settings_changed,
         )
 
     def _create_overlay(self):
@@ -236,43 +257,47 @@ class LiveTrackerPanel(tk.Toplevel):
     # =========================================================================
 
     def _update_log_path(self):
-        """Refresh the combat-log folder + the status label + the overlay's
-        waiting-state footer (the sanitized tracked-log name)."""
+        """Point the combat monitor at the game folder, refresh the detected
+        log name + the overlay's waiting-state footer, then re-render status."""
         game_path = self.game_path_getter()
 
-        if not game_path:
-            self._set_log_status("Set a game folder in the main window first", "no_path")
+        if not game_path or not Path(game_path).exists():
+            self._latest_log = None
             self.boss_timer.set_waiting_footer("")
-            return
-
-        if not Path(game_path).exists():
-            self._set_log_status(f"Game folder not found: {game_path}", "no_folder")
-            self.boss_timer.set_waiting_footer("")
+            self._render_status()
             return
 
         latest = self.combat_monitor.set_log_folder(game_path)
-
         if latest:
-            name = sanitize_log_name(latest)
-            self._set_log_status(f"Found: {name}", "found")
-            self.boss_timer.set_waiting_footer(name)
+            # Full filename for the panel status line (matches Deeps); the
+            # sanitized short name is only for the cramped overlay footer.
+            self._latest_log = Path(latest).name
+            self.boss_timer.set_waiting_footer(sanitize_log_name(latest))
         else:
-            self._set_log_status("No combat logs found. Type /logcombat on in game.", "missing")
+            self._latest_log = None
             self.boss_timer.set_waiting_footer("Waiting for combat log…")
+        self._render_status()
 
-    # Per log-state: label foreground key in THEME_COLORS.
-    _LOG_STATE_FG = {
-        "found": "success",
-        "missing": "warning",
-        "no_path": "warning",
-        "no_folder": "danger",
-        "default": "muted",
-    }
-
-    def _set_log_status(self, text, state):
-        """Update the log status label colored by its semantic state."""
-        fg_key = self._LOG_STATE_FG.get(state, "muted")
-        self.log_status_label.config(text=text, foreground=THEME_COLORS[fg_key])
+    def _render_status(self):
+        """Map (game path, monitoring, detected log) to one colored status line
+        — the single-line model DeepsPanel uses, with the same color semantics."""
+        game = self.game_path_getter()
+        if not game:
+            text = "No game folder set in KazBars main window."
+            color = THEME_COLORS['danger_text']
+        elif not Path(game).exists():
+            text = f"Game folder not found: {game}"
+            color = THEME_COLORS['danger_text']
+        elif not self._monitoring:
+            text = "Not monitoring. Click Start to begin."
+            color = THEME_COLORS['muted']
+        elif self._latest_log:
+            text = f"Tailing {self._latest_log}"
+            color = THEME_COLORS['success']
+        else:
+            text = "Waiting for combat log. Type /logcombat on in game."
+            color = THEME_COLORS['warning']
+        self.status_label.config(text=text, foreground=color)
 
     def _on_start_stop_click(self):
         if self._monitoring:
@@ -290,7 +315,7 @@ class LiveTrackerPanel(tk.Toplevel):
             return
 
         self._monitoring = True
-        self.status_label.config(text="Running", foreground=THEME_COLORS['success'])
+        self._render_status()
         self._refresh_monitor_button()
         self.test_btn.config(state='disabled')
         self.boss_timer.push_waiting_state()
@@ -304,12 +329,11 @@ class LiveTrackerPanel(tk.Toplevel):
         self.boss_timer.stop_cycle()
         self._monitoring = False
         self._stop_game_loop()
-        self.status_label.config(text="Stopped", foreground=THEME_COLORS['body'])
         self._refresh_monitor_button()
         self.test_btn.config(state='normal')
         if self.overlay:
             self.overlay.hide()
-        self._update_log_path()
+        self._update_log_path()  # re-renders status to the idle line
 
     def _refresh_monitor_button(self):
         """Sync the Start/Stop toggle label, color, and enabled-state."""

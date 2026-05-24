@@ -27,7 +27,7 @@ TIMERS_DEFAULTS = {
     "locked": False,
     "bg_opacity": 0.0,          # 0.0 transparent → 1.0 solid dark
     "font_family": "Segoe UI",  # one of overlay_engine.FONT_FAMILY_CHOICES
-    "font_size": 12,            # 8 - 20
+    "font_size": 22,            # matches Deeps overlay_font_size default; range 12-48
 
     # Visibility (remember if user hid the overlay)
     "visible": True,
