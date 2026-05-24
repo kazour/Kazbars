@@ -9,6 +9,7 @@ This folder holds the docs that go deeper than the [README](../README.md). Skim 
 | [`CHANGELOG.md`](CHANGELOG.md) | Everyone | Per release | A version is cut. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The release routine in [`.github/release.md`](../.github/release.md) prepends entries automatically; manual edits to the `[Unreleased]` section are fine in between. |
 | [`architecture.md`](architecture.md) | Maintainers / Claude | With the code | A module moves, an import changes, a file is added or retired, a dependency cluster rearranges. The line counts and module list at the bottom are the load-bearing part — keep them honest. |
 | [`flows.md`](flows.md) | Maintainers / Claude | With the code | A documented function is renamed/moved, a flow's UI trigger changes (menu, button, shortcut), or a step is added/removed in a flow's call chain. The `file:line` refs are best-effort and drift; the function names + paths + step ordering are what matters. |
+| [`database-changelog.md`](database-changelog.md) | Maintainers / Claude | On every DB edit | A buff is added, renamed, reclassified, or has its spell ID corrected in `Database.json`. One dated bullet per change (buff name + spell ID + action); applies however the edit was made. |
 
 ## What used to be here, and where it went
 
