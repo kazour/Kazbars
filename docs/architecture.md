@@ -176,7 +176,6 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/combat_monitor.py` | 289 | Combat log parser feeding the tracker |
 | `src/kazbars/cast_timer_strip.py` | 348 | Frozen `CastTimerStrip` card (collapsed + master-off by default) for the cast-timer overlay. Header: one master Enabled toggle + title-adjacent Player/Target status tags + muted `overlay`. Body: a single settings row (independent Player/Target X/Y + Bold/Size/Display/Color, font fixed to Arial) + right-side sample preview. Master enables both sides together (`enableP == enableT == enabled`); X/Y grey out when off. Chrome mirrors a grid card — reserved handle gutter, shared `position_entry`, rose card border |
 | `src/kazbars/build_executor.py` | 240 | MTASC compile + deploy |
-| `build.py` | 225 | PyInstaller build driver |
 | `src/kazbars/profile_io.py` | 228 | Profile load (read+apply split, with auto-anchor-scale on resolution mismatch) / save (build+write+commit, `silent=` for piggyback saves) / new / open + missing-buff warning. Persists the `cast_timer` block alongside `grids` |
 | `src/kazbars/game_folder.py` | 192 | Game folder UI + Aoc.exe bypass (with install/remove reconciler) + uninstall |
 | `src/kazbars/game_resolution.py` | 104 | Game resolution dialog + anchor-rescale all loaded grids on apply |
@@ -225,4 +224,4 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `tests/test_deeps_rolling_window.py` | 169 | 13 cases — primitive smoke + decay-during-silence |
 | `tests/test_deeps_overlay.py` | 143 | 23 cases — pure helpers + 5-cell IDs/labels (visual behaviour is `/smoke`) |
 | `tools/deeps_parity_dump.py` | — | Python parity harness for ad-hoc inspection of any log |
-| `Deeps/rust/parity-dump/` | — | Rust source-of-truth dumper, regenerates `tests/fixtures/deeps_parity/expected_totals.json` |
+| `Deeps/rust/parity-dump/` *(external)* | — | Rust source-of-truth dumper — **not vendored here**; lives in the sibling Deeps project. Regenerates the checked-in `tests/fixtures/deeps_parity/expected_totals.json` |
