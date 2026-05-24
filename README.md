@@ -6,7 +6,7 @@
 
 Buff/debuff grid overlay editor for **Age of Conan**. Design icon grids that show your active effects on top of the game, then compile and install them in one click.
 
-> **Renamed from Kaz Grids.** The community has always called this mod "KazBars". As of v2.0, the project takes that name back. Existing users can install KazBars over their old Kaz Grids without uninstalling first — the build pipeline auto-cleans the old `KazGrids.swf`, `Aoc/KzGrids/`, and `# KzGrids auto-load` markers, and `SettingsManager` migrates `kzgrids_settings.json` → `kazbars_settings.json` on first launch. Old preferences and game folder configuration carry over.
+> **Renamed from Kaz Grids.** The community has always called this mod "KazBars". As of v2.0, the project takes that name back. Existing users can install KazBars over their old Kaz Grids without uninstalling first — the build pipeline auto-cleans the old Kaz Grids `.swf`, its `Aoc/` module folder, and the `# KzGrids auto-load` marker, and `SettingsManager` migrates `kzgrids_settings.json` → `kazbars_settings.json` on first launch. Old preferences and game folder configuration carry over.
 
 ## Install
 
@@ -30,9 +30,11 @@ Up to **64 slots total** across all your grids.
 - **Dynamic mode** — slots auto-fill as buffs activate; choose fill direction, sort order, and grouping
 - **Static mode** — pin specific buffs to specific slots
 - **Buff database** — map numeric spell IDs to readable names and classify them as Buff (grey), Debuff (red), or Misc (golden)
+- **Buff-discovery console** — optional in-game overlay that logs effect names and their spell IDs as they land on you or your target, so you can find the numbers to add to the database
 - **Stacking** — show stack counts over icons for multi-stack effects
 - **Timers and flash warnings** — optional remaining-duration text and pulse-on-low-time
 - **Ethram-Fal Seed Timer** — always-on-top overlay for the Viscous Seed / Lotus Fixation / Syphon cycle
+- **Cast-timer overlay** — optional on-screen readout of your and your target's current cast time, positioned and styled alongside your grids
 - **Deeps** — real-time combat overlay showing DPS out, DPS in, HPS out, HPS in, and ΔHP in, with a pulsing alarm when your DPS-out climbs above a user threshold and net-HP tints on the cells
 - **Default Buff Bars editor** — edit the in-game HUD `<BuffListView />` widgets (icon size, spacing, columns, friendly/hostile filter) without hand-editing XML
 
@@ -76,12 +78,7 @@ The PyInstaller build is reproducible from the checked-in [`kazbars.spec`](kazba
 
 ## Documentation
 
-- **[`docs/README.md`](docs/README.md)** — index of all docs with audience + refresh-cadence guide
-- **[`docs/CHANGELOG.md`](docs/CHANGELOG.md)** — release history (Keep a Changelog format)
-- **[`docs/architecture.md`](docs/architecture.md)** — module inventory, dependency clusters, conventions
-- **[`docs/flows.md`](docs/flows.md)** — runtime sequences for the main user actions
-- **[`PRODUCT.md`](PRODUCT.md)** — brand brief: register, voice, anti-references, design principles
-- **[`DESIGN.md`](DESIGN.md)** — visual system: tokens, colors, typography, component contracts
+See **[`docs/README.md`](docs/README.md)** for the full doc map — every doc with its audience and when to update it (changelog, architecture, flows, brand brief, visual system).
 
 The project follows a `src/` layout — entry point is `python -m kazbars`, which loads `KazBarsApp` from [`src/kazbars/app.py`](src/kazbars/app.py).
 
