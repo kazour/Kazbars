@@ -1,8 +1,8 @@
-// KzGridsPreview.as - Preview Mode & Overlay Management
-class KzGridsPreview {
+// KazBarsPreview.as - Preview Mode & Overlay Management
+class KazBarsPreview {
     private var rootClip:MovieClip;
 
-    public function KzGridsPreview(kb:Object, root:MovieClip) {
+    public function KazBarsPreview(kb:Object, root:MovieClip) {
         rootClip = root;
     }
 
@@ -92,7 +92,7 @@ class KzGridsPreview {
             obj.coordsTF2 = yCoord;
         }
 
-        var self:KzGridsPreview = this;
+        var self:KazBarsPreview = this;
         ov._mc = mc; ov._obj = obj; ov._self = self; ov._w = w; ov._h = h; ov.useHandCursor = true;
         ov.onPress = function() {
             var maxX:Number = Stage.width - this._w;

@@ -3,7 +3,7 @@ Tests for `grids_generator.CodeGenerator` — the optional buff-discovery
 console toggle (`include_console`).
 
 When `include_console=False` the generated AS2 must contain no `console`
-references and no `KzGridsConsole` references — otherwise MTASC would
+references and no `KazBarsConsole` references — otherwise MTASC would
 fail to resolve the missing class.
 
 When `include_console=True` the generator must emit the original console
@@ -59,9 +59,9 @@ def test_console_off_emits_no_console_refs():
     main_code, _ = gen.generate()
 
     # The class name and identifier are namespaced in case-sensitive AS2.
-    # `console` (lowercase) is the member name; `KzGridsConsole` is the class.
-    assert "KzGridsConsole" not in main_code, (
-        "include_console=False must not reference KzGridsConsole class — "
+    # `console` (lowercase) is the member name; `KazBarsConsole` is the class.
+    assert "KazBarsConsole" not in main_code, (
+        "include_console=False must not reference KazBarsConsole class — "
         "MTASC would fail to resolve it."
     )
     # The substring "console" appears in many unrelated words; restrict to
@@ -77,8 +77,8 @@ def test_console_on_emits_console_hooks():
     main_code, _ = gen.generate()
 
     # Instantiation
-    assert "private var console:KzGridsConsole;" in main_code
-    assert "console = new KzGridsConsole(this, rootClip);" in main_code
+    assert "private var console:KazBarsConsole;" in main_code
+    assert "console = new KazBarsConsole(this, rootClip);" in main_code
     assert "consolePinned = false;" in main_code
 
     # The five inline call sites
@@ -100,7 +100,7 @@ def test_console_default_is_off():
     """Belt-and-suspenders: the default in CodeGenerator must be opt-in."""
     gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0")
     main_code, _ = gen.generate()
-    assert "KzGridsConsole" not in main_code
+    assert "KazBarsConsole" not in main_code
 
 
 # --------------------------------------------------------------------------
@@ -124,12 +124,12 @@ def _cast_cfg():
 
 
 def test_cast_off_emits_no_cast_refs():
-    """No cast_config (or both sides off) must reference KzGridsCastTimer —
+    """No cast_config (or both sides off) must reference KazBarsCastTimer —
     MTASC would otherwise fail to resolve the class — and leave no raw tokens."""
     gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0", cast_config=None)
     main_code, data_code = gen.generate()
     assert not gen.include_cast_timer
-    assert "KzGridsCastTimer" not in main_code
+    assert "KazBarsCastTimer" not in main_code
     assert "castTimer" not in main_code
     assert "{{CAST_" not in main_code
     assert "d.CAST" not in data_code
@@ -142,7 +142,7 @@ def test_cast_disabled_config_is_off():
     )
     main_code, _ = gen.generate()
     assert not gen.include_cast_timer
-    assert "KzGridsCastTimer" not in main_code
+    assert "KazBarsCastTimer" not in main_code
 
 
 def test_cast_on_emits_hooks_and_data():
@@ -151,8 +151,8 @@ def test_cast_on_emits_hooks_and_data():
     assert gen.include_cast_timer
 
     # Instantiation + configure
-    assert "private var castTimer:KzGridsCastTimer;" in main_code
-    assert "castTimer = new KzGridsCastTimer(this, rootClip);" in main_code
+    assert "private var castTimer:KazBarsCastTimer;" in main_code
+    assert "castTimer = new KazBarsCastTimer(this, rootClip);" in main_code
     assert "castTimer.configure(d.CAST);" in main_code
 
     # Lifecycle hooks

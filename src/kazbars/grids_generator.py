@@ -1,6 +1,6 @@
 """
-KazBars — KzGrids Code Generator
-Generates KzGrids.as ActionScript 2.0 source code from grid configurations.
+KazBars — KazBars Code Generator
+Generates KazBars.as ActionScript 2.0 source code from grid configurations.
 """
 
 import logging
@@ -35,7 +35,7 @@ _template_cache = {}
 def _load_core_template(assets_path=None):
     """Load AS2 core methods template from external file (cached)."""
     base = resolve_assets_path(assets_path)
-    template_path = base / "kazbars" / "KzGrids_core.as.template"
+    template_path = base / "kazbars" / "KazBars_core.as.template"
     key = str(template_path)
     if key not in _template_cache:
         with open(template_path, encoding="utf-8") as f:
@@ -85,8 +85,8 @@ class CodeGenerator:
         return safe or "Grid"
 
     def generate(self):
-        """Generate the main KzGrids.as and separate KzGridsData.as source code."""
-        # Main class (no inline config — calls KzGridsData.init())
+        """Generate the main KazBars.as and separate KazBarsData.as source code."""
+        # Main class (no inline config — calls KazBarsData.init())
         main = []
         main.append(self._header())
         main.append(self._class_start())
@@ -114,20 +114,20 @@ class CodeGenerator:
 """
 
     def _class_start(self):
-        return "class KzGrids {\n"
+        return "class KazBars {\n"
 
     def _class_end(self):
         return "}\n"
 
     def _member_variables(self):
-        console_decl = "\n    private var console:KzGridsConsole;" if self.include_console else ""
+        console_decl = "\n    private var console:KazBarsConsole;" if self.include_console else ""
         console_pin_decl = (
             "\n\n    // Console pin state (persisted via config archive)\n    private var consolePinned:Boolean;"
             if self.include_console
             else ""
         )
         cast_decl = (
-            "\n    private var castTimer:KzGridsCastTimer;" if self.include_cast_timer else ""
+            "\n    private var castTimer:KazBarsCastTimer;" if self.include_cast_timer else ""
         )
         return f"""
     private var rootClip:MovieClip;
@@ -166,8 +166,8 @@ class CodeGenerator:
     private var _tempMisc:Array;
 
     // HELPER CLASSES: Preview, Slot, and (optional) Console (32KB bytecode limit workaround)
-    private var preview:KzGridsPreview;{console_decl}
-    private var slot:KzGridsSlot;{console_pin_decl}{cast_decl}
+    private var preview:KazBarsPreview;{console_decl}
+    private var slot:KazBarsSlot;{console_pin_decl}{cast_decl}
 
     // Key listener reference for proper cleanup
     private var keyListener:Object;
@@ -176,17 +176,17 @@ class CodeGenerator:
     def _constructor(self):
         console_pin_init = "\n        consolePinned = false;" if self.include_console else ""
         console_init = (
-            "\n        console = new KzGridsConsole(this, rootClip);"
+            "\n        console = new KazBarsConsole(this, rootClip);"
             if self.include_console
             else ""
         )
         cast_init = (
-            "\n        castTimer = new KzGridsCastTimer(this, rootClip);"
+            "\n        castTimer = new KazBarsCastTimer(this, rootClip);"
             if self.include_cast_timer
             else ""
         )
         return f"""
-    public function KzGrids(root:MovieClip) {{
+    public function KazBars(root:MovieClip) {{
         rootClip = root;
         playerBuffs = new Array();
         targetBuffs = new Array();
@@ -222,8 +222,8 @@ class CodeGenerator:
         _tempMisc = new Array();
 
         // HELPER CLASSES: Initialize preview and slot managers (console added if enabled at build time)
-        preview = new KzGridsPreview(this, rootClip);{console_init}
-        slot = new KzGridsSlot(this, rootClip);{cast_init}
+        preview = new KazBarsPreview(this, rootClip);{console_init}
+        slot = new KazBarsSlot(this, rootClip);{cast_init}
 
         initConfig();
     }}
@@ -279,7 +279,7 @@ class CodeGenerator:
         cast_cfg = "\n        castTimer.configure(d.CAST);" if self.include_cast_timer else ""
         return f"""
     private function initConfig():Void {{
-        var d:Object = KzGridsData.init();
+        var d:Object = KazBarsData.init();
         CFG = d.CFG;
         WL = d.WL;
         ISDEB = d.ISDEB;
@@ -308,7 +308,7 @@ class CodeGenerator:
 
     def _data_class(self):
         lines = [
-            """class KzGridsData {
+            """class KazBarsData {
 
     public static function init():Object {
         var d:Object = {};
@@ -538,8 +538,8 @@ def build_grids(
 
         # Step 2: Write to temp .as files
         temp_dir = tempfile.mkdtemp(prefix="kazbars_")
-        temp_main_as = Path(temp_dir) / "KzGrids.as"
-        temp_data_as = Path(temp_dir) / "KzGridsData.as"
+        temp_main_as = Path(temp_dir) / "KazBars.as"
+        temp_data_as = Path(temp_dir) / "KazBarsData.as"
         with open(temp_main_as, "w", encoding="utf-8") as f:
             f.write(main_code)
         with open(temp_data_as, "w", encoding="utf-8") as f:

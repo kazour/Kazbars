@@ -88,7 +88,7 @@
     }
 
     private function createCB(obj:Object, si:Number):Function {
-        var self:KzGrids = this;
+        var self:KazBars = this;
         return function(url:String, ok:Boolean):Void { self.onIconLoad(obj, si, url, ok); };
     }
 
@@ -106,7 +106,7 @@
     // Attaches a baked symbol from base.swf (per-buff custom icons, or the shared IcoNull fallback)
     // as a SLOT-level sibling at dynamic depth 8. The slot's authored art (bg/icoMask/m_icon/frame)
     // is timeline content in the negative reserved depth range, so depth 8 sits above all of it;
-    // timer/stack text use depths 10-13 (KzGridsSlot) to stay above the icon. Scaleform paints
+    // timer/stack text use depths 10-13 (KazBarsSlot) to stay above the icon. Scaleform paints
     // nothing for content attached into the clip-depth-masked m_icon, so we attach as a sibling and
     // bake the rounded crop into the art (no runtime mask).
     private function attachBaked(obj:Object, si:Number, s:MovieClip, sym:String):Void {
@@ -392,12 +392,12 @@
 
     private function startTimer():Void {
         if (timerInterval == null || timerInterval == undefined) {
-            var self:KzGrids = this;
+            var self:KazBars = this;
             timerInterval = setInterval(function() { self.tick(); }, 100);
         }
         if (!frameActive) {
             frameActive = true;
-            var self2:KzGrids = this;
+            var self2:KazBars = this;
             rootClip.onEnterFrame = function() { self2.frame(); };
         }
     }
@@ -518,7 +518,7 @@
                 if (tgt != null && tgt.GetType() != _global.Enums.TypeID.e_Type_None) SlotTargetChanged(tgt);
             }
         } catch (e:Object) {
-            var self:KzGrids = this;
+            var self:KazBars = this;
             setTimeout(function() { self.SlotAlive(); }, 1000);
         }
     }
@@ -687,7 +687,7 @@
             while (c < grids.length) { if (grids[c].mc != null) grids[c].mc.removeMovieClip(); c++; }
             grids = new Array();
         }
-        var self:KzGrids = this;
+        var self:KazBars = this;
         keyListener = {};
         keyListener.onKeyDown = function() { self.handleKeyDown(); };
         keyListener.onKeyUp = function() { self.handleKeyUp(); };

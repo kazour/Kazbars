@@ -1,4 +1,4 @@
-// KzGridsCastTimer.as - Timer-only cast overlay (no bar) for player + target.
+// KazBarsCastTimer.as - Timer-only cast overlay (no bar) for player + target.
 // Lifts the cast-tracking + EMA estimate logic from the old KzCastbars module,
 // dropping the bar/mask/color visuals. Pure dynamic text fields (device fonts),
 // so it needs no new symbols in base.swf.
@@ -7,10 +7,10 @@
 // are the only positions that survive relaunch on /loadclip default clients;
 // preview drag persists via the config archive for aoc.exe clients.
 //
-// Driven from KzGrids: createFields() in onLoad, connectPlayer()/setTarget()
+// Driven from KazBars: createFields() in onLoad, connectPlayer()/setTarget()
 // from the existing player/target lifecycle, previewOn()/previewOff() from the
 // shared Shift+Ctrl+Alt preview, load/savePositions() from the module archive.
-class KzGridsCastTimer {
+class KazBarsCastTimer {
     private var rootClip:MovieClip;
 
     // Config (set by configure())
@@ -29,7 +29,7 @@ class KzGridsCastTimer {
     private var m_PlayerClip:MovieClip;
     private var m_TargetClip:MovieClip;
 
-    // Tracked characters (mirrors KzGrids m_Player/m_Target so we can read progress)
+    // Tracked characters (mirrors KazBars m_Player/m_Target so we can read progress)
     private var playerChar:Object;
     private var targetChar:Object;
 
@@ -39,7 +39,7 @@ class KzGridsCastTimer {
     private var updateInterval:Number;
     private var previewMode:Boolean;
 
-    public function KzGridsCastTimer(kb:Object, root:MovieClip) {
+    public function KazBarsCastTimer(kb:Object, root:MovieClip) {
         rootClip = root;
         previewMode = false;
         playerData = newCastData();
@@ -100,7 +100,7 @@ class KzGridsCastTimer {
     }
 
     // =========================================================================
-    // Signal wiring (called from KzGrids player/target lifecycle)
+    // Signal wiring (called from KazBars player/target lifecycle)
     // =========================================================================
 
     public function connectPlayer(ch:Object):Void {
@@ -145,7 +145,7 @@ class KzGridsCastTimer {
             if (ch.ConnectToCommandQueue) ch.ConnectToCommandQueue();
         } catch (e:Object) {}
         // Mid-cast: timer should appear even if we target someone already casting.
-        var self:KzGridsCastTimer = this;
+        var self:KazBarsCastTimer = this;
         setTimeout(function() { self.checkTargetMidCast(); }, 120);
     }
 
@@ -201,7 +201,7 @@ class KzGridsCastTimer {
 
     private function ensureInterval():Void {
         if (updateInterval == null || updateInterval == undefined) {
-            var self:KzGridsCastTimer = this;
+            var self:KazBarsCastTimer = this;
             updateInterval = setInterval(function() { self.update(); }, 60);
         }
     }
@@ -281,7 +281,7 @@ class KzGridsCastTimer {
     }
 
     // =========================================================================
-    // Preview drag (own visual style, decoupled from KzGridsPreview)
+    // Preview drag (own visual style, decoupled from KazBarsPreview)
     // =========================================================================
 
     public function previewOn():Void {
@@ -316,7 +316,7 @@ class KzGridsCastTimer {
         tl.setTextFormat(tfmt);
         var cf:TextField = ov.createTextField("co", ov.getNextHighestDepth(), -w / 2, bot - 18, w, 14);
         cf.selectable = false; cf.embedFonts = false; cf.textColor = 0xFFFF00;
-        var self:KzGridsCastTimer = this;
+        var self:KazBarsCastTimer = this;
         ov._clip = clip; ov._cf = cf; ov._self = self; ov._hw = w / 2; ov._top = top; ov._bot = bot; ov.useHandCursor = true;
         ov.onPress = function() {
             this._clip.startDrag(false, this._hw, -this._top, Stage.width - this._hw, Stage.height - this._bot);

@@ -1,5 +1,5 @@
-// KzGridsConsole.as - Buff ID Console for discovering and logging buff IDs
-class KzGridsConsole {
+// KazBarsConsole.as - Buff ID Console for discovering and logging buff IDs
+class KazBarsConsole {
     private var owner:Object;
     private var rootClip:MovieClip;
     private var consoleClip:MovieClip;
@@ -15,7 +15,7 @@ class KzGridsConsole {
     public var logPlayerEnabled:Boolean;
     public var logTargetEnabled:Boolean;
 
-    public function KzGridsConsole(kb:Object, root:MovieClip) {
+    public function KazBarsConsole(kb:Object, root:MovieClip) {
         owner = kb;
         rootClip = root;
         playerLog = "";
@@ -78,7 +78,7 @@ class KzGridsConsole {
         dragHandle.onRelease = dragHandle.onReleaseOutside = function() { this._parent.stopDrag(); };
         dragHandle.useHandCursor = true;
 
-        var self:KzGridsConsole = this;
+        var self:KazBarsConsole = this;
 
         // Player logging checkbox (next to PLAYER BUFFS title)
         var pcb:MovieClip = consoleClip.createEmptyMovieClip("pcb", consoleClip.getNextHighestDepth());

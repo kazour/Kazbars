@@ -1,10 +1,10 @@
-// KzGridsSlot.as - Slot Creation & Management Helper
+// KazBarsSlot.as - Slot Creation & Management Helper
 // Extracted to stay under MTASC 32KB per-class bytecode limit
-class KzGridsSlot {
+class KazBarsSlot {
     private var rootClip:MovieClip;
     private static var NATIVE_SIZE:Number = 64;
 
-    public function KzGridsSlot(kb:Object, root:MovieClip) {
+    public function KazBarsSlot(kb:Object, root:MovieClip) {
         rootClip = root;
     }
 
@@ -12,7 +12,7 @@ class KzGridsSlot {
     public function createTimerTF(s:MovieClip, fs:Number, yOffset:Number):Void {
         var tmrY:Number = NATIVE_SIZE - fs - 4 + yOffset;
         // Fixed depths 10-13 keep timer/stack text above the baked custom icon (attached at slot
-        // depth 8 in KzGrids.attachBaked). The slot's authored art (bg/icoMask/m_icon/frame) is
+        // depth 8 in KazBars.attachBaked). The slot's authored art (bg/icoMask/m_icon/frame) is
         // timeline content in the negative reserved depth range, so it stays below all of these.
         // Shadow TextField (created first so it's behind)
         var tfShadow:TextField = s.createTextField("tmrShadow", 10, 1, tmrY + 1, NATIVE_SIZE, fs + 4);
