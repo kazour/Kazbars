@@ -34,7 +34,7 @@ jobs:
           $hash = (Get-FileHash "KazBars.zip" -Algorithm SHA256).Hash.ToLower()
           "$hash  KazBars.zip" | Out-File -Encoding ascii -NoNewline "KazBars.zip.sha256"
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         if: startsWith(github.ref, 'refs/tags/')
         with:
           name: KazBars ${{ github.ref_name }}
