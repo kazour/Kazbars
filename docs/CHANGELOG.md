@@ -4,6 +4,11 @@ All notable changes to KazBars will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- **Deeps readout tuning** — a new **Readout** card in the Deeps panel. Choose the rolling-window width (5 / 7 / 11 / 13 s) and shape how the numbers read: a **Smoothing** strength that eases the drawn digits instead of snapping every tick, a coarse-rounding step, and a redraw cadence. The alarm pulse and net-HP tints still track the raw values, so only the digits ease. Smoothing ships on at a gentle default.
+
 ## [2.0.0] — 2026-05-25
 
 The **Kaz Grids → KazBars** release: the rename the community always used, plus a real combat meter, a cast-timer overlay, settings backup, and a wide polish pass.
