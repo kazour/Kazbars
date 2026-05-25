@@ -9,6 +9,11 @@ Persisted state:
     DPIS yellow threshold) — set from the panel.
   - Pet-damage toggle — included by default.
   - Overlay layout choice (`horizontal` | `vertical`) — radio in panel.
+  - Readout tuning (the "Readout" card) — rolling-window width, display
+    smoothing strength, coarse-rounding step, and redraw cadence. These are
+    presentation-only knobs; `window_seconds` is the one that changes the
+    measured rate (it sizes the tracker buffers), the other three only shape
+    how the already-computed number is drawn.
   - Overlay window state — position, lock state, positioned-once flag.
 
 Not persisted: the alarm-active state (recomputed every tick from threshold
@@ -55,6 +60,17 @@ DEEPS_DEFAULTS = {
     # Behavior toggle — pet damage included by default.
     "include_pet_damage": True,
 
+    # Readout tuning — the "Readout" card. `window_seconds` sizes the rolling
+    # buffers (one of `_WINDOW_CHOICES`); the other three are pure display
+    # presentation. `smoothing` is a 0-100 strength mapped to an EMA time
+    # constant (0 = off → digits snap). `round_step` quantizes the drawn value
+    # (1 = off). `refresh_ms` is how often the drawn digits are allowed to
+    # change (100 = live / every UI tick).
+    "window_seconds": 5,
+    "smoothing": 50,
+    "round_step": 5,
+    "refresh_ms": 100,
+
     # Overlay layout — radio in panel, "horizontal" or "vertical".
     "layout": "horizontal",
 
@@ -92,6 +108,9 @@ DEEPS_RANGES = {
     "hpis_green_threshold":  {"min": 0.0,  "max":  99_999.0, "kind": "float"},
     "dpis_yellow_threshold": {"min": 0.0,  "max":  99_999.0, "kind": "float"},
 
+    # Display smoothing strength — 0 (off, digits snap) to 100 (max easing).
+    "smoothing": {"min": 0, "max": 100, "kind": "int"},
+
     # Overlay font size — readable lower bound, big-monitor upper bound.
     "overlay_font_size": {"min": 12, "max": 48, "kind": "int"},
 
@@ -107,6 +126,18 @@ DEEPS_RANGES = {
 _BOOL_KEYS = ("include_pet_damage", "overlay_locked", "overlay_positioned")
 _LAYOUT_CHOICES = ("horizontal", "vertical")
 _ALL_CELL_IDS = ("dps", "dpis", "hps", "hps-out", "net")
+
+# Readout-card discrete choices. `window_seconds` are the odd-second widths the
+# user can pick; `round_step` includes 1 (= rounding off); `refresh_ms` 100 is
+# live (every UI tick). Off-list values snap back to the default.
+_WINDOW_CHOICES = (5, 7, 11, 13)
+_ROUND_STEPS = (1, 5, 10, 25, 50, 100)
+_REFRESH_CHOICES = (100, 250, 500, 1000)
+_CHOICE_KEYS = {
+    "window_seconds": _WINDOW_CHOICES,
+    "round_step": _ROUND_STEPS,
+    "refresh_ms": _REFRESH_CHOICES,
+}
 
 # `FONT_FAMILY_CHOICES` is re-exported from `overlay_engine` (the source of
 # truth) so both Deeps and the Live Tracker share the same curated list.
@@ -131,6 +162,13 @@ def validate_setting(key: str, value: object):
 
     if key == "overlay_font_family":
         return value if value in FONT_FAMILY_CHOICES else DEEPS_DEFAULTS["overlay_font_family"]
+
+    if key in _CHOICE_KEYS:
+        try:
+            coerced = int(value)
+        except (ValueError, TypeError):
+            return DEEPS_DEFAULTS[key]
+        return coerced if coerced in _CHOICE_KEYS[key] else DEEPS_DEFAULTS[key]
 
     if key == "visible_cells":
         # Keep only valid cell IDs; preserve given order but de-dupe. Empty

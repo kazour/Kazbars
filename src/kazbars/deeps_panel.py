@@ -82,6 +82,16 @@ _PANEL_DEFAULT_WIDTH = 440
 # `_build_ui` so adding controls never clips the bottom of the window.
 _PANEL_PROVISIONAL_HEIGHT = 380
 
+# Readout-card dropdown choices. The window widths mirror
+# `deeps_settings._WINDOW_CHOICES` (settings validation is the source of truth
+# for *acceptance*; these are the offered options). Round/refresh map a friendly
+# label to the stored integer (`1` = rounding off, `100` = live refresh).
+_WINDOW_CHOICES = (5, 7, 11, 13)
+_ROUND_LABELS = {1: "Off", 5: "5", 10: "10", 25: "25", 50: "50", 100: "100"}
+_REFRESH_LABELS = {100: "Live", 250: "250 ms", 500: "500 ms", 1000: "1 s"}
+_ROUND_BY_LABEL = {v: k for k, v in _ROUND_LABELS.items()}
+_REFRESH_BY_LABEL = {v: k for k, v in _REFRESH_LABELS.items()}
+
 # =========================================================================== #
 # DeepsPanel                                                                  #
 # =========================================================================== #
@@ -117,6 +127,7 @@ class DeepsPanel(tk.Toplevel):
         # Runtime state
         self.meter = DeepsMeter()
         self.meter.set_include_pet_damage(self.settings["include_pet_damage"])
+        self.meter.set_window_seconds(self.settings["window_seconds"])
         self.overlay: DeepsOverlay | None = None
         self._tick_id: str | None = None
         self._alarm_active: bool = False
@@ -136,6 +147,15 @@ class DeepsPanel(tk.Toplevel):
         self._bg_opacity_var = tk.StringVar(
             value=str(round(float(self.settings["overlay_bg_opacity"]) * 100))
         )
+        # Readout tuning vars (the "Readout" card).
+        self._window_var = tk.StringVar(value=str(int(self.settings["window_seconds"])))
+        self._smoothing_var = tk.StringVar(value=str(int(self.settings["smoothing"])))
+        self._round_var = tk.StringVar(
+            value=_ROUND_LABELS.get(int(self.settings["round_step"]), "Off")
+        )
+        self._refresh_var = tk.StringVar(
+            value=_REFRESH_LABELS.get(int(self.settings["refresh_ms"]), "Live")
+        )
         # Cell-visibility toggles — one BooleanVar per cell ID. Initialised
         # from settings; flips push to the overlay + persist on change.
         visible_set = set(self.settings.get("visible_cells", []))
@@ -150,6 +170,7 @@ class DeepsPanel(tk.Toplevel):
         self._pet_caveat: ttk.Label | None = None
         self._size_value_label: ttk.Label | None = None
         self._opacity_value_label: ttk.Label | None = None
+        self._smoothing_value_label: ttk.Label | None = None
 
         self._build_ui()
         self._create_overlay()
@@ -187,6 +208,7 @@ class DeepsPanel(tk.Toplevel):
         self._build_primary_action(body)
         self._build_overlay_row(body)
         self._build_appearance(body)
+        self._build_readout(body)
         self._build_cells_picker(body)
         self._build_thresholds(body)
         self._build_pet_toggle(body)
@@ -270,6 +292,113 @@ class DeepsPanel(tk.Toplevel):
             self._opacity_value_label.configure(text=f"{pct}%")
         if self.overlay is not None:
             self.overlay.set_bg_opacity(pct / 100.0)
+
+    # ------------------------------------------------------------------ #
+    # Readout (rolling window + display smoothing)                        #
+    # ------------------------------------------------------------------ #
+
+    def _build_readout(self, parent: ttk.Frame) -> None:
+        """Card tuning how the numbers read: rolling-window width plus the three
+        display-smoothing knobs (strength, coarse rounding, redraw cadence).
+
+        Only `Window` changes the measured rate (it sizes the tracker buffers);
+        the other three are pure presentation pushed straight to the overlay.
+        """
+        lf = create_card(parent, "Readout")
+        lf.pack(fill="x", pady=(PAD_SMALL, PAD_ROW))
+
+        self._build_combo_row(
+            lf, "Window:", self._window_var,
+            [str(s) for s in _WINDOW_CHOICES], self._on_window_change, suffix="s",
+        )
+        # Smoothing strength — slider 0-100 %. 0 = off (digits snap).
+        _, self._smoothing_value_label = create_slider_row(
+            lf, "Smoothing:", 0, 100,
+            int(self.settings["smoothing"]), "%",
+            self._on_smoothing_slider, self._on_smoothing_commit,
+        )
+        self._build_combo_row(
+            lf, "Round to:", self._round_var,
+            list(_ROUND_LABELS.values()), self._on_round_change,
+        )
+        self._build_combo_row(
+            lf, "Refresh:", self._refresh_var,
+            list(_REFRESH_LABELS.values()), self._on_refresh_change,
+        )
+
+    def _build_combo_row(
+        self,
+        parent: tk.Misc,
+        label_text: str,
+        var: tk.StringVar,
+        values: list[str],
+        command: Callable[[], None],
+        suffix: str | None = None,
+    ) -> ttk.Combobox:
+        """One row: label · readonly combobox · optional suffix unit."""
+        row = ttk.Frame(parent)
+        row.pack(fill="x", pady=PAD_XS)
+        ttk.Label(
+            row, text=label_text, font=FONT_BODY, foreground=THEME_COLORS["body"],
+        ).pack(side="left")
+        combo = ttk.Combobox(
+            row, textvariable=var, values=values, state="readonly", width=8,
+        )
+        combo.pack(side="left", padx=(PAD_SMALL, PAD_XS))
+        combo.bind("<<ComboboxSelected>>", lambda _e: command())
+        if suffix:
+            ttk.Label(
+                row, text=suffix, font=FONT_SMALL, foreground=THEME_COLORS["muted"],
+            ).pack(side="left")
+        return combo
+
+    def _on_window_change(self) -> None:
+        """Window-width dropdown — persist + rebuild the meter's trackers.
+
+        Resets the in-flight rolling average (the width IS the buffer capacity),
+        so the readout re-warms over the new window.
+        """
+        secs = validate_setting("window_seconds", self._window_var.get())
+        self._window_var.set(str(int(secs)))
+        self.settings["window_seconds"] = secs
+        save_settings(self.settings_folder, self.settings)
+        self.meter.set_window_seconds(secs)
+
+    def _on_smoothing_slider(self, value: str) -> None:
+        """Live smoothing-strength drag: refresh label + push to overlay (no save)."""
+        pct = round(float(value))
+        self._smoothing_var.set(str(pct))
+        if self._smoothing_value_label is not None:
+            self._smoothing_value_label.configure(text=f"{pct}%")
+        if self.overlay is not None:
+            self.overlay.set_smoothing(pct)
+
+    def _on_smoothing_commit(self) -> None:
+        """Persist the smoothing strength on slider release."""
+        pct = validate_setting("smoothing", self._smoothing_var.get())
+        self._smoothing_var.set(str(int(pct)))
+        self.settings["smoothing"] = pct
+        save_settings(self.settings_folder, self.settings)
+        if self.overlay is not None:
+            self.overlay.set_smoothing(int(pct))
+
+    def _on_round_change(self) -> None:
+        """Coarse-rounding dropdown — map the label to the stored step, persist, push."""
+        step = _ROUND_BY_LABEL.get(self._round_var.get(), self.settings["round_step"])
+        step = validate_setting("round_step", step)
+        self.settings["round_step"] = step
+        save_settings(self.settings_folder, self.settings)
+        if self.overlay is not None:
+            self.overlay.set_round_step(step)
+
+    def _on_refresh_change(self) -> None:
+        """Redraw-cadence dropdown — map the label to milliseconds, persist, push."""
+        ms = _REFRESH_BY_LABEL.get(self._refresh_var.get(), self.settings["refresh_ms"])
+        ms = validate_setting("refresh_ms", ms)
+        self.settings["refresh_ms"] = ms
+        save_settings(self.settings_folder, self.settings)
+        if self.overlay is not None:
+            self.overlay.set_refresh_ms(ms)
 
     def _build_cells_picker(self, parent: ttk.Frame) -> None:
         """Card with one checkbox per overlay cell (5 total): the four

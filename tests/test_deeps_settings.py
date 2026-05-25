@@ -45,6 +45,15 @@ def test_layout_default_horizontal() -> None:
     assert get_default_settings()["layout"] == "horizontal"
 
 
+def test_readout_defaults() -> None:
+    """Readout card ships with a 5s window and gentle smoothing on."""
+    d = get_default_settings()
+    assert d["window_seconds"] == 5
+    assert d["smoothing"] == 50
+    assert d["round_step"] == 5
+    assert d["refresh_ms"] == 100
+
+
 def test_overlay_starts_unlocked_unpositioned() -> None:
     d = get_default_settings()
     assert d["overlay_locked"] is False
@@ -172,6 +181,57 @@ class TestValidateSetting:
     def test_bg_opacity_clamped(self) -> None:
         assert validate_setting("overlay_bg_opacity", -0.5) == 0.0
         assert validate_setting("overlay_bg_opacity", 2.0) == 1.0
+
+    # ----- Readout tuning keys -------------------------------------------- #
+
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            (5, 5), (7, 7), (11, 11), (13, 13),
+            ("7", 7),               # string coerced
+            (6, 5),                 # off-list → default
+            (0, 5), (99, 5),
+            ("junk", 5), (None, 5),  # unparsable → default
+        ],
+    )
+    def test_window_seconds_choice(self, value: object, expected: int) -> None:
+        assert validate_setting("window_seconds", value) == expected
+
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            (1, 1), (5, 5), (10, 10), (25, 25), (50, 50), (100, 100),
+            ("25", 25),
+            (3, 5),                 # off-list → default
+            ("junk", 5), (None, 5),
+        ],
+    )
+    def test_round_step_choice(self, value: object, expected: int) -> None:
+        assert validate_setting("round_step", value) == expected
+
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            (100, 100), (250, 250), (500, 500), (1000, 1000),
+            ("500", 500),
+            (200, 100),             # off-list → default
+            ("junk", 100), (None, 100),
+        ],
+    )
+    def test_refresh_ms_choice(self, value: object, expected: int) -> None:
+        assert validate_setting("refresh_ms", value) == expected
+
+    def test_smoothing_within_range(self) -> None:
+        assert validate_setting("smoothing", 0) == 0
+        assert validate_setting("smoothing", 50) == 50
+        assert validate_setting("smoothing", 100) == 100
+
+    def test_smoothing_clamped(self) -> None:
+        assert validate_setting("smoothing", -10) == 0
+        assert validate_setting("smoothing", 250) == 100
+
+    def test_smoothing_unparsable_falls_back(self) -> None:
+        assert validate_setting("smoothing", "lots") == 50
 
 
 # =========================================================================== #

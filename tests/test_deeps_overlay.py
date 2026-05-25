@@ -13,6 +13,7 @@ import pytest
 from kazbars.deeps_overlay import (
     ALL_CELL_IDS,
     CELL_LABELS,
+    _DisplaySmoother,
     _format_rate,
     _format_signed_int,
     _lerp_color,
@@ -137,6 +138,60 @@ class TestCells:
 
     def test_visible_order_empty(self) -> None:
         assert visible_cells_in_order(set()) == []
+
+
+# =========================================================================== #
+# _DisplaySmoother — EMA + coarse rounding + redraw cadence                   #
+# =========================================================================== #
+
+class TestDisplaySmoother:
+    @staticmethod
+    def _vals(dps=None, dpis=None, hps=None, hps_out=None) -> dict[str, float | None]:
+        return {"dps": dps, "dpis": dpis, "hps": hps, "hps-out": hps_out}
+
+    def test_smoothing_off_snaps_each_sample(self) -> None:
+        s = _DisplaySmoother(smoothing=0, round_step=1, refresh_ms=100)
+        assert s.update(self._vals(dps=1000), 0.0)["dps"] == 1000
+        # No easing — jumps straight to the new value.
+        assert s.update(self._vals(dps=2000), 0.5)["dps"] == 2000
+
+    def test_first_real_sample_snaps_even_when_smoothing_on(self) -> None:
+        """A fresh channel snaps to its first value rather than easing up from 0."""
+        s = _DisplaySmoother(smoothing=100, round_step=1, refresh_ms=100)
+        assert s.update(self._vals(dps=1500), 0.0)["dps"] == 1500
+
+    def test_ema_eases_between_samples(self) -> None:
+        s = _DisplaySmoother(smoothing=100, round_step=1, refresh_ms=100)
+        s.update(self._vals(dps=1000), 0.0)               # snap to 1000
+        out = s.update(self._vals(dps=2000), 1.0)["dps"]  # ~one tau later
+        assert 1000 < out < 2000
+
+    def test_ema_converges_over_time(self) -> None:
+        s = _DisplaySmoother(smoothing=100, round_step=1, refresh_ms=100)
+        s.update(self._vals(dps=0), 0.0)
+        t = 0.0
+        out = 0.0
+        for _ in range(50):
+            t += 0.5
+            out = s.update(self._vals(dps=1000), t)["dps"]
+        assert abs(out - 1000) < 5
+
+    def test_none_resets_channel_to_dashes(self) -> None:
+        s = _DisplaySmoother(smoothing=50, round_step=1, refresh_ms=100)
+        assert s.update(self._vals(dps=1000), 0.0)["dps"] == 1000
+        assert s.update(self._vals(dps=None), 1.0)["dps"] is None
+
+    def test_round_step_quantizes_committed_value(self) -> None:
+        s = _DisplaySmoother(smoothing=0, round_step=25, refresh_ms=100)
+        assert s.update(self._vals(dps=1037), 0.0)["dps"] == 1025
+
+    def test_refresh_cadence_holds_drawn_value(self) -> None:
+        s = _DisplaySmoother(smoothing=0, round_step=1, refresh_ms=1000)
+        assert s.update(self._vals(dps=1000), 0.0)["dps"] == 1000     # first commit
+        # Before the 1s cadence elapses the drawn value holds despite new input.
+        assert s.update(self._vals(dps=2000), 0.5)["dps"] == 1000
+        # Once it elapses, it commits the latest eased value.
+        assert s.update(self._vals(dps=2000), 1.0)["dps"] == 2000
 
 
 

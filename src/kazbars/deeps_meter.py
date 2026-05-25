@@ -41,6 +41,7 @@ from .deeps_parsers import (
     strip_log_timestamp,
 )
 from .deeps_trackers import (
+    DEFAULT_WINDOW_SECONDS,
     DamageInTracker,
     DamageOutTracker,
     HealsInTracker,
@@ -181,10 +182,14 @@ class DeepsMeter:
         self._thread: threading.Thread | None = None
         self._game_folder: Path | None = None
 
-        self._out_tracker = DamageOutTracker()
-        self._in_tracker = DamageInTracker()
-        self._heals_tracker = HealsInTracker()
-        self._heals_out_tracker = HealsOutTracker()
+        # Rolling-window width (seconds). User-selectable from the panel; sizing
+        # the trackers' buffers, so a change recreates them (see
+        # `set_window_seconds`). `_make_trackers_locked` reads this field.
+        self._window_seconds: float = DEFAULT_WINDOW_SECONDS
+        self._out_tracker = DamageOutTracker(self._window_seconds)
+        self._in_tracker = DamageInTracker(self._window_seconds)
+        self._heals_tracker = HealsInTracker(self._window_seconds)
+        self._heals_out_tracker = HealsOutTracker(self._window_seconds)
         self._include_pet_damage = False
 
         # Targets you (or your pets) have damaged in this session. Used to
@@ -252,6 +257,21 @@ class DeepsMeter:
         """Toggle pet damage attribution. Effective on the next parsed line."""
         with self._lock:
             self._include_pet_damage = on
+
+    def set_window_seconds(self, seconds: float) -> None:
+        """Set the rolling-window width and rebuild the trackers at it.
+
+        The window width IS the tracker buffer capacity, so changing it
+        recreates the four trackers — the in-flight rolling average resets and
+        the new session re-warms over `seconds`. No-op if unchanged.
+        """
+        seconds = float(seconds)
+        with self._lock:
+            if seconds == self._window_seconds:
+                return
+            self._window_seconds = seconds
+            self._reset_trackers_locked()
+            self._snapshot = self._build_snapshot_locked(time.monotonic())
 
     def is_running(self) -> bool:
         with self._lock:
@@ -412,11 +432,17 @@ class DeepsMeter:
         )
 
     def _reset_trackers_locked(self) -> None:
-        """Zero the four trackers and the known-mobs set (caller holds the lock)."""
-        self._out_tracker.reset()
-        self._in_tracker.reset()
-        self._heals_tracker.reset()
-        self._heals_out_tracker.reset()
+        """Recreate the four trackers at the current window width + clear
+        known-mobs (caller holds the lock).
+
+        Recreates rather than `.reset()`s so a `set_window_seconds` change takes
+        effect here — the window width is the buffer capacity, fixed per
+        tracker instance, so a new width means new instances.
+        """
+        self._out_tracker = DamageOutTracker(self._window_seconds)
+        self._in_tracker = DamageInTracker(self._window_seconds)
+        self._heals_tracker = HealsInTracker(self._window_seconds)
+        self._heals_out_tracker = HealsOutTracker(self._window_seconds)
         self._known_mobs.clear()
 
     def _reset_for_log_boundary(self) -> None:

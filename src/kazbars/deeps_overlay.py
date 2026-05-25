@@ -121,18 +121,105 @@ def _format_signed_int(value: float | None) -> str:
 
 
 # =========================================================================== #
+# Display smoother — EMA + coarse rounding + redraw cadence                   #
+# =========================================================================== #
+
+# Numeric channels the smoother eases. The ΔHP-in cell is derived from the
+# smoothed `hps`/`dpis` at render time, so it isn't a channel of its own.
+_SMOOTH_CHANNELS: tuple[str, ...] = ("dps", "dpis", "hps", "hps-out")
+
+# Smoothing strength 100 maps to this EMA time constant (seconds). The drawn
+# digit covers ~63% of a step toward the true value in one tau; bigger = calmer
+# but laggier. 1.5 s reads as a gentle glide without feeling stale.
+_MAX_TAU = 1.5
+
+
+class _DisplaySmoother:
+    """Presentation-layer easing for the overlay numbers.
+
+    Pure (the caller supplies a monotonic `now`), so it's unit-tested without a
+    display. Three independent knobs, each disable-able:
+
+      - `smoothing` (0-100): EMA strength. 0 = off (the drawn value snaps to the
+        true value). Mapped to a time constant `tau = pct/100 * _MAX_TAU`.
+      - `round_step` (>=1): coarse rounding of the committed value. 1 = off.
+      - `refresh_ms` (>=100): how often the committed (drawn) value is allowed to
+        change. 100 = live (every call). Larger holds the last drawn digits
+        between commits while the EMA keeps gliding underneath.
+
+    The EMA advances every `update()` call; the rounded result is *committed*
+    (becomes the drawn value) only when `refresh_ms` has elapsed since the last
+    commit. `None` (warm-up) resets a channel so the next real sample snaps in
+    rather than easing up from a stale number.
+
+    Colors/tints/alarm are NOT smoothed — callers read those off the raw
+    snapshot so the "am I dying" signal stays instant. Only digits ease.
+    """
+
+    def __init__(self, smoothing: int = 0, round_step: int = 1, refresh_ms: int = 100) -> None:
+        self._tau = max(0, min(int(smoothing), 100)) / 100.0 * _MAX_TAU
+        self._step = max(1, int(round_step))
+        self._refresh = max(0.0, int(refresh_ms) / 1000.0)
+        self._ema: dict[str, float | None] = dict.fromkeys(_SMOOTH_CHANNELS)
+        self._shown: dict[str, float | None] = dict.fromkeys(_SMOOTH_CHANNELS)
+        self._last_now: float | None = None
+        self._last_commit: float | None = None
+
+    def set_smoothing(self, pct: int) -> None:
+        self._tau = max(0, min(int(pct), 100)) / 100.0 * _MAX_TAU
+
+    def set_round_step(self, step: int) -> None:
+        self._step = max(1, int(step))
+
+    def set_refresh_ms(self, ms: int) -> None:
+        self._refresh = max(0.0, int(ms) / 1000.0)
+
+    def _round(self, value: float | None) -> float | None:
+        if value is None:
+            return None
+        if self._step <= 1:
+            return float(round(value))
+        return float(round(value / self._step) * self._step)
+
+    def update(self, values: dict[str, float | None], now: float) -> dict[str, float | None]:
+        """Advance the EMA for each channel, commit on the cadence, return the
+        drawn values. Keys mirror `_SMOOTH_CHANNELS`."""
+        dt = 0.0 if self._last_now is None else max(0.0, now - self._last_now)
+        self._last_now = now
+
+        for ch in _SMOOTH_CHANNELS:
+            raw = values.get(ch)
+            prev = self._ema.get(ch)
+            if raw is None:
+                self._ema[ch] = None
+            elif prev is None or self._tau <= 0.0 or dt <= 0.0:
+                # First real sample after warm-up, or smoothing off → snap.
+                self._ema[ch] = float(raw)
+            else:
+                alpha = 1.0 - math.exp(-dt / self._tau)
+                self._ema[ch] = prev + alpha * (float(raw) - prev)
+
+        if self._last_commit is None or (now - self._last_commit) >= self._refresh:
+            self._last_commit = now
+            for ch in _SMOOTH_CHANNELS:
+                self._shown[ch] = self._round(self._ema[ch])
+        return dict(self._shown)
+
+
+# =========================================================================== #
 # Render context + cell renderers                                             #
 # =========================================================================== #
 
 class _RenderContext:
     """Bundle of state a cell renderer needs."""
 
-    __slots__ = ("alarm_active", "alarm_threshold", "dpis_yellow",
+    __slots__ = ("alarm_active", "alarm_threshold", "display", "dpis_yellow",
                  "font", "hpis_green", "label_font", "now", "scale", "snapshot")
 
     def __init__(
         self,
         snapshot: MeterSnapshot,
+        display: dict[str, float | None],
         now: float,
         font: ImageFont.ImageFont,
         label_font: ImageFont.ImageFont,
@@ -143,6 +230,7 @@ class _RenderContext:
         scale: float,
     ) -> None:
         self.snapshot = snapshot
+        self.display = display
         self.now = now
         self.font = font
         self.label_font = label_font
@@ -255,18 +343,25 @@ CELL_LABELS: dict[str, str] = {
 def _cell_text_and_color(
     cell_id: str, ctx: _RenderContext,
 ) -> tuple[str, tuple[int, int, int]]:
-    """Formatted value + render color for one cell at the current snapshot."""
-    snap = ctx.snapshot
+    """Formatted value + render color for one cell at the current snapshot.
+
+    The number text comes from the smoothed `ctx.display` values; the color
+    comes from the raw `ctx.snapshot` (via the tint/alarm helpers) so tints stay
+    instant while the digits ease.
+    """
+    disp = ctx.display
     if cell_id == "dps":
-        return _format_rate(snap.dps), _dps_color(ctx)
+        return _format_rate(disp["dps"]), _dps_color(ctx)
     if cell_id == "dpis":
-        return _format_rate(snap.dpis), _tint_colors(ctx)[1]
+        return _format_rate(disp["dpis"]), _tint_colors(ctx)[1]
     if cell_id == "hps":
-        return _format_rate(snap.hps), _tint_colors(ctx)[0]
+        return _format_rate(disp["hps"]), _tint_colors(ctx)[0]
     if cell_id == "hps-out":
-        return _format_rate(snap.hps_out), _Palette.DEFAULT
-    # net (ΔHP in) — signed HPS-in minus DPS-in, tinted to match the cells.
-    net = snap.hps - snap.dpis if (snap.hps is not None and snap.dpis is not None) else None
+        return _format_rate(disp["hps-out"]), _Palette.DEFAULT
+    # net (ΔHP in) — signed smoothed-HPS-in minus smoothed-DPS-in, tinted to
+    # match the cells (tint still derived from the raw snapshot).
+    d_hps, d_dpis = disp["hps"], disp["dpis"]
+    net = d_hps - d_dpis if (d_hps is not None and d_dpis is not None) else None
     return _format_signed_int(net), _net_color(ctx)
 
 
@@ -317,6 +412,15 @@ class DeepsOverlay:
         self._snapshot: MeterSnapshot = MeterSnapshot.empty()
         self._now: float = 0.0
 
+        # Presentation-layer easing of the drawn numbers (see _DisplaySmoother).
+        # Reads its three knobs from settings; the meter owns `window_seconds`.
+        self._smoother = _DisplaySmoother(
+            smoothing=int(settings.get("smoothing", 0)),
+            round_step=int(settings.get("round_step", 1)),
+            refresh_ms=int(settings.get("refresh_ms", 100)),
+        )
+        self._display: dict[str, float | None] = dict.fromkeys(_SMOOTH_CHANNELS)
+
         self._on_position_changed_external = on_position_changed
         self._on_lock_changed = on_lock_changed
 
@@ -361,6 +465,18 @@ class DeepsOverlay:
         self._config.bg_opacity = max(0.0, min(float(opacity), 1.0))
         self._hud.request_paint()
 
+    def set_smoothing(self, pct: int) -> None:
+        """Display-easing strength 0-100 (0 = off). Takes effect on the next tick."""
+        self._smoother.set_smoothing(pct)
+
+    def set_round_step(self, step: int) -> None:
+        """Coarse-rounding step for the drawn value (1 = off)."""
+        self._smoother.set_round_step(step)
+
+    def set_refresh_ms(self, ms: int) -> None:
+        """How often the drawn digits may change (100 = live)."""
+        self._smoother.set_refresh_ms(ms)
+
     def set_visible_cells(self, cells: list[str] | tuple[str, ...] | set[str]) -> None:
         """Set which cells are visible. Unknown IDs are ignored defensively."""
         new = frozenset(c for c in cells if c in ALL_CELL_IDS)
@@ -384,9 +500,21 @@ class DeepsOverlay:
         self._alarm_active = bool(active)
 
     def paint(self, snapshot: MeterSnapshot, now: float) -> None:
-        """Called by the panel's tick. Snapshots the state, repaints."""
+        """Called by the panel's tick. Snapshots the state, advances the display
+        smoother, repaints. The smoother advances here (the time-driven entry
+        point) — not in `_render_content`, which also runs on resize/appearance
+        changes and must not move the easing."""
         self._snapshot = snapshot
         self._now = now
+        self._display = self._smoother.update(
+            {
+                "dps": snapshot.dps,
+                "dpis": snapshot.dpis,
+                "hps": snapshot.hps,
+                "hps-out": snapshot.hps_out,
+            },
+            now,
+        )
         self._hud.request_paint()
 
     # ------------------------------------------------------------------ #
@@ -425,6 +553,7 @@ class DeepsOverlay:
         label_font = load_font(self._config.font_family, label_size, bold=False)
         ctx = _RenderContext(
             snapshot=self._snapshot,
+            display=self._display,
             now=self._now,
             font=font,
             label_font=label_font,

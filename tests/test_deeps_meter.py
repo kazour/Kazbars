@@ -222,6 +222,45 @@ class TestProcessLine:
 
 
 # =========================================================================== #
+# Configurable rolling window                                                 #
+# =========================================================================== #
+
+class TestWindowSeconds:
+    def test_default_window_is_five(self) -> None:
+        m = DeepsMeter()
+        assert m._window_seconds == 5.0
+        assert m._out_tracker._window_seconds == 5.0
+
+    def test_set_window_recreates_trackers_at_new_width(self) -> None:
+        m = DeepsMeter()
+        old = m._out_tracker
+        m.set_window_seconds(13)
+        assert m._window_seconds == 13.0
+        assert m._out_tracker is not old  # fresh instance
+        for tracker_window in (
+            m._out_tracker._window_seconds,
+            m._in_tracker._window_seconds,
+            m._heals_out_tracker._window_seconds,
+        ):
+            assert tracker_window == 13.0
+
+    def test_set_window_clears_in_flight_state(self) -> None:
+        m = DeepsMeter()
+        m._process_line(1.0, "Your Strike hits Arbanus for 105.")
+        assert len(m._out_tracker._window._events) == 1
+        assert "Arbanus" in m._known_mobs
+        m.set_window_seconds(7)
+        assert len(m._out_tracker._window._events) == 0
+        assert m._known_mobs == set()
+
+    def test_set_window_same_value_is_noop(self) -> None:
+        m = DeepsMeter()
+        old = m._out_tracker
+        m.set_window_seconds(5)  # already 5.0
+        assert m._out_tracker is old  # not recreated
+
+
+# =========================================================================== #
 # Lifecycle (no real file I/O)                                                #
 # =========================================================================== #
 
