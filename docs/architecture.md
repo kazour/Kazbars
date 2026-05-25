@@ -216,5 +216,6 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `tests/test_deeps_parsers.py` | 544 | 163 behavior-table cases from Deeps's Rust tests + the own-pet gate |
 | `tests/test_deeps_meter.py` | 354 | 32 cases — file selection, lifecycle, `_process_line` dispatch, held-open-file end-to-end |
 | `tests/test_deeps_trackers.py` | 288 | 28 cases — warm-up, decay, reset, per-bucket warm-up for heals |
-| `tests/test_deeps_settings.py` | 270 | 52 cases — defaults, validation, round-trip, corrupt-file fallback || `tests/test_deeps_rolling_window.py` | 169 | 13 cases — primitive smoke + decay-during-silence |
+| `tests/test_deeps_settings.py` | 270 | 52 cases — defaults, validation, round-trip, corrupt-file fallback |
+| `tests/test_deeps_rolling_window.py` | 169 | 13 cases — primitive smoke + decay-during-silence |
 | `tests/test_deeps_overlay.py` | 143 | 23 cases — pure helpers + 5-cell IDs/labels (visual behaviour is `/smoke`) |
