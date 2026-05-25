@@ -4,7 +4,7 @@ All notable changes to KazBars will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [2.0.0] — Unreleased
+## [2.0.0] — 2026-05-25
 
 The **Kaz Grids → KazBars** release: the rename the community always used, plus a real combat meter, a cast-timer overlay, settings backup, and a wide polish pass.
 
