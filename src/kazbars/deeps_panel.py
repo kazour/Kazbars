@@ -174,7 +174,10 @@ class DeepsPanel(tk.Toplevel):
         """Compose the panel: header → status → primary action → overlay
         controls → thresholds → pet toggle."""
         # CRT dialog header — brand-defining strip, same pattern as Live Tracker.
-        create_dialog_header(self, "Deeps", MODULE_COLORS["deeps"], width=_HEADER_WIDTH)
+        create_dialog_header(
+            self, "Deeps", MODULE_COLORS["deeps"], width=_HEADER_WIDTH,
+            accent_segments=[("by ", THEME_COLORS["muted"]), ("Veni", THEME_COLORS["warning"])],
+        )
         create_tip_bar(self, "Live DPS, HPS, and net-HP readout from your combat log.")
 
         body = ttk.Frame(self, padding=(PAD_TAB, PAD_LF))

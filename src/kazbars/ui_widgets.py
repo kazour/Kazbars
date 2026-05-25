@@ -8,6 +8,7 @@ a debounce utility, the alpha-blend color helper, and CollapsibleSection.
 """
 
 import tkinter as tk
+from tkinter import font as tkfont
 from tkinter import ttk
 
 from .ui_helpers import (
@@ -119,7 +120,7 @@ def app_toast(widget, message, style="info", duration=6, key=None, on_click=None
         w = getattr(w, "master", None)
 
 
-def create_dialog_header(parent, title_text, accent_color, width=460):
+def create_dialog_header(parent, title_text, accent_color, width=460, accent_segments=None):
     """CRT-styled header canvas strip for dialogs — matches BuildLoadingScreen aesthetic.
 
     Resize-aware: accent strip and scanlines stretch when the dialog is resizable.
@@ -130,6 +131,8 @@ def create_dialog_header(parent, title_text, accent_color, width=460):
         title_text: Title to display (will be wrapped in Unicode brackets)
         accent_color: Hex color string for accent strip (e.g. MODULE_COLORS['grids'])
         width: Canvas width in pixels
+        accent_segments: Optional list of (text, color) drawn smaller (FONT_SMALL)
+            to the right of the bracketed title — e.g. a "by <name>" credit.
 
     Returns:
         The canvas widget (already packed).
@@ -145,12 +148,25 @@ def create_dialog_header(parent, title_text, accent_color, width=460):
     glow_color = blend_alpha(accent_color, bg, 25)
     mid_glow = blend_alpha(accent_color, bg, 50)
 
+    # Measure title + optional smaller accent suffix so the pair stays centered.
+    _title_font = tkfont.Font(font=FONT_DIALOG_HEADER)
+    _accent_font = tkfont.Font(font=FONT_SMALL)
+    _title_w = _title_font.measure(display_text)
+    _accent_gap = 8
+    _accent_w = (
+        _accent_gap + sum(_accent_font.measure(t) for t, _ in accent_segments)
+        if accent_segments
+        else 0
+    )
+
     def _draw(w):
         canvas.delete("all")
         canvas.create_rectangle(0, 0, w, 3, fill=accent_color, outline="")
         for y in range(0, height, 3):
             canvas.create_line(0, y, w, y, fill=scanline_color)
-        cx, cy = w // 2, height // 2 + 2
+        cy = height // 2 + 2
+        left = w // 2 - (_title_w + _accent_w) // 2
+        cx = left + _title_w // 2
         canvas.create_text(
             cx, cy, text=display_text, anchor="center", fill=glow_color, font=FONT_DIALOG_HEADER
         )
@@ -165,6 +181,13 @@ def create_dialog_header(parent, title_text, accent_color, width=460):
             fill=THEME_COLORS["heading"],
             font=FONT_DIALOG_HEADER,
         )
+        if accent_segments:
+            sx = left + _title_w + _accent_gap
+            for _seg_text, _seg_fill in accent_segments:
+                canvas.create_text(
+                    sx, cy, text=_seg_text, anchor="w", fill=_seg_fill, font=FONT_SMALL
+                )
+                sx += _accent_font.measure(_seg_text)
 
     _draw(width)
     _dlg_after = [None]

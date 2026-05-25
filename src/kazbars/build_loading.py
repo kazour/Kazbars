@@ -252,14 +252,14 @@ def show_welcome_popup(parent, grid_count, enabled_count,
 
 
 DISCORD_URL = "https://discord.gg/ubK5Guryfa"
-GITHUB_URL = "https://github.com/kazour/Kaz-Grids"
+GITHUB_URL = "https://github.com/kazour/Kazbars"
 
 
 def show_about_popup(parent, app_name, app_version):
     """About dialog — same frameless dark style as build popups, with an
     animated miniature buff-grid scene at the bottom.
     """
-    h = 322 if GITHUB_URL else 300
+    h = 342 if GITHUB_URL else 320
 
     popup, canvas = _make_popup_shell(parent, h)
 
@@ -288,6 +288,18 @@ def show_about_popup(parent, app_name, app_version):
         canvas.create_text(_cx, y, text=_text, anchor='w',
                            font=FONT_SMALL, fill=_fill)
         _cx += _font_sm.measure(_text)
+    y += 20
+    # Deeps meter credit — Veni (golden, Spartan)
+    _deeps_credit = [
+        ("Deeps meter by ", THEME_COLORS['muted']),
+        ("Veni", THEME_COLORS['warning']),
+    ]
+    _dc_w = sum(_font_sm.measure(t) for t, _ in _deeps_credit)
+    _dcx = WIDTH // 2 - _dc_w // 2
+    for _text, _fill in _deeps_credit:
+        canvas.create_text(_dcx, y, text=_text, anchor='w',
+                           font=FONT_SMALL, fill=_fill)
+        _dcx += _font_sm.measure(_text)
     y += 26
 
     # Clickable links
