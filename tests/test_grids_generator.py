@@ -14,7 +14,7 @@ Run: `pytest tests/test_grids_generator.py` (from repo root).
 """
 
 from kazbars.buff_database import BuffDatabase
-from kazbars.grids_generator import CodeGenerator
+from kazbars.grids_generator import CodeGenerator, escape_as2_string
 from kazbars.paths import KAZBARS_ASSETS
 
 
@@ -52,6 +52,34 @@ def _load_db():
         db.buffs = []
         db._rebuild_indexes()
     return db
+
+
+def test_escape_as2_string_escapes_quotes_newlines_backslashes():
+    assert escape_as2_string("plain") == "plain"
+    assert escape_as2_string('a"b') == 'a\\"b'
+    assert escape_as2_string("a\\b") == "a\\\\b"
+    assert escape_as2_string("a\nb") == "a\\nb"
+    assert escape_as2_string("a\rb") == "a\\rb"
+
+
+def test_grid_id_with_quote_is_escaped_in_output():
+    grid = _minimal_grid()
+    grid["id"] = 'My"Grid'
+    main, data = CodeGenerator([grid], _load_db(), "0.0.0").generate()
+    combined = main + data
+    # The quote is escaped, keeping the AS2 string literal well-formed...
+    assert 'My\\"Grid' in combined
+    # ...and the raw, literal-breaking form never appears.
+    assert 'My"Grid' not in combined
+
+
+def test_grid_id_with_newline_does_not_inject():
+    grid = _minimal_grid()
+    grid["id"] = "X\ninjected"
+    main, data = CodeGenerator([grid], _load_db(), "0.0.0").generate()
+    combined = main + data
+    assert "X\\ninjected" in combined  # escaped to backslash-n
+    assert "X\ninjected" not in combined  # no raw newline survives
 
 
 def test_console_off_emits_no_console_refs():

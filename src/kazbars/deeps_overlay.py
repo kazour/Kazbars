@@ -80,7 +80,7 @@ def _hex_to_rgb(hex_str: str) -> tuple[int, int, int]:
 try:
     _Palette.ALARM_PEAK = _hex_to_rgb(THEME_COLORS["danger"])
 except Exception:
-    pass
+    logger.debug("Could not derive alarm-peak from theme; keeping default", exc_info=True)
 
 
 def _lerp_rgb(c1: tuple[int, int, int], c2: tuple[int, int, int], t: float) -> tuple[int, int, int]:

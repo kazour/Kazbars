@@ -139,7 +139,7 @@ def uninstall_from_client(game_path):
                         auto_login.unlink()
                     removed.append("auto_login entry")
             except (UnicodeDecodeError, OSError):
-                pass
+                logger.debug("Could not read/clean auto_login markers", exc_info=True)
     except OSError as e:
         return False, f"Could not remove files:\n\n{e}"
 

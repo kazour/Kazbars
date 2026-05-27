@@ -24,7 +24,7 @@ This folder holds the docs that go deeper than the [README](../README.md). Skim 
 | [`PRODUCT.md`](../PRODUCT.md) | Maintainers | Brand brief: register, users, voice, anti-references, design principles. Read before changing user-facing copy or product direction. |
 | [`DESIGN.md`](../DESIGN.md) | Maintainers | Visual system: tokens, colors, typography, components, do's and don'ts. Read before changing visible UI. |
 | [`DESIGN.json`](../DESIGN.json) | Tooling | Machine-readable companion to DESIGN.md (color tonal ramps, role classifications). Useful for design-system tooling, theme generation, or audit scripts. |
-| [`CLAUDE.md`](../CLAUDE.md) | Claude Code | Working agreement: code-quality rules, architecture context, key files, style. Updated when conventions change. |
+| [`CLAUDE.md`](../CLAUDE.md) | Claude Code | **Local-only — `.gitignore`d, not shipped in the repo.** Working agreement: code-quality rules, architecture context, key files, style. Updated when conventions change. |
 | [`.github/release.md`](../.github/release.md) | Claude Code | Release routine. Run via "prepare a release". Updated when the release workflow or version-source moves. |
 | [`.github/release-notes.md`](../.github/release-notes.md) | End users (rendered in GitHub Releases) | Evergreen install/highlights body + per-release "What's New" preamble prepended by the release routine. |
 

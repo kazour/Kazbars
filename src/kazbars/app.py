@@ -443,7 +443,7 @@ class KazBarsApp(ttkb.Window):
             if self.boss_timer_panel.winfo_exists():
                 return self.boss_timer_panel
         except Exception:
-            pass
+            logger.debug("boss_timer_panel existence probe failed", exc_info=True)
         self.boss_timer_panel = None
         return None
 

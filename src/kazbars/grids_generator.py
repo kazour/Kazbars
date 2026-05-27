@@ -46,6 +46,19 @@ def _load_core_template(assets_path=None):
 # ============================================================================
 # CODE GENERATOR
 # ============================================================================
+def escape_as2_string(value):
+    """Escape a string for safe interpolation into an AS2 double-quoted literal
+    or bracket key — guards user-set grid IDs that contain quotes or newlines
+    (which would otherwise break, or inject into, the generated AS2)."""
+    return (
+        str(value)
+        .replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+    )
+
+
 class CodeGenerator:
     """Generate AS2 source code for the KazBars buff-tracking grid system."""
 
@@ -356,15 +369,16 @@ class CodeGenerator:
 
     def _generate_grid_config(self, grid, idx, var_prefix=""):
         gid = grid["id"]
+        gid_lit = escape_as2_string(gid)
         vid = f"{self.sanitize_id(gid)}_{idx}"
         cfg = f"{var_prefix}CFG"
         wl = f"{var_prefix}WL"
         lines = []
 
         lines.append(f'''
-        // {gid}
+        // {gid_lit}
         var {vid}:Object = {{
-            id: "{gid}",
+            id: "{gid_lit}",
             type: "{grid["type"]}",
             rows: {grid["rows"]},
             cols: {grid["cols"]},
@@ -396,13 +410,13 @@ class CodeGenerator:
 
         whitelist = grid.get("whitelist", [])
         if whitelist or grid["slotMode"] == "dynamic":
-            lines.append(f'\n        {wl}["{gid}"] = {{}};')
+            lines.append(f'\n        {wl}["{gid_lit}"] = {{}};')
             if whitelist:
                 ids_str = ", ".join(str(bid) for bid in whitelist)
                 lines.append(f"        var {vid}_ids:Array = [{ids_str}];")
                 lines.append(f'''        i = 0;
         while (i < {vid}_ids.length) {{
-            {wl}["{gid}"][{vid}_ids[i]] = true;
+            {wl}["{gid_lit}"][{vid}_ids[i]] = true;
             i++;
         }}''')
 
@@ -411,9 +425,9 @@ class CodeGenerator:
             for slot_ids in grid.get("slotAssignments", {}).values():
                 all_ids.update(slot_ids)
             if all_ids:
-                lines.append(f'\n        {wl}["{gid}"] = {{}};')
+                lines.append(f'\n        {wl}["{gid_lit}"] = {{}};')
                 for bid in sorted(all_ids):
-                    lines.append(f'        {wl}["{gid}"][{bid}] = true;')
+                    lines.append(f'        {wl}["{gid_lit}"][{bid}] = true;')
 
         return "\n".join(lines)
 
