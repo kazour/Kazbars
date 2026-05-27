@@ -140,6 +140,8 @@ Plain-Python pytest cases guard the failure modes we've actually hit.
 - **`tests/test_timer_sizing.py`** — Live Tracker overlay font-derived auto-size (`_measure`) bounds across font sizes.
 - **`tests/test_toggle_button_state.py`** — pure `toggle_button_state` label/bootstyle flip shared by both panels' single Start↔Stop toggle.
 - **`tests/test_log_name.py`** — `sanitize_log_name` trims a CombatLog filename to `CombatLog_HHMM`.
+- **`tests/test_boss_timer.py`** — `BossTimer` cycle/syphon/double-seed state transitions + the phase state machine at representative elapsed times (driven via `cycle_start_time`, no sleeps).
+- **`tests/test_combat_monitor.py`** — `_process_line` trigger dispatch (seed/fixation/syphon → `BossTimer`), player-name extraction, latest-log discovery + folder selection on a tmp folder, and the start-without-folder guard.
 
 Run before every commit touching code or data:
 ```bash
@@ -204,6 +206,8 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `tests/test_timer_sizing.py` | 41 | Live Tracker overlay font-derived auto-size (`_measure`) bounds |
 | `tests/test_toggle_button_state.py` | 41 | Pure `toggle_button_state` label/bootstyle flip shared by both panels' Start↔Stop toggle |
 | `tests/test_log_name.py` | 22 | `sanitize_log_name` CombatLog filename trimming (`CombatLog-2026-05-16_2152` → `CombatLog_2152`) |
+| `tests/test_boss_timer.py` | 151 | `BossTimer` cycle/syphon/double-seed transitions + phase state machine (time-driven, no sleeps) |
+| `tests/test_combat_monitor.py` | 123 | `_process_line` dispatch, player extraction, latest-log discovery, start-without-folder guard |
 | `src/kazbars/deeps_panel.py` | 874 | `DeepsPanel` Toplevel — status row, Start/Stop, Lock + Layout, appearance (font + size/background sliders), Readout card (window width + smoothing/round/refresh), Alarm & Tints thresholds, 5-cell visibility picker, pet toggle. Owns the meter + overlay + 100 ms UI tick + alarm hysteresis state machine |
 | `src/kazbars/deeps_meter.py` | 452 | `DeepsMeter` daemon thread — tail loop, log rotation detection, `is_live` probe via `CreateFile` exclusive-share, configurable rolling-window width (`set_window_seconds` recreates the trackers). Publishes `MeterSnapshot` (focus is no longer probed here — the shared `ForegroundWatcher` owns it) |
 | `src/kazbars/deeps_overlay.py` | 606 | Five-cell numbers display (DPS out/in, HPS out/in, ΔHP in). Two layouts (horizontal/vertical), 8-direction stroke text, 2 Hz alarm pulse on DPS-out, net-HP tints, click-through lock. `_DisplaySmoother` eases the drawn digits (EMA + coarse rounding + redraw-cadence gate); numbers use smoothed values, colors use the raw snapshot |
