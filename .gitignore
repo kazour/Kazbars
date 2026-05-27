@@ -22,10 +22,12 @@ KazBars.zip
 
 # Internal planning docs
 PATCH_PLAN.md
+audit_report.html
 
 # User-specific runtime data
 settings/*.json
 profiles/*.json
+logs/
 
 # IDE / dev tooling
 .vscode/
