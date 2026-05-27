@@ -74,7 +74,7 @@ uv run pyinstaller kazbars.spec
 # Output: dist/KazBars/KazBars.exe + bundled assets
 ```
 
-The PyInstaller build is reproducible from the checked-in [`kazbars.spec`](kazbars.spec). CI builds the same artifact on every tagged release via [`.github/workflows/release.yml`](.github/workflows/release.yml).
+The PyInstaller build is reproducible from the checked-in [`kazbars.spec`](kazbars.spec) and the committed [`uv.lock`](uv.lock) (CI installs with `uv sync --locked`). CI builds the same artifact on every tagged release via [`.github/workflows/release.yml`](.github/workflows/release.yml).
 
 ## Documentation
 

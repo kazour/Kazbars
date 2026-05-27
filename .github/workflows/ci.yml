@@ -15,11 +15,9 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-          # No uv.lock in this repo; key the cache on the deps file that exists.
-          cache-dependency-glob: "pyproject.toml"
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync --locked --extra dev
 
       # Lint only — the formatter is intentionally not enforced (single-quote
       # codebase vs quote-style="double"); mirrors .pre-commit-config.yaml.
