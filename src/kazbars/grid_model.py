@@ -96,9 +96,9 @@ def validate_grid(grid):
         grid[key] = max(lo, min(int(grid.get(key, default)), hi))
 
     # Validate enums
-    for key, (default, valid) in ENUM_SPECS.items():
+    for key, (enum_default, valid) in ENUM_SPECS.items():
         if grid.get(key) not in valid:
-            grid[key] = default
+            grid[key] = enum_default
 
     # Validate booleans
     for bool_key in ('enabled', 'showTimers', 'enableFlashing'):

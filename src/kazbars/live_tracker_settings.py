@@ -7,6 +7,7 @@ import json
 import logging
 import re
 from pathlib import Path
+from typing import Any
 
 from .overlay_engine import FONT_FAMILY_CHOICES, OverlayConfig
 
@@ -41,7 +42,7 @@ TIMERS_DEFAULTS = {
 # VALIDATION RANGES
 # =============================================================================
 
-TIMERS_RANGES = {
+TIMERS_RANGES: dict[str, dict[str, Any]] = {
     "x":          {"min": 0,    "max": 3840,  "step": 1},
     "y":          {"min": 0,    "max": 2160,  "step": 1},
     "width":      {"min": 150,  "max": 600,   "step": 1},

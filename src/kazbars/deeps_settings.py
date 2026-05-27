@@ -24,6 +24,7 @@ auto-resume per the locked decision).
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 from .overlay_engine import FONT_FAMILY_CHOICES, OverlayConfig
 
@@ -51,7 +52,7 @@ __all__ = [
 # DEFAULTS                                                                    #
 # =========================================================================== #
 
-DEEPS_DEFAULTS = {
+DEEPS_DEFAULTS: dict[str, Any] = {
     # Thresholds — set from the panel by the user.
     "alarm_threshold": 2500.0,           # red-flash alarm activates at this 5s DPS
     "hpis_green_threshold": 50.0,        # HPS cell tints green when net > +N/s
@@ -101,7 +102,7 @@ DEEPS_DEFAULTS = {
 # VALIDATION RANGES                                                           #
 # =========================================================================== #
 
-DEEPS_RANGES = {
+DEEPS_RANGES: dict[str, dict[str, Any]] = {
     # Thresholds: positive numbers, generous upper caps so wild raid DPS
     # values are still accepted.
     "alarm_threshold":       {"min": 0.0, "max": 999_999.0, "kind": "float"},
@@ -152,7 +153,7 @@ def get_default_settings() -> dict:
     return dict(DEEPS_DEFAULTS)
 
 
-def validate_setting(key: str, value: object):
+def validate_setting(key: str, value: Any):
     """Validate and coerce a single setting. Returns the value to store."""
     if key in _BOOL_KEYS:
         return bool(value)
@@ -187,10 +188,10 @@ def validate_setting(key: str, value: object):
     if key in DEEPS_RANGES:
         spec = DEEPS_RANGES[key]
         try:
-            coerced = float(value) if spec["kind"] == "float" else int(value)
+            num = float(value) if spec["kind"] == "float" else int(value)
         except (ValueError, TypeError):
             return DEEPS_DEFAULTS[key]
-        return max(spec["min"], min(coerced, spec["max"]))
+        return max(spec["min"], min(num, spec["max"]))
 
     return value
 

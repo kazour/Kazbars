@@ -29,7 +29,7 @@ CUSTOM_ICON_LINKAGE = {
 }
 
 
-_template_cache = {}
+_template_cache: dict[str, str] = {}
 
 
 def _load_core_template(assets_path=None):
@@ -503,10 +503,10 @@ class CodeGenerator:
 def build_grids(
     grids: list,
     database,
-    base_swf: str,
-    stubs_path: str,
-    output_swf: str,
-    compiler_path: str,
+    base_swf: str | Path,
+    stubs_path: str | Path,
+    output_swf: str | Path,
+    compiler_path: str | Path,
     app_version: str = "3.6.0",
     assets_path=None,
     include_console: bool = False,

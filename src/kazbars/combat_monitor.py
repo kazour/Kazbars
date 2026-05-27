@@ -52,7 +52,7 @@ class CombatLogMonitor:
         self.monitoring = False
         self.monitor_thread = None
         self.last_position = 0
-        self.last_file_check = 0
+        self.last_file_check = 0.0
         self.file_handle = None
         self._lock = threading.Lock()
 
@@ -150,6 +150,9 @@ class CombatLogMonitor:
     def _check_for_newer_log(self):
         """Re-scan for a newer CombatLog (throttled to _NEWER_LOG_CHECK_SEC) and
         switch to it if one appeared. Returns True if it switched."""
+        folder = self.log_folder
+        if not folder:
+            return False
         try:
             current_time = time.time()
             if current_time - self.last_file_check < _NEWER_LOG_CHECK_SEC:
@@ -157,9 +160,9 @@ class CombatLogMonitor:
             self.last_file_check = current_time
 
             newest_log = None
-            newest_mtime = 0
+            newest_mtime = 0.0
 
-            for entry in Path(self.log_folder).iterdir():
+            for entry in Path(folder).iterdir():
                 if entry.name.startswith("CombatLog") and entry.name.endswith(".txt"):
                     full_path = str(entry)
                     mtime = entry.stat().st_mtime

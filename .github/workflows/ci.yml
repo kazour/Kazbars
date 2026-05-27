@@ -24,7 +24,15 @@ jobs:
       - name: Lint
         run: uv run ruff check src tests
 
-      - name: Type check
+      # Blocking: the Tk-free logic core (the `files` list in [tool.mypy]) must
+      # stay type-clean. A regression here fails CI.
+      - name: Type check (core, blocking)
+        run: uv run mypy
+
+      # Advisory: the full repo, including the Tk/ttkbootstrap UI modules whose
+      # dynamic widget typing emits errors mypy can't resolve. Surfaced for
+      # visibility but never fails the build.
+      - name: Type check (full repo, advisory)
         run: uv run mypy src/kazbars
         continue-on-error: true
 

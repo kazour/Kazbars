@@ -10,7 +10,7 @@ from kazbars.paths import app_path
 def _configure_logging():
     """Console + rotating file log. A windowed .exe has no console, so the file
     handler is what gives shipped builds a retrievable crash trail."""
-    handlers = [logging.StreamHandler()]
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
     try:
         log_dir = app_path() / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
