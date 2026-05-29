@@ -7,7 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
-- **Deeps readout tuning** — a new **Readout** card in the Deeps panel. Choose the rolling-window width (5 / 7 / 11 / 13 s) and shape how the numbers read: a **Smoothing** strength that eases the drawn digits instead of snapping every tick, a coarse-rounding step, and a redraw cadence. The alarm pulse and net-HP tints still track the raw values, so only the digits ease. Smoothing ships on at a gentle default.
+- **Deeps readout tuning** — a new **Readout** card in the Deeps panel. Choose the rolling-window width (5 / 7 / 11 / 13 s) and pick a **Style** preset — **Live** (exact, every spike shows), **Steady** (calm but responsive), or **Calm** (heavy smoothing, chunky numbers, half-second redraw) — that shapes how the drawn numbers read. The alarm pulse and net-HP tints still track the raw values, so only the digits ease. Ships on **Steady**. A note flags that widening the window also makes the alarm and tints react later.
+- **Crash log on disk.** The windowed build now writes a rotating `logs/kazbars.log` next to the app, so a crash with no console still leaves a retrievable trail.
+
+### Changed
+- **Deeps alarm pulse is now smooth.** The DPS-out alarm glides through its red pulse instead of stuttering, and the incoming-damage / ΔHP-in cells now ramp through amber as the deficit grows — a graduated warning that fades in and then pulses, rather than snapping on at a single threshold.
+
+### Fixed
+- **Grid names with quotes, newlines, or backslashes no longer break the build.** Such characters are now escaped when the grid is written into the generated overlay code, so an unusual grid name can't corrupt the SWF build.
 
 ## [2.0.0] — 2026-05-25
 
