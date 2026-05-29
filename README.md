@@ -18,11 +18,15 @@ Buff/debuff grid overlay editor for **Age of Conan**. Design icon grids that sho
 ## Quick start
 
 1. **Set your game folder** — click the `Game:` label in the bottom bar and pick your Age of Conan install folder.
-2. **Create a grid** — on the Grids tab, click `+ Add Grid`. A 1×10 horizontal bar is a good starting point.
-3. **Choose buffs to track** — click `Tracked Buffs` and pick entries from the database.
+2. **Add a grid** — in the Grids view, click `+ Add Grid`. A 1×10 horizontal bar is a good starting point.
+3. **Choose buffs to track** — click `Tracked Buffs...` and pick entries from the database.
 4. **Build & Install** — click the green button. Close the game for your first build; after that, rebuild anytime and type `/reloadui` in chat to apply changes.
 
 Up to **64 slots total** across all your grids.
+
+## Community
+
+Questions, bug reports, and release news live on Discord. [Join the Discord](https://discord.gg/ubK5Guryfa).
 
 ## Features
 
@@ -35,8 +39,9 @@ Up to **64 slots total** across all your grids.
 - **Timers and flash warnings** — optional remaining-duration text and pulse-on-low-time
 - **Ethram-Fal Seed Timer** — always-on-top overlay for the Viscous Seed / Lotus Fixation / Syphon cycle
 - **Cast-timer overlay** — optional on-screen readout of your and your target's current cast time, positioned and styled alongside your grids
-- **Deeps** — real-time combat overlay showing DPS out, DPS in, HPS out, HPS in, and ΔHP in, with a pulsing alarm when your DPS-out climbs above a user threshold and net-HP tints on the cells
+- **Deeps** — real-time combat overlay showing DPS out, DPS in, HPS out, HPS in, and ΔHP in. The DPS-out cell pulses red past a threshold you set; the incoming cells tint as your net HP drops
 - **Default Buff Bars editor** — edit the in-game HUD `<BuffListView />` widgets (icon size, spacing, columns, friendly/hostile filter) without hand-editing XML
+- **Backup & restore** — save your full Age of Conan config plus your KazBars profiles and settings to one portable zip, and restore it after a reformat or a corrupted profile
 
 ## Requirements
 
