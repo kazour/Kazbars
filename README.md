@@ -6,7 +6,7 @@
 
 Buff/debuff grid overlay editor for **Age of Conan**. Design icon grids that show your active effects on top of the game, then compile and install them in one click.
 
-> **Renamed from Kaz Grids.** The community has always called this mod "KazBars". As of v2.0, the project takes that name back. Existing users can install KazBars over their old Kaz Grids without uninstalling first — the build pipeline auto-cleans the old Kaz Grids `.swf`, its `Aoc/` module folder, and the `# KzGrids auto-load` marker, and `SettingsManager` migrates `kzgrids_settings.json` → `kazbars_settings.json` on first launch. Old preferences and game folder configuration carry over.
+> **Upgrading from Kaz Grids?** Install over it — no uninstall needed. Your settings and game folder carry over automatically.
 
 ## Install
 
