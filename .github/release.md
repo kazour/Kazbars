@@ -236,9 +236,13 @@ Release v1.1.0 shipped. Don't forget:
 
 [ ] Download the zip and sanity-check: extract, run KazBars.exe,
     confirm the version in the About dialog reads 1.1.0
-[ ] Submit the exe to Microsoft Defender for reputation:
+[ ] ONLY if a release is flagged as malware (Defender quarantines/deletes the
+    exe — not the routine "unrecognized app" SmartScreen prompt): submit that
+    file as a false positive at
     https://www.microsoft.com/en-us/wdsi/filesubmission
-    (Select "Software developer", upload the zip, takes 1-3 days)
+    ("Software developer", upload the zip, 1-3 days). This does NOT grant
+    SmartScreen reputation — an unsigned build's rep resets every release, so
+    the "More info -> Run anyway" prompt is expected each time regardless.
 [ ] Post in Discord with a link to the release notes
 [ ] First-time check: confirm v1.0.0 users get the update toast on
     their next launch (someone in Discord will report if they don't)
