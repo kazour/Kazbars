@@ -1,6 +1,6 @@
 # Architectural Map
 
-**Current as of:** 2026-05-29 (inventory line counts resynced to the tree — the Deeps subtree had drifted furthest; added the `__main__.py`/`__init__.py` entry-point rows that were never listed. Drift is now guarded by `tests/test_docs_in_sync.py` and refreshed via the `/sync-docs` command + `doc-maintainer` agent. Prior pass (2026-05-25): overlay consolidation — both overlays unified onto a shared `overlay_engine.HudOverlay` + `OverlayConfig`; one app-owned `focus_watcher.ForegroundWatcher` replaced the per-cluster focus polls; the foreground probe moved to a pure `foreground.py`; `paths.py` centralizes asset/app-path resolution.)
+**Current as of:** 2026-05-29 (`instructions_panel.py` inventory count refreshed 403 → 512 after six help sections were added; inventory line counts resynced to the tree — the Deeps subtree had drifted furthest; added the `__main__.py`/`__init__.py` entry-point rows that were never listed. Drift is now guarded by `tests/test_docs_in_sync.py` and refreshed via the `/sync-docs` command + `doc-maintainer` agent. Prior pass (2026-05-25): overlay consolidation — both overlays unified onto a shared `overlay_engine.HudOverlay` + `OverlayConfig`; one app-owned `focus_watcher.ForegroundWatcher` replaced the per-cluster focus polls; the foreground probe moved to a pure `foreground.py`; `paths.py` centralizes asset/app-path resolution.)
 **Purpose:** Module topology, dependencies, and coupling hotspots. Updated alongside code changes — if you edit this file, commit it with the code. `CLAUDE.md` has the short version; this file has the detail that doesn't fit there.
 
 ## Dependency clusters
@@ -175,7 +175,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/ui_components.py` | 454 | `ToastManager` (coalesce-by-key, in-place text update), `DragReorderManager`, scrollable frame |
 | `src/kazbars/grids_generator.py` | 593 | AS2 code generation from grid configs (optional console hooks via `include_console`; optional cast-timer overlay hooks + `d.CAST` block via `cast_config` → `include_cast_timer`). Also holds `CUSTOM_ICON_LINKAGE` (null-icon buff IDs → baked `base.swf` symbol names), emitted into `KazBarsData.CUSTOMICON` |
 | `src/kazbars/boss_timer.py` | 399 | Boss timer state + UI |
-| `src/kazbars/instructions_panel.py` | 403 | Help/instructions view |
+| `src/kazbars/instructions_panel.py` | 512 | Help/instructions view |
 | `src/kazbars/first_launch.py` | 364 | First-launch dialog + post-dialog orchestrator (`run_first_launch`) |
 | `src/kazbars/custom_menu_bar.py` | 402 | Canvas-based dark menu bar (active-cascade phosphor underline; ttkb-safe Canvas spacers; supports `command`, `separator`, `checkbutton` entries) |
 | `src/kazbars/combat_monitor.py` | 292 | Combat log parser feeding the tracker |

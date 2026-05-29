@@ -147,6 +147,28 @@ class InstructionsPanel(ttk.Frame):
             "'Applying and Positioning In-Game'.",
         ])
 
+        # --- Cast Timer ---
+
+        cast_section = self._add_section(inner, "Cast Timer", [
+            "A timer-only overlay for your own and your target's cast time — "
+            "floating text over the game's cast bar, no bar of its own. Off "
+            "by default.",
+        ])
+        self._add_subsection(cast_section.content, "Turn it on", [
+            "Open the Cast Timer strip pinned above the grid list and flip "
+            "Enabled. One toggle runs both the Player and Target sides.",
+        ])
+        self._add_subsection(cast_section.content, "Settings", [
+            "Player / Target X/Y — where each timer sits on screen.",
+            "Bold, Size, Color — shared by both sides.",
+            "Show — Elapsed counts up, Total is the estimated cast length, "
+            "Both shows 1.2 / 2.5.",
+        ])
+        self._add_subsection(cast_section.content, "Positioning", [
+            "Set X/Y in the strip, or press Shift+Ctrl+Alt in-game to drag "
+            "the timer. Rebuild and reload to apply.",
+        ])
+
         # --- Building & Installing ---
 
         build_section = self._add_section(inner, "Building and Installing", [
@@ -170,6 +192,16 @@ class InstructionsPanel(ttk.Frame):
               "in-game, just click ", None),
              ("Build & Install", THEME_COLORS['success']),
              (" again.", None)],
+        ])
+        self._add_subsection(build_section.content, "Buff-discovery console", [
+            "Don't know an effect's buff ID? Turn on Game → Include "
+            "buff-discovery console in builds, then Build & Install. In "
+            "preview mode (Shift+Ctrl+Alt), the console logs every effect's "
+            "name and buff ID as it lands on you or your target — copy the "
+            "ID into the Database.",
+            "It's off by default and only included when you enable it, so "
+            "finished builds don't carry it. Turn it off and rebuild to "
+            "remove it.",
         ])
         self._add_subsection(build_section.content, "Removing KazBars from your game folder", [
             "File → Uninstall from game client... removes KazBars.swf "
@@ -226,6 +258,39 @@ class InstructionsPanel(ttk.Frame):
             "the next seed.",
             "Phase 4: two seeds at once, kite the scorpions. Syphon "
             "clouds interrupt the cycle.",
+        ])
+
+        # --- Deeps ---
+
+        deeps = self._add_section(inner, "Deeps", [
+            "Always-on-top combat meter that reads your combat log. Five "
+            "rolling numbers: DPS out, DPS in, HPS out, HPS in, and ΔHP in "
+            "(your net health change per second).",
+        ])
+        self._add_subsection(deeps.content, "Setup", [
+            [("Click ", None),
+             ("⚔ Deeps", THEME_COLORS['accent']),
+             (" at the bottom right, then ", None),
+             ("Start", THEME_COLORS['success']),
+             (". Numbers appear once you're in a fight.", None)],
+        ])
+        self._add_subsection(deeps.content, "Positioning", [
+            "Drag the overlay to position. Use Lock in the panel to fix it "
+            "in place and pass game clicks through; unlock from the same "
+            "button. Choose a Horizontal or Vertical layout, and pick which "
+            "of the five cells to show under Overlay Cells.",
+        ])
+        self._add_subsection(deeps.content, "Readout", [
+            "Window — how many seconds the rolling average covers. A wider "
+            "window is steadier but reacts later.",
+            "Style — Live shows every spike, Steady is the calm middle, Calm "
+            "smooths heavily for peripheral glances.",
+        ])
+        self._add_subsection(deeps.content, "Alarms and pet damage", [
+            "Alarm & Tints set when the DPS-out cell pulses and when the "
+            "ΔHP-in cell ramps to orange as your deficit grows.",
+            "Pet damage counts only your own pet, and is off unless you "
+            "enable it.",
         ])
 
         # --- Buff Database ---
@@ -290,6 +355,50 @@ class InstructionsPanel(ttk.Frame):
         self._add_subsection(stacking.content, "Stack range (stacking only, partial list off)", [
             "Show the icon only within a stack range. 'Start at' is when "
             "it appears; 'End at' is the last shown (0 means show all).",
+        ])
+
+        # --- Game resolution ---
+
+        self._add_section(inner, "Game Resolution", [
+            "Game → Game resolution... sets the screen size KazBars builds "
+            "for. Grid X/Y are positions on that screen, so the resolution "
+            "has to match the one you play at.",
+            "Change it and your loaded grids re-anchor to the new size — a "
+            "layout built for 1920×1080 scales to 2560×1440 without "
+            "repositioning every grid by hand. Rebuild to apply.",
+        ])
+
+        # --- Default Buff Bars ---
+
+        bars_section = self._add_section(inner, "Default Buff Bars", [
+            "Game → Default buff bars... edits Age of Conan's own built-in "
+            "buff bars — the Player and Target portrait icons, the top bar, "
+            "and floating portraits. This is separate from your KazBars "
+            "grids; KazBars isn't affected.",
+        ])
+        self._add_subsection(bars_section.content, "What you can change", [
+            "Icon size, spacing, and column count per bar, plus a friendly / "
+            "hostile filter. Toggle a bar off to hide it entirely.",
+        ])
+        self._add_subsection(bars_section.content, "Where it writes", [
+            "Edits go only to your Customized UI skin, and each file is "
+            "backed up once before the first change. Set your game folder "
+            "first.",
+        ])
+
+        # --- Backup & Restore ---
+
+        backup_section = self._add_section(inner, "Backup and Restore", [
+            "Game → Backup & restore game settings... writes one portable "
+            ".zip of your Age of Conan config — keybinds, HUD layout, "
+            "graphics, all characters — plus your KazBars profiles and "
+            "settings. The recovery path after a reformat or a corrupted "
+            "profile.",
+        ])
+        self._add_subsection(backup_section.content, "Restoring", [
+            "Restore replaces your current settings, so it snapshots them "
+            "first — a bad restore is reversible. Close Age of Conan before "
+            "backing up or restoring.",
         ])
 
         # Bottom spacer
