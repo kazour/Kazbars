@@ -19,6 +19,7 @@ from kazbars.deeps_settings import (
     get_default_settings,
     get_settings_path,
     load_settings,
+    normalize_readout_preset,
     save_settings,
     validate_all_settings,
     validate_setting,
@@ -29,11 +30,15 @@ from kazbars.deeps_settings import (
 # =========================================================================== #
 
 def test_defaults_match_locked_decisions() -> None:
-    """The three threshold defaults are the user-locked numbers."""
+    """The threshold defaults are the user-locked numbers — DPS-out alarm,
+    HPS-in green deadband, and the three-step ΔHP-in ramp (tint start → full
+    tint → flash alarm)."""
     d = get_default_settings()
     assert d["alarm_threshold"] == 2500.0
     assert d["hpis_green_threshold"] == 50.0
-    assert d["dpis_yellow_threshold"] == 300.0
+    assert d["dpis_tint_start"] == 200.0
+    assert d["dpis_tint_full"] == 300.0
+    assert d["dpis_flash"] == 500.0
 
 
 def test_pet_damage_default_on() -> None:
@@ -46,11 +51,14 @@ def test_layout_default_horizontal() -> None:
 
 
 def test_readout_defaults() -> None:
-    """Readout card ships with a 5s window and gentle smoothing on."""
+    """Readout card ships with a 5s window and the Steady preset (gentle EMA +
+    tens rounding + live refresh). The three smoother keys mirror the preset
+    so the overlay reads coherent values straight from settings."""
     d = get_default_settings()
     assert d["window_seconds"] == 5
+    assert d["readout_preset"] == "steady"
     assert d["smoothing"] == 50
-    assert d["round_step"] == 5
+    assert d["round_step"] == 10
     assert d["refresh_ms"] == 100
 
 
@@ -202,12 +210,26 @@ class TestValidateSetting:
         [
             (1, 1), (5, 5), (10, 10), (25, 25), (50, 50), (100, 100),
             ("25", 25),
-            (3, 5),                 # off-list → default
-            ("junk", 5), (None, 5),
+            (3, 10),                # off-list → default (Steady's value)
+            ("junk", 10), (None, 10),
         ],
     )
     def test_round_step_choice(self, value: object, expected: int) -> None:
         assert validate_setting("round_step", value) == expected
+
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            ("live", "live"), ("steady", "steady"), ("calm", "calm"),
+            ("LIVE", "steady"),     # case-sensitive — off-list → default
+            ("custom", "steady"),   # off-list → default
+            ("", "steady"),
+            (None, "steady"),
+            (42, "steady"),
+        ],
+    )
+    def test_readout_preset_choice(self, value: object, expected: str) -> None:
+        assert validate_setting("readout_preset", value) == expected
 
     @pytest.mark.parametrize(
         ("value", "expected"),
@@ -286,7 +308,9 @@ class TestFileIO:
         original = get_default_settings()
         original["alarm_threshold"] = 3500.0
         original["hpis_green_threshold"] = 75.0
-        original["dpis_yellow_threshold"] = 400.0
+        original["dpis_tint_start"] = 250.0
+        original["dpis_tint_full"] = 400.0
+        original["dpis_flash"] = 650.0
         original["include_pet_damage"] = True
         original["layout"] = "vertical"
         original["overlay_font_family"] = "Consolas"
@@ -328,3 +352,90 @@ class TestFileIO:
         save_settings(tmp_path, bad)
         loaded = load_settings(tmp_path)
         assert loaded["alarm_threshold"] == 999_999.0
+
+
+# =========================================================================== #
+# normalize_readout_preset                                                    #
+# =========================================================================== #
+
+class TestNormalizeReadoutPreset:
+    """The disk/memory/overlay invariant: the three smoother keys are
+    derived from `readout_preset`, never edited independently. The
+    function snaps them back into sync."""
+
+    def test_calm_overrides_stale_smoother_values(self) -> None:
+        settings = {
+            "readout_preset": "calm",
+            "smoothing": 0,
+            "round_step": 1,
+            "refresh_ms": 100,
+        }
+        result = normalize_readout_preset(settings)
+        assert result == "calm"
+        assert settings["smoothing"] == 90
+        assert settings["round_step"] == 50
+        assert settings["refresh_ms"] == 500
+
+    def test_steady_overrides_stale_smoother_values(self) -> None:
+        settings = {
+            "readout_preset": "steady",
+            "smoothing": 90,
+            "round_step": 50,
+            "refresh_ms": 500,
+        }
+        result = normalize_readout_preset(settings)
+        assert result == "steady"
+        assert settings["smoothing"] == 50
+        assert settings["round_step"] == 10
+        assert settings["refresh_ms"] == 100
+
+    def test_live_leaves_matching_values_unchanged(self) -> None:
+        settings = {
+            "readout_preset": "live",
+            "smoothing": 0,
+            "round_step": 1,
+            "refresh_ms": 100,
+        }
+        result = normalize_readout_preset(settings)
+        assert result == "live"
+        assert settings["smoothing"] == 0
+        assert settings["round_step"] == 1
+        assert settings["refresh_ms"] == 100
+
+    def test_unknown_preset_falls_back_to_steady(self) -> None:
+        settings = {
+            "readout_preset": "unknown_garbage",
+            "smoothing": 0,
+            "round_step": 1,
+            "refresh_ms": 100,
+        }
+        result = normalize_readout_preset(settings)
+        assert result == "steady"
+        assert settings["readout_preset"] == "steady"
+        assert settings["smoothing"] == 50
+        assert settings["round_step"] == 10
+        assert settings["refresh_ms"] == 100
+
+    def test_missing_preset_key_defaults_to_steady(self) -> None:
+        settings: dict = {}
+        result = normalize_readout_preset(settings)
+        assert result == "steady"
+        assert settings["readout_preset"] == "steady"
+        assert settings["smoothing"] == 50
+        assert settings["round_step"] == 10
+        assert settings["refresh_ms"] == 100
+
+    def test_mutates_input_dict_in_place(self) -> None:
+        """Other keys are preserved and the same dict object is mutated —
+        callers rely on the in-place write to keep their settings reference
+        live."""
+        settings = {
+            "readout_preset": "calm",
+            "alarm_threshold": 2500.0,
+            "smoothing": 0,
+        }
+        normalize_readout_preset(settings)
+        assert settings["alarm_threshold"] == 2500.0
+        assert settings["smoothing"] == 90
+        assert settings["round_step"] == 50
+        assert settings["refresh_ms"] == 500

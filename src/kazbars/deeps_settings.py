@@ -37,10 +37,12 @@ __all__ = [
     "DEEPS_RANGES",
     "FONT_FAMILY_CHOICES",
     "SETTINGS_FILENAME",
+    "_READOUT_PRESETS",
     "apply_overlay_config_to_deeps",
     "get_default_settings",
     "get_settings_path",
     "load_settings",
+    "normalize_readout_preset",
     "overlay_config_from_deeps",
     "save_settings",
     "validate_all_settings",
@@ -56,20 +58,32 @@ DEEPS_DEFAULTS: dict[str, Any] = {
     # Thresholds — set from the panel by the user.
     "alarm_threshold": 2500.0,           # red-flash alarm activates at this 5s DPS
     "hpis_green_threshold": 50.0,        # HPS cell tints green when net > +N/s
-    "dpis_yellow_threshold": 300.0,      # DPIS cell tints yellow when -net > +N/s
+    # DPIS / ΔHP-in three-step ramp on -net (incoming damage minus heals):
+    #   < tint_start          → no tint
+    #   tint_start → tint_full → linear fade DEFAULT → YELLOW_TINT
+    #   tint_full → flash      → solid YELLOW_TINT
+    #   >= flash              → YELLOW_TINT pulse-flashing to deeper amber
+    "dpis_tint_start": 200.0,
+    "dpis_tint_full": 300.0,
+    "dpis_flash": 500.0,
 
     # Behavior toggle — pet damage included by default.
     "include_pet_damage": True,
 
     # Readout tuning — the "Readout" card. `window_seconds` sizes the rolling
-    # buffers (one of `_WINDOW_CHOICES`); the other three are pure display
-    # presentation. `smoothing` is a 0-100 strength mapped to an EMA time
-    # constant (0 = off → digits snap). `round_step` quantizes the drawn value
-    # (1 = off). `refresh_ms` is how often the drawn digits are allowed to
-    # change (100 = live / every UI tick).
+    # buffers (one of `_WINDOW_CHOICES`) and is the one knob that changes the
+    # *measured* rate (it therefore also shifts when the DPS-out alarm fires
+    # and when the ΔHP-in ramp tints). `smoothing` / `round_step` / `refresh_ms`
+    # are pure display presentation, bundled into named presets the user picks
+    # from (`readout_preset`); the three keys are kept as the source the
+    # overlay's smoother reads. `smoothing` is a 0-100 strength mapped to an
+    # EMA time constant (0 = off → digits snap). `round_step` quantizes the
+    # drawn value (1 = off). `refresh_ms` is how often the drawn digits are
+    # allowed to change (100 = live / every UI tick).
     "window_seconds": 5,
+    "readout_preset": "steady",
     "smoothing": 50,
-    "round_step": 5,
+    "round_step": 10,
     "refresh_ms": 100,
 
     # Overlay layout — radio in panel, "horizontal" or "vertical".
@@ -107,7 +121,9 @@ DEEPS_RANGES: dict[str, dict[str, Any]] = {
     # values are still accepted.
     "alarm_threshold":       {"min": 0.0, "max": 999_999.0, "kind": "float"},
     "hpis_green_threshold":  {"min": 0.0,  "max":  99_999.0, "kind": "float"},
-    "dpis_yellow_threshold": {"min": 0.0,  "max":  99_999.0, "kind": "float"},
+    "dpis_tint_start":       {"min": 0.0,  "max":  99_999.0, "kind": "float"},
+    "dpis_tint_full":        {"min": 0.0,  "max":  99_999.0, "kind": "float"},
+    "dpis_flash":            {"min": 0.0,  "max":  99_999.0, "kind": "float"},
 
     # Display smoothing strength — 0 (off, digits snap) to 100 (max easing).
     "smoothing": {"min": 0, "max": 100, "kind": "int"},
@@ -127,6 +143,17 @@ DEEPS_RANGES: dict[str, dict[str, Any]] = {
 _BOOL_KEYS = ("include_pet_damage", "overlay_locked", "overlay_positioned")
 _LAYOUT_CHOICES = ("horizontal", "vertical")
 _ALL_CELL_IDS = ("dps", "dpis", "hps", "hps-out", "net")
+_READOUT_PRESET_CHOICES = ("live", "steady", "calm")
+
+# Disk/memory/overlay invariant — the three smoother knobs are derived from the
+# selected preset name, not edited independently. `normalize_readout_preset`
+# snaps `smoothing`/`round_step`/`refresh_ms` back to these values whenever
+# settings are loaded or the user picks a preset.
+_READOUT_PRESETS: dict[str, dict[str, int]] = {
+    "live":   {"smoothing":  0, "round_step":  1, "refresh_ms": 100},
+    "steady": {"smoothing": 50, "round_step": 10, "refresh_ms": 100},
+    "calm":   {"smoothing": 90, "round_step": 50, "refresh_ms": 500},
+}
 
 # Readout-card discrete choices. `window_seconds` are the odd-second widths the
 # user can pick; `round_step` includes 1 (= rounding off); `refresh_ms` 100 is
@@ -164,6 +191,9 @@ def validate_setting(key: str, value: Any):
     if key == "overlay_font_family":
         return value if value in FONT_FAMILY_CHOICES else DEEPS_DEFAULTS["overlay_font_family"]
 
+    if key == "readout_preset":
+        return value if value in _READOUT_PRESET_CHOICES else DEEPS_DEFAULTS["readout_preset"]
+
     if key in _CHOICE_KEYS:
         try:
             coerced = int(value)
@@ -194,6 +224,20 @@ def validate_setting(key: str, value: Any):
         return max(spec["min"], min(num, spec["max"]))
 
     return value
+
+
+def normalize_readout_preset(settings: dict) -> str:
+    """Snap the three smoother keys to match the persisted
+    readout_preset. Returns the (possibly defaulted) preset name."""
+    name = settings.get("readout_preset", DEEPS_DEFAULTS["readout_preset"])
+    if name not in _READOUT_PRESETS:
+        name = DEEPS_DEFAULTS["readout_preset"]
+    preset = _READOUT_PRESETS[name]
+    settings["readout_preset"] = name
+    settings["smoothing"] = preset["smoothing"]
+    settings["round_step"] = preset["round_step"]
+    settings["refresh_ms"] = preset["refresh_ms"]
+    return name
 
 
 def validate_all_settings(settings: dict) -> dict:

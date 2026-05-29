@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import logging
 import math
+import time
 import tkinter as tk
 from collections.abc import Callable
 
@@ -34,6 +35,12 @@ from .overlay_engine import HudOverlay, load_font
 from .ui_helpers import THEME_COLORS
 
 logger = logging.getLogger(__name__)
+
+# Pulse animation cadence — runs only while a pulse is active so the 2 Hz sine
+# reads as a smooth glide rather than the 10 Hz "on/off" stutter you get from
+# sampling at the data-tick rate. ~30 Hz (33 ms) is plenty for human-eye smooth
+# at 2 Hz and stays cheap because it ONLY runs while alarm/flash is active.
+_PULSE_REPAINT_MS = 33
 
 
 # =========================================================================== #
@@ -66,9 +73,12 @@ class _Palette:
     DEFAULT = (232, 230, 224)            # warm off-white
     LABEL = (176, 176, 176)              # muted
     SEPARATOR = (64, 64, 64)
-    ALARM_PEAK = (231, 76, 60)           # #E74C3C — pulse target
+    ALARM_PEAK = (231, 76, 60)           # #E74C3C — DPS-out (threat) pulse target
     GREEN_TINT = (130, 195, 130)         # sage HPS-positive
-    YELLOW_TINT = (215, 165, 95)         # warm-orange DPIS-deficit
+    YELLOW_TINT = (215, 165, 95)         # warm-orange DPIS-deficit (steady tint)
+    DPIS_FLASH_PEAK = (240, 130, 40)     # deeper amber — DPIS/ΔHP pulse target,
+                                         # distinct from ALARM_PEAK red so threat
+                                         # and survival signals don't blend
 
 
 def _hex_to_rgb(hex_str: str) -> tuple[int, int, int]:
@@ -213,8 +223,10 @@ class _DisplaySmoother:
 class _RenderContext:
     """Bundle of state a cell renderer needs."""
 
-    __slots__ = ("alarm_active", "alarm_threshold", "display", "dpis_yellow",
-                 "font", "hpis_green", "label_font", "now", "scale", "snapshot")
+    __slots__ = ("alarm_active", "alarm_threshold", "display",
+                 "dpis_flash", "dpis_flash_active", "dpis_tint_full",
+                 "dpis_tint_start", "font", "hpis_green",
+                 "label_font", "now", "scale", "snapshot")
 
     def __init__(
         self,
@@ -226,7 +238,10 @@ class _RenderContext:
         alarm_active: bool,
         alarm_threshold: float,
         hpis_green: float,
-        dpis_yellow: float,
+        dpis_tint_start: float,
+        dpis_tint_full: float,
+        dpis_flash: float,
+        dpis_flash_active: bool,
         scale: float,
     ) -> None:
         self.snapshot = snapshot
@@ -237,7 +252,10 @@ class _RenderContext:
         self.alarm_active = alarm_active
         self.alarm_threshold = alarm_threshold
         self.hpis_green = hpis_green
-        self.dpis_yellow = dpis_yellow
+        self.dpis_tint_start = dpis_tint_start
+        self.dpis_tint_full = dpis_tint_full
+        self.dpis_flash = dpis_flash
+        self.dpis_flash_active = dpis_flash_active
         self.scale = scale
 
 
@@ -249,15 +267,44 @@ def _dps_color(ctx: _RenderContext) -> tuple[int, int, int]:
     return _lerp_rgb(_Palette.DEFAULT, _Palette.ALARM_PEAK, phase)
 
 
+def _dpis_ramp_color(ctx: _RenderContext) -> tuple[int, int, int]:
+    """Three-step ramp for the DPIS / ΔHP-in cells driven by `-net` (incoming
+    damage minus heals):
+
+      < tint_start          → DEFAULT (no tint)
+      tint_start → tint_full → linear fade DEFAULT → YELLOW_TINT
+      tint_full → flash      → solid YELLOW_TINT
+      >= flash + flash_active → YELLOW_TINT pulse-flashing to DPIS_FLASH_PEAK
+
+    `dpis_flash_active` is hysteresis-tracked in the overlay (on at `flash`,
+    off at `flash * 0.9`) so the pulse doesn't strobe on/off at the boundary.
+    Reads `ctx.snapshot` (raw) so the tint stays instant while digits ease.
+    """
+    snap = ctx.snapshot
+    if snap.hps is None or snap.dpis is None:
+        return _Palette.DEFAULT
+    net_deficit = snap.dpis - snap.hps  # = -net
+    if net_deficit < ctx.dpis_tint_start:
+        return _Palette.DEFAULT
+    if net_deficit < ctx.dpis_tint_full:
+        span = max(1e-6, ctx.dpis_tint_full - ctx.dpis_tint_start)
+        t = (net_deficit - ctx.dpis_tint_start) / span
+        return _lerp_rgb(_Palette.DEFAULT, _Palette.YELLOW_TINT, t)
+    if not ctx.dpis_flash_active:
+        return _Palette.YELLOW_TINT
+    phase = (math.sin(2 * math.pi * _ALARM_BLINK_HZ * ctx.now) + 1.0) * 0.5
+    return _lerp_rgb(_Palette.YELLOW_TINT, _Palette.DPIS_FLASH_PEAK, phase)
+
+
 def _tint_colors(ctx: _RenderContext) -> tuple[tuple[int, int, int], tuple[int, int, int]]:
-    """Compute (hps_color, dpis_color) from net HP rate vs thresholds."""
+    """Compute (hps_color, dpis_color). HPS-in is the same binary green; DPIS
+    runs through the new three-step ramp."""
     snap = ctx.snapshot
     if snap.hps is None or snap.dpis is None:
         return (_Palette.DEFAULT, _Palette.DEFAULT)
     net = snap.hps - snap.dpis
     hps = _Palette.GREEN_TINT if net > ctx.hpis_green else _Palette.DEFAULT
-    dpis = _Palette.YELLOW_TINT if -net > ctx.dpis_yellow else _Palette.DEFAULT
-    return (hps, dpis)
+    return (hps, _dpis_ramp_color(ctx))
 
 
 def _draw_stroked_text(
@@ -305,21 +352,16 @@ def _draw_solo_cell(
 
 
 def _net_color(ctx: _RenderContext) -> tuple[int, int, int]:
-    """Tint for the ΔHP-in cell, derived from the existing HPIS/DPIS thresholds.
-
-    Mirrors `_tint_colors` so the net cell agrees with the HPS / DPIS cells:
-    when HPS would tint green, net tints green; when DPIS would tint warm-
-    orange, net tints warm-orange; otherwise default white.
-    """
+    """Tint for the ΔHP-in cell. Positive side mirrors the HPS-in green; negative
+    side runs through the same `_dpis_ramp_color` ramp so the DPIS and ΔHP
+    cells always agree visually (they're two views of the same signal)."""
     snap = ctx.snapshot
     if snap.hps is None or snap.dpis is None:
         return _Palette.DEFAULT
     net = snap.hps - snap.dpis
     if net > ctx.hpis_green:
         return _Palette.GREEN_TINT
-    if -net > ctx.dpis_yellow:
-        return _Palette.YELLOW_TINT
-    return _Palette.DEFAULT
+    return _dpis_ramp_color(ctx)
 
 
 # =========================================================================== #
@@ -407,10 +449,19 @@ class DeepsOverlay:
         )
         self._alarm_threshold: float = 2000.0
         self._hpis_green: float = 50.0
-        self._dpis_yellow: float = 300.0
+        self._dpis_tint_start: float = 200.0
+        self._dpis_tint_full: float = 300.0
+        self._dpis_flash: float = 500.0
         self._alarm_active: bool = False
+        self._dpis_flash_active: bool = False
         self._snapshot: MeterSnapshot = MeterSnapshot.empty()
         self._now: float = 0.0
+
+        # Self-driven ~30 Hz repaint loop that only runs while a pulse is
+        # active. Without it the 2 Hz sine would be sampled at 10 Hz
+        # (the panel's data tick) → ~5 frames per cycle → reads as on/off.
+        self._root: tk.Misc = root
+        self._pulse_after_id: str | None = None
 
         # Presentation-layer easing of the drawn numbers (see _DisplaySmoother).
         # Reads its three knobs from settings; the meter owns `window_seconds`.
@@ -440,11 +491,17 @@ class DeepsOverlay:
 
     def hide(self) -> None:
         self._hud.hide()
+        # Tear down pulse state + animation so Stop->Start doesn't paint
+        # against stale flags and the 30 Hz loop doesn't fire while hidden.
+        self._alarm_active = False
+        self._dpis_flash_active = False
+        self._cancel_pulse_tick()
 
     def set_focus_suppressed(self, suppressed: bool) -> None:
         self._hud.set_focus_suppressed(suppressed)
 
     def destroy(self) -> None:
+        self._cancel_pulse_tick()
         self._hud.destroy()
 
     def set_layout(self, layout: str) -> None:
@@ -491,13 +548,32 @@ class DeepsOverlay:
     def is_locked(self) -> bool:
         return self._hud.is_locked()
 
-    def update_thresholds(self, alarm: float, green: float, yellow: float) -> None:
+    def update_thresholds(
+        self,
+        alarm: float,
+        green: float,
+        dpis_tint_start: float,
+        dpis_tint_full: float,
+        dpis_flash: float,
+    ) -> None:
+        """Push the DPS-out alarm + ΔHP-in tint ramp thresholds.
+
+        Three ramp values define the DPIS / ΔHP cells' tint zones (see
+        `_dpis_ramp_color` for the curve). Caller's responsibility to keep them
+        ordered (`tint_start < tint_full < dpis_flash`) — the overlay doesn't
+        re-sort, since the user is the one configuring them.
+        """
         self._alarm_threshold = float(alarm)
         self._hpis_green = float(green)
-        self._dpis_yellow = float(yellow)
+        self._dpis_tint_start = float(dpis_tint_start)
+        self._dpis_tint_full = float(dpis_tint_full)
+        self._dpis_flash = float(dpis_flash)
 
     def update_alarm_active(self, active: bool) -> None:
+        was = self._alarm_active
         self._alarm_active = bool(active)
+        if was != self._alarm_active:
+            self._sync_pulse_animation()
 
     def paint(self, snapshot: MeterSnapshot, now: float) -> None:
         """Called by the panel's tick. Snapshots the state, advances the display
@@ -515,7 +591,71 @@ class DeepsOverlay:
             },
             now,
         )
+        self._update_dpis_flash_state(snapshot)
         self._hud.request_paint()
+
+    # ------------------------------------------------------------------ #
+    # DPIS flash hysteresis + self-driven pulse repaint loop              #
+    # ------------------------------------------------------------------ #
+
+    # Mirrors the DPS-out alarm hysteresis (in deeps_panel) to keep the pulse
+    # from strobing when -net hovers around the flash threshold.
+    _DPIS_FLASH_HYSTERESIS = 0.9
+
+    def _update_dpis_flash_state(self, snapshot: MeterSnapshot) -> None:
+        if snapshot.hps is None or snapshot.dpis is None:
+            return
+        deficit = snapshot.dpis - snapshot.hps  # = -net
+        on = self._dpis_flash
+        off = on * self._DPIS_FLASH_HYSTERESIS
+        prev = self._dpis_flash_active
+        if not prev and deficit >= on:
+            self._dpis_flash_active = True
+        elif prev and deficit < off:
+            self._dpis_flash_active = False
+        if prev != self._dpis_flash_active:
+            self._sync_pulse_animation()
+
+    def _wants_pulse(self) -> bool:
+        return self._alarm_active or self._dpis_flash_active
+
+    def _sync_pulse_animation(self) -> None:
+        """Start the ~30 Hz repaint loop iff a pulse is wanted; cancel otherwise."""
+        if self._wants_pulse():
+            if self._pulse_after_id is None:
+                self._schedule_pulse_tick()
+        elif self._pulse_after_id is not None:
+            self._cancel_pulse_tick()
+
+    def _schedule_pulse_tick(self) -> None:
+        try:
+            self._pulse_after_id = self._root.after(_PULSE_REPAINT_MS, self._pulse_tick)
+        except tk.TclError:
+            # Root vanished mid-schedule (shutdown race) — drop the loop.
+            self._pulse_after_id = None
+
+    def _cancel_pulse_tick(self) -> None:
+        if self._pulse_after_id is None:
+            return
+        try:
+            self._root.after_cancel(self._pulse_after_id)
+        except (ValueError, tk.TclError):
+            pass
+        self._pulse_after_id = None
+
+    def _pulse_tick(self) -> None:
+        """Advance `now` and repaint between data ticks so the sine reads
+        smoothly. The data tick (panel-driven) keeps writing snapshot/display;
+        we only move the clock forward and re-render."""
+        self._pulse_after_id = None
+        if not self._wants_pulse():
+            return
+        self._now = time.monotonic()
+        try:
+            self._hud.request_paint()
+        except tk.TclError:
+            return
+        self._schedule_pulse_tick()
 
     # ------------------------------------------------------------------ #
     # Internals                                                           #
@@ -560,7 +700,10 @@ class DeepsOverlay:
             alarm_active=self._alarm_active,
             alarm_threshold=self._alarm_threshold,
             hpis_green=self._hpis_green,
-            dpis_yellow=self._dpis_yellow,
+            dpis_tint_start=self._dpis_tint_start,
+            dpis_tint_full=self._dpis_tint_full,
+            dpis_flash=self._dpis_flash,
+            dpis_flash_active=self._dpis_flash_active,
             scale=scale,
         )
         if self._layout == "horizontal":

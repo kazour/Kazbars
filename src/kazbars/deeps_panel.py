@@ -36,6 +36,7 @@ from .deeps_overlay import CELL_LABELS, DeepsOverlay
 from .deeps_settings import (
     get_default_settings,
     load_settings,
+    normalize_readout_preset,
     save_settings,
     validate_setting,
 )
@@ -82,15 +83,34 @@ _PANEL_DEFAULT_WIDTH = 440
 # `_build_ui` so adding controls never clips the bottom of the window.
 _PANEL_PROVISIONAL_HEIGHT = 380
 
-# Readout-card dropdown choices. The window widths mirror
-# `deeps_settings._WINDOW_CHOICES` (settings validation is the source of truth
-# for *acceptance*; these are the offered options). Round/refresh map a friendly
-# label to the stored integer (`1` = rounding off, `100` = live refresh).
+# Readout-card window-width choices (mirrors `deeps_settings._WINDOW_CHOICES`;
+# settings validation is the source of truth for *acceptance*, this is the
+# offered option set).
 _WINDOW_CHOICES = (5, 7, 11, 13)
-_ROUND_LABELS = {1: "Off", 5: "5", 10: "10", 25: "25", 50: "50", 100: "100"}
-_REFRESH_LABELS = {100: "Live", 250: "250 ms", 500: "500 ms", 1000: "1 s"}
-_ROUND_BY_LABEL = {v: k for k, v in _ROUND_LABELS.items()}
-_REFRESH_BY_LABEL = {v: k for k, v in _REFRESH_LABELS.items()}
+
+# Readout-display PRESETS — the three named bundles that replace the old
+# smoothing/round/refresh trio of controls. Window stays its own dropdown
+# because it sizes the rolling buffer (the measured rate) and therefore also
+# shifts where the alarm + tint ramp fire, which is a different concern from
+# "how should the digits read".
+#
+#   Live   — exact, jittery, reactive. Every spike shows. For active parsing.
+#   Steady — calm but responsive. Gentle EMA + tens rounding. The all-purpose
+#            middle. Default for new installs.
+#   Calm   — heavy smoothing + chunky rounding + half-second redraw. Sits
+#            quietly in peripheral vision; only the colors pull the eye.
+#
+# Values map 1:1 onto the overlay smoother's three knobs; the panel writes
+# them into `self.settings` whenever the user picks a preset, so the disk
+# state, the panel state, and the overlay state never drift. The preset
+# table itself lives in `deeps_settings._READOUT_PRESETS` so the normalize
+# logic is unit-testable without spinning up Tk.
+_READOUT_PRESET_ORDER: tuple[tuple[str, str, str], ...] = (
+    ("live",   "Live",   "Exact, jittery — every spike shows. For active parsing."),
+    ("steady", "Steady", "Calm but responsive. The all-purpose middle."),
+    ("calm",   "Calm",   "Heavy smoothing, chunky numbers, half-second redraw."),
+)
+_DEFAULT_READOUT_PRESET = "steady"
 
 # =========================================================================== #
 # DeepsPanel                                                                  #
@@ -123,6 +143,11 @@ class DeepsPanel(tk.Toplevel):
         # Persisted state — load before building widgets so var defaults
         # come from the user's saved settings.
         self.settings = load_settings(self.settings_folder)
+        # Normalize the three smoother keys to match the persisted preset, so
+        # the overlay starts coherent (`disk == memory == overlay`). A
+        # power-user JSON edit that desyncs preset name vs. underlying values
+        # gets snapped back to the preset on next load.
+        self._normalize_readout_preset(save=False)
 
         # Runtime state
         self.meter = DeepsMeter()
@@ -139,7 +164,9 @@ class DeepsPanel(tk.Toplevel):
         # tk vars for two-way binding with widgets
         self._alarm_var = tk.StringVar(value=str(int(self.settings["alarm_threshold"])))
         self._green_var = tk.StringVar(value=str(int(self.settings["hpis_green_threshold"])))
-        self._yellow_var = tk.StringVar(value=str(int(self.settings["dpis_yellow_threshold"])))
+        self._tint_start_var = tk.StringVar(value=str(int(self.settings["dpis_tint_start"])))
+        self._tint_full_var = tk.StringVar(value=str(int(self.settings["dpis_tint_full"])))
+        self._flash_var = tk.StringVar(value=str(int(self.settings["dpis_flash"])))
         self._pet_var = tk.BooleanVar(value=bool(self.settings["include_pet_damage"]))
         self._layout_var = tk.StringVar(value=str(self.settings["layout"]))
         self._font_family_var = tk.StringVar(value=str(self.settings["overlay_font_family"]))
@@ -149,13 +176,7 @@ class DeepsPanel(tk.Toplevel):
         )
         # Readout tuning vars (the "Readout" card).
         self._window_var = tk.StringVar(value=str(int(self.settings["window_seconds"])))
-        self._smoothing_var = tk.StringVar(value=str(int(self.settings["smoothing"])))
-        self._round_var = tk.StringVar(
-            value=_ROUND_LABELS.get(int(self.settings["round_step"]), "Off")
-        )
-        self._refresh_var = tk.StringVar(
-            value=_REFRESH_LABELS.get(int(self.settings["refresh_ms"]), "Live")
-        )
+        self._preset_var = tk.StringVar(value=str(self.settings["readout_preset"]))
         # Cell-visibility toggles — one BooleanVar per cell ID. Initialised
         # from settings; flips push to the overlay + persist on change.
         visible_set = set(self.settings.get("visible_cells", []))
@@ -170,7 +191,6 @@ class DeepsPanel(tk.Toplevel):
         self._pet_caveat: ttk.Label | None = None
         self._size_value_label: ttk.Label | None = None
         self._opacity_value_label: ttk.Label | None = None
-        self._smoothing_value_label: ttk.Label | None = None
 
         self._build_ui()
         self._create_overlay()
@@ -298,11 +318,16 @@ class DeepsPanel(tk.Toplevel):
     # ------------------------------------------------------------------ #
 
     def _build_readout(self, parent: ttk.Frame) -> None:
-        """Card tuning how the numbers read: rolling-window width plus the three
-        display-smoothing knobs (strength, coarse rounding, redraw cadence).
+        """Card tuning how the numbers read: rolling-window width + a single
+        Style preset (three named bundles of smoothing / rounding / refresh
+        cadence). The four-control clutter (slider + two dropdowns + window
+        dropdown) collapses to two surfaces — window plus preset radios.
 
-        Only `Window` changes the measured rate (it sizes the tracker buffers);
-        the other three are pure presentation pushed straight to the overlay.
+        Window stays its own control because it sizes the rolling buffers, so
+        changing it also shifts where the DPS-out alarm fires and where the
+        ΔHP-in tint ramp lights up. The other three knobs only affect how the
+        already-computed numbers are drawn; bundling them into presets removes
+        the "what do these knobs interact with" guesswork.
         """
         lf = create_card(parent, "Readout")
         lf.pack(fill="x", pady=(PAD_SMALL, PAD_ROW))
@@ -311,20 +336,31 @@ class DeepsPanel(tk.Toplevel):
             lf, "Window:", self._window_var,
             [str(s) for s in _WINDOW_CHOICES], self._on_window_change, suffix="s",
         )
-        # Smoothing strength — slider 0-100 %. 0 = off (digits snap).
-        _, self._smoothing_value_label = create_slider_row(
-            lf, "Smoothing:", 0, 100,
-            int(self.settings["smoothing"]), "%",
-            self._on_smoothing_slider, self._on_smoothing_commit,
-        )
-        self._build_combo_row(
-            lf, "Round to:", self._round_var,
-            list(_ROUND_LABELS.values()), self._on_round_change,
-        )
-        self._build_combo_row(
-            lf, "Refresh:", self._refresh_var,
-            list(_REFRESH_LABELS.values()), self._on_refresh_change,
-        )
+        # Caveat: window affects more than just the readout numbers, so flag
+        # the cross-coupling here rather than buried in a tooltip.
+        ttk.Label(
+            lf,
+            text="Wider window = slower rate response. Alarm + tints react later.",
+            font=FONT_SMALL,
+            foreground=THEME_COLORS["muted"],
+        ).pack(anchor="w", padx=(PAD_TAB + PAD_SMALL, 0))
+
+        # Style preset selector — three radios in a row, with a tooltip on
+        # each explaining the feel. Same widget pattern as the layout radios
+        # above so the panel reads as one consistent control family.
+        style_row = ttk.Frame(lf)
+        style_row.pack(anchor="w", fill="x", pady=(PAD_SMALL, 0))
+        ttk.Label(
+            style_row, text="Style:", font=FONT_BODY, foreground=THEME_COLORS["body"],
+        ).pack(side="left")
+        for key, label, hint in _READOUT_PRESET_ORDER:
+            rb = ttk.Radiobutton(
+                style_row, text=label, value=key,
+                variable=self._preset_var,
+                command=self._on_preset_change,
+            )
+            rb.pack(side="left", padx=(PAD_SMALL, 0))
+            add_tooltip(rb, hint)
 
     def _build_combo_row(
         self,
@@ -364,41 +400,31 @@ class DeepsPanel(tk.Toplevel):
         save_settings(self.settings_folder, self.settings)
         self.meter.set_window_seconds(secs)
 
-    def _on_smoothing_slider(self, value: str) -> None:
-        """Live smoothing-strength drag: refresh label + push to overlay (no save)."""
-        pct = round(float(value))
-        self._smoothing_var.set(str(pct))
-        if self._smoothing_value_label is not None:
-            self._smoothing_value_label.configure(text=f"{pct}%")
-        if self.overlay is not None:
-            self.overlay.set_smoothing(pct)
+    def _normalize_readout_preset(self, *, save: bool) -> None:
+        """Force `self.settings` to be coherent with the persisted preset name.
 
-    def _on_smoothing_commit(self) -> None:
-        """Persist the smoothing strength on slider release."""
-        pct = validate_setting("smoothing", self._smoothing_var.get())
-        self._smoothing_var.set(str(int(pct)))
-        self.settings["smoothing"] = pct
-        save_settings(self.settings_folder, self.settings)
-        if self.overlay is not None:
-            self.overlay.set_smoothing(int(pct))
+        Writes the preset's three values into `smoothing`/`round_step`/
+        `refresh_ms`, replacing whatever was there. Called on init (no save —
+        first user action will commit) and on preset click (save = True). The
+        overlay is updated by the caller when it exists; on init the overlay
+        is constructed *after* this runs, so its smoother starts with the
+        already-normalized values without an extra push.
+        """
+        normalize_readout_preset(self.settings)
+        if save:
+            save_settings(self.settings_folder, self.settings)
 
-    def _on_round_change(self) -> None:
-        """Coarse-rounding dropdown — map the label to the stored step, persist, push."""
-        step = _ROUND_BY_LABEL.get(self._round_var.get(), self.settings["round_step"])
-        step = validate_setting("round_step", step)
-        self.settings["round_step"] = step
-        save_settings(self.settings_folder, self.settings)
+    def _on_preset_change(self) -> None:
+        """User picked a Readout style — normalize settings, persist, push all
+        three smoother knobs to the overlay so the change is immediate."""
+        self.settings["readout_preset"] = self._preset_var.get()
+        self._normalize_readout_preset(save=True)
+        # Re-read the (now validated) name in case the radio supplied junk.
+        self._preset_var.set(self.settings["readout_preset"])
         if self.overlay is not None:
-            self.overlay.set_round_step(step)
-
-    def _on_refresh_change(self) -> None:
-        """Redraw-cadence dropdown — map the label to milliseconds, persist, push."""
-        ms = _REFRESH_BY_LABEL.get(self._refresh_var.get(), self.settings["refresh_ms"])
-        ms = validate_setting("refresh_ms", ms)
-        self.settings["refresh_ms"] = ms
-        save_settings(self.settings_folder, self.settings)
-        if self.overlay is not None:
-            self.overlay.set_refresh_ms(ms)
+            self.overlay.set_smoothing(int(self.settings["smoothing"]))
+            self.overlay.set_round_step(int(self.settings["round_step"]))
+            self.overlay.set_refresh_ms(int(self.settings["refresh_ms"]))
 
     def _build_cells_picker(self, parent: ttk.Frame) -> None:
         """Card with one checkbox per overlay cell (5 total): the four
@@ -447,9 +473,23 @@ class DeepsPanel(tk.Toplevel):
             command=self._on_thresholds_change,
             suffix="/s",
         )
+        # ΔHP-in / DPIS three-step danger ramp:
+        #   tint starts (fade in) → full tint reached → flash pulse begins
         self._build_threshold_row(
-            lf, "Orange when ΔHP in < −",
-            self._yellow_var, increment=10,
+            lf, "Orange tint starts at",
+            self._tint_start_var, increment=10,
+            command=self._on_thresholds_change,
+            suffix="/s",
+        )
+        self._build_threshold_row(
+            lf, "Full orange at",
+            self._tint_full_var, increment=10,
+            command=self._on_thresholds_change,
+            suffix="/s",
+        )
+        self._build_threshold_row(
+            lf, "Flash alarm at",
+            self._flash_var, increment=50,
             command=self._on_thresholds_change,
             suffix="/s",
         )
@@ -498,7 +538,7 @@ class DeepsPanel(tk.Toplevel):
 
         self._pet_caveat = ttk.Label(
             parent,
-            text="Counts only your own pet's damage.",
+            text="Counts only your own pet's damage. Also affects DPS-out alarm timing.",
             font=FONT_SMALL,
             foreground=THEME_COLORS["muted"],
             wraplength=_PANEL_DEFAULT_WIDTH - 2 * PAD_TAB,
@@ -527,7 +567,9 @@ class DeepsPanel(tk.Toplevel):
         self.overlay.update_thresholds(
             float(self.settings["alarm_threshold"]),
             float(self.settings["hpis_green_threshold"]),
-            float(self.settings["dpis_yellow_threshold"]),
+            float(self.settings["dpis_tint_start"]),
+            float(self.settings["dpis_tint_full"]),
+            float(self.settings["dpis_flash"]),
         )
 
     def _on_overlay_position_changed(self, x: int, y: int, positioned: bool) -> None:
@@ -629,24 +671,30 @@ class DeepsPanel(tk.Toplevel):
     # ------------------------------------------------------------------ #
 
     def _on_thresholds_change(self) -> None:
-        """Parse + validate the three threshold fields; push to overlay + save."""
+        """Parse + validate the five threshold fields; push to overlay + save."""
         alarm = validate_setting("alarm_threshold", self._alarm_var.get())
         green = validate_setting("hpis_green_threshold", self._green_var.get())
-        yellow = validate_setting("dpis_yellow_threshold", self._yellow_var.get())
+        tint_start = validate_setting("dpis_tint_start", self._tint_start_var.get())
+        tint_full = validate_setting("dpis_tint_full", self._tint_full_var.get())
+        flash = validate_setting("dpis_flash", self._flash_var.get())
 
         # Snap the displayed values back to validated form (handles
         # garbage-in cases — Spinbox might show "abc" until this normalises).
         self._alarm_var.set(str(int(alarm)))
         self._green_var.set(str(int(green)))
-        self._yellow_var.set(str(int(yellow)))
+        self._tint_start_var.set(str(int(tint_start)))
+        self._tint_full_var.set(str(int(tint_full)))
+        self._flash_var.set(str(int(flash)))
 
         self.settings["alarm_threshold"] = alarm
         self.settings["hpis_green_threshold"] = green
-        self.settings["dpis_yellow_threshold"] = yellow
+        self.settings["dpis_tint_start"] = tint_start
+        self.settings["dpis_tint_full"] = tint_full
+        self.settings["dpis_flash"] = flash
         save_settings(self.settings_folder, self.settings)
 
         if self.overlay is not None:
-            self.overlay.update_thresholds(alarm, green, yellow)
+            self.overlay.update_thresholds(alarm, green, tint_start, tint_full, flash)
 
     # ------------------------------------------------------------------ #
     # Appearance (font family, size, bg opacity)                         #
