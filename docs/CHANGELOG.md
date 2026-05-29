@@ -4,7 +4,7 @@ All notable changes to KazBars will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [2.1.0] — 2026-05-29
 
 ### Added
 - **Deeps readout tuning** — a new **Readout** card in the Deeps panel. Choose the rolling-window width (5 / 7 / 11 / 13 s) and pick a **Style** preset — **Live** (exact, every spike shows), **Steady** (calm but responsive), or **Calm** (heavy smoothing, chunky numbers, half-second redraw) — that shapes how the drawn numbers read. The alarm pulse and net-HP tints still track the raw values, so only the digits ease. Ships on **Steady**. A note flags that widening the window also makes the alarm and tints react later.
@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 - **Deeps alarm pulse is now smooth.** The DPS-out alarm glides through its red pulse instead of stuttering, and the incoming-damage / ΔHP-in cells now ramp through amber as the deficit grows — a graduated warning that fades in and then pulses, rather than snapping on at a single threshold.
+- **Expanded in-app Help.** The Help view now documents Deeps, the Cast Timer overlay, Backup & restore, the Default Buff Bars editor, the buff-discovery console toggle, and game resolution.
 
 ### Fixed
 - **Grid names with quotes, newlines, or backslashes no longer break the build.** Such characters are now escaped when the grid is written into the generated overlay code, so an unusual grid name can't corrupt the SWF build.
