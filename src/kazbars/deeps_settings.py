@@ -38,11 +38,13 @@ __all__ = [
     "FONT_FAMILY_CHOICES",
     "SETTINGS_FILENAME",
     "_READOUT_PRESETS",
+    "_SURVIVAL_PRESETS",
     "apply_overlay_config_to_deeps",
     "get_default_settings",
     "get_settings_path",
     "load_settings",
     "normalize_readout_preset",
+    "normalize_survival_preset",
     "overlay_config_from_deeps",
     "save_settings",
     "validate_all_settings",
@@ -55,17 +57,25 @@ __all__ = [
 # =========================================================================== #
 
 DEEPS_DEFAULTS: dict[str, Any] = {
-    # Thresholds — set from the panel by the user.
-    "alarm_threshold": 2500.0,           # red-flash alarm activates at this 5s DPS
-    "hpis_green_threshold": 50.0,        # HPS cell tints green when net > +N/s
-    # DPIS / ΔHP-in three-step ramp on -net (incoming damage minus heals):
-    #   < tint_start          → no tint
+    # Threat axis — DPS-out alarm (red pulse). Set from the panel's slider over
+    # the 1000-4000/s band; the stored value is just clamped to that on display.
+    "alarm_threshold": 2500.0,
+
+    # Survival axis — the ΔHP-in / DPS-in / HPS-in tints. These four values are
+    # four breakpoints on one signed net-HP/s axis (heals minus incoming damage):
+    #   net > +green           → HPS-in / ΔHP-in glow green
+    #   deficit < tint_start   → no tint
     #   tint_start → tint_full → linear fade DEFAULT → YELLOW_TINT
     #   tint_full → flash      → solid YELLOW_TINT
     #   >= flash              → YELLOW_TINT pulse-flashing to deeper amber
-    "dpis_tint_start": 200.0,
-    "dpis_tint_full": 300.0,
-    "dpis_flash": 500.0,
+    # Driven together by `survival_preset` (Tank / Standard) via
+    # `normalize_survival_preset`, never edited independently — kept as the
+    # source the overlay reads. Defaults match the Standard preset.
+    "survival_preset": "standard",
+    "hpis_green_threshold": 50.0,
+    "dpis_tint_start": 100.0,
+    "dpis_tint_full": 200.0,
+    "dpis_flash": 300.0,
 
     # Behavior toggle — pet damage included by default.
     "include_pet_damage": True,
@@ -155,6 +165,20 @@ _READOUT_PRESETS: dict[str, dict[str, int]] = {
     "calm":   {"smoothing": 90, "round_step": 50, "refresh_ms": 500},
 }
 
+# Survival-tint presets — the same disk/memory/overlay invariant as the readout
+# presets, applied to the four ΔHP-in tint thresholds. The user picks a preset,
+# not four numbers; `normalize_survival_preset` snaps the keys to the selection.
+# Tank is symmetric (the +green surplus mirrors the -tint_start deficit, ±200)
+# for big-hit / big-heal play; Standard glows green on a small surplus with a
+# tighter danger ramp.
+_SURVIVAL_PRESET_CHOICES = ("tank", "standard")
+_SURVIVAL_PRESETS: dict[str, dict[str, float]] = {
+    "tank":     {"hpis_green_threshold": 200.0, "dpis_tint_start": 200.0,
+                 "dpis_tint_full": 350.0, "dpis_flash": 500.0},
+    "standard": {"hpis_green_threshold":  50.0, "dpis_tint_start": 100.0,
+                 "dpis_tint_full": 200.0, "dpis_flash": 300.0},
+}
+
 # Readout-card discrete choices. `window_seconds` are the odd-second widths the
 # user can pick; `round_step` includes 1 (= rounding off); `refresh_ms` 100 is
 # live (every UI tick). Off-list values snap back to the default.
@@ -193,6 +217,9 @@ def validate_setting(key: str, value: Any):
 
     if key == "readout_preset":
         return value if value in _READOUT_PRESET_CHOICES else DEEPS_DEFAULTS["readout_preset"]
+
+    if key == "survival_preset":
+        return value if value in _SURVIVAL_PRESET_CHOICES else DEEPS_DEFAULTS["survival_preset"]
 
     if key in _CHOICE_KEYS:
         try:
@@ -237,6 +264,25 @@ def normalize_readout_preset(settings: dict) -> str:
     settings["smoothing"] = preset["smoothing"]
     settings["round_step"] = preset["round_step"]
     settings["refresh_ms"] = preset["refresh_ms"]
+    return name
+
+
+def normalize_survival_preset(settings: dict) -> str:
+    """Snap the four survival-tint thresholds to match the persisted
+    `survival_preset`. Returns the (possibly defaulted) preset name.
+
+    Twin of `normalize_readout_preset`: the four ΔHP-in tint keys are derived
+    from the preset name, never edited independently, so this re-syncs them
+    whenever settings load or the user picks a preset."""
+    name = settings.get("survival_preset", DEEPS_DEFAULTS["survival_preset"])
+    if name not in _SURVIVAL_PRESETS:
+        name = DEEPS_DEFAULTS["survival_preset"]
+    preset = _SURVIVAL_PRESETS[name]
+    settings["survival_preset"] = name
+    settings["hpis_green_threshold"] = preset["hpis_green_threshold"]
+    settings["dpis_tint_start"] = preset["dpis_tint_start"]
+    settings["dpis_tint_full"] = preset["dpis_tint_full"]
+    settings["dpis_flash"] = preset["dpis_flash"]
     return name
 
 

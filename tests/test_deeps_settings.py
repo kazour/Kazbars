@@ -20,6 +20,7 @@ from kazbars.deeps_settings import (
     get_settings_path,
     load_settings,
     normalize_readout_preset,
+    normalize_survival_preset,
     save_settings,
     validate_all_settings,
     validate_setting,
@@ -30,15 +31,16 @@ from kazbars.deeps_settings import (
 # =========================================================================== #
 
 def test_defaults_match_locked_decisions() -> None:
-    """The threshold defaults are the user-locked numbers — DPS-out alarm,
-    HPS-in green deadband, and the three-step ΔHP-in ramp (tint start → full
-    tint → flash alarm)."""
+    """The threshold defaults: the DPS-out alarm plus the four survival-tint
+    breakpoints, which default to the Standard preset (green deadband + the
+    three-step ΔHP-in ramp: tint start → full tint → flash alarm)."""
     d = get_default_settings()
     assert d["alarm_threshold"] == 2500.0
+    assert d["survival_preset"] == "standard"
     assert d["hpis_green_threshold"] == 50.0
-    assert d["dpis_tint_start"] == 200.0
-    assert d["dpis_tint_full"] == 300.0
-    assert d["dpis_flash"] == 500.0
+    assert d["dpis_tint_start"] == 100.0
+    assert d["dpis_tint_full"] == 200.0
+    assert d["dpis_flash"] == 300.0
 
 
 def test_pet_damage_default_on() -> None:
@@ -230,6 +232,20 @@ class TestValidateSetting:
     )
     def test_readout_preset_choice(self, value: object, expected: str) -> None:
         assert validate_setting("readout_preset", value) == expected
+
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            ("tank", "tank"), ("standard", "standard"),
+            ("TANK", "standard"),    # case-sensitive — off-list → default
+            ("dps", "standard"),     # off-list → default
+            ("", "standard"),
+            (None, "standard"),
+            (7, "standard"),
+        ],
+    )
+    def test_survival_preset_choice(self, value: object, expected: str) -> None:
+        assert validate_setting("survival_preset", value) == expected
 
     @pytest.mark.parametrize(
         ("value", "expected"),
@@ -439,3 +455,63 @@ class TestNormalizeReadoutPreset:
         assert settings["smoothing"] == 90
         assert settings["round_step"] == 50
         assert settings["refresh_ms"] == 500
+
+
+# =========================================================================== #
+# normalize_survival_preset                                                   #
+# =========================================================================== #
+
+class TestNormalizeSurvivalPreset:
+    """Twin invariant for the survival tints: the four ΔHP-in tint thresholds
+    are derived from `survival_preset`, never edited independently."""
+
+    def test_tank_overrides_stale_values(self) -> None:
+        settings = {
+            "survival_preset": "tank",
+            "hpis_green_threshold": 50.0,
+            "dpis_tint_start": 100.0,
+            "dpis_tint_full": 200.0,
+            "dpis_flash": 300.0,
+        }
+        result = normalize_survival_preset(settings)
+        assert result == "tank"
+        assert settings["hpis_green_threshold"] == 200.0
+        assert settings["dpis_tint_start"] == 200.0
+        assert settings["dpis_tint_full"] == 350.0
+        assert settings["dpis_flash"] == 500.0
+
+    def test_standard_overrides_stale_values(self) -> None:
+        settings = {
+            "survival_preset": "standard",
+            "hpis_green_threshold": 200.0,
+            "dpis_tint_start": 200.0,
+            "dpis_tint_full": 350.0,
+            "dpis_flash": 500.0,
+        }
+        result = normalize_survival_preset(settings)
+        assert result == "standard"
+        assert settings["hpis_green_threshold"] == 50.0
+        assert settings["dpis_tint_start"] == 100.0
+        assert settings["dpis_tint_full"] == 200.0
+        assert settings["dpis_flash"] == 300.0
+
+    def test_unknown_preset_falls_back_to_standard(self) -> None:
+        settings = {"survival_preset": "berserker"}
+        result = normalize_survival_preset(settings)
+        assert result == "standard"
+        assert settings["survival_preset"] == "standard"
+        assert settings["dpis_flash"] == 300.0
+
+    def test_missing_preset_key_defaults_to_standard(self) -> None:
+        settings: dict = {}
+        result = normalize_survival_preset(settings)
+        assert result == "standard"
+        assert settings["survival_preset"] == "standard"
+        assert settings["hpis_green_threshold"] == 50.0
+
+    def test_mutates_input_dict_in_place(self) -> None:
+        """Other keys are preserved and the same dict object is mutated."""
+        settings = {"survival_preset": "tank", "alarm_threshold": 2500.0}
+        normalize_survival_preset(settings)
+        assert settings["alarm_threshold"] == 2500.0
+        assert settings["dpis_flash"] == 500.0

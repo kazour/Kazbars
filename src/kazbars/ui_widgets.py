@@ -999,13 +999,17 @@ def create_status_block(parent, title="Status", wraplength=0):
     return body
 
 
-def create_slider_row(parent, label_text, from_, to, initial, suffix, on_drag, on_commit):
+def create_slider_row(parent, label_text, from_, to, initial, suffix, on_drag, on_commit,
+                      value_width=5):
     """One row: descriptor label · ttk.Scale · live value label.
 
     `on_drag(value)` fires continuously while dragging (refresh the label + push
     live, but do NOT persist); `on_commit()` fires on button/key release so a
     drag is a single write. Returns `(scale, value_label)` — keep the scale to
     move it programmatically (e.g. on profile load).
+
+    `value_width` is the readout label width in chars — default 5 fits short
+    units like `48pt` / `100%`; widen it for longer readouts (e.g. `4000/s`).
     """
     row = ttk.Frame(parent)
     row.pack(fill="x", pady=PAD_XS)
@@ -1014,7 +1018,7 @@ def create_slider_row(parent, label_text, from_, to, initial, suffix, on_drag, o
     ).pack(side="left")
     value_label = ttk.Label(
         row, text=f"{initial}{suffix}", font=FONT_SMALL,
-        foreground=THEME_COLORS["muted"], width=5, anchor="e",
+        foreground=THEME_COLORS["muted"], width=value_width, anchor="e",
     )
     value_label.pack(side="right")
     scale = ttk.Scale(

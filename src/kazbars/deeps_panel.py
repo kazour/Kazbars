@@ -2,15 +2,16 @@
 
 The single user-facing surface for Deeps: opened from the bottom-bar
 `⚔ Deeps` button, it shows monitoring status, holds the Start/Stop
-control, and exposes the three thresholds + pet toggle + layout radio
-+ overlay lock. Single-instance: closing withdraws (monitoring stays
-running so the overlay keeps updating in-game).
+control, and exposes the DPS-out alarm slider + survival-tint presets
++ pet toggle + layout radio + overlay lock. Single-instance: closing
+withdraws (monitoring stays running so the overlay keeps updating in-game).
 
 Owns three pieces:
   - `DeepsMeter`  — background tail thread (Step 6 module).
   - `DeepsOverlay` — transparent always-on-top numbers (Step 7).
-  - The 100 ms UI tick that ferries data between them and decides
-    when to show / hide the overlay (based on `aoc_in_focus`).
+  - The 100 ms UI tick that ferries data between them: snapshot →
+    status line → overlay paint. Overlay visibility is gated by the
+    app-owned `ForegroundWatcher`, not here.
 
 Alarm hysteresis lives here, not in the meter (matches Deeps's
 Rust split — main.rs owns alarm state). The transition rule:
@@ -19,8 +20,9 @@ Rust split — main.rs owns alarm state). The transition rule:
   - was ON,  dps <  threshold * 0.9 → become OFF
   - otherwise no change
 
-The overlay only repaints when monitoring is running AND
-`snapshot.aoc_in_focus` is True. Everything else hides it.
+The overlay paints every tick while monitoring is running; the
+app-owned `ForegroundWatcher` gates its visibility on AoC focus
+(`paint()` no-ops while focus-suppressed). Stop hides it entirely.
 """
 
 import logging
@@ -37,6 +39,7 @@ from .deeps_settings import (
     get_default_settings,
     load_settings,
     normalize_readout_preset,
+    normalize_survival_preset,
     save_settings,
     validate_setting,
 )
@@ -45,7 +48,6 @@ from .ui_helpers import (
     BTN_SMALL,
     FONT_BODY,
     FONT_SMALL,
-    INPUT_WIDTH_NUM,
     MODULE_COLORS,
     PAD_LF,
     PAD_ROW,
@@ -112,6 +114,22 @@ _READOUT_PRESET_ORDER: tuple[tuple[str, str, str], ...] = (
 )
 _DEFAULT_READOUT_PRESET = "steady"
 
+# DPS-out alarm slider band (threat axis). The stored value is clamped to this
+# range on display; an older out-of-band value just snaps into it on first load.
+_ALARM_MIN = 1000
+_ALARM_MAX = 4000
+_ALARM_STEP = 50
+
+# Survival-tint presets — two named bundles driving the four ΔHP-in tint
+# thresholds together (always ordered by construction). The value table lives
+# in `deeps_settings._SURVIVAL_PRESETS`; this is just the panel's display order
+# + per-radio tooltip. Standard (default) glows green on a small surplus with a
+# tighter danger ramp; Tank is a symmetric ±200 neutral band for big-hit play.
+_SURVIVAL_PRESET_ORDER: tuple[tuple[str, str, str], ...] = (
+    ("standard", "Standard", "DPS / healers — green on a small surplus, tighter danger ramp."),
+    ("tank",     "Tank",     "Tanks — symmetric ±200 neutral band before any tint."),
+)
+
 # =========================================================================== #
 # DeepsPanel                                                                  #
 # =========================================================================== #
@@ -148,6 +166,11 @@ class DeepsPanel(tk.Toplevel):
         # power-user JSON edit that desyncs preset name vs. underlying values
         # gets snapped back to the preset on next load.
         self._normalize_readout_preset(save=False)
+        # Same coherence pass for the survival-tint preset (Tank / Standard).
+        self._normalize_survival_preset(save=False)
+        # Snap any out-of-band stored alarm into the slider's 1000-4000/s band
+        # (in-memory; persisted on the next settings write).
+        self.settings["alarm_threshold"] = float(self._clamp_alarm(self.settings["alarm_threshold"]))
 
         # Runtime state
         self.meter = DeepsMeter()
@@ -161,12 +184,9 @@ class DeepsPanel(tk.Toplevel):
         self._last_status: tuple[str, str] | None = None
         self._focus_watcher = getattr(parent, "focus_watcher", None)
 
-        # tk vars for two-way binding with widgets
-        self._alarm_var = tk.StringVar(value=str(int(self.settings["alarm_threshold"])))
-        self._green_var = tk.StringVar(value=str(int(self.settings["hpis_green_threshold"])))
-        self._tint_start_var = tk.StringVar(value=str(int(self.settings["dpis_tint_start"])))
-        self._tint_full_var = tk.StringVar(value=str(int(self.settings["dpis_tint_full"])))
-        self._flash_var = tk.StringVar(value=str(int(self.settings["dpis_flash"])))
+        # tk vars for two-way binding with widgets. The DPS-out alarm is
+        # slider-driven — its value lives in `self.settings`, not a tk var.
+        self._survival_var = tk.StringVar(value=str(self.settings["survival_preset"]))
         self._pet_var = tk.BooleanVar(value=bool(self.settings["include_pet_damage"]))
         self._layout_var = tk.StringVar(value=str(self.settings["layout"]))
         self._font_family_var = tk.StringVar(value=str(self.settings["overlay_font_family"]))
@@ -191,6 +211,8 @@ class DeepsPanel(tk.Toplevel):
         self._pet_caveat: ttk.Label | None = None
         self._size_value_label: ttk.Label | None = None
         self._opacity_value_label: ttk.Label | None = None
+        self._alarm_value_label: ttk.Label | None = None
+        self._survival_caption: ttk.Label | None = None
 
         self._build_ui()
         self._create_overlay()
@@ -414,6 +436,16 @@ class DeepsPanel(tk.Toplevel):
         if save:
             save_settings(self.settings_folder, self.settings)
 
+    def _normalize_survival_preset(self, *, save: bool) -> None:
+        """Force `self.settings` coherent with the persisted survival preset.
+
+        Twin of `_normalize_readout_preset`: writes the preset's four tint
+        thresholds into settings, replacing whatever was there. Called on init
+        (no save — first user action commits) and on preset click (save=True)."""
+        normalize_survival_preset(self.settings)
+        if save:
+            save_settings(self.settings_folder, self.settings)
+
     def _on_preset_change(self) -> None:
         """User picked a Readout style — normalize settings, persist, push all
         three smoother knobs to the overlay so the change is immediate."""
@@ -457,76 +489,99 @@ class DeepsPanel(tk.Toplevel):
             self.overlay.set_visible_cells(visible)
 
     def _build_thresholds(self, parent: ttk.Frame) -> None:
-        """Card with the three threshold spinboxes."""
+        """Card holding the DPS-out alarm slider (threat) + the survival-tint
+        preset radios. Replaces the old five-spinbox grid: the alarm is one
+        slider, and the four ΔHP-in tint thresholds collapse into two named
+        presets (Tank / Standard) since they're breakpoints on one axis."""
         lf = create_card(parent, "Alarm & Tints")
         lf.pack(fill="x", pady=(PAD_SMALL, PAD_ROW))
 
-        self._build_threshold_row(
-            lf, "DPS-out alarm",
-            self._alarm_var, increment=100,
-            command=self._on_thresholds_change,
-            suffix="/s",
-        )
-        self._build_threshold_row(
-            lf, "Green when ΔHP in > +",
-            self._green_var, increment=10,
-            command=self._on_thresholds_change,
-            suffix="/s",
-        )
-        # ΔHP-in / DPIS three-step danger ramp:
-        #   tint starts (fade in) → full tint reached → flash pulse begins
-        self._build_threshold_row(
-            lf, "Orange tint starts at",
-            self._tint_start_var, increment=10,
-            command=self._on_thresholds_change,
-            suffix="/s",
-        )
-        self._build_threshold_row(
-            lf, "Full orange at",
-            self._tint_full_var, increment=10,
-            command=self._on_thresholds_change,
-            suffix="/s",
-        )
-        self._build_threshold_row(
-            lf, "Flash alarm at",
-            self._flash_var, increment=50,
-            command=self._on_thresholds_change,
-            suffix="/s",
+        # DPS-out alarm — slider over the 1000-4000/s threat band. The value
+        # lives in settings (no tk var); drag updates in-memory so the tick's
+        # hysteresis reacts live, release persists. Seed is clamped into band.
+        alarm_seed = self._clamp_alarm(self.settings["alarm_threshold"])
+        _, self._alarm_value_label = create_slider_row(
+            lf, "DPS-out alarm:", _ALARM_MIN, _ALARM_MAX, alarm_seed, "/s",
+            self._on_alarm_slider, self._on_alarm_commit, value_width=7,
         )
 
-    def _build_threshold_row(
-        self,
-        parent: tk.Misc,
-        label_text: str,
-        var: tk.StringVar,
-        increment: int,
-        command: Callable[[], None],
-        suffix: str,
-    ) -> None:
-        """One row: label · spinbox · suffix unit."""
-        row = ttk.Frame(parent)
-        row.pack(fill="x", pady=PAD_XS)
-
+        # Survival tints — two named presets driving the four tint thresholds.
+        preset_row = ttk.Frame(lf)
+        preset_row.pack(anchor="w", fill="x", pady=(PAD_SMALL, 0))
         ttk.Label(
-            row, text=label_text + ":", font=FONT_BODY,
+            preset_row, text="Survival tints:", font=FONT_BODY,
             foreground=THEME_COLORS["body"],
         ).pack(side="left")
+        for key, label, hint in _SURVIVAL_PRESET_ORDER:
+            rb = ttk.Radiobutton(
+                preset_row, text=label, value=key,
+                variable=self._survival_var,
+                command=self._on_survival_preset_change,
+            )
+            rb.pack(side="left", padx=(PAD_SMALL, 0))
+            add_tooltip(rb, hint)
 
-        spin = ttk.Spinbox(
-            row, textvariable=var,
-            from_=0, to=999_999, increment=increment,
-            width=INPUT_WIDTH_NUM,
-            command=command,
+        # Live caption restating the selected preset's breakpoints in plain
+        # terms, so "Tank" / "Standard" isn't a black box.
+        self._survival_caption = ttk.Label(
+            lf, text="", font=FONT_SMALL, foreground=THEME_COLORS["muted"],
+            wraplength=_PANEL_DEFAULT_WIDTH - 2 * PAD_TAB,
         )
-        spin.pack(side="left", padx=(PAD_SMALL, PAD_XS))
-        # Spinbox `command=` fires only on arrow click — bind typing paths too.
-        spin.bind("<FocusOut>", lambda _e: command())
-        spin.bind("<Return>", lambda _e: command())
+        self._survival_caption.pack(anchor="w", padx=(PAD_TAB + PAD_SMALL, 0))
+        self._refresh_survival_caption()
 
-        ttk.Label(
-            row, text=suffix, font=FONT_SMALL,
-            foreground=THEME_COLORS["muted"],
-        ).pack(side="left")
+    @staticmethod
+    def _clamp_alarm(value: float) -> int:
+        """Clamp a stored alarm threshold into the slider's display band."""
+        return max(_ALARM_MIN, min(round(float(value)), _ALARM_MAX))
+
+    def _on_alarm_slider(self, value: str) -> None:
+        """Live DPS-out alarm drag: round to the step, refresh the label, and
+        update the in-memory threshold so the tick's hysteresis reacts live.
+        No save — the slider's release commits."""
+        v = int(round(float(value) / _ALARM_STEP) * _ALARM_STEP)
+        self.settings["alarm_threshold"] = float(v)
+        if self._alarm_value_label is not None:
+            self._alarm_value_label.configure(text=f"{v}/s")
+
+    def _on_alarm_commit(self) -> None:
+        """Alarm slider released — persist + sync the overlay's threshold field."""
+        save_settings(self.settings_folder, self.settings)
+        self._push_thresholds()
+
+    def _on_survival_preset_change(self) -> None:
+        """User picked Tank/Standard — snap the four tint values, persist, push
+        to the overlay, refresh the caption."""
+        self.settings["survival_preset"] = self._survival_var.get()
+        self._normalize_survival_preset(save=True)
+        # Re-read the (now validated) name in case the radio supplied junk.
+        self._survival_var.set(self.settings["survival_preset"])
+        self._refresh_survival_caption()
+        self._push_thresholds()
+
+    def _refresh_survival_caption(self) -> None:
+        """Restate the active preset's breakpoints (U+2212 minus to match the
+        overlay's signed numbers)."""
+        if self._survival_caption is None:
+            return
+        g = int(self.settings["hpis_green_threshold"])
+        s = int(self.settings["dpis_tint_start"])
+        f = int(self.settings["dpis_flash"])
+        self._survival_caption.configure(
+            text=f"Orange from −{s}/s · flash −{f}/s · green above +{g}/s",
+        )
+
+    def _push_thresholds(self) -> None:
+        """Push the five current threshold values from settings to the overlay."""
+        if self.overlay is None:
+            return
+        self.overlay.update_thresholds(
+            float(self.settings["alarm_threshold"]),
+            float(self.settings["hpis_green_threshold"]),
+            float(self.settings["dpis_tint_start"]),
+            float(self.settings["dpis_tint_full"]),
+            float(self.settings["dpis_flash"]),
+        )
 
     def _build_pet_toggle(self, parent: ttk.Frame) -> None:
         """Checkbox + small caveat line beneath it."""
@@ -564,13 +619,7 @@ class DeepsPanel(tk.Toplevel):
         if self._focus_watcher:
             self._focus_watcher.register(self.overlay)
         # Push the latest thresholds so initial tints react correctly.
-        self.overlay.update_thresholds(
-            float(self.settings["alarm_threshold"]),
-            float(self.settings["hpis_green_threshold"]),
-            float(self.settings["dpis_tint_start"]),
-            float(self.settings["dpis_tint_full"]),
-            float(self.settings["dpis_flash"]),
-        )
+        self._push_thresholds()
 
     def _on_overlay_position_changed(self, x: int, y: int, positioned: bool) -> None:
         """Persist drag-end position to settings."""
@@ -665,36 +714,6 @@ class DeepsPanel(tk.Toplevel):
         save_settings(self.settings_folder, self.settings)
         if self.overlay is not None:
             self.overlay.set_layout(layout)
-
-    # ------------------------------------------------------------------ #
-    # Thresholds                                                         #
-    # ------------------------------------------------------------------ #
-
-    def _on_thresholds_change(self) -> None:
-        """Parse + validate the five threshold fields; push to overlay + save."""
-        alarm = validate_setting("alarm_threshold", self._alarm_var.get())
-        green = validate_setting("hpis_green_threshold", self._green_var.get())
-        tint_start = validate_setting("dpis_tint_start", self._tint_start_var.get())
-        tint_full = validate_setting("dpis_tint_full", self._tint_full_var.get())
-        flash = validate_setting("dpis_flash", self._flash_var.get())
-
-        # Snap the displayed values back to validated form (handles
-        # garbage-in cases — Spinbox might show "abc" until this normalises).
-        self._alarm_var.set(str(int(alarm)))
-        self._green_var.set(str(int(green)))
-        self._tint_start_var.set(str(int(tint_start)))
-        self._tint_full_var.set(str(int(tint_full)))
-        self._flash_var.set(str(int(flash)))
-
-        self.settings["alarm_threshold"] = alarm
-        self.settings["hpis_green_threshold"] = green
-        self.settings["dpis_tint_start"] = tint_start
-        self.settings["dpis_tint_full"] = tint_full
-        self.settings["dpis_flash"] = flash
-        save_settings(self.settings_folder, self.settings)
-
-        if self.overlay is not None:
-            self.overlay.update_thresholds(alarm, green, tint_start, tint_full, flash)
 
     # ------------------------------------------------------------------ #
     # Appearance (font family, size, bg opacity)                         #
@@ -882,7 +901,7 @@ class DeepsPanel(tk.Toplevel):
         gets a chance to re-show in case AoC focus changed in the meantime.
         """
         if self.meter.is_running() and self.overlay is not None:
-            # Force a tick to re-evaluate aoc_in_focus + repaint.
+            # Force a tick to refresh the status line + repaint the overlay.
             self._tick()
 
 

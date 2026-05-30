@@ -4,6 +4,11 @@ All notable changes to KazBars will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+- **Deeps "Alarm & Tints" is simpler to set.** The DPS-out alarm is now a slider over a 1000–4000/s band (instead of a typed value), and the four ΔHP-in survival-tint thresholds collapse into two presets — **Standard** (DPS / healers) and **Tank** (a wider symmetric band) — with a caption that restates the breakpoints. The default survival tints changed to match the **Standard** preset; the alarm default stays 2500/s. Your saved alarm value is kept and clamped into the slider's band.
+
 ## [2.1.0] — 2026-05-29
 
 ### Added
