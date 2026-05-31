@@ -114,6 +114,7 @@ class KazBarsApp(ttkb.Window):
         self._building = False
         self.boss_timer_panel = None
         self.deeps_panel = None
+        self.damage_numbers_panel = None
 
         # One shared focus gate for every overlay: hides them whenever neither
         # KazBars nor AoC owns the foreground window. Overlays register on
@@ -347,6 +348,8 @@ class KazBarsApp(ttkb.Window):
         self._menubar.add_cascade(label="Game", menu_def=[
             {'type': 'command', 'label': 'Default buff bars...',
              'command': self._open_buff_display_editor},
+            {'type': 'command', 'label': 'Damage numbers...',
+             'command': self._open_damage_numbers},
             {'type': 'command', 'label': 'Backup & restore game settings...',
              'command': self._open_backup_dialog},
             {'type': 'separator'},
@@ -463,6 +466,11 @@ class KazBarsApp(ttkb.Window):
         """Open the Deeps panel (single-instance) — mirrors _open_boss_timer."""
         from .deeps_panel import open_deeps_panel
         open_deeps_panel(self)
+
+    def _open_damage_numbers(self):
+        """Open the Damage Numbers config panel (single-instance)."""
+        from .damageinfo_panel import open_damage_numbers_panel
+        open_damage_numbers_panel(self)
 
     def _open_backup_dialog(self):
         """Open the Backup & Restore settings dialog."""

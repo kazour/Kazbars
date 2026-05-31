@@ -1,6 +1,6 @@
 # Architectural Map
 
-**Current as of:** 2026-05-30 (Deeps "Alarm & Tints" card redesigned — DPS-out alarm is now a 1000–4000/s slider and the four ΔHP-in tint thresholds collapsed into a Tank/Standard `survival_preset`; refreshed the `deeps_panel.py`/`deeps_settings.py`/`test_deeps_settings.py` inventory rows + counts. Prior pass 2026-05-29: `instructions_panel.py` inventory count refreshed 403 → 512 after six help sections were added; inventory line counts resynced to the tree — the Deeps subtree had drifted furthest; added the `__main__.py`/`__init__.py` entry-point rows that were never listed. Drift is now guarded by `tests/test_docs_in_sync.py` and refreshed via the `/sync-docs` command + `doc-maintainer` agent. Prior pass (2026-05-25): overlay consolidation — both overlays unified onto a shared `overlay_engine.HudOverlay` + `OverlayConfig`; one app-owned `focus_watcher.ForegroundWatcher` replaced the per-cluster focus polls; the foreground probe moved to a pure `foreground.py`; `paths.py` centralizes asset/app-path resolution.)
+**Current as of:** 2026-05-31 (**Damage Numbers** feature added — a Game-menu popup (`damageinfo_panel.py`) + offset-bake config (`damageinfo_settings.py`) + MTASC-inject generator (`damageinfo_generator.py`) that ships a lean from-scratch rewrite of AoC's `DamageInfo.swf` under `assets/damageinfo/`; threaded through `build_action`/`build_executor` like the console/cast-timer gates, with a one-time `DamageInfo.swf.kazbars.bak` of the stock file for clean revert. New tests: `test_damageinfo_settings.py`, `test_damageinfo_generator.py`. Prior pass 2026-05-30: Deeps "Alarm & Tints" card redesigned — DPS-out alarm is now a 1000–4000/s slider and the four ΔHP-in tint thresholds collapsed into a Tank/Standard `survival_preset`; refreshed the `deeps_panel.py`/`deeps_settings.py`/`test_deeps_settings.py` inventory rows + counts. Prior pass 2026-05-29: `instructions_panel.py` inventory count refreshed 403 → 512 after six help sections were added; inventory line counts resynced to the tree — the Deeps subtree had drifted furthest; added the `__main__.py`/`__init__.py` entry-point rows that were never listed. Drift is now guarded by `tests/test_docs_in_sync.py` and refreshed via the `/sync-docs` command + `doc-maintainer` agent. Prior pass (2026-05-25): overlay consolidation — both overlays unified onto a shared `overlay_engine.HudOverlay` + `OverlayConfig`; one app-owned `focus_watcher.ForegroundWatcher` replaced the per-cluster focus polls; the foreground probe moved to a pure `foreground.py`; `paths.py` centralizes asset/app-path resolution.)
 **Purpose:** Module topology, dependencies, and coupling hotspots. Updated alongside code changes — if you edit this file, commit it with the code. `CLAUDE.md` has the short version; this file has the detail that doesn't fit there.
 
 ## Dependency clusters
@@ -48,6 +48,30 @@ build_loading  ← build_action, first_launch
 ```
 
 **Null-icon custom icons.** Some AoC buffs return `m_Icon.GetInstance()==0` (no game icon → the slot rendered blank). `grids_generator.CUSTOM_ICON_LINKAGE` maps such buff IDs → baked symbol linkage names in `base.swf` (`IcoSlow30/40/45/60` for the ice-gem slows), emitted into `KazBarsData.CUSTOMICON`. `KazBars_core.as.template`'s `loadIcon` routes through `attachBaked` to attach the symbol as a slot sibling at **dynamic depth 8**, with a shared **`IcoNull`** fallback for any other no-icon buff — so no tracked buff shows a blank slot. The slot's authored art (bg/icoMask/m_icon/frame, depths 1/3/5/9 in the FLA) becomes timeline content in the negative reserved depth range at runtime, so depth 8 sits above it; the timer/stack TextFields are pinned to fixed depths **10–13** (`KazBarsSlot`, not `getNextHighestDepth()`) so they render above the icon rather than under it. The flash (`animSlot`) pulses `s.cust` for baked icons, `m_icon` for RDB icons. The rounded crop is baked into the art (PNG inset ~56×56 in a 64×64 canvas), **not masked** at runtime: AoC's Scaleform renderer applies masks only to `loadClip` content (the RDB game icons), never to `attachMovie`'d content.
+
+### Damage Numbers (offset-bake mod for AoC's DamageInfo.swf)
+```
+damageinfo_settings  ← damageinfo_generator  ← build_action (gated)
+                     ← damageinfo_panel       ← app.py (Game menu)
+```
+A Game-menu config popup (`damageinfo_panel.py`) tunes AoC's floating combat-number
+overlay. Each setting is an **offset from the stock game value** (default 0 ⇒
+unchanged); `damageinfo_settings.GLOBAL_SETTINGS` is the bake-map (UI ranges + target
+file + regex pattern) and `GAME_DEFAULTS` the baseline. On Build & Install,
+`damageinfo_generator.build_damageinfo` copies the lean AS2 tree under
+`assets/damageinfo/src/__Packages`, regex-rewrites each named constant to
+`default + offset`, and MTASC-injects the result into a copy of the pristine
+`assets/damageinfo/DamageInfo.swf` (two entry points — `MainDamageNumbers` +
+`FixOnLoad`, the latter force-compiled so the container's `onLoad` survives the
+inject). The AS2 is a from-scratch lean rewrite of the stock overlay: a single
+`onEnterFrame` IN/LIVE/OUT loop (no TweenLite / `setInterval`), an O(1) column
+hashmap, object pools, and a 3-way `SHADOW_MODE` (None / Fast offset-twin / Real
+DropShadowFilter). Gated by a master `enabled` flag (off by default); when off the
+build leaves the stock file alone and reverts any prior mod via the one-time
+`DamageInfo.swf.kazbars.bak`. The regex↔constant coupling is guarded by
+`tests/test_damageinfo_generator.py` (no MTASC). Isolated — `damageinfo_*` import only
+stdlib + `build_utils`/`paths` (generator) and shared UI builders (panel); no
+cross-import with the Deeps/Live Tracker clusters.
 
 ### Live Tracker (isolated — no other panel imports from it)
 ```
@@ -146,6 +170,8 @@ Plain-Python pytest cases guard the failure modes we've actually hit.
 - **`tests/test_combat_monitor.py`** — `_process_line` trigger dispatch (seed/fixation/syphon → `BossTimer`), player-name extraction, latest-log discovery + folder selection on a tmp folder, and the start-without-folder guard.
 - **`tests/test_build_executor.py`** — install/uninstall orchestration on a tmp game folder (no MTASC, no Tk): SWF + script deployment in standard *and* Aoc.exe modes, `cleanup_legacy_files` (legacy SWFs/Aoc dirs removed, current `KazBars.swf` kept), `create_scripts` marker handling, `write_xml_add_files`, `detect_aoc_launcher`, `uninstall_from_client` (incl. marker-strip + nothing-to-remove), and `get_running_game_process` argv/match/per-process-exception isolation (monkeypatched `tasklist`).
 - **`tests/test_build_compile.py`** — MTASC compile-integration: runs the whole `build_grids` codegen through the bundled `mtasc.exe` and asserts exit-0 — the only check bridging Python-side correctness to SWF-side. Pins the AS2-escaping fix end-to-end (a grid `id` with quote/newline/backslash must still compile) and compiles the console + cast-timer feature variants. Windows + bundled-compiler gated (skips elsewhere); runs on CI (`windows-latest`).
+- **`tests/test_damageinfo_settings.py`** — Damage Numbers config layer: default/schema invariants, offset clamping (int + float), enum/bool coercion, `validate_all_settings` drop-unknown/fill-missing, `compute_final_value` (offset vs absolute keys), `apply_preset` bundles, save/load round-trip + corrupt/partial fallback. Pure — no Tk.
+- **`tests/test_damageinfo_generator.py`** — the regex↔AS2 coupling guard: asserts every `GLOBAL_SETTINGS` bake pattern still matches its shipped source file (a renamed AS2 constant fails CI, not silently in-game), the two entry points exist, and bakes resolve correctly (defaults → game defaults, offset → final value, dual-axis `shadow_blur`, enum/bool). No MTASC — runs anywhere.
 
 Run before every commit touching code or data:
 ```bash
@@ -193,6 +219,9 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `tests/test_data_integrity.py` | 97 | Buff-ref resolution smoke test |
 | `src/kazbars/build_utils.py` | 98 | Compiler discovery + path helpers |
 | `src/kazbars/cast_timer.py` | 113 | Cast-timer overlay config (pure data): defaults, validation, `is_enabled` gate. No Tk |
+| `src/kazbars/damageinfo_settings.py` | 328 | Damage Numbers config (pure data): `GLOBAL_SETTINGS` bake-map (offset ranges + target file + regex), `GAME_DEFAULTS`, `PRESETS`, validate/`compute_final_value`/`apply_preset`, load/save. No Tk |
+| `src/kazbars/damageinfo_generator.py` | 100 | Bakes setting offsets into the lean AS2 tree and MTASC-injects the pristine `DamageInfo.swf` (`build_damageinfo` via `build_utils.compile_as2`). No Tk |
+| `src/kazbars/damageinfo_panel.py` | 273 | `DamageNumbersPanel` Toplevel (Game ▸ Damage numbers…) — master enable gate, presets, and offset sliders/radios/checkboxes across Distance/Shadow/Size/Animation/Position/Behavior cards in a scrollable body; persists to `damageinfo_settings.json` |
 | `src/kazbars/window_position.py` | 110 | Window geometry save/restore |
 | `src/kazbars/settings_manager.py` | 104 | `SettingsManager` (incl. `reload()` to resync in-memory state from disk after a restore), JSON helpers, settings proxy |
 | `src/kazbars/update_check.py` | 69 | Background GitHub release check + named main-thread toast dispatcher |
@@ -232,3 +261,5 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `tests/test_deeps_settings.py` | 517 | 110 cases — defaults, validation (incl. readout-tuning keys + `survival_preset`), `normalize_survival_preset`, round-trip, corrupt-file fallback |
 | `tests/test_deeps_rolling_window.py` | 169 | 13 cases — primitive smoke + decay-during-silence |
 | `tests/test_deeps_overlay.py` | 376 | 30 cases — pure helpers + 5-cell IDs/labels + `_DisplaySmoother` (EMA/rounding/cadence) (visual behaviour is `/smoke`) |
+| `tests/test_damageinfo_settings.py` | 216 | Damage Numbers config — defaults/schema invariants, offset clamping, enum/bool coercion, `compute_final_value`, `apply_preset`, round-trip + corrupt/partial-file fallback |
+| `tests/test_damageinfo_generator.py` | 137 | Regex↔AS2 coupling guard (every bake pattern matches the shipped source) + bake correctness (offset→final, dual-axis shadow blur, enum/bool) + hard-fail on drifted source; no MTASC |

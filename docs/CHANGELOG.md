@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Damage Numbers** (Game ▸ Damage numbers…) — a new panel that tunes Age of Conan's floating combat-number overlay and installs a leaner, faster rewrite of it on your next Build & Install. The headline fix: damage numbers no longer shrink to nothing at range — a **Distance** card sets the full-size zone, the vanish distance, and a minimum on-screen size (a real help for ranged classes). Also tune shadow style (None / Fast / Real), number and label size, pop-in and fade speed, and where numbers land (above the target, in fixed columns, or a zig-zag stack), with Default / Performance / Beauty presets. Off by default behind a single master toggle; your stock `DamageInfo.swf` is backed up once, so turning it off or uninstalling restores the original.
+
 ### Changed
 - **Deeps "Alarm & Tints" is simpler to set.** The DPS-out alarm is now a slider over a 1000–4000/s band (instead of a typed value), and the four ΔHP-in survival-tint thresholds collapse into two presets — **Standard** (DPS / healers) and **Tank** (a wider symmetric band) — with a caption that restates the breakpoints. The default survival tints changed to match the **Standard** preset; the alarm default stays 2500/s. Your saved alarm value is kept and clamped into the slider's band.
 

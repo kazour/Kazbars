@@ -118,6 +118,7 @@ MODULE_COLORS = {
     'grids':        '#3498db',   # Blue
     'live_tracker': '#3498db',   # Blue — Live Tracker editor panel header
     'deeps':        '#3498db',   # Blue — Deeps panel header (sibling to live_tracker)
+    'damage_numbers': '#3498db', # Blue — Damage Numbers panel header (sibling config window)
 }
 
 # Retro/CRT decorative colors — DECORATIVE ONLY.

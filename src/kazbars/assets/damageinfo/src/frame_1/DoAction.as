@@ -1,0 +1,1 @@
+MainDamageNumbers.main(this);

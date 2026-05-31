@@ -13,6 +13,7 @@ from pathlib import Path
 
 from ttkbootstrap.dialogs import Messagebox
 
+from . import damageinfo_settings as dis
 from . import game_folder, profile_io
 from .build_loading import BuildLoadingScreen, show_close_game_required_dialog
 from .build_utils import find_compiler
@@ -38,6 +39,13 @@ def build(app):
     grids = app.grids_panel.get_profile_data()
     total_slots = app.grids_panel.get_total_slots()
 
+    di_settings = dis.load_settings(app.settings_path)
+    di_enabled = bool(di_settings.get('enabled'))
+    di_assets_ok = (
+        (Path(app.assets_path) / "damageinfo" / "DamageInfo.swf").exists()
+        and (Path(app.assets_path) / "damageinfo" / "src" / "__Packages").exists()
+    )
+
     validations = [
         (not valid,
          "No valid game folder configured.\n\n"
@@ -50,6 +58,9 @@ def build(app):
         (total_slots > MAX_TOTAL_SLOTS,
          f"Total slots ({total_slots}) exceeds maximum ({MAX_TOTAL_SLOTS}).\n\n"
          "Remove some grids or reduce grid sizes."),
+        (di_enabled and not di_assets_ok,
+         "Damage Numbers is enabled but its files are missing.\n\n"
+         "Re-download KazBars to restore them."),
     ]
     for k, (failed, msg) in enumerate(validations):
         if failed:
@@ -123,11 +134,31 @@ def build(app):
             flash_status_bar(app.bottom_bar, THEME_COLORS['danger'])
             return
 
+        # Damage Numbers: bake + compile the modded DamageInfo.swf into the same
+        # staging dir (gated by the master enable). Both SWFs are staged before any
+        # install so the deploy is all-or-nothing. When disabled, damageinfo_swf
+        # stays None and install reverts any previously-installed mod to stock.
+        damageinfo_swf = None
+        if di_enabled:
+            loading.advance_step("Baking damage numbers...")
+            app.update()
+            from .damageinfo_generator import build_damageinfo
+            staged_di = staging_dir / "DamageInfo.swf"
+            di_ok, di_msg = build_damageinfo(app.assets_path, di_settings, compiler, staged_di)
+            if not di_ok:
+                logger.warning("Damage Numbers build failed: %s", di_msg)
+                loading.show_summary([], (False, di_msg), profile_name=profile_name)
+                app_toast(app, "Damage Numbers build failed", 'error', 10)
+                flash_status_bar(app.bottom_bar, THEME_COLORS['danger'])
+                return
+            damageinfo_swf = staged_di
+
         loading.advance_step("Installing...")
         app.update()
 
         staging_swf = staging_dir / "KazBars.swf"
-        ok, err = install_to_client(staging_swf, app.game_path, app.use_aoc_bypass)
+        ok, err = install_to_client(staging_swf, app.game_path, app.use_aoc_bypass,
+                                    damageinfo_swf=damageinfo_swf)
         client_results = [(game_folder.format_game_path(app.game_path), ok, err)]
 
         aoc_running = app.use_aoc_bypass and is_aoc_running()

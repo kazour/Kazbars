@@ -29,6 +29,11 @@ LEGACY_AOC_DIRS = ("KzGrids", "KazGrids", "Kazbars")
 AUTO_LOAD_MARKER = "# KazBars auto-load"
 LEGACY_AUTO_LOAD_MARKERS = ("# KzGrids auto-load",)
 
+# Damage Numbers: a core game Flash file we replace with a modded build. We back the
+# stock file up once so install/disable/uninstall can always revert cleanly.
+DAMAGEINFO_FILE = "DamageInfo.swf"
+DAMAGEINFO_BACKUP = "DamageInfo.swf.kazbars.bak"
+
 
 def compile_to_staging(grids, database, assets_path, compiler, app_version,
                        include_console=False, cast_config=None):
@@ -55,8 +60,12 @@ def compile_to_staging(grids, database, assets_path, compiler, app_version,
     return staging_dir, result
 
 
-def install_to_client(staging_swf, game_path, use_aoc):
+def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None):
     """Install compiled SWF + scripts to the game folder.
+
+    ``damageinfo_swf`` (a staged modded DamageInfo.swf, or None) drives the Damage
+    Numbers feature: a path installs the mod (backing up the stock file once); None
+    reverts to the stock file from that backup if one exists. See ``_apply_damageinfo``.
 
     Returns (success, error_message).
     """
@@ -68,6 +77,18 @@ def install_to_client(staging_swf, game_path, use_aoc):
         scripts_path.mkdir(parents=True, exist_ok=True)
 
         cleanup_legacy_files(game_path)
+
+        # Damage Numbers touches a core game file the running client can hold locked.
+        # Apply it FIRST so a lock failure leaves nothing half-installed (KazBars.swf
+        # is not yet copied), and surface a clear "close the game" message.
+        try:
+            _apply_damageinfo(flash_path, damageinfo_swf)
+        except OSError:
+            return False, (
+                "Couldn't update Damage Numbers (DamageInfo.swf).\n\n"
+                "Close Age of Conan and build again — the game locks this file while "
+                "it's running. Your grids were not changed."
+            )
 
         shutil.copy2(staging_swf, flash_path / "KazBars.swf")
 
@@ -83,6 +104,28 @@ def install_to_client(staging_swf, game_path, use_aoc):
         )
 
     return True, ""
+
+
+def _apply_damageinfo(flash_path, staged_swf):
+    """Install or revert the modded DamageInfo.swf in the game's Flash folder.
+
+    - staged_swf given: back up the stock DamageInfo.swf once (if not already), then
+      overwrite it with the modded build.
+    - staged_swf None: Damage Numbers is off — restore the stock file from the backup
+      if we made one (a no-op when the feature was never installed).
+
+    The backup is taken exactly once, only when the stock file exists and no backup is
+    present yet (a real AoC client always ships DamageInfo.swf, so the very first install
+    captures genuine stock — never our own modded build).
+    """
+    target = flash_path / DAMAGEINFO_FILE
+    backup = flash_path / DAMAGEINFO_BACKUP
+    if staged_swf:
+        if target.exists() and not backup.exists():
+            shutil.copy2(target, backup)
+        shutil.copy2(staged_swf, target)
+    elif backup.exists():
+        shutil.copy2(backup, target)
 
 
 def cleanup_legacy_files(game_path):
@@ -109,10 +152,18 @@ def uninstall_from_client(game_path):
     """
     removed = []
     try:
-        swf = Path(game_path) / "Data" / "Gui" / "Default" / "Flash" / "KazBars.swf"
+        flash = Path(game_path) / "Data" / "Gui" / "Default" / "Flash"
+        swf = flash / "KazBars.swf"
         if swf.exists():
             swf.unlink()
             removed.append("KazBars.swf")
+
+        # Damage Numbers: restore the stock DamageInfo.swf from our one-time backup.
+        di_backup = flash / DAMAGEINFO_BACKUP
+        if di_backup.exists():
+            shutil.copy2(di_backup, flash / DAMAGEINFO_FILE)
+            di_backup.unlink()
+            removed.append("DamageInfo.swf (restored stock)")
 
         aoc_dir = Path(game_path) / "Data" / "Gui" / "Aoc" / "KazBars"
         if aoc_dir.exists():

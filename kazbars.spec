@@ -19,6 +19,9 @@ a = Analysis(
         # Deeps cluster: bundled pet-name registry consumed lazily by
         # `kazbars.deeps_parsers._pet_names()` on first call.
         (str(ASSETS / "deeps"), "kazbars/assets/deeps"),
+        # Damage Numbers: the pristine game SWF + the lean AS2 source tree the
+        # generator bakes + MTASC-injects on each build (see damageinfo_generator).
+        (str(ASSETS / "damageinfo"), "kazbars/assets/damageinfo"),
     ],
     hiddenimports=[],
     hookspath=[],

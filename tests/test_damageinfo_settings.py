@@ -1,0 +1,216 @@
+"""Tests for damageinfo_settings — schema, validation, presets, I/O.
+
+Pure-data layer (no Tk, no MTASC). Mirrors test_deeps_settings.
+"""
+
+import json
+
+import pytest
+
+from kazbars import damageinfo_settings as dis
+
+
+# --------------------------------------------------------------------------- #
+# Schema invariants
+# --------------------------------------------------------------------------- #
+def test_defaults_has_every_global_key_plus_enabled():
+    d = dis.get_default_settings()
+    for key in dis.GLOBAL_SETTINGS:
+        assert key in d
+    assert d['enabled'] is False
+    assert len(d) == len(dis.GLOBAL_SETTINGS) + 1
+
+
+def test_default_offsets_match_schema():
+    d = dis.get_default_settings()
+    for key, meta in dis.GLOBAL_SETTINGS.items():
+        assert d[key] == meta['default']
+
+
+def test_every_global_entry_has_file_and_pattern():
+    for key, meta in dis.GLOBAL_SETTINGS.items():
+        assert meta['file'], key
+        assert meta['pattern'], key
+        assert {'min', 'max', 'step', 'default'} <= set(meta), key
+
+
+def test_game_defaults_keys_are_known():
+    assert set(dis.GAME_DEFAULTS) <= set(dis.GLOBAL_SETTINGS)
+
+
+def test_absolute_keys_absent_from_game_defaults():
+    # shadow_mode/shrink_start/min_scale are absolute (offset == value).
+    for key in ('shadow_mode', 'shrink_start', 'min_scale'):
+        assert key not in dis.GAME_DEFAULTS
+
+
+def test_is_float_key():
+    for key in ('show_duration', 'fade_duration', 'title_scale', 'text_scale'):
+        assert dis.is_float_key(key)
+    for key in ('dir1_x_offset', 'easing_type', 'shadow_mode', 'fixed_col_split'):
+        assert not dis.is_float_key(key)
+
+
+# --------------------------------------------------------------------------- #
+# validate_setting
+# --------------------------------------------------------------------------- #
+def test_validate_clamps_int_offset_to_range():
+    assert dis.validate_setting('dir1_x_offset', 99999) == 150   # max
+    assert dis.validate_setting('dir1_x_offset', -99999) == -50  # min
+    assert dis.validate_setting('dir1_x_offset', 30) == 30
+
+
+def test_validate_clamps_float_offset_and_keeps_float():
+    v = dis.validate_setting('show_duration', 5.0)
+    assert v == pytest.approx(0.8)
+    assert isinstance(v, float)
+    v2 = dis.validate_setting('show_duration', -5.0)
+    assert v2 == pytest.approx(-0.15)
+
+
+def test_validate_int_keys_return_int():
+    v = dis.validate_setting('dir1_x_offset', 30.0)
+    assert v == 30 and isinstance(v, int)
+
+
+def test_validate_enum_clamped():
+    assert dis.validate_setting('shadow_mode', 5) == 2
+    assert dis.validate_setting('shadow_mode', -3) == 0
+    assert dis.validate_setting('easing_type', 1) == 1
+
+
+def test_validate_bool_master():
+    assert dis.validate_setting('enabled', 1) is True
+    assert dis.validate_setting('enabled', 0) is False
+    assert dis.validate_setting('enabled', '') is False
+
+
+def test_validate_garbage_falls_back_to_default():
+    assert dis.validate_setting('dir1_x_offset', 'nonsense') == 0
+    assert dis.validate_setting('show_duration', None) == 0
+
+
+def test_validate_unknown_key_passthrough():
+    assert dis.validate_setting('not_a_key', 'whatever') == 'whatever'
+
+
+# --------------------------------------------------------------------------- #
+# validate_all_settings
+# --------------------------------------------------------------------------- #
+def test_validate_all_drops_unknown_and_fills_missing():
+    out = dis.validate_all_settings({'dir1_x_offset': 20, 'bogus': 7})
+    assert out['dir1_x_offset'] == 20
+    assert 'bogus' not in out
+    assert out['enabled'] is False
+    assert out['shadow_mode'] == 2  # filled from default
+
+
+def test_validate_all_clamps_each():
+    out = dis.validate_all_settings({'min_scale': 999, 'shadow_blur': -999})
+    assert out['min_scale'] == 20
+    assert out['shadow_blur'] == -3
+
+
+# --------------------------------------------------------------------------- #
+# compute_final_value
+# --------------------------------------------------------------------------- #
+def test_compute_final_offset_keys():
+    assert dis.compute_final_value('distance_falloff', 0) == 60
+    assert dis.compute_final_value('distance_falloff', 10) == 70
+    assert dis.compute_final_value('shadow_distance', 0) == 4
+    assert dis.compute_final_value('dir1_x_offset', 0) == 50
+
+
+def test_compute_final_absolute_keys():
+    assert dis.compute_final_value('shadow_mode', 1) == 1
+    assert dis.compute_final_value('shrink_start', 20) == 20
+    assert dis.compute_final_value('min_scale', 6) == 6
+
+
+def test_compute_final_float_keys():
+    assert dis.compute_final_value('title_scale', 0) == pytest.approx(0.7)
+    assert dis.compute_final_value('show_duration', -0.1) == pytest.approx(0.1)
+    assert isinstance(dis.compute_final_value('title_scale', 0.1), float)
+
+
+# --------------------------------------------------------------------------- #
+# presets
+# --------------------------------------------------------------------------- #
+def test_apply_preset_default():
+    out = dis.apply_preset(dis.get_default_settings(), 'Default')
+    assert out['shadow_mode'] == 2
+    assert out['show_duration'] == 0
+    assert out['easing_type'] == 0
+
+
+def test_apply_preset_performance():
+    out = dis.apply_preset(dis.get_default_settings(), 'Performance')
+    assert out['shadow_mode'] == 1
+    assert out['show_duration'] == pytest.approx(-0.1)
+    assert out['fade_duration'] == pytest.approx(-0.1)
+
+
+def test_apply_preset_beauty():
+    out = dis.apply_preset(dis.get_default_settings(), 'Beauty')
+    assert out['easing_type'] == 1
+    assert out['shadow_mode'] == 2
+    assert out['shadow_distance'] == 1
+    assert out['shadow_blur'] == 1
+
+
+def test_apply_preset_unknown_is_noop():
+    base = dis.get_default_settings()
+    base['dir1_x_offset'] = 30
+    out = dis.apply_preset(base, 'NopeNotReal')
+    assert out['dir1_x_offset'] == 30
+    assert out == dis.validate_all_settings(base)
+
+
+def test_apply_preset_preserves_unrelated_keys():
+    base = dis.get_default_settings()
+    base['enabled'] = True
+    base['dir1_x_offset'] = 40
+    out = dis.apply_preset(base, 'Performance')
+    assert out['enabled'] is True
+    assert out['dir1_x_offset'] == 40  # not part of any preset bundle
+
+
+# --------------------------------------------------------------------------- #
+# file I/O
+# --------------------------------------------------------------------------- #
+def test_save_load_round_trip(tmp_path):
+    s = dis.get_default_settings()
+    s['enabled'] = True
+    s['distance_falloff'] = 20
+    s['shadow_mode'] = 1
+    assert dis.save_settings(tmp_path, s)
+    loaded = dis.load_settings(tmp_path)
+    assert loaded['enabled'] is True
+    assert loaded['distance_falloff'] == 20
+    assert loaded['shadow_mode'] == 1
+
+
+def test_load_missing_returns_defaults(tmp_path):
+    assert dis.load_settings(tmp_path) == dis.get_default_settings()
+
+
+def test_load_corrupt_returns_defaults(tmp_path):
+    (tmp_path / dis.SETTINGS_FILENAME).write_text('{not json', encoding='utf-8')
+    assert dis.load_settings(tmp_path) == dis.get_default_settings()
+
+
+def test_load_partial_fills_defaults(tmp_path):
+    (tmp_path / dis.SETTINGS_FILENAME).write_text(
+        json.dumps({'enabled': True, 'min_scale': 4}), encoding='utf-8')
+    loaded = dis.load_settings(tmp_path)
+    assert loaded['enabled'] is True
+    assert loaded['min_scale'] == 4
+    assert loaded['shadow_mode'] == 2  # filled
+
+
+def test_save_validates_out_of_range(tmp_path):
+    s = dis.get_default_settings()
+    s['min_scale'] = 999  # out of range
+    dis.save_settings(tmp_path, s)
+    on_disk = json.loads((tmp_path / dis.SETTINGS_FILENAME).read_text(encoding='utf-8'))
+    assert on_disk['min_scale'] == 20  # clamped before write
