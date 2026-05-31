@@ -4,6 +4,7 @@ Compile KazBars.swf and install to game folders.
 """
 
 import logging
+import os
 import shutil
 import subprocess
 import tempfile
@@ -35,6 +36,34 @@ DAMAGEINFO_FILE = "DamageInfo.swf"
 DAMAGEINFO_BACKUP = "DamageInfo.swf.kazbars.bak"
 
 
+def _files_equal(a, b):
+    """True only if both paths exist and have byte-identical contents."""
+    try:
+        a, b = Path(a), Path(b)
+        return a.is_file() and b.is_file() and a.read_bytes() == b.read_bytes()
+    except OSError:
+        return False
+
+
+def _atomic_install(src, dst):
+    """Copy ``src`` onto ``dst`` atomically.
+
+    Writes a temp file beside ``dst`` then ``os.replace`` (atomic within a volume on
+    Windows), so an interrupted/partial write can never leave ``dst`` truncated: on
+    failure the target is untouched and the temp is cleaned up. Used for the live game
+    file (DamageInfo.swf), which a running client can hold locked — a lock makes the
+    replace raise before touching the target, so the caller's OSError handler fires.
+    """
+    dst = Path(dst)
+    tmp = dst.with_name(dst.name + ".kaztmp")
+    shutil.copy2(src, tmp)
+    try:
+        os.replace(tmp, dst)
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
 def compile_to_staging(grids, database, assets_path, compiler, app_version,
                        include_console=False, cast_config=None):
     """Compile KazBars.swf to a temp staging dir.
@@ -60,12 +89,15 @@ def compile_to_staging(grids, database, assets_path, compiler, app_version,
     return staging_dir, result
 
 
-def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None):
+def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None,
+                      damageinfo_pristine=None):
     """Install compiled SWF + scripts to the game folder.
 
     ``damageinfo_swf`` (a staged modded DamageInfo.swf, or None) drives the Damage
     Numbers feature: a path installs the mod (backing up the stock file once); None
-    reverts to the stock file from that backup if one exists. See ``_apply_damageinfo``.
+    reverts to the stock file from that backup if one exists. ``damageinfo_pristine``
+    is the bundled genuine stock SWF — used to seed/recognize the backup so it can
+    never capture a mod. See ``_apply_damageinfo``.
 
     Returns (success, error_message).
     """
@@ -82,7 +114,7 @@ def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None):
         # Apply it FIRST so a lock failure leaves nothing half-installed (KazBars.swf
         # is not yet copied), and surface a clear "close the game" message.
         try:
-            _apply_damageinfo(flash_path, damageinfo_swf)
+            _apply_damageinfo(flash_path, damageinfo_swf, damageinfo_pristine)
         except OSError:
             return False, (
                 "Couldn't update Damage Numbers (DamageInfo.swf).\n\n"
@@ -106,26 +138,35 @@ def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None):
     return True, ""
 
 
-def _apply_damageinfo(flash_path, staged_swf):
+def _apply_damageinfo(flash_path, staged_swf, pristine_swf=None):
     """Install or revert the modded DamageInfo.swf in the game's Flash folder.
 
-    - staged_swf given: back up the stock DamageInfo.swf once (if not already), then
-      overwrite it with the modded build.
+    - staged_swf given: ensure a stock backup exists, then atomically overwrite the
+      target with the modded build.
     - staged_swf None: Damage Numbers is off — restore the stock file from the backup
       if we made one (a no-op when the feature was never installed).
 
-    The backup is taken exactly once, only when the stock file exists and no backup is
-    present yet (a real AoC client always ships DamageInfo.swf, so the very first install
-    captures genuine stock — never our own modded build).
+    The backup must always hold genuine stock so a later revert can never resurrect a
+    mod. The old "copy whatever the target is, once" rule failed if the .bak was lost
+    out-of-band while a modded target remained — the next build would capture the mod as
+    "stock". So when no backup exists we seed it from the live target ONLY if it is
+    byte-identical to our bundled pristine stock (``pristine_swf``); otherwise (modded,
+    a variant, or absent) we seed from the bundled pristine itself. Either way the backup
+    is real stock. ``pristine_swf`` None falls back to the legacy behavior for callers
+    that don't supply it.
     """
     target = flash_path / DAMAGEINFO_FILE
     backup = flash_path / DAMAGEINFO_BACKUP
     if staged_swf:
-        if target.exists() and not backup.exists():
-            shutil.copy2(target, backup)
-        shutil.copy2(staged_swf, target)
+        if not backup.exists():
+            if pristine_swf and Path(pristine_swf).is_file():
+                source = target if _files_equal(target, pristine_swf) else Path(pristine_swf)
+                shutil.copy2(source, backup)
+            elif target.exists():
+                shutil.copy2(target, backup)  # legacy fallback: no pristine supplied
+        _atomic_install(staged_swf, target)
     elif backup.exists():
-        shutil.copy2(backup, target)
+        _atomic_install(backup, target)
 
 
 def cleanup_legacy_files(game_path):
@@ -145,8 +186,12 @@ def cleanup_legacy_files(game_path):
             shutil.rmtree(legacy_aoc, ignore_errors=True)
 
 
-def uninstall_from_client(game_path):
+def uninstall_from_client(game_path, damageinfo_pristine=None):
     """Remove KazBars files from the game folder.
+
+    ``damageinfo_pristine`` is the bundled genuine stock DamageInfo.swf — used to
+    restore stock if the one-time backup is missing but a modded file remains, so a
+    "complete" uninstall never leaves a modded core game file behind.
 
     Returns (success, message).
     """
@@ -158,12 +203,19 @@ def uninstall_from_client(game_path):
             swf.unlink()
             removed.append("KazBars.swf")
 
-        # Damage Numbers: restore the stock DamageInfo.swf from our one-time backup.
+        # Damage Numbers: restore the stock DamageInfo.swf from our one-time backup; if
+        # that backup is gone but a non-stock (modded) file is still present, fall back to
+        # the bundled pristine so uninstall never leaves the game file modded.
         di_backup = flash / DAMAGEINFO_BACKUP
+        di_target = flash / DAMAGEINFO_FILE
         if di_backup.exists():
-            shutil.copy2(di_backup, flash / DAMAGEINFO_FILE)
+            _atomic_install(di_backup, di_target)
             di_backup.unlink()
             removed.append("DamageInfo.swf (restored stock)")
+        elif (damageinfo_pristine and Path(damageinfo_pristine).is_file()
+              and di_target.exists() and not _files_equal(di_target, damageinfo_pristine)):
+            _atomic_install(damageinfo_pristine, di_target)
+            removed.append("DamageInfo.swf (restored stock from bundled copy)")
 
         aoc_dir = Path(game_path) / "Data" / "Gui" / "Aoc" / "KazBars"
         if aoc_dir.exists():

@@ -24,6 +24,10 @@ KazBars.zip
 PATCH_PLAN.md
 audit_report.html
 
+# Damage Numbers scratch reference (stock SWF + decompiled AS2) — the shipped
+# bundle lives under src/kazbars/assets/damageinfo/; this root dir is dev-only scratch
+/Damageinfo/
+
 # User-specific runtime data
 settings/*.json
 profiles/*.json

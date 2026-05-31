@@ -35,14 +35,47 @@ def test_entry_points_exist():
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize("key", list(dis.GLOBAL_SETTINGS))
 def test_every_bake_pattern_matches_shipped_source(key):
+    # Must match EXACTLY once: 0 = the AS2 constant was renamed; >1 = the generator's
+    # re.subn would silently rewrite an unintended second site (it rewrites all matches).
     meta = dis.GLOBAL_SETTINGS[key]
     target = SRC_PKG / meta['file']
     assert target.exists(), f"{key}: missing target {meta['file']}"
     content = target.read_text(encoding='utf-8')
-    assert re.search(meta['pattern'], content), (
-        f"{key}: pattern {meta['pattern']!r} matched nothing in {meta['file']} — "
-        "the AS2 constant was likely renamed."
+    n = len(re.findall(meta['pattern'], content))
+    assert n == 1, (
+        f"{key}: pattern {meta['pattern']!r} matched {n} sites in {meta['file']} "
+        "(expected exactly 1). 0 = constant renamed; >1 = the bake would rewrite an "
+        "unintended line."
     )
+
+
+# The value each constant must SHIP at in the pristine (un-baked) source so that
+# offset 0 == stock: GAME_DEFAULTS for offset keys, these baselines for the absolute
+# keys (no GAME_DEFAULTS entry). This pins the load-bearing offset-bake invariant — the
+# bake-then-read tests below can't catch a source constant drifting off its game default.
+_ABSOLUTE_SHIPPED = {'shadow_mode': 2, 'shrink_start': 0, 'min_scale': 0}
+
+
+@pytest.mark.parametrize("key", list(dis.GLOBAL_SETTINGS))
+def test_shipped_constant_equals_game_default(key):
+    meta = dis.GLOBAL_SETTINGS[key]
+    content = (SRC_PKG / meta['file']).read_text(encoding='utf-8')
+    shipped = re.search(meta['pattern'], content).group(2)
+    expected = dis.GAME_DEFAULTS[key] if key in dis.GAME_DEFAULTS else _ABSOLUTE_SHIPPED[key]
+    assert float(shipped) == float(expected), (
+        f"{key}: shipped AS2 value {shipped!r} != game default {expected} — offset 0 "
+        "would no longer mean 'stock'. Fix the AS2 constant or GAME_DEFAULTS."
+    )
+
+
+def test_shipped_shadow_blur_both_axes_are_game_default():
+    # shadow_blur is dual-axis (blurX, blurY = capture groups 2 and 3); both must ship
+    # at GAME_DEFAULTS['shadow_blur'] so offset 0 leaves the stock filter unchanged.
+    meta = dis.GLOBAL_SETTINGS['shadow_blur']
+    content = (SRC_PKG / meta['file']).read_text(encoding='utf-8')
+    m = re.search(meta['pattern'], content)
+    expected = str(int(dis.GAME_DEFAULTS['shadow_blur']))
+    assert (m.group(2), m.group(3)) == (expected, expected)
 
 
 # --------------------------------------------------------------------------- #

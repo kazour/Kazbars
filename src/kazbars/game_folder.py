@@ -161,7 +161,9 @@ def uninstall_game(app):
     ) != "Yes":
         return
     from .build_executor import uninstall_from_client
-    ok, msg = uninstall_from_client(app.game_path)
+    ok, msg = uninstall_from_client(
+        app.game_path,
+        damageinfo_pristine=Path(app.assets_path) / "damageinfo" / "DamageInfo.swf")
     if ok:
         app_toast(app, msg, 'success', 8)
     else:

@@ -83,22 +83,22 @@ class numbersManagers.NumbersColumn
       return this._elements;
    }
    
-   // PHASE2: Get first element (oldest)
+   // PHASE2: Get first element (oldest). Elements are push()ed, so index 0 is the oldest.
    function getFirstElement()
    {
       if(this._elements.length > 0)
       {
-         return this._elements[this._elements.length - 1];
+         return this._elements[0];
       }
       return null;
    }
-   
-   // PHASE2: Get last element (newest)
+
+   // PHASE2: Get last element (newest) — the most recently push()ed.
    function getLastElement()
    {
       if(this._elements.length > 0)
       {
-         return this._elements[0];
+         return this._elements[this._elements.length - 1];
       }
       return null;
    }

@@ -157,8 +157,10 @@ def build(app):
         app.update()
 
         staging_swf = staging_dir / "KazBars.swf"
-        ok, err = install_to_client(staging_swf, app.game_path, app.use_aoc_bypass,
-                                    damageinfo_swf=damageinfo_swf)
+        ok, err = install_to_client(
+            staging_swf, app.game_path, app.use_aoc_bypass,
+            damageinfo_swf=damageinfo_swf,
+            damageinfo_pristine=Path(app.assets_path) / "damageinfo" / "DamageInfo.swf")
         client_results = [(game_folder.format_game_path(app.game_path), ok, err)]
 
         aoc_running = app.use_aoc_bypass and is_aoc_running()

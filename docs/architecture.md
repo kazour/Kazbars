@@ -206,7 +206,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/custom_menu_bar.py` | 402 | Canvas-based dark menu bar (active-cascade phosphor underline; ttkb-safe Canvas spacers; supports `command`, `separator`, `checkbutton` entries) |
 | `src/kazbars/combat_monitor.py` | 292 | Combat log parser feeding the tracker |
 | `src/kazbars/cast_timer_strip.py` | 348 | Frozen `CastTimerStrip` card (collapsed + master-off by default) for the cast-timer overlay. Header: one master Enabled toggle + title-adjacent Player/Target status tags + muted `overlay`. Body: a single settings row (independent Player/Target X/Y + Bold/Size/Display/Color, font fixed to Arial) + right-side sample preview. Master enables both sides together (`enableP == enableT == enabled`); X/Y grey out when off. Chrome mirrors a grid card — reserved handle gutter, shared `position_entry`, rose card border |
-| `src/kazbars/build_executor.py` | 240 | MTASC compile + deploy |
+| `src/kazbars/build_executor.py` | 343 | MTASC compile + deploy; Damage Numbers backup/restore (bundled pristine as the stock source of truth, atomic install via temp+`os.replace`) |
 | `src/kazbars/profile_io.py` | 228 | Profile load (read+apply split, with auto-anchor-scale on resolution mismatch) / save (build+write+commit, `silent=` for piggyback saves) / new / open + missing-buff warning. Persists the `cast_timer` block alongside `grids` |
 | `src/kazbars/game_folder.py` | 192 | Game folder UI + Aoc.exe bypass (with install/remove reconciler) + uninstall |
 | `src/kazbars/game_resolution.py` | 104 | Game resolution dialog + anchor-rescale all loaded grids on apply |
@@ -219,9 +219,9 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `tests/test_data_integrity.py` | 97 | Buff-ref resolution smoke test |
 | `src/kazbars/build_utils.py` | 98 | Compiler discovery + path helpers |
 | `src/kazbars/cast_timer.py` | 113 | Cast-timer overlay config (pure data): defaults, validation, `is_enabled` gate. No Tk |
-| `src/kazbars/damageinfo_settings.py` | 328 | Damage Numbers config (pure data): `GLOBAL_SETTINGS` bake-map (offset ranges + target file + regex), `GAME_DEFAULTS`, `PRESETS`, validate/`compute_final_value`/`apply_preset`, load/save. No Tk |
-| `src/kazbars/damageinfo_generator.py` | 100 | Bakes setting offsets into the lean AS2 tree and MTASC-injects the pristine `DamageInfo.swf` (`build_damageinfo` via `build_utils.compile_as2`). No Tk |
-| `src/kazbars/damageinfo_panel.py` | 273 | `DamageNumbersPanel` Toplevel (Game ▸ Damage numbers…) — master enable gate, presets, and offset sliders/radios/checkboxes across Distance/Shadow/Size/Animation/Position/Behavior cards in a scrollable body; persists to `damageinfo_settings.json` |
+| `src/kazbars/damageinfo_settings.py` | 363 | Damage Numbers config (pure data): `GLOBAL_SETTINGS` bake-map (offset ranges + target file + regex), `GAME_DEFAULTS`, `PRESETS`, validate/`compute_final_value`/`apply_preset`, load/save. No Tk |
+| `src/kazbars/damageinfo_generator.py` | 134 | Bakes setting offsets into the lean AS2 tree and MTASC-injects the pristine `DamageInfo.swf` (`build_damageinfo` via `build_utils.compile_as2`). No Tk |
+| `src/kazbars/damageinfo_panel.py` | 326 | `DamageNumbersPanel` Toplevel (Game ▸ Damage numbers…) — master enable gate, presets, and offset sliders/radios/checkboxes across Distance/Shadow/Size/Animation/Position/Behavior cards in a scrollable body; persists to `damageinfo_settings.json` |
 | `src/kazbars/window_position.py` | 110 | Window geometry save/restore |
 | `src/kazbars/settings_manager.py` | 104 | `SettingsManager` (incl. `reload()` to resync in-memory state from disk after a restore), JSON helpers, settings proxy |
 | `src/kazbars/update_check.py` | 69 | Background GitHub release check + named main-thread toast dispatcher |
@@ -244,7 +244,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `tests/test_log_name.py` | 22 | `sanitize_log_name` CombatLog filename trimming (`CombatLog-2026-05-16_2152` → `CombatLog_2152`) |
 | `tests/test_boss_timer.py` | 151 | `BossTimer` cycle/syphon/double-seed transitions + phase state machine (time-driven, no sleeps) |
 | `tests/test_combat_monitor.py` | 123 | `_process_line` dispatch, player extraction, latest-log discovery, start-without-folder guard |
-| `tests/test_build_executor.py` | 297 | Install/uninstall orchestration (both modes), legacy cleanup, `create_scripts` markers, xml.add, launcher detect, `tasklist` argv — no MTASC/Tk |
+| `tests/test_build_executor.py` | 460 | Install/uninstall orchestration (both modes), legacy cleanup, `create_scripts` markers, xml.add, launcher detect, `tasklist` argv, Damage Numbers backup-once/install/revert/uninstall + orphan-mod recovery — no MTASC/Tk |
 | `tests/test_build_compile.py` | 120 | MTASC compile-integration — whole codegen → bundled `mtasc.exe` exit-0 (escaping end-to-end + console/cast variants); win32 + compiler gated |
 | `src/kazbars/deeps_panel.py` | 941 | `DeepsPanel` Toplevel — status row, Start/Stop, Lock + Layout, appearance (size/background sliders, font fixed to Segoe UI), Readout card (window width + a Style preset radio — Live/Steady/Calm — bundling smoothing/round/refresh), Alarm & Tints card (DPS-out alarm slider over the 1000–4000/s band + Tank/Standard survival-tint preset radios + a live breakpoint caption), 5-cell visibility picker, pet toggle. Owns the meter + overlay + 100 ms UI tick + alarm hysteresis state machine |
 | `src/kazbars/deeps_meter.py` | 452 | `DeepsMeter` daemon thread — tail loop, log rotation detection, `is_live` probe via `CreateFile` exclusive-share, configurable rolling-window width (`set_window_seconds` recreates the trackers). Publishes `MeterSnapshot` (focus is no longer probed here — the shared `ForegroundWatcher` owns it) |
@@ -262,4 +262,4 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `tests/test_deeps_rolling_window.py` | 169 | 13 cases — primitive smoke + decay-during-silence |
 | `tests/test_deeps_overlay.py` | 376 | 30 cases — pure helpers + 5-cell IDs/labels + `_DisplaySmoother` (EMA/rounding/cadence) (visual behaviour is `/smoke`) |
 | `tests/test_damageinfo_settings.py` | 216 | Damage Numbers config — defaults/schema invariants, offset clamping, enum/bool coercion, `compute_final_value`, `apply_preset`, round-trip + corrupt/partial-file fallback |
-| `tests/test_damageinfo_generator.py` | 137 | Regex↔AS2 coupling guard (every bake pattern matches the shipped source) + bake correctness (offset→final, dual-axis shadow blur, enum/bool) + hard-fail on drifted source; no MTASC |
+| `tests/test_damageinfo_generator.py` | 170 | Regex↔AS2 coupling guard (every bake pattern matches the shipped source **exactly once**) + shipped-constant == GAME_DEFAULTS (the offset-0-is-stock invariant) + bake correctness (offset→final, dual-axis shadow blur, enum/bool) + hard-fail on drifted source; no MTASC |

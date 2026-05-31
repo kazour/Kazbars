@@ -214,9 +214,14 @@ class DamageNumbersPanel(tk.Toplevel):
         return f"{txt}{dis.GLOBAL_SETTINGS[key]['unit']}"
 
     def _quantize(self, key: str, raw: float):
-        """Snap a continuous scale value to the key's step and clamp it."""
+        """Snap a continuous scale value to the key's step and clamp it.
+
+        The extra round(..., 10) collapses binary-float drift (e.g. 0.7000000000000001)
+        so the stored offset and the JSON stay canonical; the readout/bake already format
+        defensively, so this is hygiene, not a behavior change.
+        """
         step = dis.GLOBAL_SETTINGS[key]['step']
-        return dis.validate_setting(key, round(raw / step) * step)
+        return dis.validate_setting(key, round(round(raw / step) * step, 10))
 
     def _save(self) -> None:
         dis.save_settings(self.settings_folder, self.settings)

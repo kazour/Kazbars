@@ -15,6 +15,8 @@ import types
 from kazbars import build_executor
 from kazbars.build_executor import (
     AUTO_LOAD_MARKER,
+    DAMAGEINFO_BACKUP,
+    DAMAGEINFO_FILE,
     GAME_PROCESSES,
     LEGACY_AOC_DIRS,
     LEGACY_FLASH_FILES,
@@ -246,6 +248,167 @@ class TestUninstall:
         ok, msg = uninstall_from_client(str(tmp_path))
         assert ok is True
         assert "isn't installed" in msg
+
+
+# =========================================================================== #
+# Damage Numbers install / backup-once / revert / uninstall                   #
+# (guards the one path that overwrites a core game file — see the audit)      #
+# =========================================================================== #
+
+class TestDamageInfo:
+    @staticmethod
+    def _kazbars(tmp_path):
+        swf = tmp_path / "staging" / "KazBars.swf"
+        swf.parent.mkdir(parents=True, exist_ok=True)
+        swf.write_bytes(b"FWS\x06kazbars")
+        return swf
+
+    @staticmethod
+    def _staged_di(tmp_path, content):
+        p = tmp_path / "staging" / "DamageInfo.swf"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(content)
+        return p
+
+    @staticmethod
+    def _pristine(tmp_path, content=b"STOCK"):
+        p = tmp_path / "assets" / "damageinfo" / "DamageInfo.swf"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(content)
+        return p
+
+    def _install(self, tmp_path, game, *, di, pristine, use_aoc=False):
+        return install_to_client(self._kazbars(tmp_path), str(game), use_aoc=use_aoc,
+                                 damageinfo_swf=di, damageinfo_pristine=pristine)
+
+    # --- install + backup-once ------------------------------------------- #
+
+    def test_first_install_backs_up_stock_and_writes_mod(self, tmp_path):
+        game = tmp_path / "game"
+        flash = _flash(game)
+        flash.mkdir(parents=True)
+        (flash / DAMAGEINFO_FILE).write_bytes(b"STOCK")
+        ok, err = self._install(tmp_path, game,
+                                di=self._staged_di(tmp_path, b"MODDED"),
+                                pristine=self._pristine(tmp_path, b"STOCK"))
+
+        assert (ok, err) == (True, "")
+        assert (flash / DAMAGEINFO_FILE).read_bytes() == b"MODDED"
+        assert (flash / DAMAGEINFO_BACKUP).read_bytes() == b"STOCK"
+
+    def test_second_install_does_not_overwrite_backup(self, tmp_path):
+        game = tmp_path / "game"
+        flash = _flash(game)
+        flash.mkdir(parents=True)
+        (flash / DAMAGEINFO_FILE).write_bytes(b"STOCK")
+        pristine = self._pristine(tmp_path, b"STOCK")
+        self._install(tmp_path, game, di=self._staged_di(tmp_path, b"MODDED1"), pristine=pristine)
+        self._install(tmp_path, game, di=self._staged_di(tmp_path, b"MODDED2"), pristine=pristine)
+
+        assert (flash / DAMAGEINFO_FILE).read_bytes() == b"MODDED2"
+        assert (flash / DAMAGEINFO_BACKUP).read_bytes() == b"STOCK"  # still genuine stock
+
+    def test_install_with_no_existing_target_seeds_pristine_backup(self, tmp_path):
+        game = tmp_path / "game"
+        flash = _flash(game)
+        flash.mkdir(parents=True)
+        # no DamageInfo.swf present at all
+        self._install(tmp_path, game, di=self._staged_di(tmp_path, b"MODDED"),
+                      pristine=self._pristine(tmp_path, b"STOCK"))
+
+        assert (flash / DAMAGEINFO_FILE).read_bytes() == b"MODDED"
+        assert (flash / DAMAGEINFO_BACKUP).read_bytes() == b"STOCK"
+
+    def test_lost_backup_with_modded_target_reseeds_stock_not_mod(self, tmp_path):
+        # The core regression: .bak deleted out-of-band while a mod remains. The next
+        # build must seed the backup from bundled pristine stock, never from the mod —
+        # otherwise "restore stock" would resurrect the mod forever.
+        game = tmp_path / "game"
+        flash = _flash(game)
+        flash.mkdir(parents=True)
+        pristine = self._pristine(tmp_path, b"STOCK")
+        (flash / DAMAGEINFO_FILE).write_bytes(b"OLD-MODDED")  # modded, no .bak
+
+        self._install(tmp_path, game, di=self._staged_di(tmp_path, b"NEW-MODDED"), pristine=pristine)
+        assert (flash / DAMAGEINFO_BACKUP).read_bytes() == b"STOCK"
+        assert (flash / DAMAGEINFO_FILE).read_bytes() == b"NEW-MODDED"
+
+        # disabling now restores genuine stock, not the mod
+        self._install(tmp_path, game, di=None, pristine=pristine)
+        assert (flash / DAMAGEINFO_FILE).read_bytes() == b"STOCK"
+
+    # --- disable (damageinfo_swf=None) ----------------------------------- #
+
+    def test_disable_restores_stock_and_keeps_backup(self, tmp_path):
+        game = tmp_path / "game"
+        flash = _flash(game)
+        flash.mkdir(parents=True)
+        (flash / DAMAGEINFO_FILE).write_bytes(b"STOCK")
+        pristine = self._pristine(tmp_path, b"STOCK")
+        self._install(tmp_path, game, di=self._staged_di(tmp_path, b"MODDED"), pristine=pristine)
+
+        self._install(tmp_path, game, di=None, pristine=pristine)
+
+        assert (flash / DAMAGEINFO_FILE).read_bytes() == b"STOCK"
+        # backup retained across a disable so a later re-enable keeps genuine stock
+        assert (flash / DAMAGEINFO_BACKUP).read_bytes() == b"STOCK"
+
+    def test_disable_with_no_backup_is_noop(self, tmp_path):
+        game = tmp_path / "game"
+        flash = _flash(game)
+        flash.mkdir(parents=True)
+        (flash / DAMAGEINFO_FILE).write_bytes(b"STOCK")
+
+        self._install(tmp_path, game, di=None, pristine=self._pristine(tmp_path, b"STOCK"))
+
+        assert (flash / DAMAGEINFO_FILE).read_bytes() == b"STOCK"   # untouched
+        assert not (flash / DAMAGEINFO_BACKUP).exists()             # none created
+
+    # --- uninstall ------------------------------------------------------- #
+
+    def test_uninstall_restores_stock_and_removes_backup(self, tmp_path):
+        game = tmp_path / "game"
+        flash = _flash(game)
+        flash.mkdir(parents=True)
+        (flash / DAMAGEINFO_FILE).write_bytes(b"STOCK")
+        pristine = self._pristine(tmp_path, b"STOCK")
+        self._install(tmp_path, game, di=self._staged_di(tmp_path, b"MODDED"), pristine=pristine)
+
+        ok, msg = uninstall_from_client(str(game), damageinfo_pristine=pristine)
+
+        assert ok is True
+        assert "restored stock" in msg
+        assert (flash / DAMAGEINFO_FILE).read_bytes() == b"STOCK"
+        assert not (flash / DAMAGEINFO_BACKUP).exists()
+
+    def test_uninstall_orphaned_mod_restored_from_pristine(self, tmp_path):
+        # backup lost but a modded core file remains — uninstall must not leave it modded
+        game = tmp_path / "game"
+        flash = _flash(game)
+        flash.mkdir(parents=True)
+        (flash / "KazBars.swf").write_bytes(b"x")
+        (flash / DAMAGEINFO_FILE).write_bytes(b"ORPHAN-MOD")
+        pristine = self._pristine(tmp_path, b"STOCK")
+
+        ok, msg = uninstall_from_client(str(game), damageinfo_pristine=pristine)
+
+        assert ok is True
+        assert (flash / DAMAGEINFO_FILE).read_bytes() == b"STOCK"
+        assert "restored stock" in msg
+
+    def test_uninstall_leaves_genuine_stock_untouched(self, tmp_path):
+        # no backup, target already byte-identical to pristine → nothing to restore
+        game = tmp_path / "game"
+        flash = _flash(game)
+        flash.mkdir(parents=True)
+        (flash / "KazBars.swf").write_bytes(b"x")
+        (flash / DAMAGEINFO_FILE).write_bytes(b"STOCK")
+        pristine = self._pristine(tmp_path, b"STOCK")
+
+        ok, msg = uninstall_from_client(str(game), damageinfo_pristine=pristine)
+
+        assert (flash / DAMAGEINFO_FILE).read_bytes() == b"STOCK"
+        assert "DamageInfo" not in msg   # don't claim a restore we didn't do
 
 
 # =========================================================================== #
