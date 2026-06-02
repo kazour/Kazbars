@@ -49,11 +49,10 @@ _H = 620
 _CARDS = (
     ('Distance', ['shrink_start', 'distance_falloff', 'min_scale']),
     ('Shadow', ['shadow_mode', 'shadow_distance', 'shadow_blur']),
-    ('Size', ['title_scale', 'text_scale']),
-    ('Animation', ['show_duration', 'fade_duration', 'easing_type']),
+    ('Size', ['text_scale']),
     ('Above-target position', ['dir1_x_offset', 'dir1_y_offset']),
     ('Fixed columns', ['fixed_col_x', 'fixed_col_y', 'fixed_col_split', 'col_b_x', 'col_b_y']),
-    ('Zig-zag (static)', ['fixed_y_base', 'fixed_x_offset', 'fixed_y_spacing']),
+    ('Zig-zag (static)', ['fixed_x_base', 'fixed_y_base', 'spread_spacing']),
     ('Behavior', ['show_titles', 'other_resource_loss_to_target']),
 )
 
@@ -82,6 +81,7 @@ class DamageNumbersPanel(tk.Toplevel):
         self._colb_scales: list = []       # gated by fixed_col_split
         self._shadow_dist_scale: ttk.Scale | None = None
         self._shadow_blur_scale: ttk.Scale | None = None
+        self._spread_spacing_var: tk.StringVar | None = None  # the coupled spread/spacing radio
 
         self._enabled_var = tk.BooleanVar(value=bool(self.settings['enabled']))
 
@@ -140,6 +140,9 @@ class DamageNumbersPanel(tk.Toplevel):
             self._all_controls.append(btn)
 
     def _build_control(self, card: ttk.LabelFrame, key: str) -> None:
+        if key == 'spread_spacing':  # composite radio driving two baked offsets
+            self._build_spread_spacing(card)
+            return
         kind = dis.GLOBAL_SETTINGS[key].get('type')
         if kind == 'enum':
             self._build_enum(card, key)
@@ -151,11 +154,15 @@ class DamageNumbersPanel(tk.Toplevel):
     def _build_slider(self, card: ttk.LabelFrame, key: str) -> None:
         meta = dis.GLOBAL_SETTINGS[key]
         offset = self.settings[key]
+        # Vertical-position sliders run high→low so dragging right moves the number up
+        # (screen Y grows downward). The stored offset and baked value are unchanged.
+        lo, hi = (meta['max'], meta['min']) if meta.get('invert') else (meta['min'], meta['max'])
         scale, label = create_slider_row(
-            card, meta['description'] + ":", meta['min'], meta['max'], offset, meta['unit'],
+            card, meta['description'] + ":", lo, hi, offset, meta['unit'],
             on_drag=lambda v, k=key: self._on_slider(k, v),
             on_commit=self._save,
             value_width=6,
+            notch=dis.is_offset_key(key),
         )
         label.configure(text=self._readout(key, offset))
         if meta.get('tooltip'):
@@ -190,6 +197,24 @@ class DamageNumbersPanel(tk.Toplevel):
             rb.pack(side="left", padx=PAD_XS)
             self._all_controls.append(rb)
 
+    def _build_spread_spacing(self, card: ttk.LabelFrame) -> None:
+        """One radio that sets the zig-zag spread + spacing together (no per-axis slider)."""
+        row = ttk.Frame(card)
+        row.pack(fill="x", pady=PAD_XS)
+        lbl = ttk.Label(row, text="Spread-spacing:", font=FONT_BODY,
+                        foreground=THEME_COLORS['body'])
+        lbl.pack(side="left")
+        add_tooltip(lbl, "Zig-zag swing width and row gap together. "
+                         "Compact = tight, Extended = wide.")
+        var = tk.StringVar(value=dis.spread_spacing_option(self.settings))
+        self._spread_spacing_var = var
+        for name, _values in dis.SPREAD_SPACING_OPTIONS:
+            rb = ttk.Radiobutton(
+                row, text=name, value=name, variable=var, command=self._on_spread_spacing,
+            )
+            rb.pack(side="left", padx=PAD_XS)
+            self._all_controls.append(rb)
+
     def _build_bool(self, card: ttk.LabelFrame, key: str) -> None:
         meta = dis.GLOBAL_SETTINGS[key]
         var = tk.BooleanVar(value=bool(self.settings[key]))
@@ -208,10 +233,8 @@ class DamageNumbersPanel(tk.Toplevel):
     # ------------------------------------------------------------------ #
 
     def _readout(self, key: str, offset) -> str:
-        """The slider's right-side label: the resulting game value, not the offset."""
-        final = dis.compute_final_value(key, offset)
-        txt = f"{final:g}" if isinstance(final, float) else str(final)
-        return f"{txt}{dis.GLOBAL_SETTINGS[key]['unit']}"
+        """The slider's right-side label (pure; see ``dis.readout``)."""
+        return dis.readout(key, offset)
 
     def _quantize(self, key: str, raw: float):
         """Snap a continuous scale value to the key's step and clamp it.
@@ -247,6 +270,14 @@ class DamageNumbersPanel(tk.Toplevel):
         self._save()
         if key == 'fixed_col_split':
             self._sync_split_state()
+
+    def _on_spread_spacing(self) -> None:
+        name = self._spread_spacing_var.get()
+        for opt_name, values in dis.SPREAD_SPACING_OPTIONS:
+            if opt_name == name:
+                self.settings.update(values)  # writes both fixed_x_offset + fixed_y_spacing
+                break
+        self._save()
 
     def _on_enabled(self) -> None:
         self.settings['enabled'] = bool(self._enabled_var.get())
@@ -306,6 +337,8 @@ class DamageNumbersPanel(tk.Toplevel):
             var.set(options[int(self.settings[key])])
         for key, var in self._bool_vars.items():
             var.set(bool(self.settings[key]))
+        if self._spread_spacing_var is not None:
+            self._spread_spacing_var.set(dis.spread_spacing_option(self.settings))
         self._sync_enabled_state()
 
 

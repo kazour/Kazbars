@@ -78,6 +78,16 @@ def test_shipped_shadow_blur_both_axes_are_game_default():
     assert (m.group(2), m.group(3)) == (expected, expected)
 
 
+def test_content_scale_applies_per_content_factor():
+    # The pop-in/fade animation must multiply the shared scale by each content's own
+    # factor, or DEFAULT_TEXT_SCALE (the "Size" slider) silently flattens out and does
+    # nothing. Source-level guard for the AS2 fix.
+    abstract = (SRC_PKG / "numbersTypes" / "DamageTextAbstract.as").read_text(encoding='utf-8')
+    assert "this._contentScale * this._contents[_loc2_].scale" in abstract
+    content = (SRC_PKG / "DamageTextContent.as").read_text(encoding='utf-8')
+    assert re.search(r'function (get|set) scale', content), "DamageTextContent needs a scale accessor"
+
+
 # --------------------------------------------------------------------------- #
 # Bake correctness (no MTASC)
 # --------------------------------------------------------------------------- #
@@ -100,9 +110,9 @@ def test_defaults_bake_to_game_defaults(tmp_path):
     assert _value(out, 'shrink_start') == '0'
     assert _value(out, 'min_scale') == '0'
     assert _value(out, 'shadow_mode') == '2'
-    assert _value(out, 'dir1_x_offset') == '50'
+    assert _value(out, 'dir1_x_offset') == '-50'
     assert _value(out, 'show_duration') == '0.2'
-    assert _value(out, 'title_scale') == '0.7'
+    assert _value(out, 'text_scale') == '1'
 
 
 def test_offset_bakes_to_final_value(tmp_path):
@@ -126,14 +136,19 @@ def test_float_offset_formats_cleanly(tmp_path):
 def test_enum_and_bool_bake(tmp_path):
     s = dis.get_default_settings()
     s['shadow_mode'] = 0
-    s['easing_type'] = 2
     s['fixed_col_split'] = 1
     s['show_titles'] = 1
     out = _bake(tmp_path, s)
     assert _value(out, 'shadow_mode') == '0'
-    assert _value(out, 'easing_type') == '2'
     assert _value(out, 'fixed_col_split') == '1'
     assert _value(out, 'show_titles') == '1'
+
+
+def test_easing_type_ships_quad():
+    # Easing is fixed to Quad — no setting, no bake. Guard the AS2 constant so it
+    # can't silently drift to Cubic/Quart (which there'd be no UI to undo).
+    content = (SRC_PKG / "numbersManagers" / "AbstractManager.as").read_text(encoding='utf-8')
+    assert re.search(r'static var EASING_TYPE\s*=\s*0\b', content)
 
 
 def test_shadow_blur_dual_axis(tmp_path):

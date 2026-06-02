@@ -5,7 +5,7 @@ class numbersTypes.MovingDamageText extends numbersTypes.DamageTextAbstract
    var _targetCharacter;
 
    // CUSTOMIZATION: Direction 1 - Above target (floats above player/enemy head)
-   static var DIR1_X_OFFSET = 50;   // Horizontal shift from target head
+   static var DIR1_X_OFFSET = -50;  // Horizontal shift from head (+ = right; ships -50 = 50px left, the stock spot)
    static var DIR1_Y_OFFSET = 0;    // Vertical shift from target head
 
    // CUSTOMIZATION: Direction -1 - Fixed columns (at fixed screen position)
@@ -64,7 +64,7 @@ class numbersTypes.MovingDamageText extends numbersTypes.DamageTextAbstract
       if(effectiveDirection > 0)
       {
          // Direction 1: Numbers float above target's head (player or enemy)
-         xPos -= numbersTypes.MovingDamageText.DIR1_X_OFFSET;
+         xPos += numbersTypes.MovingDamageText.DIR1_X_OFFSET;  // + = right (matches the fixed columns)
          yPos += numbersTypes.MovingDamageText.DIR1_Y_OFFSET;
       }
       else if(effectiveDirection < 0)
@@ -93,7 +93,7 @@ class numbersTypes.MovingDamageText extends numbersTypes.DamageTextAbstract
       var _loc6_ = this._getContentByType(DamageTextContent.TYPE_TITLE);
       if(_loc6_ != null)
       {
-         this._start(this._getContentByType(DamageTextContent.TYPE_TITLE), 0, -(_loc4_.content._height + 10));
+         this._start(_loc6_, 0, -((_loc4_.content._height + _loc6_.content._height) * 0.5 + numbersTypes.DamageTextAbstract.TITLE_GAP));
       }
       this._currentPosition = new flash.geom.Point(xPos, yPos);
    }

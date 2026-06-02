@@ -30,7 +30,7 @@ class numbersTypes.FixedDamageText extends numbersTypes.DamageTextAbstract
       var _loc2_ = this._getContentByType(DamageTextContent.TYPE_TITLE);
       if(_loc2_ != null)
       {
-         this._start(_loc2_, 0, -(_loc3_.content._height + 10));
+         this._start(_loc2_, 0, -((_loc3_.content._height + _loc2_.content._height) * 0.5 + numbersTypes.DamageTextAbstract.TITLE_GAP));
       }
    }
    

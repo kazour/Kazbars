@@ -45,27 +45,124 @@ def test_absolute_keys_absent_from_game_defaults():
 
 
 def test_is_float_key():
-    for key in ('show_duration', 'fade_duration', 'title_scale', 'text_scale'):
+    for key in ('show_duration', 'fade_duration', 'text_scale'):
         assert dis.is_float_key(key)
-    for key in ('dir1_x_offset', 'easing_type', 'shadow_mode', 'fixed_col_split'):
+    for key in ('dir1_x_offset', 'shadow_mode', 'fixed_col_split'):
         assert not dis.is_float_key(key)
+
+
+def test_is_offset_key():
+    for key in ('distance_falloff', 'dir1_x_offset', 'text_scale', 'shadow_blur'):
+        assert dis.is_offset_key(key)
+    for key in ('shrink_start', 'min_scale', 'shadow_mode'):  # absolute → no notch
+        assert not dis.is_offset_key(key)
+
+
+def test_offset_sliders_are_symmetric():
+    # Offset sliders centre on 0 (== the stock value) so the panel can notch the
+    # midpoint. Bool/enum offset keys aren't sliders, so they're exempt.
+    for key in dis.GAME_DEFAULTS:
+        meta = dis.GLOBAL_SETTINGS[key]
+        if meta.get('type') in ('bool', 'enum'):
+            continue
+        assert meta['min'] == -meta['max'], f"{key}: {meta['min']}..{meta['max']} not symmetric"
+
+
+def test_xy_position_sliders_share_common_step():
+    # The X/Y position sliders all snap on one common step (10px).
+    xy_keys = (
+        'dir1_x_offset', 'dir1_y_offset', 'fixed_col_x', 'fixed_col_y',
+        'col_b_x', 'col_b_y', 'fixed_x_base', 'fixed_y_base',
+    )
+    for key in xy_keys:
+        assert dis.GLOBAL_SETTINGS[key]['step'] == 10, key
+
+
+def test_spread_spacing_options():
+    names = [n for n, _ in dis.SPREAD_SPACING_OPTIONS]
+    assert names == ['Compact', 'Default', 'Extended']
+    by_name = dict(dis.SPREAD_SPACING_OPTIONS)
+    assert by_name['Compact'] == {'fixed_x_offset': -100, 'fixed_y_spacing': -20}
+    assert by_name['Default'] == {'fixed_x_offset': 0, 'fixed_y_spacing': 0}
+    assert by_name['Extended'] == {'fixed_x_offset': 100, 'fixed_y_spacing': 20}
+
+
+def test_spread_spacing_option_lookup():
+    s = dis.get_default_settings()
+    assert dis.spread_spacing_option(s) == 'Default'          # defaults are 0/0
+    s['fixed_x_offset'], s['fixed_y_spacing'] = -100, -20
+    assert dis.spread_spacing_option(s) == 'Compact'
+    s['fixed_x_offset'], s['fixed_y_spacing'] = 100, 20
+    assert dis.spread_spacing_option(s) == 'Extended'
+    s['fixed_x_offset'] = 33                                  # no match → Default
+    assert dis.spread_spacing_option(s) == 'Default'
+
+
+def test_vertical_position_sliders_are_inverted():
+    # 'invert' reverses the slider so dragging right moves the number UP. Exactly the
+    # vertical-position keys carry it; horizontal/spread/spacing stay normal.
+    inverted = {k for k, m in dis.GLOBAL_SETTINGS.items() if m.get('invert')}
+    assert inverted == {'dir1_y_offset', 'fixed_col_y', 'col_b_y', 'fixed_y_base'}
+    # Inverted sliders stay symmetric so the centre notch still marks the default.
+    for k in inverted:
+        m = dis.GLOBAL_SETTINGS[k]
+        assert m['min'] == -m['max']
+
+
+def test_relative_readout_keys():
+    # The position-card px sliders read as a relative shift; only those carry 'relative'.
+    relative = {k for k, m in dis.GLOBAL_SETTINGS.items() if m.get('relative')}
+    assert relative == {
+        'dir1_x_offset', 'dir1_y_offset', 'fixed_col_x', 'fixed_col_y',
+        'col_b_x', 'col_b_y', 'fixed_x_base', 'fixed_y_base',
+    }
+    # Every inverted key is also relative (the inverse needn't hold — the X positions
+    # are relative but not inverted).
+    inverted = {k for k, m in dis.GLOBAL_SETTINGS.items() if m.get('invert')}
+    assert inverted <= relative
+
+
+# --------------------------------------------------------------------------- #
+# readout (UI label)
+# --------------------------------------------------------------------------- #
+def test_readout_relative_signed_shift():
+    # 0 = default (midpoint); right-drag reads '+', left reads '-'.
+    assert dis.readout('dir1_x_offset', 0) == '0px'
+    assert dis.readout('dir1_x_offset', 30) == '+30px'
+    assert dis.readout('dir1_x_offset', -30) == '-30px'
+
+
+def test_readout_inverted_keeps_right_positive():
+    # Vertical sliders store a right-drag as a negative offset; the label flips the
+    # sign so dragging right still reads '+'.
+    assert dis.readout('fixed_col_y', 0) == '0px'
+    assert dis.readout('fixed_col_y', -30) == '+30px'
+    assert dis.readout('fixed_col_y', 30) == '-30px'
+
+
+def test_readout_absolute_keys_show_game_value():
+    # Non-position sliders keep showing the resulting game value, not a shift.
+    assert dis.readout('distance_falloff', 0) == '60m'
+    assert dis.readout('shadow_distance', 0) == '4px'
+    assert dis.readout('text_scale', 0) == '1x'
+    assert dis.readout('text_scale', 0.3) == '1.3x'
 
 
 # --------------------------------------------------------------------------- #
 # validate_setting
 # --------------------------------------------------------------------------- #
 def test_validate_clamps_int_offset_to_range():
-    assert dis.validate_setting('dir1_x_offset', 99999) == 150   # max
-    assert dis.validate_setting('dir1_x_offset', -99999) == -50  # min
+    assert dis.validate_setting('dir1_x_offset', 99999) == 200   # max
+    assert dis.validate_setting('dir1_x_offset', -99999) == -200  # min
     assert dis.validate_setting('dir1_x_offset', 30) == 30
 
 
 def test_validate_clamps_float_offset_and_keeps_float():
     v = dis.validate_setting('show_duration', 5.0)
-    assert v == pytest.approx(0.8)
+    assert v == pytest.approx(0.2)
     assert isinstance(v, float)
     v2 = dis.validate_setting('show_duration', -5.0)
-    assert v2 == pytest.approx(-0.15)
+    assert v2 == pytest.approx(-0.2)
 
 
 def test_validate_int_keys_return_int():
@@ -76,7 +173,6 @@ def test_validate_int_keys_return_int():
 def test_validate_enum_clamped():
     assert dis.validate_setting('shadow_mode', 5) == 2
     assert dis.validate_setting('shadow_mode', -3) == 0
-    assert dis.validate_setting('easing_type', 1) == 1
 
 
 def test_validate_bool_master():
@@ -118,7 +214,7 @@ def test_compute_final_offset_keys():
     assert dis.compute_final_value('distance_falloff', 0) == 60
     assert dis.compute_final_value('distance_falloff', 10) == 70
     assert dis.compute_final_value('shadow_distance', 0) == 4
-    assert dis.compute_final_value('dir1_x_offset', 0) == 50
+    assert dis.compute_final_value('dir1_x_offset', 0) == -50  # 50px left of head, + = right
 
 
 def test_compute_final_absolute_keys():
@@ -128,9 +224,9 @@ def test_compute_final_absolute_keys():
 
 
 def test_compute_final_float_keys():
-    assert dis.compute_final_value('title_scale', 0) == pytest.approx(0.7)
+    assert dis.compute_final_value('text_scale', 0) == pytest.approx(1.0)
     assert dis.compute_final_value('show_duration', -0.1) == pytest.approx(0.1)
-    assert isinstance(dis.compute_final_value('title_scale', 0.1), float)
+    assert isinstance(dis.compute_final_value('text_scale', 0.1), float)
 
 
 # --------------------------------------------------------------------------- #
@@ -139,23 +235,21 @@ def test_compute_final_float_keys():
 def test_apply_preset_default():
     out = dis.apply_preset(dis.get_default_settings(), 'Default')
     assert out['shadow_mode'] == 2
+    # 0.2s in / 0.2s out (offset 0 over the 0.2 game default)
     assert out['show_duration'] == 0
-    assert out['easing_type'] == 0
+    assert out['fade_duration'] == 0
 
 
 def test_apply_preset_performance():
     out = dis.apply_preset(dis.get_default_settings(), 'Performance')
     assert out['shadow_mode'] == 1
+    # 0.1s in / 0.1s out
     assert out['show_duration'] == pytest.approx(-0.1)
     assert out['fade_duration'] == pytest.approx(-0.1)
 
 
-def test_apply_preset_beauty():
-    out = dis.apply_preset(dis.get_default_settings(), 'Beauty')
-    assert out['easing_type'] == 1
-    assert out['shadow_mode'] == 2
-    assert out['shadow_distance'] == 1
-    assert out['shadow_blur'] == 1
+def test_only_default_and_performance_presets():
+    assert set(dis.PRESETS) == {'Default', 'Performance'}
 
 
 def test_apply_preset_unknown_is_noop():

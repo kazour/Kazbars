@@ -1000,7 +1000,7 @@ def create_status_block(parent, title="Status", wraplength=0):
 
 
 def create_slider_row(parent, label_text, from_, to, initial, suffix, on_drag, on_commit,
-                      value_width=5):
+                      value_width=5, notch=False):
     """One row: descriptor label · ttk.Scale · live value label.
 
     `on_drag(value)` fires continuously while dragging (refresh the label + push
@@ -1010,6 +1010,11 @@ def create_slider_row(parent, label_text, from_, to, initial, suffix, on_drag, o
 
     `value_width` is the readout label width in chars — default 5 fits short
     units like `48pt` / `100%`; widen it for longer readouts (e.g. `4000/s`).
+
+    `notch=True` draws a thin tick under the trough's centre — use it on
+    symmetric sliders (`from_ == -to`) so the midpoint reads as the default. It
+    is pure chrome (no effect on the value), and the centre is robust because
+    the thumb inset is symmetric, so the midpoint maps to value 0.
     """
     row = ttk.Frame(parent)
     row.pack(fill="x", pady=PAD_XS)
@@ -1021,10 +1026,26 @@ def create_slider_row(parent, label_text, from_, to, initial, suffix, on_drag, o
         foreground=THEME_COLORS["muted"], width=value_width, anchor="e",
     )
     value_label.pack(side="right")
-    scale = ttk.Scale(
-        row, from_=from_, to=to, value=initial, orient="horizontal", command=on_drag,
-    )
-    scale.pack(side="left", fill="x", expand=True, padx=PAD_SMALL)
+    if notch:
+        # Overlay a centre tick on the trough's lower edge (relx=0.5 == value 0 for a
+        # symmetric range — the thumb inset is symmetric, so the midpoint maps to 0).
+        # It tucks behind the thumb at the default and reappears the moment you drag
+        # away, marking "home". Tick lives in the same frame as the scale so widths and
+        # x-origins match exactly.
+        track = ttk.Frame(row)
+        track.pack(side="left", fill="x", expand=True, padx=PAD_SMALL)
+        scale = ttk.Scale(
+            track, from_=from_, to=to, value=initial, orient="horizontal", command=on_drag,
+        )
+        scale.pack(fill="x", expand=True)
+        tk.Frame(track, width=2, height=7, bg=THEME_COLORS["muted"]).place(
+            relx=0.5, rely=1.0, anchor="s",
+        )
+    else:
+        scale = ttk.Scale(
+            row, from_=from_, to=to, value=initial, orient="horizontal", command=on_drag,
+        )
+        scale.pack(side="left", fill="x", expand=True, padx=PAD_SMALL)
     scale.bind("<ButtonRelease-1>", lambda _e: on_commit())
     scale.bind("<KeyRelease>", lambda _e: on_commit())
     return scale, value_label
