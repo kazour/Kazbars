@@ -43,6 +43,14 @@ from .deeps_settings import (
     save_settings,
     validate_setting,
 )
+from .ui_forms import (
+    create_card,
+    create_slider_row,
+    create_status_block,
+    create_toggle_action_button,
+    refresh_toggle_button,
+)
+from .ui_headers import create_dialog_header, create_tip_bar
 from .ui_helpers import (
     BTN_LARGE,
     BTN_SMALL,
@@ -56,16 +64,7 @@ from .ui_helpers import (
     PAD_XS,
     THEME_COLORS,
 )
-from .ui_widgets import (
-    add_tooltip,
-    create_card,
-    create_dialog_header,
-    create_slider_row,
-    create_status_block,
-    create_tip_bar,
-    create_toggle_action_button,
-    refresh_toggle_button,
-)
+from .ui_widgets import add_tooltip
 from .window_position import bind_window_position_save, restore_window_position
 
 logger = logging.getLogger(__name__)

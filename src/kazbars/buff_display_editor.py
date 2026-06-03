@@ -22,7 +22,9 @@ from .buff_xml import (
     _write_bufflistview,
 )
 from .settings_manager import get_setting, set_setting
+from .ui_collapsible import CollapsibleSection
 from .ui_components import create_scrollable_frame
+from .ui_headers import create_dialog_header
 from .ui_helpers import (
     BTN_DIALOG,
     FONT_BODY,
@@ -41,7 +43,7 @@ from .ui_helpers import (
     TK_COLORS,
 )
 from .ui_tk_style import apply_dark_titlebar
-from .ui_widgets import CollapsibleSection, app_toast, create_dialog_header
+from .ui_widgets import app_toast
 from .window_position import bind_window_position_save, restore_window_position
 
 logger = logging.getLogger(__name__)

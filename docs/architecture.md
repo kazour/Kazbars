@@ -1,6 +1,6 @@
 # Architectural Map
 
-**Current as of:** 2026-05-31 (**Damage Numbers** feature added — a Game-menu popup (`damageinfo_panel.py`) + offset-bake config (`damageinfo_settings.py`) + MTASC-inject generator (`damageinfo_generator.py`) that ships a lean from-scratch rewrite of AoC's `DamageInfo.swf` under `assets/damageinfo/`; threaded through `build_action`/`build_executor` like the console/cast-timer gates, with a one-time `DamageInfo.swf.kazbars.bak` of the stock file for clean revert. New tests: `test_damageinfo_settings.py`, `test_damageinfo_generator.py`. Prior pass 2026-05-30: Deeps "Alarm & Tints" card redesigned — DPS-out alarm is now a 1000–4000/s slider and the four ΔHP-in tint thresholds collapsed into a Tank/Standard `survival_preset`; refreshed the `deeps_panel.py`/`deeps_settings.py`/`test_deeps_settings.py` inventory rows + counts. Prior pass 2026-05-29: `instructions_panel.py` inventory count refreshed 403 → 512 after six help sections were added; inventory line counts resynced to the tree — the Deeps subtree had drifted furthest; added the `__main__.py`/`__init__.py` entry-point rows that were never listed. Drift is now guarded by `tests/test_docs_in_sync.py` and refreshed via the `/sync-docs` command + `doc-maintainer` agent. Prior pass (2026-05-25): overlay consolidation — both overlays unified onto a shared `overlay_engine.HudOverlay` + `OverlayConfig`; one app-owned `focus_watcher.ForegroundWatcher` replaced the per-cluster focus polls; the foreground probe moved to a pure `foreground.py`; `paths.py` centralizes asset/app-path resolution.)
+**Current as of:** 2026-06-03 (**`ui_widgets.py` split** — pure file-move refactor, no behavior change: the 1080-line module was carved into the leaf `ui_widgets.py` (283 — core glue: `blend_alpha`/`add_tooltip`/`app_toast`/`flash_status_bar`/`debounced_callback` + event bindings) plus three new siblings — `ui_headers.py` (197 — `create_dialog_header`/`create_app_header`/`update_app_header_color`/`create_tip_bar`), `ui_forms.py` (424 — fields, `ColorSwatch`/`create_rounded_rect`/`draw_grid_cells` + the shared settings-panel builders: card/status-block/slider-row/toggle-button), `ui_collapsible.py` (232 — `CollapsibleSection`). All three depend only on `ui_widgets` (`blend_alpha`/`add_tooltip`) + `ui_helpers` tokens; `ui_widgets` imports none of them, so it stays the leaf core (no cycles). Prior pass 2026-05-31: **Damage Numbers** feature added — a Game-menu popup (`damageinfo_panel.py`) + offset-bake config (`damageinfo_settings.py`) + MTASC-inject generator (`damageinfo_generator.py`) that ships a lean from-scratch rewrite of AoC's `DamageInfo.swf` under `assets/damageinfo/`; threaded through `build_action`/`build_executor` like the console/cast-timer gates, with a one-time `DamageInfo.swf.kazbars.bak` of the stock file for clean revert. New tests: `test_damageinfo_settings.py`, `test_damageinfo_generator.py`. Prior pass 2026-05-30: Deeps "Alarm & Tints" card redesigned — DPS-out alarm is now a 1000–4000/s slider and the four ΔHP-in tint thresholds collapsed into a Tank/Standard `survival_preset`; refreshed the `deeps_panel.py`/`deeps_settings.py`/`test_deeps_settings.py` inventory rows + counts. Prior pass 2026-05-29: `instructions_panel.py` inventory count refreshed 403 → 512 after six help sections were added; inventory line counts resynced to the tree — the Deeps subtree had drifted furthest; added the `__main__.py`/`__init__.py` entry-point rows that were never listed. Drift is now guarded by `tests/test_docs_in_sync.py` and refreshed via the `/sync-docs` command + `doc-maintainer` agent. Prior pass (2026-05-25): overlay consolidation — both overlays unified onto a shared `overlay_engine.HudOverlay` + `OverlayConfig`; one app-owned `focus_watcher.ForegroundWatcher` replaced the per-cluster focus polls; the foreground probe moved to a pure `foreground.py`; `paths.py` centralizes asset/app-path resolution.)
 **Purpose:** Module topology, dependencies, and coupling hotspots. Updated alongside code changes — if you edit this file, commit it with the code. `CLAUDE.md` has the short version; this file has the detail that doesn't fit there.
 
 ## Dependency clusters
@@ -10,12 +10,16 @@ All arrows point in the "imports from" direction. Every chain terminates — **n
 ### UI primitives (tokens at the root)
 ```
 ui_helpers  ← ui_tk_style
-ui_helpers  ← ui_widgets          ← ui_components
-                                    (also imports ui_tk_style)
+ui_helpers  ← ui_widgets          ← ui_headers, ui_forms, ui_collapsible
+                                    ← ui_components
+                                    (ui_components also imports ui_tk_style)
 ui_helpers  ← custom_menu_bar
 ```
 - `ui_helpers` holds design tokens only (fonts, colors, padding, BTN_*, INPUT_WIDTH_*, canvas-geometry constants, SCANLINE_ALPHA) + `setup_custom_styles` + `style_treeview_heading` (called post-Treeview-construction because ttkbootstrap rebuilds `Treeview.Heading` lazily on first instantiation, clobbering boot-time styling). Leaf — imports nothing internal.
-- `ui_widgets` adds the builder layer: `blend_alpha`, `CollapsibleSection`, tooltips, dialog/app headers, event bindings, `debounced_callback`.
+- `ui_widgets` is the leaf "core glue": `blend_alpha`, `add_tooltip` (+ `_InAppToolTip`), `app_toast`, `flash_status_bar`, `debounced_callback`, and the event-binding helpers (`bind_card_events`, `bind_button_press_effect`, `bind_label_hover_colors`, `bind_label_press_effect`). Imports nothing from the three siblings below — they depend on it, not the reverse, so no cycles.
+- `ui_headers` builds the headers: `create_dialog_header`, `create_app_header`, `update_app_header_color`, `create_tip_bar`. Imports `blend_alpha` from `ui_widgets`.
+- `ui_forms` builds the form fields + settings-panel builders: `labeled_spinbox`/`labeled_combobox`/`position_entry`, `draw_grid_cells`, `create_rounded_rect`, `ColorSwatch`, and the shared settings-panel group both config panels use — `create_card`, `create_status_block`, `create_slider_row`, `toggle_button_state`, `create_toggle_action_button`, `refresh_toggle_button`. Imports `add_tooltip` from `ui_widgets`.
+- `ui_collapsible` holds `CollapsibleSection` (with `set_dimmed`). Imports `blend_alpha` from `ui_widgets`.
 - `ui_components` adds stateful composites: `ToastManager` (coalesce-by-key for spammy emitters; single trailing `update_idletasks` in `_reposition`), `DragReorderManager`, `create_scrollable_frame`, global mousewheel routing.
 - `ui_tk_style` handles raw-tk widget styling + dark-titlebar monkey-patch.
 - `custom_menu_bar` is the dark-themed Canvas-based menu bar (was in `ui_components`; extracted for size + single-consumer isolation).
@@ -119,9 +123,11 @@ These modules are consumed only by `src/kazbars/app.py` by design — they hold 
 
 | Fan-in | Module | Notes |
 |---:|---|---|
-| 15 | `ui_helpers` | Pure tokens — high fan-in is expected for shared constants. Keep the surface small. |
-| 12 | `ui_widgets` | Widest builder surface. Keep new helpers focused; don't expand unchecked. |
-|  5 | `window_position`, `settings_manager` | Small stable APIs. |
+| 25 | `ui_helpers` | Pure tokens — high fan-in is expected for shared constants. Keep the surface small. |
+| 22 | `ui_widgets` | Core glue (`app_toast`/`add_tooltip`/`blend_alpha` + event bindings). Still the widest UI surface even after the builders split out — most panels pull at least a toast/tooltip/binding. Keep new helpers focused. |
+| 10 | `ui_headers` | Dialog/app headers + tip bar — pulled by every dialog/panel that draws a CRT header. |
+|  6 | `ui_forms` | Form fields + shared settings-panel builders (card/status-block/slider-row/toggle). The Deeps + Live Tracker config panels are its heaviest consumers. |
+|  5 | `ui_collapsible`, `window_position`, `settings_manager` | Small stable APIs. `ui_collapsible` is just `CollapsibleSection`. |
 |  4 | `ui_tk_style`, `ui_components`, `overlay_engine` | Narrow surface — ripple is contained. `overlay_engine` feeds both overlays + both settings adapters. |
 |  3 | `grid_model`, `build_utils`, `build_executor`, `build_loading`, `live_tracker_settings`, `paths` | Cluster leaves. `paths` is imported directly by `app.py`, `build_utils`, `deeps_parsers` (everyone else gets paths via the `app` object). |
 |  2 | `grids_generator` | |
@@ -132,7 +138,10 @@ These modules are consumed only by `src/kazbars/app.py` by design — they hold 
 - **Import style:** relative (`from .other import X`) inside `src/kazbars/`; absolute (`from kazbars.X import`) only from `src/kazbars/app.py` (top-level entry).
 - **Where new code goes:**
   - Design token → `ui_helpers`
-  - Reusable widget builder / event binding / small helper → `ui_widgets`
+  - Core glue: tooltip / toast / `blend_alpha` / event-binding helper → `ui_widgets`
+  - Dialog/app header or tip bar → `ui_headers`
+  - Form field / canvas-geometry helper / shared settings-panel builder (card, status block, slider row, toggle button) → `ui_forms`
+  - Collapsible section → `ui_collapsible`
   - Stateful widget class or window-scope helper → `ui_components`
   - Raw-tk (Listbox/Text/Canvas) styling → `ui_tk_style`
   - Window geometry → `window_position`
@@ -185,7 +194,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | File | Lines | Role |
 |---|---:|---|
 | `src/kazbars/grids_panel.py` | 628 | `GridsPanel` container, toolbar, scrollable list, anchor-based `scale_to_resolution`, frozen `CastTimerStrip` pinned above the list. Per-row card lives in `grid_editor_panel.py` |
-| `src/kazbars/grid_editor_panel.py` | 617 | `GridEditorPanel` (per-row collapsible card) + module-level `_FILL_*`/`_LAYOUT_*`/`_SORT_*` option maps; X/Y bounds pulled from `game_resolution` setting; X/Y fields built via shared `ui_widgets.position_entry` |
+| `src/kazbars/grid_editor_panel.py` | 617 | `GridEditorPanel` (per-row collapsible card) + module-level `_FILL_*`/`_LAYOUT_*`/`_SORT_*` option maps; X/Y bounds pulled from `game_resolution` setting; X/Y fields built via shared `ui_forms.position_entry` |
 | `src/kazbars/database_editor.py` | 750 | Buff DB UI (treeview, dialogs, category management). Pure data layer in `buff_database.py` |
 | `src/kazbars/grid_dialogs.py` | 874 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
 | `src/kazbars/build_loading.py` | 818 | Build-progress screen + welcome/about popups |
@@ -195,7 +204,10 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/app.py` | 627 | Entry point + `KazBarsApp` root window (widgets, menu, lifecycle) |
 | `src/kazbars/__main__.py` | 43 | Process entry point — logging setup + `KazBarsApp().mainloop()`; invoked by `python -m kazbars` |
 | `src/kazbars/__init__.py` | 4 | Package version + `APP_NAME`; `__version__` is the hatchling dynamic-version source |
-| `src/kazbars/ui_widgets.py` | 1080 | Widget builders, tooltips, bindings, `CollapsibleSection` (with `set_dimmed`), `ColorSwatch` (rounded swatch + themed `ColorChooserDialog`) + `create_rounded_rect`, `blend_alpha`, `flash_status_bar`, `app_toast`, `labeled_spinbox`/`labeled_combobox`/`position_entry`, `create_slider_row` (optional `value_width` for the readout label + `notch` for a centered default tick on symmetric sliders), `draw_grid_cells` |
+| `src/kazbars/ui_widgets.py` | 283 | Leaf "core glue": `blend_alpha`, `add_tooltip` (+ `_InAppToolTip`), `app_toast`, `flash_status_bar`, `debounced_callback`, and the event-binding helpers (`bind_card_events`/`bind_button_press_effect`/`bind_label_hover_colors`/`bind_label_press_effect`). Imports nothing from `ui_headers`/`ui_forms`/`ui_collapsible` — they depend on it |
+| `src/kazbars/ui_headers.py` | 197 | Dialog/app headers: `create_dialog_header`, `create_app_header`, `update_app_header_color`, `create_tip_bar`. Imports `blend_alpha` from `ui_widgets` |
+| `src/kazbars/ui_forms.py` | 424 | Form fields + shared settings-panel builders: `labeled_spinbox`/`labeled_combobox`/`position_entry`, `draw_grid_cells`, `create_rounded_rect`, `ColorSwatch` (rounded swatch + themed `ColorChooserDialog`), and the group both config panels share — `create_card`, `create_status_block`, `create_slider_row` (optional `value_width` for the readout label + `notch` for a centered default tick on symmetric sliders), `toggle_button_state`, `create_toggle_action_button`, `refresh_toggle_button`. Imports `add_tooltip` from `ui_widgets` |
+| `src/kazbars/ui_collapsible.py` | 232 | `CollapsibleSection` (with `set_dimmed`). Imports `blend_alpha` from `ui_widgets` |
 | `src/kazbars/live_tracker_panel.py` | 533 | Live Tracker Toplevel orchestrator |
 | `src/kazbars/timer_overlay.py` | 387 | In-game transparent Live Tracker overlay — a `HudOverlay` consumer (`_render_content`: two text rows + cycle-timer dock with 8-direction stroke; `_measure`: font-derived auto-size, no resize handle) |
 | `src/kazbars/ui_components.py` | 454 | `ToastManager` (coalesce-by-key, in-place text update), `DragReorderManager`, scrollable frame |

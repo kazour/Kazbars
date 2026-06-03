@@ -21,6 +21,8 @@ from tkinter import ttk
 
 from . import damageinfo_settings as dis
 from .ui_components import create_scrollable_frame
+from .ui_forms import create_card, create_slider_row
+from .ui_headers import create_dialog_header, create_tip_bar
 from .ui_helpers import (
     FONT_BODY,
     MODULE_COLORS,
@@ -29,14 +31,7 @@ from .ui_helpers import (
     PAD_XS,
     THEME_COLORS,
 )
-from .ui_widgets import (
-    add_tooltip,
-    app_toast,
-    create_card,
-    create_dialog_header,
-    create_slider_row,
-    create_tip_bar,
-)
+from .ui_widgets import add_tooltip, app_toast
 from .window_position import bind_window_position_save, restore_window_position
 
 logger = logging.getLogger(__name__)

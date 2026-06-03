@@ -13,6 +13,7 @@ from . import game_folder, profile_io
 from .build_executor import detect_aoc_launcher
 from .build_loading import show_welcome_popup
 from .grid_model import parse_resolution
+from .ui_headers import create_dialog_header
 from .ui_helpers import (
     BTN_SMALL,
     FONT_BODY,
@@ -27,7 +28,7 @@ from .ui_helpers import (
     THEME_COLORS,
     TK_COLORS,
 )
-from .ui_widgets import bind_label_press_effect, create_dialog_header
+from .ui_widgets import bind_label_press_effect
 from .window_position import restore_window_position
 
 

@@ -2,6 +2,7 @@ import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import ttk
 
+from .ui_collapsible import CollapsibleSection
 from .ui_components import create_scrollable_frame
 from .ui_helpers import (
     FONT_BODY,
@@ -16,7 +17,6 @@ from .ui_helpers import (
     THEME_COLORS,
     TK_COLORS,
 )
-from .ui_widgets import CollapsibleSection
 
 # Pixel margins from canvas-outer width to text-wrap width. Built up by adding
 # the chrome layered between the canvas edge and each nesting level:

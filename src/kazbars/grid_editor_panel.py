@@ -20,6 +20,13 @@ from .grid_model import (
     MAX_TOTAL_SLOTS,
     get_game_resolution_or_default,
 )
+from .ui_collapsible import CollapsibleSection
+from .ui_forms import (
+    draw_grid_cells,
+    labeled_combobox,
+    labeled_spinbox,
+    position_entry,
+)
 from .ui_helpers import (
     BTN_MEDIUM,
     FONT_BODY_LG,
@@ -39,16 +46,11 @@ from .ui_helpers import (
     TK_COLORS,
 )
 from .ui_widgets import (
-    CollapsibleSection,
     add_tooltip,
     app_toast,
     bind_card_events,
     bind_label_hover_colors,
     bind_label_press_effect,
-    draw_grid_cells,
-    labeled_combobox,
-    labeled_spinbox,
-    position_entry,
 )
 
 

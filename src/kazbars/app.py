@@ -37,6 +37,7 @@ from kazbars.ui_components import (
     ToastManager,
     disable_mousewheel_on_inputs,
 )
+from kazbars.ui_headers import create_app_header, update_app_header_color
 from kazbars.ui_helpers import (
     BTN_LARGE,
     FONT_SMALL,
@@ -53,8 +54,6 @@ from kazbars.ui_widgets import (
     add_tooltip,
     bind_button_press_effect,
     blend_alpha,
-    create_app_header,
-    update_app_header_color,
 )
 from kazbars.window_position import bind_window_position_save, restore_window_position
 

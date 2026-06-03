@@ -27,6 +27,7 @@ from .grid_model import (
 )
 from .settings_manager import get_setting, set_setting
 from .ui_components import DragReorderManager, create_scrollable_frame
+from .ui_forms import draw_grid_cells
 from .ui_helpers import (
     BTN_MEDIUM,
     FONT_BODY,
@@ -54,7 +55,6 @@ from .ui_widgets import (
     add_tooltip,
     bind_label_hover_colors,
     bind_label_press_effect,
-    draw_grid_cells,
 )
 
 

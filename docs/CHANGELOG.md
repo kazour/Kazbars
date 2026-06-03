@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 - **Deeps "Alarm & Tints" is simpler to set.** The DPS-out alarm is now a slider over a 1000–4000/s band (instead of a typed value), and the four ΔHP-in survival-tint thresholds collapse into two presets — **Standard** (DPS / healers) and **Tank** (a wider symmetric band) — with a caption that restates the breakpoints. The default survival tints changed to match the **Standard** preset; the alarm default stays 2500/s. Your saved alarm value is kept and clamped into the slider's band.
+- **Internal** (no user-facing change) — `ui_widgets.py` split into focused modules: `ui_headers.py` (dialog/app headers), `ui_forms.py` (form fields + shared settings-panel builders), and `ui_collapsible.py` (`CollapsibleSection`), leaving `ui_widgets` as the leaf core (tooltips, toasts, event bindings).
 
 ## [2.1.0] — 2026-05-29
 
