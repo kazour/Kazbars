@@ -24,6 +24,10 @@ KazBars.zip
 PATCH_PLAN.md
 audit_report.html
 
+# graphify knowledge-graph output (regenerable artifact; rebuild via /graphify --update)
+graphify-out/
+kazbars_graph_audit.html
+
 # Damage Numbers scratch reference (stock SWF + decompiled AS2) — the shipped
 # bundle lives under src/kazbars/assets/damageinfo/; this root dir is dev-only scratch
 /Damageinfo/

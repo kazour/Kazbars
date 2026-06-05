@@ -15,6 +15,7 @@ from ttkbootstrap.dialogs import Messagebox
 
 from .grid_model import MAX_TOTAL_SLOTS, create_default_grid
 from .settings_manager import get_setting, set_setting
+from .ui_headers import create_dialog_header
 from .ui_helpers import (
     _RETRO_COLORS,
     BTN_DIALOG,
@@ -43,12 +44,7 @@ from .ui_helpers import (
     TK_COLORS,
 )
 from .ui_tk_style import style_tk_listbox
-from .ui_widgets import (
-    app_toast,
-    blend_alpha,
-    create_dialog_header,
-    debounced_callback,
-)
+from .ui_widgets import app_toast, blend_alpha, debounced_callback
 from .window_position import bind_window_position_save, restore_window_position
 
 ADD_GRID_WIZARD_SIZE = (460, 600)

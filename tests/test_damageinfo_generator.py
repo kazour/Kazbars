@@ -53,7 +53,7 @@ def test_every_bake_pattern_matches_shipped_source(key):
 # offset 0 == stock: GAME_DEFAULTS for offset keys, these baselines for the absolute
 # keys (no GAME_DEFAULTS entry). This pins the load-bearing offset-bake invariant — the
 # bake-then-read tests below can't catch a source constant drifting off its game default.
-_ABSOLUTE_SHIPPED = {'shadow_mode': 2, 'shrink_start': 0, 'min_scale': 0}
+_ABSOLUTE_SHIPPED = {'shadow_mode': 2, 'ranged_keep': 0}
 
 
 @pytest.mark.parametrize("key", list(dis.GLOBAL_SETTINGS))
@@ -78,6 +78,16 @@ def test_shipped_shadow_blur_both_axes_are_game_default():
     assert (m.group(2), m.group(3)) == (expected, expected)
 
 
+def test_content_scale_applies_per_content_factor():
+    # The pop-in/fade animation must multiply the shared scale by each content's own
+    # factor, or DEFAULT_TEXT_SCALE (the "Size" slider) silently flattens out and does
+    # nothing. Source-level guard for the AS2 fix.
+    abstract = (SRC_PKG / "numbersTypes" / "DamageTextAbstract.as").read_text(encoding='utf-8')
+    assert "this._contentScale * this._contents[_loc2_].scale" in abstract
+    content = (SRC_PKG / "DamageTextContent.as").read_text(encoding='utf-8')
+    assert re.search(r'function (get|set) scale', content), "DamageTextContent needs a scale accessor"
+
+
 # --------------------------------------------------------------------------- #
 # Bake correctness (no MTASC)
 # --------------------------------------------------------------------------- #
@@ -96,23 +106,21 @@ def _value(out, key):
 
 def test_defaults_bake_to_game_defaults(tmp_path):
     out = _bake(tmp_path, dis.get_default_settings())
-    assert _value(out, 'distance_falloff') == '60'
-    assert _value(out, 'shrink_start') == '0'
-    assert _value(out, 'min_scale') == '0'
+    assert _value(out, 'ranged_keep') == '0'   # all behavior toggles ship off; source ships 0 = stock
     assert _value(out, 'shadow_mode') == '2'
-    assert _value(out, 'dir1_x_offset') == '50'
+    assert _value(out, 'dir1_x_offset') == '-50'
     assert _value(out, 'show_duration') == '0.2'
-    assert _value(out, 'title_scale') == '0.7'
+    assert _value(out, 'essential_labels_only') == '0'   # off = show all labels (stock)
 
 
 def test_offset_bakes_to_final_value(tmp_path):
     s = dis.get_default_settings()
-    s['distance_falloff'] = 10   # 60 + 10
-    s['shrink_start'] = 15       # absolute
-    s['dir1_y_offset'] = -50
+    s['ranged_keep'] = 1         # absolute bool, overriding the default 0 (the stored value IS the baked constant)
+    s['shadow_distance'] = 2     # offset key: 4 + 2 = 6
+    s['dir1_y_offset'] = -50     # offset key over base 0
     out = _bake(tmp_path, s)
-    assert _value(out, 'distance_falloff') == '70'
-    assert _value(out, 'shrink_start') == '15'
+    assert _value(out, 'ranged_keep') == '1'
+    assert _value(out, 'shadow_distance') == '6'
     assert _value(out, 'dir1_y_offset') == '-50'
 
 
@@ -126,14 +134,19 @@ def test_float_offset_formats_cleanly(tmp_path):
 def test_enum_and_bool_bake(tmp_path):
     s = dis.get_default_settings()
     s['shadow_mode'] = 0
-    s['easing_type'] = 2
     s['fixed_col_split'] = 1
-    s['show_titles'] = 1
+    s['essential_labels_only'] = 1
     out = _bake(tmp_path, s)
     assert _value(out, 'shadow_mode') == '0'
-    assert _value(out, 'easing_type') == '2'
     assert _value(out, 'fixed_col_split') == '1'
-    assert _value(out, 'show_titles') == '1'
+    assert _value(out, 'essential_labels_only') == '1'
+
+
+def test_easing_type_ships_quad():
+    # Easing is fixed to Quad — no setting, no bake. Guard the AS2 constant so it
+    # can't silently drift to Cubic/Quart (which there'd be no UI to undo).
+    content = (SRC_PKG / "numbersManagers" / "AbstractManager.as").read_text(encoding='utf-8')
+    assert re.search(r'static var EASING_TYPE\s*=\s*0\b', content)
 
 
 def test_shadow_blur_dual_axis(tmp_path):
@@ -153,7 +166,7 @@ def test_generate_fails_loudly_on_drifted_source(tmp_path):
     shutil.copytree(SRC_PKG, drifted)
     dnm = drifted / "DamageNumberManager.as"
     dnm.write_text(
-        dnm.read_text(encoding='utf-8').replace("SHRINK_START", "SHRINK_BEGIN"),
+        dnm.read_text(encoding='utf-8').replace("RANGED_KEEP", "RANGED_HOLD"),
         encoding='utf-8',
     )
     out = tmp_path / "__Packages"
@@ -161,10 +174,10 @@ def test_generate_fails_loudly_on_drifted_source(tmp_path):
 
 
 def test_bake_leaves_untouched_constants_alone(tmp_path):
-    # A bake of only distance_falloff must not perturb other constants in the same file.
+    # Baking essential_labels_only must not perturb the other constants in the same file.
     s = dis.get_default_settings()
-    s['distance_falloff'] = 20
+    s['essential_labels_only'] = 1
     out = _bake(tmp_path, s)
-    assert _value(out, 'shrink_start') == '0'
-    assert _value(out, 'min_scale') == '0'
-    assert _value(out, 'show_titles') == '0'
+    assert _value(out, 'essential_labels_only') == '1'
+    assert _value(out, 'ranged_keep') == '0'                   # default (off), untouched
+    assert _value(out, 'other_resource_loss_to_target') == '0'

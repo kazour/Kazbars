@@ -3,6 +3,10 @@ class DamageTextContent
    var _content;
    var _label;
    var _type;
+   // Per-content size factor — set from DEFAULT_TEXT_SCALE (the "Size" slider), shared by
+   // number and label. Multiplied on top of the shared animated contentScale so it
+   // survives the pop-in/fade.
+   var _scale = 1;
    static var TYPE_TITLE = "title";
    static var TYPE_TEXT = "text";
    function DamageTextContent(type, content)
@@ -14,6 +18,14 @@ class DamageTextContent
    function get type()
    {
       return this._type;
+   }
+   function get scale()
+   {
+      return this._scale;
+   }
+   function set scale(value)
+   {
+      this._scale = value;
    }
    function get label()
    {

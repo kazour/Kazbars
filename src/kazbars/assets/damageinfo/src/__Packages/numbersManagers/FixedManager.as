@@ -3,6 +3,7 @@ class numbersManagers.FixedManager extends numbersManagers.AbstractManager
    var _elements;
    var _numElements;
    static var TEXT_Y_BASE = 100;
+   static var TEXT_X_BASE = 0;     // Horizontal centre offset (mirrors TEXT_Y_BASE; 0 = at the hit)
    static var TEXT_X_OFFSET = 200;
    static var TEXT_Y_OFFSET = 60;
    static var MAX_STATIC_NUMBERS = 10;
@@ -77,6 +78,7 @@ class numbersManagers.FixedManager extends numbersManagers.AbstractManager
    {
       var _loc1_ = element.currentPosition;
       _loc1_.y = _loc1_.y - numbersManagers.FixedManager.TEXT_Y_OFFSET * (index - 4) * element.scale / 100 + numbersManagers.FixedManager.TEXT_Y_BASE;
+      _loc1_.x = _loc1_.x + numbersManagers.FixedManager.TEXT_X_BASE;
       if(index % 2 == 0)
       {
          _loc1_.x -= numbersManagers.FixedManager.TEXT_X_OFFSET;

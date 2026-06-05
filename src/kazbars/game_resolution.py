@@ -11,6 +11,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from .grid_model import get_game_resolution_or_default, parse_resolution
+from .ui_headers import create_dialog_header
 from .ui_helpers import (
     BTN_SMALL,
     FONT_BODY,
@@ -23,7 +24,7 @@ from .ui_helpers import (
     PAD_XS,
     THEME_COLORS,
 )
-from .ui_widgets import app_toast, create_dialog_header
+from .ui_widgets import app_toast
 from .window_position import restore_window_position
 
 COMMON_RESOLUTIONS = ["1920x1080", "2560x1440", "3840x2160"]

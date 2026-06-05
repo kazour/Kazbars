@@ -14,6 +14,7 @@ from tkinter import filedialog, ttk
 from ttkbootstrap.dialogs import Messagebox, Querybox
 
 from .buff_database import TYPE_FILTER_MAP
+from .ui_headers import create_dialog_header
 from .ui_helpers import (
     BTN_DIALOG,
     BTN_MEDIUM,
@@ -33,7 +34,7 @@ from .ui_helpers import (
     style_treeview_heading,
 )
 from .ui_tk_style import style_tk_text
-from .ui_widgets import add_tooltip, app_toast, create_dialog_header, debounced_callback
+from .ui_widgets import add_tooltip, app_toast, debounced_callback
 from .window_position import bind_window_position_save, restore_window_position
 
 logger = logging.getLogger(__name__)

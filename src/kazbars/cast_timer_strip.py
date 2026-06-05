@@ -25,6 +25,8 @@ from .cast_timer import (
     validate_config,
 )
 from .grid_model import SCREEN_MAX_X, SCREEN_MAX_Y
+from .ui_collapsible import CollapsibleSection
+from .ui_forms import ColorSwatch, labeled_spinbox, position_entry
 from .ui_helpers import (
     CAST_TIMER_ACCENT,
     FONT_BODY_LG,
@@ -42,13 +44,7 @@ from .ui_helpers import (
     THEME_COLORS,
     TK_COLORS,
 )
-from .ui_widgets import (
-    CollapsibleSection,
-    ColorSwatch,
-    add_tooltip,
-    labeled_spinbox,
-    position_entry,
-)
+from .ui_widgets import add_tooltip
 
 logger = logging.getLogger(__name__)
 

@@ -10,8 +10,15 @@ class numbersTypes.DamageTextAbstract
    var _ttl;
    static var TYPE_HOSTILE = 1;
    static var TYPE_FRIENDLY = 0;
-   var DEFAULT_TITLE_SCALE = 0.7;
-   var DEFAULT_TEXT_SCALE = 0.5;
+   // One size factor for both number and label, applied via the contentScale setter so
+   // it survives the pop-in/fade. Ships at 1 (== game default) so a 0 offset leaves them
+   // at their current on-screen size; the panel "Size" slider bakes an offset on top.
+   var DEFAULT_TEXT_SCALE = 1;
+
+   // Vertical gap (px) between a number and its shown label, added on top of half of
+   // each one's height. 0 = the label tucks right against the number.
+   static var TITLE_GAP = 0;
+
    var _contentScale = 100;
 
    // Shared DropShadowFilter — distance (arg 1) and blur (args 5,6) are bake targets.
@@ -52,7 +59,7 @@ class numbersTypes.DamageTextAbstract
       this._scale = scale;
       this._ttl = this._font.m_WaitOnScreen * 60;
       this._container._x = xPos;
-      this._addContent(this._generateContent(DamageTextContent.TYPE_TITLE, title, this.DEFAULT_TITLE_SCALE));
+      this._addContent(this._generateContent(DamageTextContent.TYPE_TITLE, title, this.DEFAULT_TEXT_SCALE));
       this._addContent(this._generateContent(DamageTextContent.TYPE_TEXT, text, this.DEFAULT_TEXT_SCALE));
 
       // Real shadow is a per-clip filter; Fast shadow is a twin built in _generateContent; None adds nothing.
@@ -103,7 +110,10 @@ class numbersTypes.DamageTextAbstract
       var _loc2_ = 0;
       while(_loc2_ < this._numContents)
       {
-         this._contents[_loc2_]._xscale = this._contents[_loc2_]._yscale = this._contentScale;
+         // Keep each content's own size factor on top of the shared animated scale —
+         // without it the pop-in flattens it out and DEFAULT_TEXT_SCALE (the "Size"
+         // slider) does nothing.
+         this._contents[_loc2_]._xscale = this._contents[_loc2_]._yscale = this._contentScale * this._contents[_loc2_].scale;
          _loc2_ = _loc2_ + 1;
       }
    }
