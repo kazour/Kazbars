@@ -20,6 +20,7 @@ from pathlib import Path
 from tkinter import ttk
 
 from . import damageinfo_settings as dis
+from .damageinfo_colors_panel import open_damage_number_colors_panel
 from .ui_components import create_scrollable_frame
 from .ui_forms import create_card, create_slider_row
 from .ui_headers import create_dialog_header, create_tip_bar
@@ -103,6 +104,7 @@ class DamageNumbersPanel(tk.Toplevel):
         body.pack(fill="both", expand=True)
 
         self._build_presets(body)
+        self._build_colors_button(body)
         for title, keys in _CARDS:
             card = create_card(body, title)
             card.pack(fill="x", pady=(0, PAD_ROW))
@@ -132,6 +134,19 @@ class DamageNumbersPanel(tk.Toplevel):
             )
             btn.pack(side="left", padx=(0, PAD_XS))
             self._all_controls.append(btn)
+
+    def _build_colors_button(self, parent: tk.Misc) -> None:
+        """Launch button for the per-source color editor (greys with the master enable)."""
+        row = ttk.Frame(parent)
+        row.pack(fill="x", pady=(0, PAD_ROW))
+        btn = ttk.Button(
+            row, text="Damage number colors…", bootstyle="secondary",
+            command=lambda: open_damage_number_colors_panel(self.master),
+        )
+        btn.pack(side="left")
+        add_tooltip(btn, "Set the color of each combat-number source "
+                         "(applies on Build & Install, like the rest of this panel).")
+        self._all_controls.append(btn)
 
     def _build_control(self, card: ttk.LabelFrame, key: str) -> None:
         if key == 'spread_spacing':  # composite radio driving two baked offsets

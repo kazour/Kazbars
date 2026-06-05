@@ -18,6 +18,7 @@ built and installed at all). Pure data; no Tk. Mirrors ``deeps_settings.py``.
 
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -262,9 +263,112 @@ _FLOAT_KEYS = frozenset(
 )
 
 
+# ============================================================
+# PER-SOURCE COLORS (TextColors.xml)
+# ============================================================
+# Catalog of AoC's flytext sources for the color editor, grouped for the 2-column
+# (self | other) panel. Names MUST match the htmlFontParser("...") calls in
+# assets/damageinfo/src/__Packages/helpers/NumbersFontsCollection.as — guarded by
+# test_damageinfo_settings. Colors live in TextColors.xml and apply at Build & Install
+# (build_executor._apply_textcolors) — they are NOT baked into the SWF.
+
+# (group title, self [(name, label)], other [(name, label)]) — paired source groups.
+PAIRED_GROUPS: tuple[tuple[str, tuple[tuple[str, str], ...], tuple[tuple[str, str], ...]], ...] = (
+    ('Attacks', (
+        ('self_attacked', 'Hit'),
+        ('self_attacked_unshielded', 'Unshielded'),
+        ('self_attacked_critical', 'Critical'),
+        ('self_attacked_environment', 'Environment'),
+        ('self_dodged', 'Dodge / miss'),
+    ), (
+        ('other_attacked', 'Hit'),
+        ('other_attacked_unshielded', 'Unshielded'),
+        ('other_attacked_critical', 'Critical'),
+        ('other_attacked_environment', 'Environment'),
+        ('other_dodged', 'Dodge / miss'),
+    )),
+    ('Spells', (
+        ('self_attacked_spell', 'Spell'),
+        ('self_attacked_spell_critical', 'Spell crit'),
+    ), (
+        ('other_attacked_spell', 'Spell'),
+        ('other_attacked_spell_critical', 'Spell crit'),
+    )),
+    ('Combos', (
+        ('self_attacked_combo', 'Combo'),
+        ('self_attacked_combo_critical', 'Combo crit'),
+        ('self_combo_name', 'Combo name'),
+    ), (
+        ('other_attacked_combo', 'Combo'),
+        ('other_attacked_combo_critical', 'Combo crit'),
+        ('other_combo_name', 'Combo name'),
+    )),
+    ('Heals', (
+        ('self_healed', 'Heal'),
+        ('self_healed_critical', 'Heal crit'),
+    ), (
+        ('other_healed', 'Heal'),
+        ('other_healed_critical', 'Heal crit'),
+    )),
+)
+
+# Sources the game stores as single entries (no self/other split) → full-width card.
+SHARED_SOURCES: tuple[tuple[str, str], ...] = (
+    ('stamina_gained', 'Stamina gain'),
+    ('stamina_lost', 'Stamina loss'),
+    ('stamina_gained_critical', 'Stamina gain crit'),
+    ('stamina_loss_critical', 'Stamina loss crit'),
+    ('mana_gained', 'Mana gain'),
+    ('mana_lost', 'Mana loss'),
+    ('mana_gained_critical', 'Mana gain crit'),
+    ('mana_loss_critical', 'Mana loss crit'),
+    ('xp_gained', 'XP gain'),
+    ('murder_points_gained', 'Murder points'),
+    ('murder_points_gained_murderer', 'Murder points (murderer)'),
+)
+
+
+def _all_source_names() -> frozenset[str]:
+    names: set[str] = set()
+    for _title, self_rows, other_rows in PAIRED_GROUPS:
+        names.update(n for n, _ in self_rows)
+        names.update(n for n, _ in other_rows)
+    names.update(n for n, _ in SHARED_SOURCES)
+    return frozenset(names)
+
+
+ALL_SOURCE_NAMES: frozenset[str] = _all_source_names()
+
+_HEX6_RE = re.compile(r'^[0-9A-Fa-f]{6}$')
+
+
+def normalize_color(value: Any) -> str | None:
+    """Bare upper-case ``RRGGBB`` for a ``0x``/``#``/bare hex string, or None if invalid."""
+    if not isinstance(value, str):
+        return None
+    v = value.strip().lstrip('#')
+    if v[:2].lower() == '0x':
+        v = v[2:]
+    return v.upper() if _HEX6_RE.match(v) else None
+
+
+def validate_source_colors(value: Any) -> dict[str, str]:
+    """Keep only known source names mapped to a valid 6-hex color (bare upper-case)."""
+    if not isinstance(value, dict):
+        return {}
+    out: dict[str, str] = {}
+    for name, color in value.items():
+        if name in ALL_SOURCE_NAMES:
+            norm = normalize_color(color)
+            if norm is not None:
+                out[name] = norm
+    return out
+
+
 def _build_defaults() -> dict[str, Any]:
     d: dict[str, Any] = {k: m['default'] for k, m in GLOBAL_SETTINGS.items()}
-    d['enabled'] = False  # master gate — not baked
+    d['enabled'] = False        # master gate — not baked
+    d['source_colors'] = {}     # per-source flytext colors → TextColors.xml (not baked)
     return d
 
 
@@ -276,7 +380,9 @@ DAMAGEINFO_DEFAULTS: dict[str, Any] = _build_defaults()
 # ============================================================
 def get_default_settings() -> dict[str, Any]:
     """Return a fresh copy of the default Damage Numbers settings."""
-    return dict(DAMAGEINFO_DEFAULTS)
+    d = dict(DAMAGEINFO_DEFAULTS)
+    d['source_colors'] = {}  # own dict per copy — never share the module-level default
+    return d
 
 
 def is_float_key(key: str) -> bool:
@@ -302,6 +408,8 @@ def validate_setting(key: str, value: Any) -> Any:
     """
     if key == 'enabled':
         return bool(value)
+    if key == 'source_colors':
+        return validate_source_colors(value)
     meta = GLOBAL_SETTINGS.get(key)
     if meta is None:
         return value

@@ -4,10 +4,12 @@ Pure-data layer (no Tk, no MTASC). Mirrors test_deeps_settings.
 """
 
 import json
+import re
 
 import pytest
 
 from kazbars import damageinfo_settings as dis
+from kazbars.paths import ASSETS
 
 
 # --------------------------------------------------------------------------- #
@@ -18,7 +20,16 @@ def test_defaults_has_every_global_key_plus_enabled():
     for key in dis.GLOBAL_SETTINGS:
         assert key in d
     assert d['enabled'] is False
-    assert len(d) == len(dis.GLOBAL_SETTINGS) + 1
+    assert d['source_colors'] == {}
+    # +2 non-baked keys outside GLOBAL_SETTINGS: the master 'enabled' gate + 'source_colors'.
+    assert len(d) == len(dis.GLOBAL_SETTINGS) + 2
+
+
+def test_get_default_settings_source_colors_not_shared():
+    # Each call must hand back its own source_colors dict (never the module-level default).
+    a = dis.get_default_settings()
+    a['source_colors']['self_attacked'] = 'FF0000'
+    assert dis.get_default_settings()['source_colors'] == {}
 
 
 def test_default_offsets_match_schema():
@@ -306,3 +317,62 @@ def test_save_validates_out_of_range(tmp_path):
     dis.save_settings(tmp_path, s)
     on_disk = json.loads((tmp_path / dis.SETTINGS_FILENAME).read_text(encoding='utf-8'))
     assert on_disk['dir1_x_offset'] == 200  # clamped before write
+
+
+# --------------------------------------------------------------------------- #
+# per-source colors (TextColors.xml) — catalog + validation
+# --------------------------------------------------------------------------- #
+def test_source_catalog_matches_engine():
+    # The color catalog must list exactly the flytext types the SWF parses, or a swatch
+    # would target a non-existent TextColors entry (or a real type would be uneditable).
+    src = (ASSETS / 'damageinfo' / 'src' / '__Packages' / 'helpers'
+           / 'NumbersFontsCollection.as').read_text(encoding='utf-8')
+    engine = set(re.findall(r'htmlFontParser\("([^"]+)"\)', src))
+    assert engine == set(dis.ALL_SOURCE_NAMES)
+
+
+def test_source_catalog_no_duplicates():
+    names = []
+    for _title, self_rows, other_rows in dis.PAIRED_GROUPS:
+        names += [n for n, _ in self_rows] + [n for n, _ in other_rows]
+    names += [n for n, _ in dis.SHARED_SOURCES]
+    assert len(names) == len(set(names)) == len(dis.ALL_SOURCE_NAMES)
+
+
+def test_normalize_color():
+    assert dis.normalize_color('#ABCDEF') == 'ABCDEF'
+    assert dis.normalize_color('0xabcdef') == 'ABCDEF'
+    assert dis.normalize_color('abcdef') == 'ABCDEF'
+    assert dis.normalize_color('12345') is None    # too short
+    assert dis.normalize_color('GGGGGG') is None   # non-hex
+    assert dis.normalize_color(123) is None         # non-str
+
+
+def test_validate_source_colors_filters_and_normalizes():
+    out = dis.validate_source_colors({
+        'self_attacked': '#ffcc00',   # hash → bare upper
+        'other_healed': '0x00FF00',   # 0x → bare upper
+        'mana_lost': 'aabbcc',        # bare → upper
+        'not_a_source': 'FFFFFF',     # unknown name dropped
+        'self_dodged': 'xyz',         # invalid hex dropped
+        'xp_gained': 123,             # non-str dropped
+    })
+    assert out == {'self_attacked': 'FFCC00', 'other_healed': '00FF00', 'mana_lost': 'AABBCC'}
+
+
+def test_validate_source_colors_non_dict():
+    assert dis.validate_source_colors(None) == {}
+    assert dis.validate_source_colors('nope') == {}
+
+
+def test_source_colors_validated_in_all_settings():
+    out = dis.validate_all_settings({'source_colors': {'self_attacked': '#ff0000', 'bogus': '00ff00'}})
+    assert out['source_colors'] == {'self_attacked': 'FF0000'}
+
+
+def test_source_colors_round_trip(tmp_path):
+    s = dis.get_default_settings()
+    s['source_colors'] = {'self_attacked': 'FF0000', 'other_healed': '00FF00'}
+    assert dis.save_settings(tmp_path, s)
+    loaded = dis.load_settings(tmp_path)
+    assert loaded['source_colors'] == {'self_attacked': 'FF0000', 'other_healed': '00FF00'}

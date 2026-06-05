@@ -108,7 +108,7 @@ def compile_to_staging(grids, database, assets_path, compiler, app_version,
 
 
 def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None,
-                      damageinfo_pristine=None, group_resources=False):
+                      damageinfo_pristine=None, group_resources=False, source_colors=None):
     """Install compiled SWF + scripts to the game folder.
 
     ``damageinfo_swf`` (a staged modded DamageInfo.swf, or None) drives the Damage
@@ -117,9 +117,9 @@ def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None,
     is the bundled genuine stock SWF — used to seed/recognize the backup so it can
     never capture a mod. See ``_apply_damageinfo``.
 
-    ``group_resources`` is the "Group my resource numbers" toggle (already AND-ed with
-    the master enable by the caller): True patches TextColors.xml so your resource
-    losses drop into the fixed column, False restores the stock directions. See
+    ``group_resources`` is the "Group my resource numbers" toggle and ``source_colors`` is
+    the per-source color map (both already gated on the master enable by the caller): they
+    customize the skin's TextColors.xml, regenerated from a one-time stock backup. See
     ``_apply_textcolors``.
 
     Returns (success, error_message).
@@ -146,7 +146,7 @@ def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None,
             )
 
         try:
-            _apply_textcolors(game_path, group_resources)
+            _apply_textcolors(game_path, group_resources, source_colors)
         except OSError:
             return False, (
                 "Couldn't update Damage Numbers (TextColors.xml).\n\n"
@@ -201,26 +201,39 @@ def _apply_damageinfo(flash_path, staged_swf, pristine_swf=None):
         _atomic_install(backup, target)
 
 
-def _apply_textcolors(game_path, group_resources):
-    """Patch (or restore) the resource-loss flytext directions in TextColors.xml.
+def _apply_textcolors(game_path, group_resources, source_colors=None):
+    """Patch (or restore) the skin's TextColors.xml for the Damage Numbers features.
 
-    ``group_resources`` True routes your own mana/stamina losses into the fixed resource
-    column (``direction="-1"``), to sit with your gains; False restores stock
-    (``direction="1"``). Edits the file the game actually reads — your ``Customized/``
-    copy if present, else ``Default/`` — in place, with a one-time courtesy backup. The
-    flip is surgical and reversible, so restore simply rewrites the four directions back.
-    A no-op when the file is missing or already in the wanted state. Raises OSError on a
+    Two things customize TextColors.xml and must compose: the "Group my resource numbers"
+    toggle (``group_resources`` → resource-loss flytext directions) and the per-source
+    color editor (``source_colors`` → a ``{name: "RRGGBB"}`` map). Colors have no
+    deterministic inverse, so instead of editing in place we keep a one-time genuine-stock
+    backup (``TextColors.xml.kazbars.bak``) and **regenerate** the live file from it each
+    build: stock → direction flip (if toggle) → color overrides. Nothing active ⇒ restore
+    from the backup (kept across a disable, dropped on uninstall). Edits the file the game
+    reads (Customized/ if present, else Default/) atomically. Raises OSError on a
     locked/failed write (the caller turns that into a "close the game" message).
     """
+    source_colors = source_colors or {}
     _default, _customized, source = buff_xml._resolve_paths(game_path, TEXTCOLORS_RELPATH)
     if source is None:
         return
-    text = source.read_text(encoding="utf-8")
-    new_text, _flips = buff_xml.set_resource_loss_to_column(text, group_resources)
-    if new_text == text:
-        return  # already in the desired state (idempotent)
-    buff_xml._backup_once(source)
-    _atomic_write_text(source, new_text)
+    backup = source.with_name(source.name + buff_xml.BACKUP_SUFFIX)
+    current = source.read_text(encoding="utf-8")
+
+    if group_resources or source_colors:
+        buff_xml._backup_once(source)  # seed genuine stock once (first edit)
+        base = backup.read_text(encoding="utf-8") if backup.exists() else current
+        if group_resources:
+            base, _ = buff_xml.set_resource_loss_to_column(base, True)
+        for name, color in source_colors.items():
+            base, _ = buff_xml.set_source_color(base, name, color)
+        if base != current:
+            _atomic_write_text(source, base)
+    elif backup.exists():
+        stock = backup.read_text(encoding="utf-8")
+        if stock != current:
+            _atomic_write_text(source, stock)
 
 
 def cleanup_legacy_files(game_path):
@@ -271,19 +284,15 @@ def uninstall_from_client(game_path, damageinfo_pristine=None):
             _atomic_install(damageinfo_pristine, di_target)
             removed.append("DamageInfo.swf (restored stock from bundled copy)")
 
-        # Damage Numbers: restore the resource-loss flytext directions in TextColors.xml
-        # to stock and drop our one-time courtesy backup (no-op if never patched).
+        # Damage Numbers: restore TextColors.xml from our one-time stock backup (covers
+        # both the resource-direction toggle and the per-source colors) and drop the backup.
         _d, _c, tc_source = buff_xml._resolve_paths(game_path, TEXTCOLORS_RELPATH)
         if tc_source is not None:
-            try:
-                tc_text = tc_source.read_text(encoding="utf-8")
-                tc_stock, _flips = buff_xml.set_resource_loss_to_column(tc_text, False)
-                if tc_stock != tc_text:
-                    _atomic_write_text(tc_source, tc_stock)
-                    removed.append("TextColors.xml (restored stock)")
-            except OSError as e:
-                logger.warning("Could not restore TextColors.xml: %s", e)
-            tc_source.with_name(tc_source.name + buff_xml.BACKUP_SUFFIX).unlink(missing_ok=True)
+            tc_backup = tc_source.with_name(tc_source.name + buff_xml.BACKUP_SUFFIX)
+            if tc_backup.exists():
+                _atomic_install(tc_backup, tc_source)
+                tc_backup.unlink(missing_ok=True)
+                removed.append("TextColors.xml (restored stock)")
 
         aoc_dir = Path(game_path) / "Data" / "Gui" / "Aoc" / "KazBars"
         if aoc_dir.exists():

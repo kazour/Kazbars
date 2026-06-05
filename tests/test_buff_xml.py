@@ -19,7 +19,9 @@ from kazbars.buff_xml import (
     _normalise_filter,
     _read_bufflistview,
     _write_bufflistview,
+    read_source_color,
     set_resource_loss_to_column,
+    set_source_color,
 )
 
 SAMPLE = '''\
@@ -153,9 +155,9 @@ def test_filter_canonical_form_written():
 TEXTCOLORS = '''\
 <?xml version="1.0" encoding="UTF-8"?>
 <TextColors>
-    <text name="self_attacked"          color="0xff0000" direction="1" />
-    <text name="stamina_gained"         direction="-1"   color="0x00ff00" />
-    <text name="mana_gained"            color="0x0000ff" direction="-1" />
+    <text name="self_attacked"          color="0xFF0000" direction="1" />
+    <text name="stamina_gained"         direction="-1"   color="0x00FF00" />
+    <text name="mana_gained"            color="0x0000FF" direction="-1" />
     <text name="stamina_lost"           direction="1"    color="0x888800" />
     <text name="mana_lost"              color="0x000088" direction="1" />
     <text name="stamina_loss_critical"  direction = "1" />
@@ -211,5 +213,45 @@ def test_resource_loss_preserves_surrounding_bytes():
     assert '<?xml version="1.0" encoding="UTF-8"?>' in new
     assert 'color="0x888800"' in new       # stamina_lost's other attrs intact
     assert 'color="0x440000"' in new       # multi-line element's body intact
+
+
+# =========================================================================== #
+# TextColors.xml — per-source flytext color                                   #
+# =========================================================================== #
+def test_read_source_color():
+    assert read_source_color(TEXTCOLORS, 'self_attacked') == 'FF0000'
+    assert read_source_color(TEXTCOLORS, 'mana_gained') == '0000FF'
+    assert read_source_color(TEXTCOLORS, 'stamina_loss_critical') is None  # element has no color attr
+    assert read_source_color(TEXTCOLORS, 'nonexistent') is None
+
+
+def test_set_source_color_writes_0x_form():
+    new, changed = set_source_color(TEXTCOLORS, 'self_attacked', 'ABCDEF')
+    assert changed is True
+    assert 'color="0xABCDEF"' in new
+    assert read_source_color(new, 'self_attacked') == 'ABCDEF'
+    assert read_source_color(new, 'mana_gained') == '0000FF'  # other sources untouched
+
+
+def test_set_source_color_accepts_hash_and_0x_and_uppercases():
+    n1, _ = set_source_color(TEXTCOLORS, 'self_attacked', '#abcdef')
+    n2, _ = set_source_color(TEXTCOLORS, 'self_attacked', '0xabcdef')
+    assert read_source_color(n1, 'self_attacked') == 'ABCDEF'
+    assert read_source_color(n2, 'self_attacked') == 'ABCDEF'
+
+
+def test_set_source_color_idempotent_and_missing():
+    same, changed = set_source_color(TEXTCOLORS, 'self_attacked', 'FF0000')  # already that
+    assert changed is False and same == TEXTCOLORS
+    nocolor, c2 = set_source_color(TEXTCOLORS, 'stamina_loss_critical', '123456')  # no color attr
+    assert c2 is False and nocolor == TEXTCOLORS
+    miss, c3 = set_source_color(TEXTCOLORS, 'nope', '123456')  # missing element
+    assert c3 is False and miss == TEXTCOLORS
+
+
+def test_set_source_color_preserves_direction():
+    new, _ = set_source_color(TEXTCOLORS, 'stamina_lost', '00FF00')
+    assert read_source_color(new, 'stamina_lost') == '00FF00'
+    assert _direction_of(new, 'stamina_lost') == '1'  # direction attr untouched
 
 

@@ -156,17 +156,18 @@ def build(app):
         loading.advance_step("Installing...")
         app.update()
 
-        # "Group my resource numbers" toggle: only meaningful when the mod is on (the
-        # SWF carries the matching enemy-drain override). When off, install restores the
-        # stock TextColors.xml directions.
+        # TextColors.xml customizations, gated by the master enable so disabling reverts
+        # them: the "Group my resource numbers" toggle (resource-loss directions) and the
+        # per-source color editor. When off, install regenerates stock from the backup.
         group_resources = di_enabled and bool(di_settings.get('other_resource_loss_to_target'))
+        source_colors = di_settings.get('source_colors', {}) if di_enabled else {}
 
         staging_swf = staging_dir / "KazBars.swf"
         ok, err = install_to_client(
             staging_swf, app.game_path, app.use_aoc_bypass,
             damageinfo_swf=damageinfo_swf,
             damageinfo_pristine=Path(app.assets_path) / "damageinfo" / "DamageInfo.swf",
-            group_resources=group_resources)
+            group_resources=group_resources, source_colors=source_colors)
         client_results = [(game_folder.format_game_path(app.game_path), ok, err)]
 
         aoc_running = app.use_aoc_bypass and is_aoc_running()

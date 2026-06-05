@@ -252,3 +252,45 @@ def set_resource_loss_to_column(xml_text, to_column):
             xml_text = xml_text[:m.start()] + new_elem + xml_text[m.end():]
             flips += n
     return xml_text, flips
+
+
+# ============================================================================
+# TEXTCOLORS.xml — per-source flytext color (Damage Numbers color editor)
+# ============================================================================
+# Each flytext type also carries a `color="0xRRGGBB"`. The color editor reads these to
+# seed its swatches and writes the user's picks back. Element-scoped like the direction
+# flip (find the element by name, rewrite only its color attr) so every other byte is
+# preserved.
+_COLOR_ATTR_RE = re.compile(r'(\bcolor\s*=\s*["\'])(?:0x|#)?([0-9A-Fa-f]{6})(["\'])')
+
+
+def _elem_re(name):
+    return re.compile(rf'<[^>]*\bname\s*=\s*["\']{re.escape(name)}["\'][^>]*>')
+
+
+def read_source_color(xml_text, name):
+    """Return the bare ``RRGGBB`` (upper-case) of the ``name="<name>"`` flytext element,
+    or None if the element or its color attr is absent. Accepts ``0x``/``#``/bare hex."""
+    m = _elem_re(name).search(xml_text)
+    if not m:
+        return None
+    c = _COLOR_ATTR_RE.search(m.group(0))
+    return c.group(2).upper() if c else None
+
+
+def set_source_color(xml_text, name, hex6):
+    """Rewrite the ``color`` attr of the ``name="<name>"`` flytext element to
+    ``0x<HEX6>`` (AoC's format), preserving all other bytes. ``hex6`` is bare 6-hex
+    (``0x``/``#`` accepted and stripped). Returns ``(new_text, changed)``; ``changed`` is
+    False when the element/color attr is missing or already equal."""
+    clean = hex6.strip().lstrip('#')
+    if clean[:2].lower() == '0x':
+        clean = clean[2:]
+    clean = clean.upper()
+    m = _elem_re(name).search(xml_text)
+    if not m:
+        return xml_text, False
+    new_elem, n = _COLOR_ATTR_RE.subn(rf'\g<1>0x{clean}\g<3>', m.group(0))
+    if not n or new_elem == m.group(0):
+        return xml_text, False
+    return xml_text[:m.start()] + new_elem + xml_text[m.end():], True

@@ -416,6 +416,7 @@ class TestDamageInfo:
 # =========================================================================== #
 _STOCK_TEXTCOLORS = (
     '<TextColors>\n'
+    '  <text name="self_attacked" color="0xFF0000" direction="1" />\n'
     '  <text name="stamina_lost" direction="1" />\n'
     '  <text name="mana_lost" direction="1" />\n'
     '  <text name="stamina_loss_critical" direction="1" />\n'
@@ -440,13 +441,13 @@ def _write_textcolors(game, skin, text=_STOCK_TEXTCOLORS):
 
 class TestTextColors:
     @staticmethod
-    def _install(tmp_path, game, *, group):
+    def _install(tmp_path, game, *, group=False, colors=None):
         swf = tmp_path / "staging" / "KazBars.swf"
         swf.parent.mkdir(parents=True, exist_ok=True)
         swf.write_bytes(b"FWS\x06kz")
         return install_to_client(swf, str(game), use_aoc=False,
                                  damageinfo_swf=None, damageinfo_pristine=None,
-                                 group_resources=group)
+                                 group_resources=group, source_colors=colors or {})
 
     def test_enable_patches_and_backs_up_stock(self, tmp_path):
         game = tmp_path / "game"
@@ -505,6 +506,51 @@ class TestTextColors:
         assert ok is True
         assert "TextColors.xml (restored stock)" in msg
         assert 'name="stamina_lost" direction="1"' in tc.read_text(encoding="utf-8")
+        assert not tc.with_name("TextColors.xml.kazbars.bak").exists()
+
+    # --- per-source colors (compose with the direction toggle) ----------- #
+
+    def test_colors_apply_from_stock_backup(self, tmp_path):
+        game = tmp_path / "game"
+        tc = _write_textcolors(game, "Default")
+        self._install(tmp_path, game, colors={'self_attacked': '00FF00'})
+
+        assert 'name="self_attacked" color="0x00FF00"' in tc.read_text(encoding="utf-8")
+        bak = tc.with_name("TextColors.xml.kazbars.bak")
+        assert 'name="self_attacked" color="0xFF0000"' in bak.read_text(encoding="utf-8")
+
+    def test_colors_and_direction_compose(self, tmp_path):
+        game = tmp_path / "game"
+        tc = _write_textcolors(game, "Default")
+        self._install(tmp_path, game, group=True, colors={'self_attacked': '00FF00'})
+
+        text = tc.read_text(encoding="utf-8")
+        assert 'name="self_attacked" color="0x00FF00"' in text   # color override
+        assert 'name="stamina_lost" direction="-1"' in text      # resource flip composed in
+
+    def test_colors_regenerate_from_stock_not_compounded(self, tmp_path):
+        game = tmp_path / "game"
+        tc = _write_textcolors(game, "Default")
+        self._install(tmp_path, game, colors={'self_attacked': '111111'})
+        self._install(tmp_path, game, colors={'self_attacked': '222222'})  # each build derives from stock
+        assert 'name="self_attacked" color="0x222222"' in tc.read_text(encoding="utf-8")
+
+    def test_disable_restores_colors_from_backup(self, tmp_path):
+        game = tmp_path / "game"
+        tc = _write_textcolors(game, "Default")
+        self._install(tmp_path, game, colors={'self_attacked': '00FF00'})
+        self._install(tmp_path, game)  # nothing active → restore stock
+
+        assert 'name="self_attacked" color="0xFF0000"' in tc.read_text(encoding="utf-8")
+
+    def test_uninstall_restores_colors(self, tmp_path):
+        game = tmp_path / "game"
+        tc = _write_textcolors(game, "Default")
+        self._install(tmp_path, game, colors={'self_attacked': '00FF00'})
+
+        uninstall_from_client(str(game))
+
+        assert 'name="self_attacked" color="0xFF0000"' in tc.read_text(encoding="utf-8")
         assert not tc.with_name("TextColors.xml.kazbars.bak").exists()
 
 
