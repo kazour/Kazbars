@@ -343,7 +343,7 @@ def create_status_block(parent, title="Status", wraplength=0):
 
 
 def create_slider_row(parent, label_text, from_, to, initial, suffix, on_drag, on_commit,
-                      value_width=5, notch=False, label_width=None):
+                      value_width=5, notch=False, label_width=None, label_sink=None):
     """One row: descriptor label · ttk.Scale · live value label.
 
     `on_drag(value)` fires continuously while dragging (refresh the label + push
@@ -359,6 +359,10 @@ def create_slider_row(parent, label_text, from_, to, initial, suffix, on_drag, o
     label's length to keep a column of rows aligned. None = shrink-to-fit (the
     sliders start ragged, fine when the labels are uniform).
 
+    `label_sink`, when given a list, receives the descriptor + value labels so a
+    caller can grey them in step with the controls (the labels are not
+    interactive, so a disabled state never reaches them otherwise).
+
     `notch=True` draws a thin tick under the trough's centre — use it on
     symmetric sliders (`from_ == -to`) so the midpoint reads as the default. It
     is pure chrome (no effect on the value), and the centre is robust because
@@ -367,9 +371,10 @@ def create_slider_row(parent, label_text, from_, to, initial, suffix, on_drag, o
     row = ttk.Frame(parent)
     row.pack(fill="x", pady=PAD_XS)
     label_kw = {"width": label_width, "anchor": "w"} if label_width else {}
-    ttk.Label(
+    desc_label = ttk.Label(
         row, text=label_text, font=FONT_BODY, foreground=THEME_COLORS["body"], **label_kw,
-    ).pack(side="left")
+    )
+    desc_label.pack(side="left")
     value_label = ttk.Label(
         row, text=f"{initial}{suffix}", font=FONT_SMALL,
         foreground=THEME_COLORS["muted"], width=value_width, anchor="e",
@@ -397,6 +402,8 @@ def create_slider_row(parent, label_text, from_, to, initial, suffix, on_drag, o
         scale.pack(side="left", fill="x", expand=True, padx=PAD_SMALL)
     scale.bind("<ButtonRelease-1>", lambda _e: on_commit())
     scale.bind("<KeyRelease>", lambda _e: on_commit())
+    if label_sink is not None:
+        label_sink.extend((desc_label, value_label))
     return scale, value_label
 
 

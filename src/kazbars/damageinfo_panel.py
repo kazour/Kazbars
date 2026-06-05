@@ -24,12 +24,14 @@ from .ui_components import create_scrollable_frame
 from .ui_forms import create_card, create_slider_row
 from .ui_headers import create_dialog_header, create_tip_bar
 from .ui_helpers import (
+    BTN_MEDIUM,
     FONT_BODY,
     MODULE_COLORS,
     PAD_ROW,
     PAD_TAB,
     PAD_XS,
     THEME_COLORS,
+    TK_COLORS,
 )
 from .ui_tk_style import apply_dark_titlebar
 from .ui_widgets import add_tooltip, app_toast
@@ -45,17 +47,18 @@ _H = 620
 # longest label ("Shadow softness:").
 _LABEL_W = 16
 
-# Cards, in display order: (title, [setting keys]). The three position cards are named by
-# AoC's flytext direction (1 = rise above the head, -1 = drop into the fixed columns,
-# 0 = zig-zag stack). The split toggle lives inside the -1 card, right above the Column B
-# controls it reveals. Number/label size is intentionally absent (AoC's own Options slider
-# covers it).
+# Cards, in display order: (title, [setting keys]). The three position cards map to
+# AoC's flytext directions (rising = above the head / dir 1, dropping = into the fixed
+# columns / dir -1, zig-zag = the stacked swing / dir 0), but the titles lead with the
+# behaviour, not the internal code — the audience knows the game, not the SWF. The split
+# toggle lives inside the Dropping card, right above the Column B controls it reveals.
+# Number/label size is intentionally absent (AoC's own Options slider covers it).
 _CARDS = (
     ('Behavior', ['ranged_keep', 'essential_labels_only', 'other_resource_loss_to_target']),
     ('Shadow', ['shadow_mode', 'shadow_distance', 'shadow_blur']),
-    ('Direction 1 (Rising)', ['dir1_x_offset', 'dir1_y_offset']),
-    ('Direction -1 (Dropping)', ['fixed_col_x', 'fixed_col_y', 'fixed_col_split', 'col_b_x', 'col_b_y']),
-    ('Direction 0 (Zig-zag)', ['fixed_x_base', 'fixed_y_base', 'spread_spacing']),
+    ('Rising numbers', ['dir1_x_offset', 'dir1_y_offset']),
+    ('Dropping numbers', ['fixed_col_x', 'fixed_col_y', 'fixed_col_split', 'col_b_x', 'col_b_y']),
+    ('Zig-zag numbers', ['fixed_x_base', 'fixed_y_base', 'spread_spacing']),
 )
 
 
@@ -66,10 +69,10 @@ class DamageNumbersPanel(tk.Toplevel):
         super().__init__(parent)
         self.title("Damage Numbers - KazBars")
         self.resizable(False, False)
-        self.transient(parent)
-
-        restore_window_position(self, "damage_numbers", _W, _H, parent, resizable=False)
-        bind_window_position_save(self, "damage_numbers", save_size=False)
+        self.transient(parent)  # type: ignore[call-overload]  # tk stubs reject Misc master
+        # withdraw → build → restore → deiconify: build off-screen so the panel
+        # appears fully laid out instead of packing its cards a row at a time.
+        self.withdraw()
 
         self.settings_folder = str(settings_path)
         self.settings = dis.load_settings(self.settings_folder)
@@ -80,6 +83,10 @@ class DamageNumbersPanel(tk.Toplevel):
         self._enum_vars: dict[str, tuple[tk.StringVar, list]] = {}
         self._bool_vars: dict[str, tk.BooleanVar] = {}
         self._all_controls: list = []      # everything gated by the master enable
+        # Static text (row descriptors + value readouts) the master gate greys with
+        # its controls; (widget, normal_fg) so the gate can restore the exact colour.
+        self._dim_labels: list[tuple[ttk.Label, str]] = []
+        self._enable_cb: ttk.Checkbutton | None = None  # master toggle (initial focus)
         self._colb_container: ttk.Frame | None = None  # Column B rows; shown only when split is on
         self._shadow_dist_scale: ttk.Scale | None = None
         self._shadow_blur_scale: ttk.Scale | None = None
@@ -90,12 +97,18 @@ class DamageNumbersPanel(tk.Toplevel):
         self._build_ui()
         self._sync_enabled_state()
 
-        self.geometry(f"{_W}x{_H}")
+        # restore sets both size and position (resizable=False pins it to _W×_H), so no
+        # separate geometry() call is needed afterwards.
+        restore_window_position(self, "damage_numbers", _W, _H, parent, resizable=False)
+        bind_window_position_save(self, "damage_numbers", save_size=False)
+        self.deiconify()
         self.protocol("WM_DELETE_WINDOW", self.destroy)
         # The global one-shot dark-titlebar patch can miss a deep/scrollable Toplevel
         # like this one (it fires before the caption HWND is ready, then never retries),
         # so re-assert it on the panel's own map. Same fix as buff_display_editor.
         self.bind("<Map>", self._reassert_dark_titlebar, add="+")
+        if self._enable_cb is not None:
+            self.after(0, self._enable_cb.focus_set)
 
     def _reassert_dark_titlebar(self, event) -> None:
         if event.widget is self:
@@ -133,6 +146,7 @@ class DamageNumbersPanel(tk.Toplevel):
             command=self._on_enabled,
         )
         cb.pack(side="left")
+        self._enable_cb = cb
         add_tooltip(cb, "When off, builds leave AoC's stock DamageInfo.swf untouched "
                         "(and revert any mod previously installed).")
 
@@ -142,9 +156,9 @@ class DamageNumbersPanel(tk.Toplevel):
         row = ttk.Frame(card)
         row.pack(fill="x")
         for name in dis.PRESETS:
-            btn = ttk.Button(
-                row, text=name, bootstyle="secondary", width=12,
-                command=lambda n=name: self._apply_preset(n),
+            btn = ttk.Button(  # type: ignore[call-arg]  # bootstyle is a ttkbootstrap runtime kwarg
+                row, text=name, bootstyle="secondary", width=BTN_MEDIUM,
+                command=lambda n=name: self._apply_preset(n),  # type: ignore[misc]
             )
             btn.pack(side="left", padx=(0, PAD_XS))
             self._all_controls.append(btn)
@@ -169,6 +183,7 @@ class DamageNumbersPanel(tk.Toplevel):
         # Vertical-position sliders run high→low so dragging right moves the number up
         # (screen Y grows downward). The stored offset and baked value are unchanged.
         lo, hi = (meta['max'], meta['min']) if meta.get('invert') else (meta['min'], meta['max'])
+        sink: list = []
         scale, label = create_slider_row(
             card, meta['description'] + ":", lo, hi, offset, meta['unit'],
             on_drag=lambda v, k=key: self._on_slider(k, v),
@@ -176,8 +191,10 @@ class DamageNumbersPanel(tk.Toplevel):
             value_width=6,
             notch=dis.is_offset_key(key),
             label_width=_LABEL_W,
+            label_sink=sink,
         )
         label.configure(text=self._readout(key, offset))
+        self._register_dim(*sink)
         if meta.get('tooltip'):
             add_tooltip(scale, meta['tooltip'])
         self._scales[key] = scale
@@ -204,6 +221,7 @@ class DamageNumbersPanel(tk.Toplevel):
         lbl = ttk.Label(row, text=meta['description'] + ":", font=FONT_BODY,
                         foreground=THEME_COLORS['body'], width=_LABEL_W, anchor="w")
         lbl.pack(side="left")
+        self._register_dim(lbl)
         if meta.get('tooltip'):
             add_tooltip(lbl, meta['tooltip'])
         var = tk.StringVar(value=options[int(self.settings[key])])
@@ -211,18 +229,19 @@ class DamageNumbersPanel(tk.Toplevel):
         for opt in options:
             rb = ttk.Radiobutton(
                 row, text=opt, value=opt, variable=var,
-                command=lambda k=key: self._on_enum(k),
+                command=lambda k=key: self._on_enum(k),  # type: ignore[misc]
             )
             rb.pack(side="left", padx=PAD_XS)
             self._all_controls.append(rb)
 
-    def _build_spread_spacing(self, card: ttk.LabelFrame) -> None:
+    def _build_spread_spacing(self, card: tk.Misc) -> None:
         """One radio that sets the zig-zag spread + spacing together (no per-axis slider)."""
         row = ttk.Frame(card)
         row.pack(fill="x", pady=PAD_XS)
         lbl = ttk.Label(row, text="Spread-spacing:", font=FONT_BODY,
                         foreground=THEME_COLORS['body'], width=_LABEL_W, anchor="w")
         lbl.pack(side="left")
+        self._register_dim(lbl)
         add_tooltip(lbl, "Zig-zag swing width and row gap together. "
                          "Compact = tight, Extended = wide.")
         var = tk.StringVar(value=dis.spread_spacing_option(self.settings))
@@ -240,7 +259,7 @@ class DamageNumbersPanel(tk.Toplevel):
         self._bool_vars[key] = var
         cb = ttk.Checkbutton(
             card, text=meta['description'], variable=var,
-            command=lambda k=key: self._on_bool(k),
+            command=lambda k=key: self._on_bool(k),  # type: ignore[misc]
         )
         cb.pack(anchor="w", pady=PAD_XS)
         if meta.get('tooltip'):
@@ -268,6 +287,12 @@ class DamageNumbersPanel(tk.Toplevel):
     def _save(self) -> None:
         dis.save_settings(self.settings_folder, self.settings)
 
+    def _register_dim(self, *labels: ttk.Label) -> None:
+        """Track a static (non-interactive) text label so the master gate can grey it
+        in step with its controls — stores its current colour to restore on re-enable."""
+        for lbl in labels:
+            self._dim_labels.append((lbl, str(lbl.cget("foreground"))))
+
     # ------------------------------------------------------------------ #
     # Change handlers                                                    #
     # ------------------------------------------------------------------ #
@@ -291,6 +316,8 @@ class DamageNumbersPanel(tk.Toplevel):
             self._sync_split_state()
 
     def _on_spread_spacing(self) -> None:
+        if self._spread_spacing_var is None:
+            return
         name = self._spread_spacing_var.get()
         for opt_name, values in dis.SPREAD_SPACING_OPTIONS:
             if opt_name == name:
@@ -323,6 +350,10 @@ class DamageNumbersPanel(tk.Toplevel):
         on = self._enabled_var.get()
         for widget in self._all_controls:
             self._set_state(widget, on)
+        # Carry the row descriptors + value readouts with their controls so a disabled
+        # panel reads fully-off, not half-on (the readouts especially must not look live).
+        for lbl, normal_fg in self._dim_labels:
+            lbl.configure(foreground=normal_fg if on else TK_COLORS['dim_text'])
         self._sync_split_state()  # visibility tracks the split toggle, not the master gate
         if on:
             self._sync_shadow_state()
@@ -355,8 +386,8 @@ class DamageNumbersPanel(tk.Toplevel):
             self._value_labels[key].configure(text=self._readout(key, offset))
         for key, (var, options) in self._enum_vars.items():
             var.set(options[int(self.settings[key])])
-        for key, var in self._bool_vars.items():
-            var.set(bool(self.settings[key]))
+        for key, bvar in self._bool_vars.items():
+            bvar.set(bool(self.settings[key]))
         if self._spread_spacing_var is not None:
             self._spread_spacing_var.set(dis.spread_spacing_option(self.settings))
         self._sync_enabled_state()
@@ -374,6 +405,6 @@ def open_damage_numbers_panel(app: tk.Misc) -> DamageNumbersPanel:
                 return panel
         except tk.TclError:
             pass
-    panel = DamageNumbersPanel(app, app.settings_path)
+    panel = DamageNumbersPanel(app, app.settings_path)  # type: ignore[attr-defined]
     app.damage_numbers_panel = panel  # type: ignore[attr-defined]
     return panel
