@@ -15,11 +15,13 @@ from kazbars.buff_xml import (
     FILTER_BOTH,
     FILTER_FRIENDLY,
     FILTER_HOSTILE,
+    INCOMING_DAMAGE_TYPES,
     RESOURCE_LOSS_TYPES,
     _normalise_filter,
     _read_bufflistview,
     _write_bufflistview,
     read_source_color,
+    set_directions,
     set_resource_loss_to_column,
     set_source_color,
 )
@@ -213,6 +215,21 @@ def test_resource_loss_preserves_surrounding_bytes():
     assert '<?xml version="1.0" encoding="UTF-8"?>' in new
     assert 'color="0x888800"' in new       # stamina_lost's other attrs intact
     assert 'color="0x440000"' in new       # multi-line element's body intact
+
+
+def test_set_directions_flips_named_only():
+    new, flips = set_directions(TEXTCOLORS, ['self_attacked'], True)
+    assert flips == 1
+    assert _direction_of(new, 'self_attacked') == '-1'
+    assert _direction_of(new, 'stamina_lost') == '1'   # not named → untouched
+    new2, flips2 = set_directions(new, ['self_attacked'], False)  # restore
+    assert flips2 == 1
+    assert _direction_of(new2, 'self_attacked') == '1'
+
+
+def test_incoming_damage_types_are_self_prefixed():
+    assert INCOMING_DAMAGE_TYPES
+    assert all(n.startswith('self_') for n in INCOMING_DAMAGE_TYPES)
 
 
 # =========================================================================== #

@@ -108,7 +108,8 @@ def compile_to_staging(grids, database, assets_path, compiler, app_version,
 
 
 def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None,
-                      damageinfo_pristine=None, group_resources=False, source_colors=None):
+                      damageinfo_pristine=None, group_resources=False, source_colors=None,
+                      split_incoming=False):
     """Install compiled SWF + scripts to the game folder.
 
     ``damageinfo_swf`` (a staged modded DamageInfo.swf, or None) drives the Damage
@@ -117,10 +118,10 @@ def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None,
     is the bundled genuine stock SWF — used to seed/recognize the backup so it can
     never capture a mod. See ``_apply_damageinfo``.
 
-    ``group_resources`` is the "Group my resource numbers" toggle and ``source_colors`` is
-    the per-source color map (both already gated on the master enable by the caller): they
-    customize the skin's TextColors.xml, regenerated from a one-time stock backup. See
-    ``_apply_textcolors``.
+    ``group_resources`` ("Group my resource numbers"), ``split_incoming`` ("Split into two
+    columns" → incoming/self damage+heal directions), and ``source_colors`` (per-source
+    color map) — all gated on the master enable by the caller — customize the skin's
+    TextColors.xml, regenerated from a one-time stock backup. See ``_apply_textcolors``.
 
     Returns (success, error_message).
     """
@@ -146,7 +147,7 @@ def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None,
             )
 
         try:
-            _apply_textcolors(game_path, group_resources, source_colors)
+            _apply_textcolors(game_path, group_resources, source_colors, split_incoming)
         except OSError:
             return False, (
                 "Couldn't update Damage Numbers (TextColors.xml).\n\n"
@@ -201,18 +202,20 @@ def _apply_damageinfo(flash_path, staged_swf, pristine_swf=None):
         _atomic_install(backup, target)
 
 
-def _apply_textcolors(game_path, group_resources, source_colors=None):
+def _apply_textcolors(game_path, group_resources, source_colors=None, split_incoming=False):
     """Patch (or restore) the skin's TextColors.xml for the Damage Numbers features.
 
-    Two things customize TextColors.xml and must compose: the "Group my resource numbers"
-    toggle (``group_resources`` → resource-loss flytext directions) and the per-source
+    Three independent things customize TextColors.xml and must compose: the "Group my
+    resource numbers" toggle (``group_resources`` → resource-loss flytext directions), the
+    "Split into two columns" toggle (``split_incoming`` → the incoming/self damage + heal
+    directions, so everything that lands on you drops into the columns), and the per-source
     color editor (``source_colors`` → a ``{name: "RRGGBB"}`` map). Colors have no
     deterministic inverse, so instead of editing in place we keep a one-time genuine-stock
     backup (``TextColors.xml.kazbars.bak``) and **regenerate** the live file from it each
-    build: stock → direction flip (if toggle) → color overrides. Nothing active ⇒ restore
-    from the backup (kept across a disable, dropped on uninstall). Edits the file the game
-    reads (Customized/ if present, else Default/) atomically. Raises OSError on a
-    locked/failed write (the caller turns that into a "close the game" message).
+    build: stock → direction flips → color overrides. Nothing active ⇒ restore from the
+    backup (kept across a disable, dropped on uninstall). Edits the file the game reads
+    (Customized/ if present, else Default/) atomically. Raises OSError on a locked/failed
+    write (the caller turns that into a "close the game" message).
     """
     source_colors = source_colors or {}
     _default, _customized, source = buff_xml._resolve_paths(game_path, TEXTCOLORS_RELPATH)
@@ -221,11 +224,13 @@ def _apply_textcolors(game_path, group_resources, source_colors=None):
     backup = source.with_name(source.name + buff_xml.BACKUP_SUFFIX)
     current = source.read_text(encoding="utf-8")
 
-    if group_resources or source_colors:
+    if group_resources or split_incoming or source_colors:
         buff_xml._backup_once(source)  # seed genuine stock once (first edit)
         base = backup.read_text(encoding="utf-8") if backup.exists() else current
         if group_resources:
             base, _ = buff_xml.set_resource_loss_to_column(base, True)
+        if split_incoming:
+            base, _ = buff_xml.set_directions(base, buff_xml.INCOMING_DAMAGE_TYPES, True)
         for name, color in source_colors.items():
             base, _ = buff_xml.set_source_color(base, name, color)
         if base != current:

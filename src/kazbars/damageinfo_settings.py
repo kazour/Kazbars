@@ -93,15 +93,22 @@ GLOBAL_SETTINGS: dict[str, dict[str, Any]] = {
         'file': 'numbersTypes/MovingDamageText.as',
         'pattern': r'(static var FIXED_COL_Y\s*=\s*)(-?\d+)',
     },
+    # "Split into two columns" also drops your incoming damage/heals into the fixed columns:
+    # at install it flips the self Attacks/Spells/Combos/Heals directions to -1 in
+    # TextColors.xml (build_executor, independent of "Group my resource numbers"), so plain
+    # damage/heals stack in Column A and signed resource numbers in Column B.
     'fixed_col_split': {
         'default': 0, 'min': 0, 'max': 1, 'step': 1, 'type': 'bool', 'unit': '',
         'description': 'Split into two columns',
-        'tooltip': 'When on, +/- numbers go to Column B and plain numbers stay in Column A.',
+        'tooltip': 'Drops your incoming damage/heals into the fixed columns and splits them: '
+                   'plain numbers (damage/heals) in Column A, signed numbers (mana/stamina) '
+                   'in Column B.',
         'file': 'numbersTypes/MovingDamageText.as',
         'pattern': r'(static var FIXED_COL_SPLIT\s*=\s*)(\d+)',
     },
+    # Default +50 so Column B sits clear of Column A (FIXED_COL_X) when the split is on.
     'col_b_x': {
-        'default': 0, 'min': -200, 'max': 200, 'step': 10, 'unit': 'px', 'relative': True,
+        'default': 50, 'min': -200, 'max': 200, 'step': 10, 'unit': 'px', 'relative': True,
         'description': 'Column B: X',
         'tooltip': 'Column B horizontal position (used only when split is on).',
         'file': 'numbersTypes/MovingDamageText.as',
@@ -153,7 +160,7 @@ GLOBAL_SETTINGS: dict[str, dict[str, Any]] = {
     # (camera→own-avatar); see DamageNumberManager.as. Absolute key (no GAME_DEFAULTS); the
     # source constant ships at 0 (= off/stock).
     'ranged_keep': {
-        'default': 1, 'min': 0, 'max': 1, 'step': 1, 'type': 'bool', 'unit': '',
+        'default': 0, 'min': 0, 'max': 1, 'step': 1, 'type': 'bool', 'unit': '',
         'description': 'Keep ranged numbers big',
         'tooltip': 'Stops ranged damage numbers (hits past ~15 real metres) from shrinking with '
                    'distance — they hold the size of a 15 m hit. Off = stock (they shrink). '
@@ -161,12 +168,16 @@ GLOBAL_SETTINGS: dict[str, dict[str, Any]] = {
         'file': 'DamageNumberManager.as',
         'pattern': r'(static var RANGED_KEEP\s*=\s*)(-?\d+)',
     },
-    'show_titles': {
+    # Inverse of the old "show all labels": ON suppresses CRITICAL/MANA/HEALTH etc., leaving
+    # only the essential Dodge/Parry/Resist labels. OFF (default) shows every label. The AS2
+    # constant ESSENTIAL_LABELS_ONLY ships at 0, so a 0 (off) bakes 0 = show all.
+    'essential_labels_only': {
         'default': 0, 'min': 0, 'max': 1, 'step': 1, 'type': 'bool', 'unit': '',
-        'description': 'Show all labels',
-        'tooltip': "Show labels like CRITICAL / MANA / HEALTH on every number. Off = only Dodge/Parry/Resist labels show.",
+        'description': 'Keep only essential labels',
+        'tooltip': "When on, only Dodge / Parry / Resist labels show. Off (default) shows every "
+                   "label (CRITICAL / MANA / HEALTH, …).",
         'file': 'DamageNumberManager.as',
-        'pattern': r'(static var SHOW_ALL_TITLES\s*=\s*)(\d+)',
+        'pattern': r'(static var ESSENTIAL_LABELS_ONLY\s*=\s*)(\d+)',
     },
     # "Group my resource numbers": baked into OTHER_RESOURCE_LOSS_TO_TARGET (the SWF keeps
     # enemy drains over the enemy) AND patches TextColors.xml at install time so your own
@@ -181,16 +192,9 @@ GLOBAL_SETTINGS: dict[str, dict[str, Any]] = {
         'file': 'DamageNumberManager.as',
         'pattern': r'(static var OTHER_RESOURCE_LOSS_TO_TARGET\s*=\s*)(\d+)',
     },
-    # --- Size ---
-    # One slider for both number and label size — baked into the shared DEFAULT_TEXT_SCALE
-    # (the AS2 uses it for both contents). 1x = current size.
-    'text_scale': {
-        'default': 0, 'min': -0.5, 'max': 0.5, 'step': 0.1, 'unit': 'x',
-        'description': 'Numbers & labels',
-        'tooltip': 'Size of the damage numbers (and their labels). 1x = current; negative = smaller, positive = bigger.',
-        'file': 'numbersTypes/DamageTextAbstract.as',
-        'pattern': r'(var DEFAULT_TEXT_SCALE\s*=\s*)(\d+\.?\d*)',
-    },
+    # (Number/label size is intentionally NOT here — AoC's own Options ▸ Damage Number Size
+    # slider already covers it live for every class. The AS2 keeps DEFAULT_TEXT_SCALE = 1 as
+    # a no-op multiplier.)
     # --- Animation (preset-only — no slider; Default = 0.2s, Performance = 0.1s).
     #     Easing is fixed to Quad in the AS2, so there is no easing setting. ---
     'show_duration': {
@@ -225,9 +229,8 @@ GAME_DEFAULTS: dict[str, float] = {
     'fixed_y_base': 100,
     'fixed_x_offset': 200,
     'fixed_y_spacing': 60,
-    'show_titles': 0,
+    'essential_labels_only': 0,
     'other_resource_loss_to_target': 0,
-    'text_scale': 1.0,
     'show_duration': 0.2,
     'fade_duration': 0.2,
 }

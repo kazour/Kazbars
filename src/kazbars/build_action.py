@@ -157,9 +157,11 @@ def build(app):
         app.update()
 
         # TextColors.xml customizations, gated by the master enable so disabling reverts
-        # them: the "Group my resource numbers" toggle (resource-loss directions) and the
-        # per-source color editor. When off, install regenerates stock from the backup.
+        # them: "Group my resource numbers" (resource-loss directions), "Split into two
+        # columns" (incoming/self damage+heal directions), and the per-source color editor.
+        # When off, install regenerates stock from the backup.
         group_resources = di_enabled and bool(di_settings.get('other_resource_loss_to_target'))
+        split_incoming = di_enabled and bool(di_settings.get('fixed_col_split'))
         source_colors = di_settings.get('source_colors', {}) if di_enabled else {}
 
         staging_swf = staging_dir / "KazBars.swf"
@@ -167,7 +169,8 @@ def build(app):
             staging_swf, app.game_path, app.use_aoc_bypass,
             damageinfo_swf=damageinfo_swf,
             damageinfo_pristine=Path(app.assets_path) / "damageinfo" / "DamageInfo.swf",
-            group_resources=group_resources, source_colors=source_colors)
+            group_resources=group_resources, source_colors=source_colors,
+            split_incoming=split_incoming)
         client_results = [(game_folder.format_game_path(app.game_path), ok, err)]
 
         aoc_running = app.use_aoc_bypass and is_aoc_running()

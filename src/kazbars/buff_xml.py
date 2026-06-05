@@ -216,35 +216,49 @@ def _format_point(x, y):
 
 
 # ============================================================================
-# TEXTCOLORS.xml — resource-loss flytext direction (Damage Numbers toggle)
+# TEXTCOLORS.xml — flytext direction (Damage Numbers toggles)
 # ============================================================================
 # AoC's TextColors.xml gives each flying-text type a `direction`: 1 = float above the
-# head, -1 = drop into the fixed column. These four resource-LOSS types ship at 1;
-# flipping them to -1 routes your own mana/stamina losses into the same fixed column
-# as your gains (already -1), so all your resource changes read in one place. The
-# DamageInfo SWF separately keeps drains you deal to ENEMIES floating over them
-# (OTHER_RESOURCE_LOSS_TO_TARGET). Surgical + reversible — restore flips back to 1.
+# head, -1 = drop into the fixed column. Two independent toggles flip groups to -1:
+#  • "Group my resource numbers" → RESOURCE_LOSS_TYPES (your own mana/stamina losses join
+#    your gains, already -1, in one column). The DamageInfo SWF separately keeps drains you
+#    deal to ENEMIES floating overhead (OTHER_RESOURCE_LOSS_TO_TARGET).
+#  • "Split into two columns" → INCOMING_DAMAGE_TYPES (everything that lands on you drops
+#    into the columns; plain damage/heals to column A, signed resources to column B).
+# Surgical + reversible — restore flips back to 1.
 RESOURCE_LOSS_TYPES = (
     'stamina_lost', 'mana_lost', 'stamina_loss_critical', 'mana_loss_critical',
+)
+
+# The "self" side of the color catalog's paired groups (Attacks / Spells / Combos / Heals)
+# — numbers shown over your own avatar. Kept in step with damageinfo_settings.PAIRED_GROUPS
+# by test_damageinfo_settings.
+INCOMING_DAMAGE_TYPES = (
+    'self_attacked', 'self_attacked_unshielded', 'self_attacked_critical',
+    'self_attacked_environment', 'self_dodged',
+    'self_attacked_spell', 'self_attacked_spell_critical',
+    'self_attacked_combo', 'self_attacked_combo_critical', 'self_combo_name',
+    'self_healed', 'self_healed_critical',
 )
 
 _DIRECTION_ATTR_RE = re.compile(r'(\bdirection\s*=\s*["\'])(-?\d+)(["\'])')
 
 
-def set_resource_loss_to_column(xml_text, to_column):
-    """Set `direction` for the four resource-loss flytext types in TextColors.xml.
+def _elem_re(name):
+    return re.compile(rf'<[^>]*\bname\s*=\s*["\']{re.escape(name)}["\'][^>]*>')
 
-    ``to_column`` True → ``direction="-1"`` (fixed column, with your resource gains);
-    False → ``direction="1"`` (above the head, stock). Only the element carrying each
+
+def set_directions(xml_text, names, to_column):
+    """Set `direction` for each named flytext element: ``-1`` (fixed column) when
+    ``to_column`` else ``1`` (above the head). Only the element carrying each
     ``name="<type>"`` is touched (any attribute order, single- or multi-line); all other
     bytes are preserved. Returns ``(new_text, flips)`` — ``flips`` counts the direction
     attributes actually changed (0 ⇒ already in the wanted state or types absent).
     """
     target = '-1' if to_column else '1'
     flips = 0
-    for name in RESOURCE_LOSS_TYPES:
-        elem_re = re.compile(rf'<[^>]*\bname\s*=\s*["\']{re.escape(name)}["\'][^>]*>')
-        m = elem_re.search(xml_text)
+    for name in names:
+        m = _elem_re(name).search(xml_text)
         if not m:
             continue
         new_elem, n = _DIRECTION_ATTR_RE.subn(rf'\g<1>{target}\g<3>', m.group(0))
@@ -252,6 +266,12 @@ def set_resource_loss_to_column(xml_text, to_column):
             xml_text = xml_text[:m.start()] + new_elem + xml_text[m.end():]
             flips += n
     return xml_text, flips
+
+
+def set_resource_loss_to_column(xml_text, to_column):
+    """Flip the four resource-loss flytext directions (see RESOURCE_LOSS_TYPES); thin
+    wrapper over :func:`set_directions`."""
+    return set_directions(xml_text, RESOURCE_LOSS_TYPES, to_column)
 
 
 # ============================================================================
@@ -262,10 +282,6 @@ def set_resource_loss_to_column(xml_text, to_column):
 # flip (find the element by name, rewrite only its color attr) so every other byte is
 # preserved.
 _COLOR_ATTR_RE = re.compile(r'(\bcolor\s*=\s*["\'])(?:0x|#)?([0-9A-Fa-f]{6})(["\'])')
-
-
-def _elem_re(name):
-    return re.compile(rf'<[^>]*\bname\s*=\s*["\']{re.escape(name)}["\'][^>]*>')
 
 
 def read_source_color(xml_text, name):

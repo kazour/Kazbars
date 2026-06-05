@@ -56,14 +56,14 @@ def test_absolute_keys_absent_from_game_defaults():
 
 
 def test_is_float_key():
-    for key in ('show_duration', 'fade_duration', 'text_scale'):
+    for key in ('show_duration', 'fade_duration'):
         assert dis.is_float_key(key)
     for key in ('dir1_x_offset', 'shadow_mode', 'fixed_col_split'):
         assert not dis.is_float_key(key)
 
 
 def test_is_offset_key():
-    for key in ('dir1_x_offset', 'text_scale', 'shadow_blur', 'shadow_distance'):
+    for key in ('dir1_x_offset', 'shadow_blur', 'shadow_distance'):
         assert dis.is_offset_key(key)
     for key in ('ranged_keep', 'shadow_mode'):  # absolute → no notch
         assert not dis.is_offset_key(key)
@@ -154,8 +154,8 @@ def test_readout_inverted_keeps_right_positive():
 def test_readout_absolute_keys_show_game_value():
     # Non-position sliders keep showing the resulting game value, not a shift.
     assert dis.readout('shadow_distance', 0) == '4px'
-    assert dis.readout('text_scale', 0) == '1x'
-    assert dis.readout('text_scale', 0.3) == '1.3x'
+    assert dis.readout('show_duration', 0) == '0.2s'
+    assert dis.readout('show_duration', -0.1) == '0.1s'
 
 
 # --------------------------------------------------------------------------- #
@@ -233,9 +233,9 @@ def test_compute_final_absolute_keys():
 
 
 def test_compute_final_float_keys():
-    assert dis.compute_final_value('text_scale', 0) == pytest.approx(1.0)
+    assert dis.compute_final_value('show_duration', 0) == pytest.approx(0.2)
     assert dis.compute_final_value('show_duration', -0.1) == pytest.approx(0.1)
-    assert isinstance(dis.compute_final_value('text_scale', 0.1), float)
+    assert isinstance(dis.compute_final_value('fade_duration', 0.05), float)
 
 
 # --------------------------------------------------------------------------- #
@@ -284,12 +284,12 @@ def test_apply_preset_preserves_unrelated_keys():
 def test_save_load_round_trip(tmp_path):
     s = dis.get_default_settings()
     s['enabled'] = True
-    s['ranged_keep'] = 0  # off (default is on) — round-trips a changed bool
+    s['ranged_keep'] = 1  # on (default is off) — round-trips a changed bool
     s['shadow_mode'] = 1
     assert dis.save_settings(tmp_path, s)
     loaded = dis.load_settings(tmp_path)
     assert loaded['enabled'] is True
-    assert loaded['ranged_keep'] == 0
+    assert loaded['ranged_keep'] == 1
     assert loaded['shadow_mode'] == 1
 
 
@@ -304,10 +304,10 @@ def test_load_corrupt_returns_defaults(tmp_path):
 
 def test_load_partial_fills_defaults(tmp_path):
     (tmp_path / dis.SETTINGS_FILENAME).write_text(
-        json.dumps({'enabled': True, 'ranged_keep': 0}), encoding='utf-8')
+        json.dumps({'enabled': True, 'ranged_keep': 1}), encoding='utf-8')
     loaded = dis.load_settings(tmp_path)
     assert loaded['enabled'] is True
-    assert loaded['ranged_keep'] == 0
+    assert loaded['ranged_keep'] == 1
     assert loaded['shadow_mode'] == 2  # filled
 
 
@@ -337,6 +337,18 @@ def test_source_catalog_no_duplicates():
         names += [n for n, _ in self_rows] + [n for n, _ in other_rows]
     names += [n for n, _ in dis.SHARED_SOURCES]
     assert len(names) == len(set(names)) == len(dis.ALL_SOURCE_NAMES)
+
+
+def test_incoming_damage_types_match_self_catalog():
+    # buff_xml's "Split into two columns" target list must equal the self side of the
+    # color catalog's paired groups (and be valid source names), or split would flip the
+    # wrong / non-existent flytext directions.
+    from kazbars import buff_xml
+    self_side = []
+    for _title, self_rows, _other in dis.PAIRED_GROUPS:
+        self_side += [n for n, _ in self_rows]
+    assert set(buff_xml.INCOMING_DAMAGE_TYPES) == set(self_side)
+    assert set(buff_xml.INCOMING_DAMAGE_TYPES) <= set(dis.ALL_SOURCE_NAMES)
 
 
 def test_normalize_color():

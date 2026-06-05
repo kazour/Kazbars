@@ -106,20 +106,20 @@ def _value(out, key):
 
 def test_defaults_bake_to_game_defaults(tmp_path):
     out = _bake(tmp_path, dis.get_default_settings())
-    assert _value(out, 'ranged_keep') == '1'   # our chosen default (on); source ships 0 = off/stock
+    assert _value(out, 'ranged_keep') == '0'   # all behavior toggles ship off; source ships 0 = stock
     assert _value(out, 'shadow_mode') == '2'
     assert _value(out, 'dir1_x_offset') == '-50'
     assert _value(out, 'show_duration') == '0.2'
-    assert _value(out, 'text_scale') == '1'
+    assert _value(out, 'essential_labels_only') == '0'   # off = show all labels (stock)
 
 
 def test_offset_bakes_to_final_value(tmp_path):
     s = dis.get_default_settings()
-    s['ranged_keep'] = 0         # absolute bool, overriding the default 1 (the stored value IS the baked constant)
+    s['ranged_keep'] = 1         # absolute bool, overriding the default 0 (the stored value IS the baked constant)
     s['shadow_distance'] = 2     # offset key: 4 + 2 = 6
     s['dir1_y_offset'] = -50     # offset key over base 0
     out = _bake(tmp_path, s)
-    assert _value(out, 'ranged_keep') == '0'
+    assert _value(out, 'ranged_keep') == '1'
     assert _value(out, 'shadow_distance') == '6'
     assert _value(out, 'dir1_y_offset') == '-50'
 
@@ -135,11 +135,11 @@ def test_enum_and_bool_bake(tmp_path):
     s = dis.get_default_settings()
     s['shadow_mode'] = 0
     s['fixed_col_split'] = 1
-    s['show_titles'] = 1
+    s['essential_labels_only'] = 1
     out = _bake(tmp_path, s)
     assert _value(out, 'shadow_mode') == '0'
     assert _value(out, 'fixed_col_split') == '1'
-    assert _value(out, 'show_titles') == '1'
+    assert _value(out, 'essential_labels_only') == '1'
 
 
 def test_easing_type_ships_quad():
@@ -174,10 +174,10 @@ def test_generate_fails_loudly_on_drifted_source(tmp_path):
 
 
 def test_bake_leaves_untouched_constants_alone(tmp_path):
-    # Baking show_titles must not perturb the other constants in the same file (regex precision).
+    # Baking essential_labels_only must not perturb the other constants in the same file.
     s = dis.get_default_settings()
-    s['show_titles'] = 1
+    s['essential_labels_only'] = 1
     out = _bake(tmp_path, s)
-    assert _value(out, 'show_titles') == '1'
-    assert _value(out, 'ranged_keep') == '1'                   # default (on), untouched
+    assert _value(out, 'essential_labels_only') == '1'
+    assert _value(out, 'ranged_keep') == '0'                   # default (off), untouched
     assert _value(out, 'other_resource_loss_to_target') == '0'

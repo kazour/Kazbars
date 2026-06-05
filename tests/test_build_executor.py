@@ -10,6 +10,7 @@ Install Tk flow is exercised manually (/smoke).
 Run: `pytest tests/test_build_executor.py` (from repo root).
 """
 
+import re
 import types
 
 from kazbars import build_executor
@@ -439,15 +440,21 @@ def _write_textcolors(game, skin, text=_STOCK_TEXTCOLORS):
     return p
 
 
+def _dir_of(xml, name):
+    m = re.search(rf'<[^>]*\bname="{name}"[^>]*>', xml)
+    return re.search(r'direction\s*=\s*"(-?\d+)"', m.group(0)).group(1)
+
+
 class TestTextColors:
     @staticmethod
-    def _install(tmp_path, game, *, group=False, colors=None):
+    def _install(tmp_path, game, *, group=False, colors=None, split=False):
         swf = tmp_path / "staging" / "KazBars.swf"
         swf.parent.mkdir(parents=True, exist_ok=True)
         swf.write_bytes(b"FWS\x06kz")
         return install_to_client(swf, str(game), use_aoc=False,
                                  damageinfo_swf=None, damageinfo_pristine=None,
-                                 group_resources=group, source_colors=colors or {})
+                                 group_resources=group, source_colors=colors or {},
+                                 split_incoming=split)
 
     def test_enable_patches_and_backs_up_stock(self, tmp_path):
         game = tmp_path / "game"
@@ -552,6 +559,31 @@ class TestTextColors:
 
         assert 'name="self_attacked" color="0xFF0000"' in tc.read_text(encoding="utf-8")
         assert not tc.with_name("TextColors.xml.kazbars.bak").exists()
+
+    # --- "Split into two columns" → incoming/self directions (independent) -- #
+
+    def test_split_drops_incoming_self_types(self, tmp_path):
+        game = tmp_path / "game"
+        tc = _write_textcolors(game, "Default")
+        self._install(tmp_path, game, split=True)
+        text = tc.read_text(encoding="utf-8")
+        assert _dir_of(text, 'self_attacked') == '-1'   # incoming dropped to the column
+        assert _dir_of(text, 'stamina_lost') == '1'     # resources untouched (group off)
+
+    def test_split_and_resources_are_independent(self, tmp_path):
+        game = tmp_path / "game"
+        tc = _write_textcolors(game, "Default")
+        self._install(tmp_path, game, group=True, split=True)
+        text = tc.read_text(encoding="utf-8")
+        assert _dir_of(text, 'self_attacked') == '-1'   # split
+        assert _dir_of(text, 'stamina_lost') == '-1'    # resources
+
+    def test_split_disable_restores_stock(self, tmp_path):
+        game = tmp_path / "game"
+        tc = _write_textcolors(game, "Default")
+        self._install(tmp_path, game, split=True)
+        self._install(tmp_path, game)  # nothing active → restore stock
+        assert _dir_of(tc.read_text(encoding="utf-8"), 'self_attacked') == '1'
 
 
 # =========================================================================== #

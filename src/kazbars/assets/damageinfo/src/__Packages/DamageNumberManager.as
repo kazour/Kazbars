@@ -18,8 +18,10 @@ class DamageNumberManager
    // PHASE2: Type 9 is the only type that keeps title text (Dodge/Parry/Resist labels)
    static var KEEP_TITLE_TYPE = 9;
 
-   // CUSTOMIZATION: Show title labels for all types (0 = only type 9, 1 = all types)
-   static var SHOW_ALL_TITLES = 0;
+   // CUSTOMIZATION: Keep only essential labels (0 = show every label [default], 1 = only
+   // type 9 = Dodge/Parry/Resist). Inverse of the old SHOW_ALL_TITLES so the panel toggle
+   // "Keep only essential labels" reads naturally and ships off (0 = show all).
+   static var ESSENTIAL_LABELS_ONLY = 0;
 
    // CUSTOMIZATION: Enemy resource loss direction override
    // When enabled, mana/stamina you drain FROM enemies appears above their head (dir 1)
@@ -239,12 +241,12 @@ class DamageNumberManager
       
       var _loc5_ = "";
       
-      // CUSTOMIZATION: Keep title text based on SHOW_ALL_TITLES setting
-      // When SHOW_ALL_TITLES = 1, show labels like "CRITICAL", "MANA", etc. for all types
-      // When SHOW_ALL_TITLES = 0, only type 9 (Dodge/Parry/Resist) shows labels
+      // CUSTOMIZATION: Keep title text based on ESSENTIAL_LABELS_ONLY setting
+      // When ESSENTIAL_LABELS_ONLY = 0 (default), show labels like "CRITICAL", "MANA", etc. for all types
+      // When ESSENTIAL_LABELS_ONLY = 1, only type 9 (Dodge/Parry/Resist) shows labels
       if(points != 0)
       {
-         if((DamageNumberManager.SHOW_ALL_TITLES == 1 || flyingTextType == DamageNumberManager.KEEP_TITLE_TYPE) && textContent.length > 0)
+         if((DamageNumberManager.ESSENTIAL_LABELS_ONLY == 0 || flyingTextType == DamageNumberManager.KEEP_TITLE_TYPE) && textContent.length > 0)
          {
             _loc5_ = textContent;
          }
@@ -265,7 +267,7 @@ class DamageNumberManager
       else
       {
          // points == 0: Show title only (no number)
-         if(DamageNumberManager.SHOW_ALL_TITLES == 1 || flyingTextType == DamageNumberManager.KEEP_TITLE_TYPE)
+         if(DamageNumberManager.ESSENTIAL_LABELS_ONLY == 0 || flyingTextType == DamageNumberManager.KEEP_TITLE_TYPE)
          {
             _loc5_ = textContent;
             textContent = "";  // Clear to avoid showing title twice

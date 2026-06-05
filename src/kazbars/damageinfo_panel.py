@@ -40,15 +40,14 @@ logger = logging.getLogger(__name__)
 _W = 470
 _H = 620
 
-# Cards, in display order: (title, [setting keys]). The keep-ranged-big toggle (the
-# headline distance fix) lives in Behavior alongside the other on/off behaviours.
+# Cards, in display order: (title, [setting keys]). Behavior leads (all toggles, off by
+# default); number/label size is intentionally absent (AoC's own Options slider covers it).
 _CARDS = (
+    ('Behavior', ['ranged_keep', 'essential_labels_only', 'other_resource_loss_to_target', 'fixed_col_split']),
     ('Shadow', ['shadow_mode', 'shadow_distance', 'shadow_blur']),
-    ('Size', ['text_scale']),
     ('Above-target position', ['dir1_x_offset', 'dir1_y_offset']),
-    ('Fixed columns', ['fixed_col_x', 'fixed_col_y', 'fixed_col_split', 'col_b_x', 'col_b_y']),
+    ('Fixed columns', ['fixed_col_x', 'fixed_col_y', 'col_b_x', 'col_b_y']),
     ('Zig-zag (static)', ['fixed_x_base', 'fixed_y_base', 'spread_spacing']),
-    ('Behavior', ['ranged_keep', 'show_titles', 'other_resource_loss_to_target']),
 )
 
 
@@ -103,8 +102,8 @@ class DamageNumbersPanel(tk.Toplevel):
         body = ttk.Frame(inner, padding=(PAD_TAB, 0))
         body.pack(fill="both", expand=True)
 
-        self._build_presets(body)
         self._build_colors_button(body)
+        self._build_presets(body)
         for title, keys in _CARDS:
             card = create_card(body, title)
             card.pack(fill="x", pady=(0, PAD_ROW))

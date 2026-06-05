@@ -72,13 +72,15 @@ inject). The AS2 is a from-scratch lean rewrite of the stock overlay: a single
 hashmap, object pools, and a 3-way `SHADOW_MODE` (None / Fast offset-twin / Real
 DropShadowFilter). Gated by a master `enabled` flag (off by default); when off the
 build leaves the stock file alone and reverts any prior mod via the one-time
-`DamageInfo.swf.kazbars.bak`. Two features reach a *second* game file — the skin's
+`DamageInfo.swf.kazbars.bak`. Three features reach a *second* game file — the skin's
 `TextColors.xml` (Customized/ if present, else Default/): the "Group my resource numbers"
 toggle (resource-loss flytext directions → fixed column, the SWF's
-`OTHER_RESOURCE_LOSS_TO_TARGET` keeping enemy drains overhead) and the per-source **color
-editor** (`damageinfo_colors_panel.py` → `source_colors` → each type's `color="0x…"`).
-They compose: `build_executor._apply_textcolors` keeps a one-time genuine-stock backup and
-**regenerates** the live file from it each build (stock → direction flip → color
+`OTHER_RESOURCE_LOSS_TO_TARGET` keeping enemy drains overhead), the "Split into two columns"
+toggle (the incoming/self damage+heal directions → fixed column, so plain damage/heals stack
+in column A and signed resources in column B), and the per-source **color editor**
+(`damageinfo_colors_panel.py` → `source_colors` → each type's `color="0x…"`). They compose
+independently: `build_executor._apply_textcolors` keeps a one-time genuine-stock backup and
+**regenerates** the live file from it each build (stock → direction flips → color
 overrides), restoring from the backup on disable/uninstall. The regex↔constant coupling is guarded by
 `tests/test_damageinfo_generator.py` (no MTASC). Isolated — `damageinfo_*` import only
 stdlib + `build_utils`/`paths` (generator) and shared UI builders (panel); no
@@ -206,7 +208,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/grid_dialogs.py` | 874 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
 | `src/kazbars/build_loading.py` | 818 | Build-progress screen + welcome/about popups |
 | `src/kazbars/buff_display_editor.py` | 575 | Default Buff Bars dialog (UI). Pure XML helpers in `buff_xml.py` |
-| `src/kazbars/buff_xml.py` | 296 | AoC HUD XML helpers (regex-only): `<BuffListView>` reads/writes + `set_resource_loss_to_column` (resource-loss flytext direction flip) + `read_source_color`/`set_source_color` (per-source flytext `color="0x…"` in TextColors.xml, for the Damage Numbers color editor). Pure — no Tk/ttkbootstrap, importable from CI without UI extra |
+| `src/kazbars/buff_xml.py` | 312 | AoC HUD XML helpers (regex-only): `<BuffListView>` reads/writes + `set_directions` (flip flytext directions for a group; `RESOURCE_LOSS_TYPES` and `INCOMING_DAMAGE_TYPES`) + `read_source_color`/`set_source_color` (per-source flytext `color="0x…"`, for the Damage Numbers color editor). Pure — no Tk/ttkbootstrap, importable from CI without UI extra |
 | `src/kazbars/buff_database.py` | 140 | `BuffDatabase` class — JSON load/save, in-memory indexes, search. Pure — no Tk |
 | `src/kazbars/app.py` | 627 | Entry point + `KazBarsApp` root window (widgets, menu, lifecycle) |
 | `src/kazbars/__main__.py` | 43 | Process entry point — logging setup + `KazBarsApp().mainloop()`; invoked by `python -m kazbars` |
@@ -225,22 +227,22 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/custom_menu_bar.py` | 402 | Canvas-based dark menu bar (active-cascade phosphor underline; ttkb-safe Canvas spacers; supports `command`, `separator`, `checkbutton` entries) |
 | `src/kazbars/combat_monitor.py` | 292 | Combat log parser feeding the tracker |
 | `src/kazbars/cast_timer_strip.py` | 348 | Frozen `CastTimerStrip` card (collapsed + master-off by default) for the cast-timer overlay. Header: one master Enabled toggle + title-adjacent Player/Target status tags + muted `overlay`. Body: a single settings row (independent Player/Target X/Y + Bold/Size/Display/Color, font fixed to Arial) + right-side sample preview. Master enables both sides together (`enableP == enableT == enabled`); X/Y grey out when off. Chrome mirrors a grid card — reserved handle gutter, shared `position_entry`, rose card border |
-| `src/kazbars/build_executor.py` | 420 | MTASC compile + deploy; Damage Numbers backup/restore (bundled pristine as the stock source of truth, atomic install via temp+`os.replace`) + `_apply_textcolors` (regenerate the skin's TextColors.xml from a one-time stock backup = resource-loss direction flip + per-source color overrides; restore on disable/uninstall) |
+| `src/kazbars/build_executor.py` | 425 | MTASC compile + deploy; Damage Numbers backup/restore (bundled pristine as the stock source of truth, atomic install via temp+`os.replace`) + `_apply_textcolors` (regenerate the skin's TextColors.xml from a one-time stock backup = resource-loss + incoming/self direction flips + per-source color overrides; restore on disable/uninstall) |
 | `src/kazbars/profile_io.py` | 228 | Profile load (read+apply split, with auto-anchor-scale on resolution mismatch) / save (build+write+commit, `silent=` for piggyback saves) / new / open + missing-buff warning. Persists the `cast_timer` block alongside `grids` |
 | `src/kazbars/game_folder.py` | 192 | Game folder UI + Aoc.exe bypass (with install/remove reconciler) + uninstall |
 | `src/kazbars/game_resolution.py` | 104 | Game resolution dialog + anchor-rescale all loaded grids on apply |
 | `src/kazbars/settings_backup.py` | 394 | Backup & Restore dialog + pure zip layer (`write_backup_zip`/`read_manifest`/`restore_zip`, `funcom_prefs_path`, `_funcom_summary`) — bundles `%LOCALAPPDATA%\Funcom\Conan\Prefs` + KazBars `profiles/` + the whole `settings/` dir (app + Deeps + Live Tracker) into one zip; restore snapshots first, guards zip-slip, resyncs settings. Isolated satellite, no cross-imports |
-| `tests/test_buff_xml.py` | 257 | Round-trip smoke test for the `buff_xml` helpers: `<BuffListView>` attrs + the TextColors `set_resource_loss_to_column` direction flip + `read_source_color`/`set_source_color` (0x form, idempotent, missing-element, direction-preserving) |
-| `src/kazbars/build_action.py` | 210 | Build & Install flow |
+| `tests/test_buff_xml.py` | 274 | Round-trip smoke test for the `buff_xml` helpers: `<BuffListView>` attrs + TextColors `set_directions`/`set_resource_loss_to_column` flips + `read_source_color`/`set_source_color` (0x form, idempotent, missing-element, direction-preserving) |
+| `src/kazbars/build_action.py` | 213 | Build & Install flow |
 | `src/kazbars/ui_helpers.py` | 200 | Design tokens + `setup_custom_styles` + `style_treeview_heading` |
 | `src/kazbars/live_tracker_settings.py` | 247 | Tracker persistence (with one-shot legacy filename migration) |
 | `src/kazbars/grid_model.py` | 150 | Grid dataclasses, `parse_resolution`, `get_game_resolution_or_default`, anchor-based `scale_grid_position` (X center / Y bottom anchored) |
 | `tests/test_data_integrity.py` | 97 | Buff-ref resolution smoke test |
 | `src/kazbars/build_utils.py` | 98 | Compiler discovery + path helpers |
 | `src/kazbars/cast_timer.py` | 113 | Cast-timer overlay config (pure data): defaults, validation, `is_enabled` gate. No Tk |
-| `src/kazbars/damageinfo_settings.py` | 519 | Damage Numbers config (pure data): `GLOBAL_SETTINGS` bake-map (symmetric offset ranges + `invert`/`relative` UI flags for the position sliders + target file + regex), `GAME_DEFAULTS`, `PRESETS` (Default/Performance — carry the animation timing), `SPREAD_SPACING_OPTIONS` (one radio → both zig-zag offsets) + `spread_spacing_option`, the per-source color catalog (`PAIRED_GROUPS`/`SHARED_SOURCES`/`ALL_SOURCE_NAMES`) + `source_colors` setting + `validate_source_colors`/`normalize_color`, validate/`compute_final_value`/`readout`/`apply_preset`, `is_offset_key`, load/save. No Tk |
+| `src/kazbars/damageinfo_settings.py` | 522 | Damage Numbers config (pure data): `GLOBAL_SETTINGS` bake-map (symmetric offset ranges + `invert`/`relative` UI flags for the position sliders + target file + regex), `GAME_DEFAULTS`, `PRESETS` (Default/Performance — carry the animation timing), `SPREAD_SPACING_OPTIONS` (one radio → both zig-zag offsets) + `spread_spacing_option`, the per-source color catalog (`PAIRED_GROUPS`/`SHARED_SOURCES`/`ALL_SOURCE_NAMES`) + `source_colors` setting + `validate_source_colors`/`normalize_color`, validate/`compute_final_value`/`readout`/`apply_preset`, `is_offset_key`, load/save. No Tk |
 | `src/kazbars/damageinfo_generator.py` | 134 | Bakes setting offsets into the lean AS2 tree and MTASC-injects the pristine `DamageInfo.swf` (`build_damageinfo` via `build_utils.compile_as2`). No Tk |
-| `src/kazbars/damageinfo_panel.py` | 368 | `DamageNumbersPanel` Toplevel (Game ▸ Damage numbers…) — master enable gate, presets, the "Damage number colors…" launch button, offset sliders (centre-notched; vertical ones reversed), the coupled `Spread-spacing` radio, radios/checkboxes across Shadow/Size/Position/Behavior cards (keep-ranged-big toggle in Behavior) in a scrollable body; persists to `damageinfo_settings.json` |
+| `src/kazbars/damageinfo_panel.py` | 367 | `DamageNumbersPanel` Toplevel (Game ▸ Damage numbers…) — master enable gate, a top "Damage number colors…" launch button, presets, then cards Behavior (all toggles, off by default) / Shadow / Above-target / Fixed columns / Zig-zag; offset sliders (centre-notched; vertical ones reversed) + the coupled `Spread-spacing` radio in a scrollable body; persists to `damageinfo_settings.json`. No number/label size slider (AoC's own Options slider covers it) |
 | `src/kazbars/damageinfo_colors_panel.py` | 210 | `DamageNumberColorsPanel` Toplevel (opened from the Damage Numbers panel) — per-source flytext color editor: all 35 sources in a 2-column self/other card layout + a shared resources/misc card, each row a `ui_forms.ColorSwatch` + reset; reads baseline colors from the skin's TextColors.xml (backup-first) and saves picks to `source_colors`. Applied at Build & Install |
 | `src/kazbars/window_position.py` | 110 | Window geometry save/restore |
 | `src/kazbars/settings_manager.py` | 104 | `SettingsManager` (incl. `reload()` to resync in-memory state from disk after a restore), JSON helpers, settings proxy |
@@ -264,7 +266,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `tests/test_log_name.py` | 22 | `sanitize_log_name` CombatLog filename trimming (`CombatLog-2026-05-16_2152` → `CombatLog_2152`) |
 | `tests/test_boss_timer.py` | 151 | `BossTimer` cycle/syphon/double-seed transitions + phase state machine (time-driven, no sleeps) |
 | `tests/test_combat_monitor.py` | 123 | `_process_line` dispatch, player extraction, latest-log discovery, start-without-folder guard |
-| `tests/test_build_executor.py` | 603 | Install/uninstall orchestration (both modes), legacy cleanup, `create_scripts` markers, xml.add, launcher detect, `tasklist` argv, Damage Numbers backup-once/install/revert/uninstall + orphan-mod recovery, TextColors direction+color patch/restore/Customized-preference/regenerate-from-stock lifecycle — no MTASC/Tk |
+| `tests/test_build_executor.py` | 635 | Install/uninstall orchestration (both modes), legacy cleanup, `create_scripts` markers, xml.add, launcher detect, `tasklist` argv, Damage Numbers backup-once/install/revert/uninstall + orphan-mod recovery, TextColors resource+incoming-direction+color patch/restore/Customized-preference/regenerate-from-stock lifecycle — no MTASC/Tk |
 | `tests/test_build_compile.py` | 120 | MTASC compile-integration — whole codegen → bundled `mtasc.exe` exit-0 (escaping end-to-end + console/cast variants); win32 + compiler gated |
 | `src/kazbars/deeps_panel.py` | 941 | `DeepsPanel` Toplevel — status row, Start/Stop, Lock + Layout, appearance (size/background sliders, font fixed to Segoe UI), Readout card (window width + a Style preset radio — Live/Steady/Calm — bundling smoothing/round/refresh), Alarm & Tints card (DPS-out alarm slider over the 1000–4000/s band + Tank/Standard survival-tint preset radios + a live breakpoint caption), 5-cell visibility picker, pet toggle. Owns the meter + overlay + 100 ms UI tick + alarm hysteresis state machine |
 | `src/kazbars/deeps_meter.py` | 452 | `DeepsMeter` daemon thread — tail loop, log rotation detection, `is_live` probe via `CreateFile` exclusive-share, configurable rolling-window width (`set_window_seconds` recreates the trackers). Publishes `MeterSnapshot` (focus is no longer probed here — the shared `ForegroundWatcher` owns it) |
@@ -281,6 +283,6 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `tests/test_deeps_settings.py` | 517 | 110 cases — defaults, validation (incl. readout-tuning keys + `survival_preset`), `normalize_survival_preset`, round-trip, corrupt-file fallback |
 | `tests/test_deeps_rolling_window.py` | 169 | 13 cases — primitive smoke + decay-during-silence |
 | `tests/test_deeps_overlay.py` | 376 | 30 cases — pure helpers + 5-cell IDs/labels + `_DisplaySmoother` (EMA/rounding/cadence) (visual behaviour is `/smoke`) |
-| `tests/test_damageinfo_settings.py` | 378 | Damage Numbers config — defaults/schema invariants, symmetric offset ranges + common X/Y step + `is_offset_key` + `invert`/`relative` sets, offset clamping, enum/bool coercion, `compute_final_value`, `readout`, `apply_preset`, round-trip/fallback, **per-source color catalog↔engine parity + `source_colors` validation/normalize/round-trip** |
+| `tests/test_damageinfo_settings.py` | 390 | Damage Numbers config — defaults/schema invariants, symmetric offset ranges + common X/Y step + `is_offset_key` + `invert`/`relative` sets, offset clamping, enum/bool coercion, `compute_final_value`, `readout`, `apply_preset`, round-trip/fallback, **per-source color catalog↔engine parity + `source_colors` validation/normalize/round-trip** |
 | `tests/test_damageinfo_colors_panel.py` | 60 | Data-layer test for the colors panel: `_read_baseline_colors` (no game folder → {}, live Default read, Customized-preferred, backup-preferred). UI is /smoke-only |
 | `tests/test_damageinfo_generator.py` | 183 | Regex↔AS2 coupling guard (every bake pattern matches the shipped source **exactly once**) + shipped-constant == GAME_DEFAULTS (the offset-0-is-stock invariant) + bake correctness (offset→final, dual-axis shadow blur, enum/bool) + per-content-scale guard (Size survives the pop-in) + easing-ships-Quad guard + hard-fail on drifted source; no MTASC |
