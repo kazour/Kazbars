@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from . import buff_xml
 from .build_utils import strip_marker_block, update_script_with_marker
 from .grids_generator import build_grids
 
@@ -35,6 +36,11 @@ LEGACY_AUTO_LOAD_MARKERS = ("# KzGrids auto-load",)
 DAMAGEINFO_FILE = "DamageInfo.swf"
 DAMAGEINFO_BACKUP = "DamageInfo.swf.kazbars.bak"
 
+# Damage Numbers "Group my resource numbers" toggle: flips the resource-loss flytext
+# directions in the skin's TextColors.xml (Customized/ if present, else Default/). The
+# flip is surgical + reversible, so we restore by rewriting it back, not from a backup.
+TEXTCOLORS_RELPATH = "TextColors.xml"
+
 
 def _files_equal(a, b):
     """True only if both paths exist and have byte-identical contents."""
@@ -57,6 +63,18 @@ def _atomic_install(src, dst):
     dst = Path(dst)
     tmp = dst.with_name(dst.name + ".kaztmp")
     shutil.copy2(src, tmp)
+    try:
+        os.replace(tmp, dst)
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
+def _atomic_write_text(dst, text):
+    """Write ``text`` to ``dst`` atomically (temp + os.replace), like _atomic_install."""
+    dst = Path(dst)
+    tmp = dst.with_name(dst.name + ".kaztmp")
+    tmp.write_text(text, encoding="utf-8")
     try:
         os.replace(tmp, dst)
     except OSError:
@@ -90,7 +108,7 @@ def compile_to_staging(grids, database, assets_path, compiler, app_version,
 
 
 def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None,
-                      damageinfo_pristine=None):
+                      damageinfo_pristine=None, group_resources=False):
     """Install compiled SWF + scripts to the game folder.
 
     ``damageinfo_swf`` (a staged modded DamageInfo.swf, or None) drives the Damage
@@ -98,6 +116,11 @@ def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None,
     reverts to the stock file from that backup if one exists. ``damageinfo_pristine``
     is the bundled genuine stock SWF — used to seed/recognize the backup so it can
     never capture a mod. See ``_apply_damageinfo``.
+
+    ``group_resources`` is the "Group my resource numbers" toggle (already AND-ed with
+    the master enable by the caller): True patches TextColors.xml so your resource
+    losses drop into the fixed column, False restores the stock directions. See
+    ``_apply_textcolors``.
 
     Returns (success, error_message).
     """
@@ -119,6 +142,15 @@ def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None,
             return False, (
                 "Couldn't update Damage Numbers (DamageInfo.swf).\n\n"
                 "Close Age of Conan and build again — the game locks this file while "
+                "it's running. Your grids were not changed."
+            )
+
+        try:
+            _apply_textcolors(game_path, group_resources)
+        except OSError:
+            return False, (
+                "Couldn't update Damage Numbers (TextColors.xml).\n\n"
+                "Close Age of Conan and build again — the game can lock this file while "
                 "it's running. Your grids were not changed."
             )
 
@@ -169,6 +201,28 @@ def _apply_damageinfo(flash_path, staged_swf, pristine_swf=None):
         _atomic_install(backup, target)
 
 
+def _apply_textcolors(game_path, group_resources):
+    """Patch (or restore) the resource-loss flytext directions in TextColors.xml.
+
+    ``group_resources`` True routes your own mana/stamina losses into the fixed resource
+    column (``direction="-1"``), to sit with your gains; False restores stock
+    (``direction="1"``). Edits the file the game actually reads — your ``Customized/``
+    copy if present, else ``Default/`` — in place, with a one-time courtesy backup. The
+    flip is surgical and reversible, so restore simply rewrites the four directions back.
+    A no-op when the file is missing or already in the wanted state. Raises OSError on a
+    locked/failed write (the caller turns that into a "close the game" message).
+    """
+    _default, _customized, source = buff_xml._resolve_paths(game_path, TEXTCOLORS_RELPATH)
+    if source is None:
+        return
+    text = source.read_text(encoding="utf-8")
+    new_text, _flips = buff_xml.set_resource_loss_to_column(text, group_resources)
+    if new_text == text:
+        return  # already in the desired state (idempotent)
+    buff_xml._backup_once(source)
+    _atomic_write_text(source, new_text)
+
+
 def cleanup_legacy_files(game_path):
     """Remove leftover SWFs and Aoc-module folders from predecessor versions
     (Kaz Flash Mods, Kaz Grids, the original KazBars mod) before the fresh install.
@@ -216,6 +270,20 @@ def uninstall_from_client(game_path, damageinfo_pristine=None):
               and di_target.exists() and not _files_equal(di_target, damageinfo_pristine)):
             _atomic_install(damageinfo_pristine, di_target)
             removed.append("DamageInfo.swf (restored stock from bundled copy)")
+
+        # Damage Numbers: restore the resource-loss flytext directions in TextColors.xml
+        # to stock and drop our one-time courtesy backup (no-op if never patched).
+        _d, _c, tc_source = buff_xml._resolve_paths(game_path, TEXTCOLORS_RELPATH)
+        if tc_source is not None:
+            try:
+                tc_text = tc_source.read_text(encoding="utf-8")
+                tc_stock, _flips = buff_xml.set_resource_loss_to_column(tc_text, False)
+                if tc_stock != tc_text:
+                    _atomic_write_text(tc_source, tc_stock)
+                    removed.append("TextColors.xml (restored stock)")
+            except OSError as e:
+                logger.warning("Could not restore TextColors.xml: %s", e)
+            tc_source.with_name(tc_source.name + buff_xml.BACKUP_SUFFIX).unlink(missing_ok=True)
 
         aoc_dir = Path(game_path) / "Data" / "Gui" / "Aoc" / "KazBars"
         if aoc_dir.exists():

@@ -72,7 +72,12 @@ inject). The AS2 is a from-scratch lean rewrite of the stock overlay: a single
 hashmap, object pools, and a 3-way `SHADOW_MODE` (None / Fast offset-twin / Real
 DropShadowFilter). Gated by a master `enabled` flag (off by default); when off the
 build leaves the stock file alone and reverts any prior mod via the one-time
-`DamageInfo.swf.kazbars.bak`. The regex↔constant coupling is guarded by
+`DamageInfo.swf.kazbars.bak`. One toggle ("Group my resource numbers") reaches a
+*second* game file: `build_executor._apply_textcolors` flips the four resource-loss
+flytext directions in the skin's `TextColors.xml` (Customized/ if present, else
+Default/) so your own resource losses drop into the fixed column with your gains, while
+the SWF's `OTHER_RESOURCE_LOSS_TO_TARGET` keeps drains you deal to enemies over them —
+a surgical, reversible flip restored on disable/uninstall. The regex↔constant coupling is guarded by
 `tests/test_damageinfo_generator.py` (no MTASC). Isolated — `damageinfo_*` import only
 stdlib + `build_utils`/`paths` (generator) and shared UI builders (panel); no
 cross-import with the Deeps/Live Tracker clusters.
@@ -199,7 +204,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/grid_dialogs.py` | 874 | Add/Edit/Duplicate/BuffSelector/SlotAssignment dialogs |
 | `src/kazbars/build_loading.py` | 818 | Build-progress screen + welcome/about popups |
 | `src/kazbars/buff_display_editor.py` | 575 | Default Buff Bars dialog (UI). Pure XML helpers in `buff_xml.py` |
-| `src/kazbars/buff_xml.py` | 215 | AoC HUD XML helpers (regex-only). Pure — no Tk/ttkbootstrap, importable from CI without UI extra |
+| `src/kazbars/buff_xml.py` | 254 | AoC HUD XML helpers (regex-only): `<BuffListView>` reads/writes + `set_resource_loss_to_column` (flip the 4 resource-loss flytext directions in TextColors.xml for the Damage Numbers "Group my resource numbers" toggle). Pure — no Tk/ttkbootstrap, importable from CI without UI extra |
 | `src/kazbars/buff_database.py` | 140 | `BuffDatabase` class — JSON load/save, in-memory indexes, search. Pure — no Tk |
 | `src/kazbars/app.py` | 627 | Entry point + `KazBarsApp` root window (widgets, menu, lifecycle) |
 | `src/kazbars/__main__.py` | 43 | Process entry point — logging setup + `KazBarsApp().mainloop()`; invoked by `python -m kazbars` |
@@ -218,13 +223,13 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/custom_menu_bar.py` | 402 | Canvas-based dark menu bar (active-cascade phosphor underline; ttkb-safe Canvas spacers; supports `command`, `separator`, `checkbutton` entries) |
 | `src/kazbars/combat_monitor.py` | 292 | Combat log parser feeding the tracker |
 | `src/kazbars/cast_timer_strip.py` | 348 | Frozen `CastTimerStrip` card (collapsed + master-off by default) for the cast-timer overlay. Header: one master Enabled toggle + title-adjacent Player/Target status tags + muted `overlay`. Body: a single settings row (independent Player/Target X/Y + Bold/Size/Display/Color, font fixed to Arial) + right-side sample preview. Master enables both sides together (`enableP == enableT == enabled`); X/Y grey out when off. Chrome mirrors a grid card — reserved handle gutter, shared `position_entry`, rose card border |
-| `src/kazbars/build_executor.py` | 343 | MTASC compile + deploy; Damage Numbers backup/restore (bundled pristine as the stock source of truth, atomic install via temp+`os.replace`) |
+| `src/kazbars/build_executor.py` | 411 | MTASC compile + deploy; Damage Numbers backup/restore (bundled pristine as the stock source of truth, atomic install via temp+`os.replace`) + `_apply_textcolors` (patch/restore resource-loss flytext directions in the skin's TextColors.xml for the "Group my resource numbers" toggle) |
 | `src/kazbars/profile_io.py` | 228 | Profile load (read+apply split, with auto-anchor-scale on resolution mismatch) / save (build+write+commit, `silent=` for piggyback saves) / new / open + missing-buff warning. Persists the `cast_timer` block alongside `grids` |
 | `src/kazbars/game_folder.py` | 192 | Game folder UI + Aoc.exe bypass (with install/remove reconciler) + uninstall |
 | `src/kazbars/game_resolution.py` | 104 | Game resolution dialog + anchor-rescale all loaded grids on apply |
 | `src/kazbars/settings_backup.py` | 394 | Backup & Restore dialog + pure zip layer (`write_backup_zip`/`read_manifest`/`restore_zip`, `funcom_prefs_path`, `_funcom_summary`) — bundles `%LOCALAPPDATA%\Funcom\Conan\Prefs` + KazBars `profiles/` + the whole `settings/` dir (app + Deeps + Live Tracker) into one zip; restore snapshots first, guards zip-slip, resyncs settings. Isolated satellite, no cross-imports |
-| `tests/test_buff_xml.py` | 142 | Round-trip smoke test for `buff_display_editor` XML helpers |
-| `src/kazbars/build_action.py` | 170 | Build & Install flow |
+| `tests/test_buff_xml.py` | 215 | Round-trip smoke test for the `buff_xml` helpers: `<BuffListView>` attrs + the TextColors `set_resource_loss_to_column` direction flip (apply/restore/idempotent/byte-preservation) |
+| `src/kazbars/build_action.py` | 209 | Build & Install flow |
 | `src/kazbars/ui_helpers.py` | 200 | Design tokens + `setup_custom_styles` + `style_treeview_heading` |
 | `src/kazbars/live_tracker_settings.py` | 247 | Tracker persistence (with one-shot legacy filename migration) |
 | `src/kazbars/grid_model.py` | 150 | Grid dataclasses, `parse_resolution`, `get_game_resolution_or_default`, anchor-based `scale_grid_position` (X center / Y bottom anchored) |
@@ -256,7 +261,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `tests/test_log_name.py` | 22 | `sanitize_log_name` CombatLog filename trimming (`CombatLog-2026-05-16_2152` → `CombatLog_2152`) |
 | `tests/test_boss_timer.py` | 151 | `BossTimer` cycle/syphon/double-seed transitions + phase state machine (time-driven, no sleeps) |
 | `tests/test_combat_monitor.py` | 123 | `_process_line` dispatch, player extraction, latest-log discovery, start-without-folder guard |
-| `tests/test_build_executor.py` | 460 | Install/uninstall orchestration (both modes), legacy cleanup, `create_scripts` markers, xml.add, launcher detect, `tasklist` argv, Damage Numbers backup-once/install/revert/uninstall + orphan-mod recovery — no MTASC/Tk |
+| `tests/test_build_executor.py` | 557 | Install/uninstall orchestration (both modes), legacy cleanup, `create_scripts` markers, xml.add, launcher detect, `tasklist` argv, Damage Numbers backup-once/install/revert/uninstall + orphan-mod recovery, TextColors patch/restore/Customized-preference lifecycle — no MTASC/Tk |
 | `tests/test_build_compile.py` | 120 | MTASC compile-integration — whole codegen → bundled `mtasc.exe` exit-0 (escaping end-to-end + console/cast variants); win32 + compiler gated |
 | `src/kazbars/deeps_panel.py` | 941 | `DeepsPanel` Toplevel — status row, Start/Stop, Lock + Layout, appearance (size/background sliders, font fixed to Segoe UI), Readout card (window width + a Style preset radio — Live/Steady/Calm — bundling smoothing/round/refresh), Alarm & Tints card (DPS-out alarm slider over the 1000–4000/s band + Tank/Standard survival-tint preset radios + a live breakpoint caption), 5-cell visibility picker, pet toggle. Owns the meter + overlay + 100 ms UI tick + alarm hysteresis state machine |
 | `src/kazbars/deeps_meter.py` | 452 | `DeepsMeter` daemon thread — tail loop, log rotation detection, `is_live` probe via `CreateFile` exclusive-share, configurable rolling-window width (`set_window_seconds` recreates the trackers). Publishes `MeterSnapshot` (focus is no longer probed here — the shared `ForegroundWatcher` owns it) |

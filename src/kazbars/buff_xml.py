@@ -213,3 +213,42 @@ def _parse_point(raw):
 
 def _format_point(x, y):
     return f'Point({x},{y})'
+
+
+# ============================================================================
+# TEXTCOLORS.xml — resource-loss flytext direction (Damage Numbers toggle)
+# ============================================================================
+# AoC's TextColors.xml gives each flying-text type a `direction`: 1 = float above the
+# head, -1 = drop into the fixed column. These four resource-LOSS types ship at 1;
+# flipping them to -1 routes your own mana/stamina losses into the same fixed column
+# as your gains (already -1), so all your resource changes read in one place. The
+# DamageInfo SWF separately keeps drains you deal to ENEMIES floating over them
+# (OTHER_RESOURCE_LOSS_TO_TARGET). Surgical + reversible — restore flips back to 1.
+RESOURCE_LOSS_TYPES = (
+    'stamina_lost', 'mana_lost', 'stamina_loss_critical', 'mana_loss_critical',
+)
+
+_DIRECTION_ATTR_RE = re.compile(r'(\bdirection\s*=\s*["\'])(-?\d+)(["\'])')
+
+
+def set_resource_loss_to_column(xml_text, to_column):
+    """Set `direction` for the four resource-loss flytext types in TextColors.xml.
+
+    ``to_column`` True → ``direction="-1"`` (fixed column, with your resource gains);
+    False → ``direction="1"`` (above the head, stock). Only the element carrying each
+    ``name="<type>"`` is touched (any attribute order, single- or multi-line); all other
+    bytes are preserved. Returns ``(new_text, flips)`` — ``flips`` counts the direction
+    attributes actually changed (0 ⇒ already in the wanted state or types absent).
+    """
+    target = '-1' if to_column else '1'
+    flips = 0
+    for name in RESOURCE_LOSS_TYPES:
+        elem_re = re.compile(rf'<[^>]*\bname\s*=\s*["\']{re.escape(name)}["\'][^>]*>')
+        m = elem_re.search(xml_text)
+        if not m:
+            continue
+        new_elem, n = _DIRECTION_ATTR_RE.subn(rf'\g<1>{target}\g<3>', m.group(0))
+        if n and new_elem != m.group(0):
+            xml_text = xml_text[:m.start()] + new_elem + xml_text[m.end():]
+            flips += n
+    return xml_text, flips

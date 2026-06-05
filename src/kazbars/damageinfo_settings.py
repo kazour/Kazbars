@@ -167,10 +167,16 @@ GLOBAL_SETTINGS: dict[str, dict[str, Any]] = {
         'file': 'DamageNumberManager.as',
         'pattern': r'(static var SHOW_ALL_TITLES\s*=\s*)(\d+)',
     },
+    # "Group my resource numbers": baked into OTHER_RESOURCE_LOSS_TO_TARGET (the SWF keeps
+    # enemy drains over the enemy) AND patches TextColors.xml at install time so your own
+    # resource losses drop into the fixed column with your gains. See build_executor._apply_textcolors.
     'other_resource_loss_to_target': {
         'default': 0, 'min': 0, 'max': 1, 'step': 1, 'type': 'bool', 'unit': '',
-        'description': 'Enemy drain at target',
-        'tooltip': 'When on, mana/stamina you drain from enemies appears above their head instead of in your fixed column.',
+        'description': 'Group my resource numbers',
+        'tooltip': 'Sends your own mana/stamina losses to the same fixed column as your '
+                   'resource gains, so you watch all your resource changes in one place. '
+                   'Mana/stamina you drain from enemies still floats above them. '
+                   '(Patches TextColors.xml on Build & Install.)',
         'file': 'DamageNumberManager.as',
         'pattern': r'(static var OTHER_RESOURCE_LOSS_TO_TARGET\s*=\s*)(\d+)',
     },

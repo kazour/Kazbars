@@ -9,13 +9,17 @@ filter whitespace normaliser, and the no-BuffListView guard.
 Run: `pytest tests/test_buff_xml.py` (from repo root).
 """
 
+import re
+
 from kazbars.buff_xml import (
     FILTER_BOTH,
     FILTER_FRIENDLY,
     FILTER_HOSTILE,
+    RESOURCE_LOSS_TYPES,
     _normalise_filter,
     _read_bufflistview,
     _write_bufflistview,
+    set_resource_loss_to_column,
 )
 
 SAMPLE = '''\
@@ -138,5 +142,74 @@ def test_filter_canonical_form_written():
     written = _write_bufflistview(no_space, {'filter': FILTER_BOTH}, enabled=True)
     assert written is not None
     assert 'filter            = "friendly | hostile"' in written
+
+
+# =========================================================================== #
+# TextColors.xml — resource-loss flytext direction                            #
+# =========================================================================== #
+# Mixed attribute orders, a spaced `direction = "1"`, and a multi-line element —
+# plus a non-loss type (self_attacked) and the gain types (already -1) that must
+# never be touched.
+TEXTCOLORS = '''\
+<?xml version="1.0" encoding="UTF-8"?>
+<TextColors>
+    <text name="self_attacked"          color="0xff0000" direction="1" />
+    <text name="stamina_gained"         direction="-1"   color="0x00ff00" />
+    <text name="mana_gained"            color="0x0000ff" direction="-1" />
+    <text name="stamina_lost"           direction="1"    color="0x888800" />
+    <text name="mana_lost"              color="0x000088" direction="1" />
+    <text name="stamina_loss_critical"  direction = "1" />
+    <text name="mana_loss_critical"
+          color="0x440000"
+          direction="1" />
+</TextColors>
+'''
+
+
+def _direction_of(xml, name):
+    m = re.search(rf'<[^>]*\bname="{name}"[^>]*>', xml)
+    assert m, f"element {name} not found"
+    d = re.search(r'direction\s*=\s*"(-?\d+)"', m.group(0))
+    return d.group(1) if d else None
+
+
+def test_resource_loss_to_column_flips_only_loss_types():
+    new, flips = set_resource_loss_to_column(TEXTCOLORS, True)
+    assert flips == 4
+    for name in RESOURCE_LOSS_TYPES:
+        assert _direction_of(new, name) == '-1', name
+    # Non-loss type and the gains are untouched.
+    assert _direction_of(new, 'self_attacked') == '1'
+    assert _direction_of(new, 'stamina_gained') == '-1'
+    assert _direction_of(new, 'mana_gained') == '-1'
+
+
+def test_resource_loss_restore_flips_back():
+    on, _ = set_resource_loss_to_column(TEXTCOLORS, True)
+    restored, flips = set_resource_loss_to_column(on, False)
+    assert flips == 4
+    assert restored == TEXTCOLORS          # byte-identical round trip
+    assert _direction_of(restored, 'self_attacked') == '1'
+
+
+def test_resource_loss_idempotent():
+    on, _ = set_resource_loss_to_column(TEXTCOLORS, True)
+    again, flips = set_resource_loss_to_column(on, True)
+    assert flips == 0          # nothing left to change
+    assert again == on
+
+
+def test_resource_loss_missing_types_is_noop():
+    text = '<TextColors><text name="self_attacked" direction="1" /></TextColors>'
+    new, flips = set_resource_loss_to_column(text, True)
+    assert flips == 0
+    assert new == text
+
+
+def test_resource_loss_preserves_surrounding_bytes():
+    new, _ = set_resource_loss_to_column(TEXTCOLORS, True)
+    assert '<?xml version="1.0" encoding="UTF-8"?>' in new
+    assert 'color="0x888800"' in new       # stamina_lost's other attrs intact
+    assert 'color="0x440000"' in new       # multi-line element's body intact
 
 

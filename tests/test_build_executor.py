@@ -412,6 +412,103 @@ class TestDamageInfo:
 
 
 # =========================================================================== #
+# TextColors.xml — "Group my resource numbers" toggle lifecycle               #
+# =========================================================================== #
+_STOCK_TEXTCOLORS = (
+    '<TextColors>\n'
+    '  <text name="stamina_lost" direction="1" />\n'
+    '  <text name="mana_lost" direction="1" />\n'
+    '  <text name="stamina_loss_critical" direction="1" />\n'
+    '  <text name="mana_loss_critical" direction="1" />\n'
+    '  <text name="stamina_gained" direction="-1" />\n'
+    '</TextColors>\n'
+)
+
+_LOSS_NAMES = ("stamina_lost", "mana_lost", "stamina_loss_critical", "mana_loss_critical")
+
+
+def _gui(game, skin):
+    return game / "Data" / "Gui" / skin
+
+
+def _write_textcolors(game, skin, text=_STOCK_TEXTCOLORS):
+    p = _gui(game, skin) / "TextColors.xml"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(text, encoding="utf-8")
+    return p
+
+
+class TestTextColors:
+    @staticmethod
+    def _install(tmp_path, game, *, group):
+        swf = tmp_path / "staging" / "KazBars.swf"
+        swf.parent.mkdir(parents=True, exist_ok=True)
+        swf.write_bytes(b"FWS\x06kz")
+        return install_to_client(swf, str(game), use_aoc=False,
+                                 damageinfo_swf=None, damageinfo_pristine=None,
+                                 group_resources=group)
+
+    def test_enable_patches_and_backs_up_stock(self, tmp_path):
+        game = tmp_path / "game"
+        tc = _write_textcolors(game, "Default")
+        ok, err = self._install(tmp_path, game, group=True)
+
+        assert (ok, err) == (True, "")
+        text = tc.read_text(encoding="utf-8")
+        for name in _LOSS_NAMES:
+            assert f'name="{name}" direction="-1"' in text
+        assert 'name="stamina_gained" direction="-1"' in text  # gain untouched
+        bak = tc.with_name("TextColors.xml.kazbars.bak")
+        assert 'name="stamina_lost" direction="1"' in bak.read_text(encoding="utf-8")
+
+    def test_prefers_customized_over_default(self, tmp_path):
+        game = tmp_path / "game"
+        default = _write_textcolors(game, "Default")
+        cust = _write_textcolors(game, "Customized")
+        self._install(tmp_path, game, group=True)
+
+        assert 'name="stamina_lost" direction="-1"' in cust.read_text(encoding="utf-8")
+        # Default left exactly as stock — the game reads Customized.
+        assert 'name="stamina_lost" direction="1"' in default.read_text(encoding="utf-8")
+
+    def test_disable_restores_stock(self, tmp_path):
+        game = tmp_path / "game"
+        tc = _write_textcolors(game, "Default")
+        self._install(tmp_path, game, group=True)
+        self._install(tmp_path, game, group=False)
+
+        text = tc.read_text(encoding="utf-8")
+        for name in _LOSS_NAMES:
+            assert f'name="{name}" direction="1"' in text
+
+    def test_second_enable_keeps_genuine_stock_backup(self, tmp_path):
+        game = tmp_path / "game"
+        tc = _write_textcolors(game, "Default")
+        self._install(tmp_path, game, group=True)
+        self._install(tmp_path, game, group=True)  # idempotent re-enable
+
+        bak = tc.with_name("TextColors.xml.kazbars.bak")
+        assert 'name="stamina_lost" direction="1"' in bak.read_text(encoding="utf-8")
+
+    def test_missing_textcolors_install_still_succeeds(self, tmp_path):
+        game = tmp_path / "game"  # no TextColors.xml anywhere
+        ok, err = self._install(tmp_path, game, group=True)
+        assert (ok, err) == (True, "")
+
+    def test_uninstall_restores_stock_and_removes_backup(self, tmp_path):
+        game = tmp_path / "game"
+        tc = _write_textcolors(game, "Default")
+        self._install(tmp_path, game, group=True)
+
+        ok, msg = uninstall_from_client(str(game))
+
+        assert ok is True
+        assert "TextColors.xml (restored stock)" in msg
+        assert 'name="stamina_lost" direction="1"' in tc.read_text(encoding="utf-8")
+        assert not tc.with_name("TextColors.xml.kazbars.bak").exists()
+
+
+# =========================================================================== #
 # get_running_game_process — argv + match/exception handling                  #
 # =========================================================================== #
 
