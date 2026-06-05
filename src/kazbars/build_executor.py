@@ -41,6 +41,20 @@ DAMAGEINFO_BACKUP = "DamageInfo.swf.kazbars.bak"
 # flip is surgical + reversible, so we restore by rewriting it back, not from a backup.
 TEXTCOLORS_RELPATH = "TextColors.xml"
 
+# Returned when a running client locks DamageInfo.swf / TextColors.xml. _LOCK_MSG is the
+# clean "nothing committed" case; _PARTIAL_MSG covers the rare lock that bites between the
+# two adjacent os.replace commits, leaving one game file swapped and the other not (the
+# next successful build re-stages from stock and self-heals).
+_DAMAGEINFO_LOCK_MSG = (
+    "Couldn't update Damage Numbers.\n\n"
+    "Close Age of Conan and build again — the game locks DamageInfo.swf and "
+    "TextColors.xml while it's running. Your grids were not changed."
+)
+_DAMAGEINFO_PARTIAL_MSG = (
+    "Couldn't finish updating Damage Numbers — the game locked one of its files midway.\n\n"
+    "Close Age of Conan and build again to apply the rest. Your grids were not changed."
+)
+
 
 def _files_equal(a, b):
     """True only if both paths exist and have byte-identical contents."""
@@ -63,18 +77,6 @@ def _atomic_install(src, dst):
     dst = Path(dst)
     tmp = dst.with_name(dst.name + ".kaztmp")
     shutil.copy2(src, tmp)
-    try:
-        os.replace(tmp, dst)
-    except OSError:
-        tmp.unlink(missing_ok=True)
-        raise
-
-
-def _atomic_write_text(dst, text):
-    """Write ``text`` to ``dst`` atomically (temp + os.replace), like _atomic_install."""
-    dst = Path(dst)
-    tmp = dst.with_name(dst.name + ".kaztmp")
-    tmp.write_text(text, encoding="utf-8")
     try:
         os.replace(tmp, dst)
     except OSError:
@@ -116,12 +118,12 @@ def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None,
     Numbers feature: a path installs the mod (backing up the stock file once); None
     reverts to the stock file from that backup if one exists. ``damageinfo_pristine``
     is the bundled genuine stock SWF — used to seed/recognize the backup so it can
-    never capture a mod. See ``_apply_damageinfo``.
+    never capture a mod. See ``_prepare_damageinfo``.
 
     ``group_resources`` ("Group my resource numbers"), ``split_incoming`` ("Split into two
     columns" → incoming/self damage+heal directions), and ``source_colors`` (per-source
     color map) — all gated on the master enable by the caller — customize the skin's
-    TextColors.xml, regenerated from a one-time stock backup. See ``_apply_textcolors``.
+    TextColors.xml, regenerated from a one-time stock backup. See ``_prepare_textcolors``.
 
     Returns (success, error_message).
     """
@@ -134,26 +136,34 @@ def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None,
 
         cleanup_legacy_files(game_path)
 
-        # Damage Numbers touches a core game file the running client can hold locked.
-        # Apply it FIRST so a lock failure leaves nothing half-installed (KazBars.swf
-        # is not yet copied), and surface a clear "close the game" message.
+        # Damage Numbers touches two core game files (DamageInfo.swf + TextColors.xml) a
+        # running client can hold locked. Stage both changes to temp files first — the slow,
+        # failure-prone copy/compute — then commit them back-to-back with os.replace, the
+        # only lock-prone step. Staging runs before KazBars.swf is copied, so a lock leaves
+        # the grids untouched; committing the two adjacent shrinks the window where a lock
+        # could swap one file but not the other down to a near-instant gap.
+        staged_pairs = []
         try:
-            _apply_damageinfo(flash_path, damageinfo_swf, damageinfo_pristine)
+            di_pair = _prepare_damageinfo(flash_path, damageinfo_swf, damageinfo_pristine)
+            if di_pair:
+                staged_pairs.append(di_pair)
+            tc_pair = _prepare_textcolors(game_path, group_resources, source_colors, split_incoming)
+            if tc_pair:
+                staged_pairs.append(tc_pair)
         except OSError:
-            return False, (
-                "Couldn't update Damage Numbers (DamageInfo.swf).\n\n"
-                "Close Age of Conan and build again — the game locks this file while "
-                "it's running. Your grids were not changed."
-            )
+            for tmp, _ in staged_pairs:
+                tmp.unlink(missing_ok=True)
+            return False, _DAMAGEINFO_LOCK_MSG
 
-        try:
-            _apply_textcolors(game_path, group_resources, source_colors, split_incoming)
-        except OSError:
-            return False, (
-                "Couldn't update Damage Numbers (TextColors.xml).\n\n"
-                "Close Age of Conan and build again — the game can lock this file while "
-                "it's running. Your grids were not changed."
-            )
+        committed = 0
+        for tmp, target in staged_pairs:
+            try:
+                os.replace(tmp, target)
+            except OSError:
+                for tmp2, _ in staged_pairs[committed:]:
+                    tmp2.unlink(missing_ok=True)
+                return False, (_DAMAGEINFO_PARTIAL_MSG if committed else _DAMAGEINFO_LOCK_MSG)
+            committed += 1
 
         shutil.copy2(staging_swf, flash_path / "KazBars.swf")
 
@@ -171,13 +181,17 @@ def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None,
     return True, ""
 
 
-def _apply_damageinfo(flash_path, staged_swf, pristine_swf=None):
-    """Install or revert the modded DamageInfo.swf in the game's Flash folder.
+def _prepare_damageinfo(flash_path, staged_swf, pristine_swf=None):
+    """Stage the DamageInfo.swf install/revert to a temp file without committing it.
 
-    - staged_swf given: ensure a stock backup exists, then atomically overwrite the
-      target with the modded build.
-    - staged_swf None: Damage Numbers is off — restore the stock file from the backup
-      if we made one (a no-op when the feature was never installed).
+    Returns the ``(tmp, target)`` pair the caller os.replaces at commit, or ``None`` when
+    there's nothing to do. Does all the lock-safe-but-slow work up front (seed the backup,
+    copy to the temp) so the caller's commit phase is nothing but os.replace; raises
+    OSError if that work fails, with the target untouched.
+
+    - staged_swf given: ensure a stock backup exists, then stage the modded build.
+    - staged_swf None: Damage Numbers is off — stage a restore from the backup if we made
+      one (``None`` when the feature was never installed).
 
     The backup must always hold genuine stock so a later revert can never resurrect a
     mod. The old "copy whatever the target is, once" rule failed if the .bak was lost
@@ -197,30 +211,41 @@ def _apply_damageinfo(flash_path, staged_swf, pristine_swf=None):
                 shutil.copy2(source, backup)
             elif target.exists():
                 shutil.copy2(target, backup)  # legacy fallback: no pristine supplied
-        _atomic_install(staged_swf, target)
+        src = staged_swf
     elif backup.exists():
-        _atomic_install(backup, target)
+        src = backup
+    else:
+        return None
+    tmp = target.with_name(target.name + ".kaztmp")
+    shutil.copy2(src, tmp)
+    return tmp, target
 
 
-def _apply_textcolors(game_path, group_resources, source_colors=None, split_incoming=False):
-    """Patch (or restore) the skin's TextColors.xml for the Damage Numbers features.
+def _prepare_textcolors(game_path, group_resources, source_colors=None, split_incoming=False):
+    """Stage the skin's TextColors.xml patch/restore to a temp file without committing it.
+
+    Returns the ``(tmp, target)`` pair to os.replace, or ``None`` when nothing needs
+    writing (no managed change, or the result already matches the live file). Raises
+    OSError on a failed read/seed/temp-write, with the live file untouched.
 
     Three independent things customize TextColors.xml and must compose: the "Group my
     resource numbers" toggle (``group_resources`` → resource-loss flytext directions), the
-    "Split into two columns" toggle (``split_incoming`` → the incoming/self damage + heal
-    directions, so everything that lands on you drops into the columns), and the per-source
+    "Separate resources into Column B" toggle (``split_incoming`` → the incoming/self damage +
+    heal directions, so everything that lands on you drops into the columns), and the per-source
     color editor (``source_colors`` → a ``{name: "RRGGBB"}`` map). Colors have no
     deterministic inverse, so instead of editing in place we keep a one-time genuine-stock
     backup (``TextColors.xml.kazbars.bak``) and **regenerate** the live file from it each
-    build: stock → direction flips → color overrides. Nothing active ⇒ restore from the
-    backup (kept across a disable, dropped on uninstall). Edits the file the game reads
-    (Customized/ if present, else Default/) atomically. Raises OSError on a locked/failed
-    write (the caller turns that into a "close the game" message).
+    build: stock → direction flips → color overrides. Because the base is always the stock
+    backup (never the current file), any out-of-band hand-edit to the managed flytext
+    entries is intentionally overwritten on every build — KazBars owns those entries while
+    the feature is on. Nothing active ⇒ restore from the backup (kept across a disable,
+    dropped on uninstall). Targets the file the game reads (Customized/ if present, else
+    Default/).
     """
     source_colors = source_colors or {}
     _default, _customized, source = buff_xml._resolve_paths(game_path, TEXTCOLORS_RELPATH)
     if source is None:
-        return
+        return None
     backup = source.with_name(source.name + buff_xml.BACKUP_SUFFIX)
     current = source.read_text(encoding="utf-8")
 
@@ -233,12 +258,17 @@ def _apply_textcolors(game_path, group_resources, source_colors=None, split_inco
             base, _ = buff_xml.set_directions(base, buff_xml.INCOMING_DAMAGE_TYPES, True)
         for name, color in source_colors.items():
             base, _ = buff_xml.set_source_color(base, name, color)
-        if base != current:
-            _atomic_write_text(source, base)
+        target_text = base
     elif backup.exists():
-        stock = backup.read_text(encoding="utf-8")
-        if stock != current:
-            _atomic_write_text(source, stock)
+        target_text = backup.read_text(encoding="utf-8")
+    else:
+        return None
+
+    if target_text == current:
+        return None
+    tmp = source.with_name(source.name + ".kaztmp")
+    tmp.write_text(target_text, encoding="utf-8")
+    return tmp, source
 
 
 def cleanup_legacy_files(game_path):

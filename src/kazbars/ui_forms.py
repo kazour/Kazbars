@@ -343,7 +343,7 @@ def create_status_block(parent, title="Status", wraplength=0):
 
 
 def create_slider_row(parent, label_text, from_, to, initial, suffix, on_drag, on_commit,
-                      value_width=5, notch=False):
+                      value_width=5, notch=False, label_width=None):
     """One row: descriptor label · ttk.Scale · live value label.
 
     `on_drag(value)` fires continuously while dragging (refresh the label + push
@@ -354,6 +354,11 @@ def create_slider_row(parent, label_text, from_, to, initial, suffix, on_drag, o
     `value_width` is the readout label width in chars — default 5 fits short
     units like `48pt` / `100%`; widen it for longer readouts (e.g. `4000/s`).
 
+    `label_width` fixes the descriptor label's width in chars (left-anchored) so
+    every slider in a panel starts its trough at the same x — pass the longest
+    label's length to keep a column of rows aligned. None = shrink-to-fit (the
+    sliders start ragged, fine when the labels are uniform).
+
     `notch=True` draws a thin tick under the trough's centre — use it on
     symmetric sliders (`from_ == -to`) so the midpoint reads as the default. It
     is pure chrome (no effect on the value), and the centre is robust because
@@ -361,8 +366,9 @@ def create_slider_row(parent, label_text, from_, to, initial, suffix, on_drag, o
     """
     row = ttk.Frame(parent)
     row.pack(fill="x", pady=PAD_XS)
+    label_kw = {"width": label_width, "anchor": "w"} if label_width else {}
     ttk.Label(
-        row, text=label_text, font=FONT_BODY, foreground=THEME_COLORS["body"],
+        row, text=label_text, font=FONT_BODY, foreground=THEME_COLORS["body"], **label_kw,
     ).pack(side="left")
     value_label = ttk.Label(
         row, text=f"{initial}{suffix}", font=FONT_SMALL,

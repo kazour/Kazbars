@@ -75,11 +75,11 @@ build leaves the stock file alone and reverts any prior mod via the one-time
 `DamageInfo.swf.kazbars.bak`. Three features reach a *second* game file — the skin's
 `TextColors.xml` (Customized/ if present, else Default/): the "Group my resource numbers"
 toggle (resource-loss flytext directions → fixed column, the SWF's
-`OTHER_RESOURCE_LOSS_TO_TARGET` keeping enemy drains overhead), the "Split into two columns"
-toggle (the incoming/self damage+heal directions → fixed column, so plain damage/heals stack
-in column A and signed resources in column B), and the per-source **color editor**
+`OTHER_RESOURCE_LOSS_TO_TARGET` keeping enemy drains overhead), the "Separate resources into
+Column B" toggle (the incoming/self damage+heal directions → fixed column, so plain damage stacks
+in column A and the signed numbers (heals, mana, stamina) in column B), and the per-source **color editor**
 (`damageinfo_colors_panel.py` → `source_colors` → each type's `color="0x…"`). They compose
-independently: `build_executor._apply_textcolors` keeps a one-time genuine-stock backup and
+independently: `build_executor._prepare_textcolors` keeps a one-time genuine-stock backup and
 **regenerates** the live file from it each build (stock → direction flips → color
 overrides), restoring from the backup on disable/uninstall. The regex↔constant coupling is guarded by
 `tests/test_damageinfo_generator.py` (no MTASC). Isolated — `damageinfo_*` import only
@@ -227,7 +227,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/custom_menu_bar.py` | 402 | Canvas-based dark menu bar (active-cascade phosphor underline; ttkb-safe Canvas spacers; supports `command`, `separator`, `checkbutton` entries) |
 | `src/kazbars/combat_monitor.py` | 292 | Combat log parser feeding the tracker |
 | `src/kazbars/cast_timer_strip.py` | 348 | Frozen `CastTimerStrip` card (collapsed + master-off by default) for the cast-timer overlay. Header: one master Enabled toggle + title-adjacent Player/Target status tags + muted `overlay`. Body: a single settings row (independent Player/Target X/Y + Bold/Size/Display/Color, font fixed to Arial) + right-side sample preview. Master enables both sides together (`enableP == enableT == enabled`); X/Y grey out when off. Chrome mirrors a grid card — reserved handle gutter, shared `position_entry`, rose card border |
-| `src/kazbars/build_executor.py` | 425 | MTASC compile + deploy; Damage Numbers backup/restore (bundled pristine as the stock source of truth, atomic install via temp+`os.replace`) + `_apply_textcolors` (regenerate the skin's TextColors.xml from a one-time stock backup = resource-loss + incoming/self direction flips + per-source color overrides; restore on disable/uninstall) |
+| `src/kazbars/build_executor.py` | 455 | MTASC compile + deploy; Damage Numbers backup/restore (bundled pristine as the stock source of truth, install via stage-to-temp then back-to-back `os.replace` commit) + `_prepare_textcolors` (regenerate the skin's TextColors.xml from a one-time stock backup = resource-loss + incoming/self direction flips + per-source color overrides; restore on disable/uninstall) |
 | `src/kazbars/profile_io.py` | 228 | Profile load (read+apply split, with auto-anchor-scale on resolution mismatch) / save (build+write+commit, `silent=` for piggyback saves) / new / open + missing-buff warning. Persists the `cast_timer` block alongside `grids` |
 | `src/kazbars/game_folder.py` | 192 | Game folder UI + Aoc.exe bypass (with install/remove reconciler) + uninstall |
 | `src/kazbars/game_resolution.py` | 104 | Game resolution dialog + anchor-rescale all loaded grids on apply |
@@ -242,7 +242,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/cast_timer.py` | 113 | Cast-timer overlay config (pure data): defaults, validation, `is_enabled` gate. No Tk |
 | `src/kazbars/damageinfo_settings.py` | 522 | Damage Numbers config (pure data): `GLOBAL_SETTINGS` bake-map (symmetric offset ranges + `invert`/`relative` UI flags for the position sliders + target file + regex), `GAME_DEFAULTS`, `PRESETS` (Default/Performance — carry the animation timing), `SPREAD_SPACING_OPTIONS` (one radio → both zig-zag offsets) + `spread_spacing_option`, the per-source color catalog (`PAIRED_GROUPS`/`SHARED_SOURCES`/`ALL_SOURCE_NAMES`) + `source_colors` setting + `validate_source_colors`/`normalize_color`, validate/`compute_final_value`/`readout`/`apply_preset`, `is_offset_key`, load/save. No Tk |
 | `src/kazbars/damageinfo_generator.py` | 134 | Bakes setting offsets into the lean AS2 tree and MTASC-injects the pristine `DamageInfo.swf` (`build_damageinfo` via `build_utils.compile_as2`). No Tk |
-| `src/kazbars/damageinfo_panel.py` | 367 | `DamageNumbersPanel` Toplevel (Game ▸ Damage numbers…) — master enable gate, a top "Damage number colors…" launch button, presets, then cards Behavior (all toggles, off by default) / Shadow / Above-target / Fixed columns / Zig-zag; offset sliders (centre-notched; vertical ones reversed) + the coupled `Spread-spacing` radio in a scrollable body; persists to `damageinfo_settings.json`. No number/label size slider (AoC's own Options slider covers it) |
+| `src/kazbars/damageinfo_panel.py` | 379 | `DamageNumbersPanel` Toplevel (Game ▸ Damage number Mod…) — master enable gate, presets, then cards Behavior (all toggles, off by default) / Shadow / Direction 1 (Rising) / Direction -1 (Dropping) / Direction 0 (Zig-zag); offset sliders (centre-notched; vertical ones reversed) + the coupled `Spread-spacing` radio in a scrollable body, with the Column B rows hidden until the split toggle is on; persists to `damageinfo_settings.json`. No number/label size slider (AoC's own Options slider covers it). The per-source color editor is its own Game-menu entry (Damage number Colors…), not a child of this panel |
 | `src/kazbars/damageinfo_colors_panel.py` | 210 | `DamageNumberColorsPanel` Toplevel (opened from the Damage Numbers panel) — per-source flytext color editor: all 35 sources in a 2-column self/other card layout + a shared resources/misc card, each row a `ui_forms.ColorSwatch` + reset; reads baseline colors from the skin's TextColors.xml (backup-first) and saves picks to `source_colors`. Applied at Build & Install |
 | `src/kazbars/window_position.py` | 110 | Window geometry save/restore |
 | `src/kazbars/settings_manager.py` | 104 | `SettingsManager` (incl. `reload()` to resync in-memory state from disk after a restore), JSON helpers, settings proxy |

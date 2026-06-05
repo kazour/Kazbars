@@ -223,8 +223,9 @@ def _format_point(x, y):
 #  • "Group my resource numbers" → RESOURCE_LOSS_TYPES (your own mana/stamina losses join
 #    your gains, already -1, in one column). The DamageInfo SWF separately keeps drains you
 #    deal to ENEMIES floating overhead (OTHER_RESOURCE_LOSS_TO_TARGET).
-#  • "Split into two columns" → INCOMING_DAMAGE_TYPES (everything that lands on you drops
-#    into the columns; plain damage/heals to column A, signed resources to column B).
+#  • "Separate resources into Column B" → INCOMING_DAMAGE_TYPES (everything that lands on you
+#    drops into the columns; plain damage to column A, signed numbers (heals, mana, stamina)
+#    to column B).
 # Surgical + reversible — restore flips back to 1.
 RESOURCE_LOSS_TYPES = (
     'stamina_lost', 'mana_lost', 'stamina_loss_critical', 'mana_loss_critical',

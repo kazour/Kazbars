@@ -1,7 +1,7 @@
 """KazBars — Damage Number Colors panel.
 
-A per-source color editor for AoC's floating combat numbers, opened from the Damage
-Numbers panel ("Damage number colors…"). Every flytext source (see
+A per-source color editor for AoC's floating combat numbers, opened from the Game menu
+("Damage number Colors…"). Every flytext source (see
 :data:`damageinfo_settings.PAIRED_GROUPS` / ``SHARED_SOURCES`` — ~35 types) gets its own
 swatch, laid out in two columns: **self** (numbers on you) on the left, **other** (numbers
 on your target) on the right, with the shared resource/XP/murder types in a full-width
@@ -9,7 +9,7 @@ card below.
 
 Like the rest of Damage Numbers this is settings-only: picks are stored in
 ``damageinfo_settings.json`` (``source_colors``) and written to the skin's ``TextColors.xml``
-on the next Build & Install (``build_executor._apply_textcolors``). Baseline swatch colors
+on the next Build & Install (``build_executor._prepare_textcolors``). Baseline swatch colors
 are read from that file (preferring the one-time stock backup so "reset" reverts to the
 game default, not a previously-applied pick). Single-instance, mirrors
 ``open_damage_numbers_panel``.
@@ -35,6 +35,7 @@ from .ui_helpers import (
     PAD_XS,
     THEME_COLORS,
 )
+from .ui_tk_style import apply_dark_titlebar
 from .ui_widgets import add_tooltip, app_toast
 from .window_position import bind_window_position_save, restore_window_position
 
@@ -95,6 +96,13 @@ class DamageNumberColorsPanel(tk.Toplevel):
 
         self.geometry(f"{_W}x{_H}")
         self.protocol("WM_DELETE_WINDOW", self.destroy)
+        # Re-assert the dark titlebar on the panel's own map — the global one-shot patch
+        # can miss a deep/scrollable Toplevel like this one. Same fix as buff_display_editor.
+        self.bind("<Map>", self._reassert_dark_titlebar, add="+")
+
+    def _reassert_dark_titlebar(self, event) -> None:
+        if event.widget is self:
+            apply_dark_titlebar(self)
 
     # ------------------------------------------------------------------ #
     # UI construction                                                    #

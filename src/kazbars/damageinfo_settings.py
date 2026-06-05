@@ -66,14 +66,14 @@ GLOBAL_SETTINGS: dict[str, dict[str, Any]] = {
     # --- Direction 1: above target ---
     'dir1_x_offset': {
         'default': 0, 'min': -200, 'max': 200, 'step': 10, 'unit': 'px', 'relative': True,
-        'description': 'X shift from head',
+        'description': 'X offset',
         'tooltip': 'Horizontal shift for numbers that float above a target. Positive = further right.',
         'file': 'numbersTypes/MovingDamageText.as',
         'pattern': r'(static var DIR1_X_OFFSET\s*=\s*)(-?\d+)',
     },
     'dir1_y_offset': {
         'default': 0, 'min': -200, 'max': 200, 'step': 10, 'unit': 'px', 'invert': True, 'relative': True,
-        'description': 'Y shift from head',
+        'description': 'Y offset',
         'tooltip': 'Vertical shift for numbers above a target. Drag right to raise them.',
         'file': 'numbersTypes/MovingDamageText.as',
         'pattern': r'(static var DIR1_Y_OFFSET\s*=\s*)(-?\d+)',
@@ -81,57 +81,58 @@ GLOBAL_SETTINGS: dict[str, dict[str, Any]] = {
     # --- Fixed columns (direction -1) + split ---
     'fixed_col_x': {
         'default': 0, 'min': -200, 'max': 200, 'step': 10, 'unit': 'px', 'relative': True,
-        'description': 'Column A: X',
-        'tooltip': 'Column A horizontal position from screen center. Plain numbers go here (or all numbers when split is off).',
+        'description': 'X offset',
+        'tooltip': 'Column A horizontal position from screen center. Plain damage numbers go here (everything stacks here when the second column is off).',
         'file': 'numbersTypes/MovingDamageText.as',
         'pattern': r'(static var FIXED_COL_X\s*=\s*)(-?\d+)',
     },
     'fixed_col_y': {
         'default': 0, 'min': -200, 'max': 200, 'step': 10, 'unit': 'px', 'invert': True, 'relative': True,
-        'description': 'Column A: Y',
+        'description': 'Y offset',
         'tooltip': 'Column A vertical position. Drag right to raise it on screen.',
         'file': 'numbersTypes/MovingDamageText.as',
         'pattern': r'(static var FIXED_COL_Y\s*=\s*)(-?\d+)',
     },
-    # "Split into two columns" also drops your incoming damage/heals into the fixed columns:
-    # at install it flips the self Attacks/Spells/Combos/Heals directions to -1 in
+    # "Separate resources into Column B" also drops your incoming damage/heals into the fixed
+    # columns: at install it flips the self Attacks/Spells/Combos/Heals directions to -1 in
     # TextColors.xml (build_executor, independent of "Group my resource numbers"), so plain
-    # damage/heals stack in Column A and signed resource numbers in Column B.
+    # damage stacks in Column A and the signed numbers (heals, mana, stamina) in Column B.
     'fixed_col_split': {
         'default': 0, 'min': 0, 'max': 1, 'step': 1, 'type': 'bool', 'unit': '',
-        'description': 'Split into two columns',
-        'tooltip': 'Drops your incoming damage/heals into the fixed columns and splits them: '
-                   'plain numbers (damage/heals) in Column A, signed numbers (mana/stamina) '
-                   'in Column B.',
+        'description': 'Separate resources into Column B',
+        'tooltip': 'Sends everything that lands on you into the fixed columns and splits it: '
+                   'incoming damage in Column A; heals, stamina and mana in Column B. '
+                   'Off = everything in one column.',
         'file': 'numbersTypes/MovingDamageText.as',
         'pattern': r'(static var FIXED_COL_SPLIT\s*=\s*)(\d+)',
     },
     # Default +50 so Column B sits clear of Column A (FIXED_COL_X) when the split is on.
     'col_b_x': {
         'default': 50, 'min': -200, 'max': 200, 'step': 10, 'unit': 'px', 'relative': True,
-        'description': 'Column B: X',
-        'tooltip': 'Column B horizontal position (used only when split is on).',
+        'description': 'X offset',
+        'tooltip': 'Column B horizontal position. Starts +50 right of Column A so the two '
+                   'columns do not overlap.',
         'file': 'numbersTypes/MovingDamageText.as',
         'pattern': r'(static var COL_B_X\s*=\s*)(-?\d+)',
     },
     'col_b_y': {
         'default': 0, 'min': -200, 'max': 200, 'step': 10, 'unit': 'px', 'invert': True, 'relative': True,
-        'description': 'Column B: Y',
-        'tooltip': 'Column B vertical position (used only when split is on). Drag right to raise it.',
+        'description': 'Y offset',
+        'tooltip': 'Column B vertical position. Drag right to raise it.',
         'file': 'numbersTypes/MovingDamageText.as',
         'pattern': r'(static var COL_B_Y\s*=\s*)(-?\d+)',
     },
     # --- Zig-zag static (direction 0) ---
     'fixed_x_base': {
         'default': 0, 'min': -200, 'max': 200, 'step': 10, 'unit': 'px', 'relative': True,
-        'description': 'Zig-zag X center',
+        'description': 'X offset',
         'tooltip': 'Horizontal center of the zig-zag stack. Drag right to move it right.',
         'file': 'numbersManagers/FixedManager.as',
         'pattern': r'(static var TEXT_X_BASE\s*=\s*)(-?\d+)',
     },
     'fixed_y_base': {
         'default': 0, 'min': -300, 'max': 300, 'step': 10, 'unit': 'px', 'invert': True, 'relative': True,
-        'description': 'Zig-zag Y center',
+        'description': 'Y offset',
         'tooltip': 'Vertical center of the zig-zag stack. Drag right to raise it.',
         'file': 'numbersManagers/FixedManager.as',
         'pattern': r'(static var TEXT_Y_BASE\s*=\s*)(-?\d+)',
@@ -181,7 +182,7 @@ GLOBAL_SETTINGS: dict[str, dict[str, Any]] = {
     },
     # "Group my resource numbers": baked into OTHER_RESOURCE_LOSS_TO_TARGET (the SWF keeps
     # enemy drains over the enemy) AND patches TextColors.xml at install time so your own
-    # resource losses drop into the fixed column with your gains. See build_executor._apply_textcolors.
+    # resource losses drop into the fixed column with your gains. See build_executor._prepare_textcolors.
     'other_resource_loss_to_target': {
         'default': 0, 'min': 0, 'max': 1, 'step': 1, 'type': 'bool', 'unit': '',
         'description': 'Group my resource numbers',
@@ -273,7 +274,7 @@ _FLOAT_KEYS = frozenset(
 # (self | other) panel. Names MUST match the htmlFontParser("...") calls in
 # assets/damageinfo/src/__Packages/helpers/NumbersFontsCollection.as — guarded by
 # test_damageinfo_settings. Colors live in TextColors.xml and apply at Build & Install
-# (build_executor._apply_textcolors) — they are NOT baked into the SWF.
+# (build_executor._prepare_textcolors) — they are NOT baked into the SWF.
 
 # (group title, self [(name, label)], other [(name, label)]) — paired source groups.
 PAIRED_GROUPS: tuple[tuple[str, tuple[tuple[str, str], ...], tuple[tuple[str, str], ...]], ...] = (
