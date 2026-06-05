@@ -9,8 +9,8 @@ stay in lockstep with the constants declared in ``assets/damageinfo/src``. The
 ``test_damageinfo_generator`` regex-coupling test guards that lockstep.
 
 A few keys are *absolute*, not offsets — they have no ``GAME_DEFAULTS`` entry, so
-``compute_final_value`` returns the stored value directly: ``shadow_mode`` (enum),
-``shrink_start`` and ``min_scale`` (new knobs whose stock baseline is 0).
+``compute_final_value`` returns the stored value directly: ``shadow_mode`` (enum) and
+``ranged_keep`` (the keep-ranged-big toggle; its source constant ships at 0 = off/stock).
 
 ``enabled`` is the master gate (not baked — it decides whether the modded SWF is
 built and installed at all). Pure data; no Tk. Mirrors ``deeps_settings.py``.
@@ -18,6 +18,7 @@ built and installed at all). Pure data; no Tk. Mirrors ``deeps_settings.py``.
 
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -39,28 +40,6 @@ SETTINGS_FILENAME = 'damageinfo_settings.json'
 # 'pattern' has two capture groups: (declaration-prefix)(numeric-value); the bake
 # rewrites group 2. shadow_blur is the one exception (dual-axis — see the generator).
 GLOBAL_SETTINGS: dict[str, dict[str, Any]] = {
-    # --- Distance (NEW — fixes ranged numbers shrinking to nothing) ---
-    'shrink_start': {
-        'default': 0, 'min': 0, 'max': 40, 'step': 5, 'unit': 'm',
-        'description': 'Full-size zone',
-        'tooltip': 'Numbers stay full size out to this distance before they start shrinking. 0 = shrink immediately (stock).',
-        'file': 'DamageNumberManager.as',
-        'pattern': r'(static var SHRINK_START\s*=\s*)(-?\d+)',
-    },
-    'distance_falloff': {
-        'default': 0, 'min': -40, 'max': 40, 'step': 5, 'unit': 'm',
-        'description': 'Vanish distance',
-        'tooltip': 'How far away numbers fade to nothing. Higher = numbers stay readable further out (helps ranged classes).',
-        'file': 'DamageNumberManager.as',
-        'pattern': r'(static var DISTANCE_FALLOFF\s*=\s*)(-?\d+)',
-    },
-    'min_scale': {
-        'default': 0, 'min': 0, 'max': 20, 'step': 1, 'unit': '',
-        'description': 'Minimum size',
-        'tooltip': 'A floor on how small distant numbers get. 0 = stock (can shrink to nothing). Raise so far-off numbers stay visible.',
-        'file': 'DamageNumberManager.as',
-        'pattern': r'(static var MIN_SCALE\s*=\s*)(-?\d+)',
-    },
     # --- Shadow ---
     'shadow_mode': {
         'default': 2, 'min': 0, 'max': 2, 'step': 1, 'type': 'enum',
@@ -114,15 +93,22 @@ GLOBAL_SETTINGS: dict[str, dict[str, Any]] = {
         'file': 'numbersTypes/MovingDamageText.as',
         'pattern': r'(static var FIXED_COL_Y\s*=\s*)(-?\d+)',
     },
+    # "Split into two columns" also drops your incoming damage/heals into the fixed columns:
+    # at install it flips the self Attacks/Spells/Combos/Heals directions to -1 in
+    # TextColors.xml (build_executor, independent of "Group my resource numbers"), so plain
+    # damage/heals stack in Column A and signed resource numbers in Column B.
     'fixed_col_split': {
         'default': 0, 'min': 0, 'max': 1, 'step': 1, 'type': 'bool', 'unit': '',
         'description': 'Split into two columns',
-        'tooltip': 'When on, +/- numbers go to Column B and plain numbers stay in Column A.',
+        'tooltip': 'Drops your incoming damage/heals into the fixed columns and splits them: '
+                   'plain numbers (damage/heals) in Column A, signed numbers (mana/stamina) '
+                   'in Column B.',
         'file': 'numbersTypes/MovingDamageText.as',
         'pattern': r'(static var FIXED_COL_SPLIT\s*=\s*)(\d+)',
     },
+    # Default +50 so Column B sits clear of Column A (FIXED_COL_X) when the split is on.
     'col_b_x': {
-        'default': 0, 'min': -200, 'max': 200, 'step': 10, 'unit': 'px', 'relative': True,
+        'default': 50, 'min': -200, 'max': 200, 'step': 10, 'unit': 'px', 'relative': True,
         'description': 'Column B: X',
         'tooltip': 'Column B horizontal position (used only when split is on).',
         'file': 'numbersTypes/MovingDamageText.as',
@@ -167,30 +153,48 @@ GLOBAL_SETTINGS: dict[str, dict[str, Any]] = {
         'pattern': r'(static var TEXT_Y_OFFSET\s*=\s*)(-?\d+)',
     },
     # --- Behavior ---
-    'show_titles': {
+    # Keep-ranged-big is a toggle: ON freezes ranged hits (real avatar→target distance ≥ 15 m)
+    # at the size a 15 m hit gets, so they stop shrinking with distance; OFF = stock. Melee
+    # (< 15 m) is never touched either way. "Real" distance is recovered in the AS2 — the SWF
+    # is handed only camera-to-target distance, so it subtracts a live camera-zoom sample
+    # (camera→own-avatar); see DamageNumberManager.as. Absolute key (no GAME_DEFAULTS); the
+    # source constant ships at 0 (= off/stock).
+    'ranged_keep': {
         'default': 0, 'min': 0, 'max': 1, 'step': 1, 'type': 'bool', 'unit': '',
-        'description': 'Show all labels',
-        'tooltip': "Show labels like CRITICAL / MANA / HEALTH on every number. Off = only Dodge/Parry/Resist labels show.",
+        'description': 'Keep ranged numbers big',
+        'tooltip': 'Stops ranged damage numbers (hits past ~15 real metres) from shrinking with '
+                   'distance — they hold the size of a 15 m hit. Off = stock (they shrink). '
+                   'Close-range (melee) numbers are never affected.',
         'file': 'DamageNumberManager.as',
-        'pattern': r'(static var SHOW_ALL_TITLES\s*=\s*)(\d+)',
+        'pattern': r'(static var RANGED_KEEP\s*=\s*)(-?\d+)',
     },
+    # Inverse of the old "show all labels": ON suppresses CRITICAL/MANA/HEALTH etc., leaving
+    # only the essential Dodge/Parry/Resist labels. OFF (default) shows every label. The AS2
+    # constant ESSENTIAL_LABELS_ONLY ships at 0, so a 0 (off) bakes 0 = show all.
+    'essential_labels_only': {
+        'default': 0, 'min': 0, 'max': 1, 'step': 1, 'type': 'bool', 'unit': '',
+        'description': 'Keep only essential labels',
+        'tooltip': "When on, only Dodge / Parry / Resist labels show. Off (default) shows every "
+                   "label (CRITICAL / MANA / HEALTH, …).",
+        'file': 'DamageNumberManager.as',
+        'pattern': r'(static var ESSENTIAL_LABELS_ONLY\s*=\s*)(\d+)',
+    },
+    # "Group my resource numbers": baked into OTHER_RESOURCE_LOSS_TO_TARGET (the SWF keeps
+    # enemy drains over the enemy) AND patches TextColors.xml at install time so your own
+    # resource losses drop into the fixed column with your gains. See build_executor._apply_textcolors.
     'other_resource_loss_to_target': {
         'default': 0, 'min': 0, 'max': 1, 'step': 1, 'type': 'bool', 'unit': '',
-        'description': 'Enemy drain at target',
-        'tooltip': 'When on, mana/stamina you drain from enemies appears above their head instead of in your fixed column.',
+        'description': 'Group my resource numbers',
+        'tooltip': 'Sends your own mana/stamina losses to the same fixed column as your '
+                   'resource gains, so you watch all your resource changes in one place. '
+                   'Mana/stamina you drain from enemies still floats above them. '
+                   '(Patches TextColors.xml on Build & Install.)',
         'file': 'DamageNumberManager.as',
         'pattern': r'(static var OTHER_RESOURCE_LOSS_TO_TARGET\s*=\s*)(\d+)',
     },
-    # --- Size ---
-    # One slider for both number and label size — baked into the shared DEFAULT_TEXT_SCALE
-    # (the AS2 uses it for both contents). 1x = current size.
-    'text_scale': {
-        'default': 0, 'min': -0.5, 'max': 0.5, 'step': 0.1, 'unit': 'x',
-        'description': 'Numbers & labels',
-        'tooltip': 'Size of the damage numbers (and their labels). 1x = current; negative = smaller, positive = bigger.',
-        'file': 'numbersTypes/DamageTextAbstract.as',
-        'pattern': r'(var DEFAULT_TEXT_SCALE\s*=\s*)(\d+\.?\d*)',
-    },
+    # (Number/label size is intentionally NOT here — AoC's own Options ▸ Damage Number Size
+    # slider already covers it live for every class. The AS2 keeps DEFAULT_TEXT_SCALE = 1 as
+    # a no-op multiplier.)
     # --- Animation (preset-only — no slider; Default = 0.2s, Performance = 0.1s).
     #     Easing is fixed to Quad in the AS2, so there is no easing setting. ---
     'show_duration': {
@@ -210,9 +214,8 @@ GLOBAL_SETTINGS: dict[str, dict[str, Any]] = {
 }
 
 # Stock game value each offset is added to. Keys absent here are absolute
-# (compute_final_value returns the stored value): shadow_mode, shrink_start, min_scale.
+# (compute_final_value returns the stored value): shadow_mode, ranged_keep.
 GAME_DEFAULTS: dict[str, float] = {
-    'distance_falloff': 60,
     'shadow_distance': 4,
     'shadow_blur': 3,
     'dir1_x_offset': -50,  # ships -50 → +=, so 0 offset = 50px left of head (stock), + = right
@@ -226,9 +229,8 @@ GAME_DEFAULTS: dict[str, float] = {
     'fixed_y_base': 100,
     'fixed_x_offset': 200,
     'fixed_y_spacing': 60,
-    'show_titles': 0,
+    'essential_labels_only': 0,
     'other_resource_loss_to_target': 0,
-    'text_scale': 1.0,
     'show_duration': 0.2,
     'fade_duration': 0.2,
 }
@@ -264,9 +266,112 @@ _FLOAT_KEYS = frozenset(
 )
 
 
+# ============================================================
+# PER-SOURCE COLORS (TextColors.xml)
+# ============================================================
+# Catalog of AoC's flytext sources for the color editor, grouped for the 2-column
+# (self | other) panel. Names MUST match the htmlFontParser("...") calls in
+# assets/damageinfo/src/__Packages/helpers/NumbersFontsCollection.as — guarded by
+# test_damageinfo_settings. Colors live in TextColors.xml and apply at Build & Install
+# (build_executor._apply_textcolors) — they are NOT baked into the SWF.
+
+# (group title, self [(name, label)], other [(name, label)]) — paired source groups.
+PAIRED_GROUPS: tuple[tuple[str, tuple[tuple[str, str], ...], tuple[tuple[str, str], ...]], ...] = (
+    ('Attacks', (
+        ('self_attacked', 'Hit'),
+        ('self_attacked_unshielded', 'Unshielded'),
+        ('self_attacked_critical', 'Critical'),
+        ('self_attacked_environment', 'Environment'),
+        ('self_dodged', 'Dodge / miss'),
+    ), (
+        ('other_attacked', 'Hit'),
+        ('other_attacked_unshielded', 'Unshielded'),
+        ('other_attacked_critical', 'Critical'),
+        ('other_attacked_environment', 'Environment'),
+        ('other_dodged', 'Dodge / miss'),
+    )),
+    ('Spells', (
+        ('self_attacked_spell', 'Spell'),
+        ('self_attacked_spell_critical', 'Spell crit'),
+    ), (
+        ('other_attacked_spell', 'Spell'),
+        ('other_attacked_spell_critical', 'Spell crit'),
+    )),
+    ('Combos', (
+        ('self_attacked_combo', 'Combo'),
+        ('self_attacked_combo_critical', 'Combo crit'),
+        ('self_combo_name', 'Combo name'),
+    ), (
+        ('other_attacked_combo', 'Combo'),
+        ('other_attacked_combo_critical', 'Combo crit'),
+        ('other_combo_name', 'Combo name'),
+    )),
+    ('Heals', (
+        ('self_healed', 'Heal'),
+        ('self_healed_critical', 'Heal crit'),
+    ), (
+        ('other_healed', 'Heal'),
+        ('other_healed_critical', 'Heal crit'),
+    )),
+)
+
+# Sources the game stores as single entries (no self/other split) → full-width card.
+SHARED_SOURCES: tuple[tuple[str, str], ...] = (
+    ('stamina_gained', 'Stamina gain'),
+    ('stamina_lost', 'Stamina loss'),
+    ('stamina_gained_critical', 'Stamina gain crit'),
+    ('stamina_loss_critical', 'Stamina loss crit'),
+    ('mana_gained', 'Mana gain'),
+    ('mana_lost', 'Mana loss'),
+    ('mana_gained_critical', 'Mana gain crit'),
+    ('mana_loss_critical', 'Mana loss crit'),
+    ('xp_gained', 'XP gain'),
+    ('murder_points_gained', 'Murder points'),
+    ('murder_points_gained_murderer', 'Murder points (murderer)'),
+)
+
+
+def _all_source_names() -> frozenset[str]:
+    names: set[str] = set()
+    for _title, self_rows, other_rows in PAIRED_GROUPS:
+        names.update(n for n, _ in self_rows)
+        names.update(n for n, _ in other_rows)
+    names.update(n for n, _ in SHARED_SOURCES)
+    return frozenset(names)
+
+
+ALL_SOURCE_NAMES: frozenset[str] = _all_source_names()
+
+_HEX6_RE = re.compile(r'^[0-9A-Fa-f]{6}$')
+
+
+def normalize_color(value: Any) -> str | None:
+    """Bare upper-case ``RRGGBB`` for a ``0x``/``#``/bare hex string, or None if invalid."""
+    if not isinstance(value, str):
+        return None
+    v = value.strip().lstrip('#')
+    if v[:2].lower() == '0x':
+        v = v[2:]
+    return v.upper() if _HEX6_RE.match(v) else None
+
+
+def validate_source_colors(value: Any) -> dict[str, str]:
+    """Keep only known source names mapped to a valid 6-hex color (bare upper-case)."""
+    if not isinstance(value, dict):
+        return {}
+    out: dict[str, str] = {}
+    for name, color in value.items():
+        if name in ALL_SOURCE_NAMES:
+            norm = normalize_color(color)
+            if norm is not None:
+                out[name] = norm
+    return out
+
+
 def _build_defaults() -> dict[str, Any]:
     d: dict[str, Any] = {k: m['default'] for k, m in GLOBAL_SETTINGS.items()}
-    d['enabled'] = False  # master gate — not baked
+    d['enabled'] = False        # master gate — not baked
+    d['source_colors'] = {}     # per-source flytext colors → TextColors.xml (not baked)
     return d
 
 
@@ -278,7 +383,9 @@ DAMAGEINFO_DEFAULTS: dict[str, Any] = _build_defaults()
 # ============================================================
 def get_default_settings() -> dict[str, Any]:
     """Return a fresh copy of the default Damage Numbers settings."""
-    return dict(DAMAGEINFO_DEFAULTS)
+    d = dict(DAMAGEINFO_DEFAULTS)
+    d['source_colors'] = {}  # own dict per copy — never share the module-level default
+    return d
 
 
 def is_float_key(key: str) -> bool:
@@ -290,8 +397,8 @@ def is_offset_key(key: str) -> bool:
     """True if this key stores an offset from a game default (vs an absolute value).
 
     Offset keys have a symmetric range whose midpoint (0) is the stock value, so the
-    panel centre-notches them; absolute keys (``shrink_start``/``min_scale``/
-    ``shadow_mode``) start at their floor and get no notch.
+    panel centre-notches them; absolute keys (``ranged_keep``/``shadow_mode``) start at
+    their floor and get no notch.
     """
     return key in GAME_DEFAULTS
 
@@ -304,6 +411,8 @@ def validate_setting(key: str, value: Any) -> Any:
     """
     if key == 'enabled':
         return bool(value)
+    if key == 'source_colors':
+        return validate_source_colors(value)
     meta = GLOBAL_SETTINGS.get(key)
     if meta is None:
         return value

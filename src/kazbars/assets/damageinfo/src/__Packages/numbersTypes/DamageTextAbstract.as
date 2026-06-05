@@ -16,8 +16,8 @@ class numbersTypes.DamageTextAbstract
    var DEFAULT_TEXT_SCALE = 1;
 
    // Vertical gap (px) between a number and its shown label, added on top of half of
-   // each one's height. Small = the label tucks close under the number.
-   static var TITLE_GAP = 2;
+   // each one's height. 0 = the label tucks right against the number.
+   static var TITLE_GAP = 0;
 
    var _contentScale = 100;
 

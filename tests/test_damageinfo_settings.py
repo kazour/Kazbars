@@ -4,10 +4,12 @@ Pure-data layer (no Tk, no MTASC). Mirrors test_deeps_settings.
 """
 
 import json
+import re
 
 import pytest
 
 from kazbars import damageinfo_settings as dis
+from kazbars.paths import ASSETS
 
 
 # --------------------------------------------------------------------------- #
@@ -18,7 +20,16 @@ def test_defaults_has_every_global_key_plus_enabled():
     for key in dis.GLOBAL_SETTINGS:
         assert key in d
     assert d['enabled'] is False
-    assert len(d) == len(dis.GLOBAL_SETTINGS) + 1
+    assert d['source_colors'] == {}
+    # +2 non-baked keys outside GLOBAL_SETTINGS: the master 'enabled' gate + 'source_colors'.
+    assert len(d) == len(dis.GLOBAL_SETTINGS) + 2
+
+
+def test_get_default_settings_source_colors_not_shared():
+    # Each call must hand back its own source_colors dict (never the module-level default).
+    a = dis.get_default_settings()
+    a['source_colors']['self_attacked'] = 'FF0000'
+    assert dis.get_default_settings()['source_colors'] == {}
 
 
 def test_default_offsets_match_schema():
@@ -39,22 +50,22 @@ def test_game_defaults_keys_are_known():
 
 
 def test_absolute_keys_absent_from_game_defaults():
-    # shadow_mode/shrink_start/min_scale are absolute (offset == value).
-    for key in ('shadow_mode', 'shrink_start', 'min_scale'):
+    # shadow_mode/ranged_keep are absolute (offset == value).
+    for key in ('shadow_mode', 'ranged_keep'):
         assert key not in dis.GAME_DEFAULTS
 
 
 def test_is_float_key():
-    for key in ('show_duration', 'fade_duration', 'text_scale'):
+    for key in ('show_duration', 'fade_duration'):
         assert dis.is_float_key(key)
     for key in ('dir1_x_offset', 'shadow_mode', 'fixed_col_split'):
         assert not dis.is_float_key(key)
 
 
 def test_is_offset_key():
-    for key in ('distance_falloff', 'dir1_x_offset', 'text_scale', 'shadow_blur'):
+    for key in ('dir1_x_offset', 'shadow_blur', 'shadow_distance'):
         assert dis.is_offset_key(key)
-    for key in ('shrink_start', 'min_scale', 'shadow_mode'):  # absolute → no notch
+    for key in ('ranged_keep', 'shadow_mode'):  # absolute → no notch
         assert not dis.is_offset_key(key)
 
 
@@ -142,10 +153,9 @@ def test_readout_inverted_keeps_right_positive():
 
 def test_readout_absolute_keys_show_game_value():
     # Non-position sliders keep showing the resulting game value, not a shift.
-    assert dis.readout('distance_falloff', 0) == '60m'
     assert dis.readout('shadow_distance', 0) == '4px'
-    assert dis.readout('text_scale', 0) == '1x'
-    assert dis.readout('text_scale', 0.3) == '1.3x'
+    assert dis.readout('show_duration', 0) == '0.2s'
+    assert dis.readout('show_duration', -0.1) == '0.1s'
 
 
 # --------------------------------------------------------------------------- #
@@ -202,8 +212,8 @@ def test_validate_all_drops_unknown_and_fills_missing():
 
 
 def test_validate_all_clamps_each():
-    out = dis.validate_all_settings({'min_scale': 999, 'shadow_blur': -999})
-    assert out['min_scale'] == 20
+    out = dis.validate_all_settings({'dir1_x_offset': 99999, 'shadow_blur': -999})
+    assert out['dir1_x_offset'] == 200
     assert out['shadow_blur'] == -3
 
 
@@ -211,22 +221,21 @@ def test_validate_all_clamps_each():
 # compute_final_value
 # --------------------------------------------------------------------------- #
 def test_compute_final_offset_keys():
-    assert dis.compute_final_value('distance_falloff', 0) == 60
-    assert dis.compute_final_value('distance_falloff', 10) == 70
     assert dis.compute_final_value('shadow_distance', 0) == 4
+    assert dis.compute_final_value('shadow_distance', 2) == 6
     assert dis.compute_final_value('dir1_x_offset', 0) == -50  # 50px left of head, + = right
 
 
 def test_compute_final_absolute_keys():
     assert dis.compute_final_value('shadow_mode', 1) == 1
-    assert dis.compute_final_value('shrink_start', 20) == 20
-    assert dis.compute_final_value('min_scale', 6) == 6
+    assert dis.compute_final_value('ranged_keep', 0) == 0
+    assert dis.compute_final_value('ranged_keep', 1) == 1
 
 
 def test_compute_final_float_keys():
-    assert dis.compute_final_value('text_scale', 0) == pytest.approx(1.0)
+    assert dis.compute_final_value('show_duration', 0) == pytest.approx(0.2)
     assert dis.compute_final_value('show_duration', -0.1) == pytest.approx(0.1)
-    assert isinstance(dis.compute_final_value('text_scale', 0.1), float)
+    assert isinstance(dis.compute_final_value('fade_duration', 0.05), float)
 
 
 # --------------------------------------------------------------------------- #
@@ -275,12 +284,12 @@ def test_apply_preset_preserves_unrelated_keys():
 def test_save_load_round_trip(tmp_path):
     s = dis.get_default_settings()
     s['enabled'] = True
-    s['distance_falloff'] = 20
+    s['ranged_keep'] = 1  # on (default is off) — round-trips a changed bool
     s['shadow_mode'] = 1
     assert dis.save_settings(tmp_path, s)
     loaded = dis.load_settings(tmp_path)
     assert loaded['enabled'] is True
-    assert loaded['distance_falloff'] == 20
+    assert loaded['ranged_keep'] == 1
     assert loaded['shadow_mode'] == 1
 
 
@@ -295,16 +304,87 @@ def test_load_corrupt_returns_defaults(tmp_path):
 
 def test_load_partial_fills_defaults(tmp_path):
     (tmp_path / dis.SETTINGS_FILENAME).write_text(
-        json.dumps({'enabled': True, 'min_scale': 4}), encoding='utf-8')
+        json.dumps({'enabled': True, 'ranged_keep': 1}), encoding='utf-8')
     loaded = dis.load_settings(tmp_path)
     assert loaded['enabled'] is True
-    assert loaded['min_scale'] == 4
+    assert loaded['ranged_keep'] == 1
     assert loaded['shadow_mode'] == 2  # filled
 
 
 def test_save_validates_out_of_range(tmp_path):
     s = dis.get_default_settings()
-    s['min_scale'] = 999  # out of range
+    s['dir1_x_offset'] = 99999  # out of range
     dis.save_settings(tmp_path, s)
     on_disk = json.loads((tmp_path / dis.SETTINGS_FILENAME).read_text(encoding='utf-8'))
-    assert on_disk['min_scale'] == 20  # clamped before write
+    assert on_disk['dir1_x_offset'] == 200  # clamped before write
+
+
+# --------------------------------------------------------------------------- #
+# per-source colors (TextColors.xml) — catalog + validation
+# --------------------------------------------------------------------------- #
+def test_source_catalog_matches_engine():
+    # The color catalog must list exactly the flytext types the SWF parses, or a swatch
+    # would target a non-existent TextColors entry (or a real type would be uneditable).
+    src = (ASSETS / 'damageinfo' / 'src' / '__Packages' / 'helpers'
+           / 'NumbersFontsCollection.as').read_text(encoding='utf-8')
+    engine = set(re.findall(r'htmlFontParser\("([^"]+)"\)', src))
+    assert engine == set(dis.ALL_SOURCE_NAMES)
+
+
+def test_source_catalog_no_duplicates():
+    names = []
+    for _title, self_rows, other_rows in dis.PAIRED_GROUPS:
+        names += [n for n, _ in self_rows] + [n for n, _ in other_rows]
+    names += [n for n, _ in dis.SHARED_SOURCES]
+    assert len(names) == len(set(names)) == len(dis.ALL_SOURCE_NAMES)
+
+
+def test_incoming_damage_types_match_self_catalog():
+    # buff_xml's "Split into two columns" target list must equal the self side of the
+    # color catalog's paired groups (and be valid source names), or split would flip the
+    # wrong / non-existent flytext directions.
+    from kazbars import buff_xml
+    self_side = []
+    for _title, self_rows, _other in dis.PAIRED_GROUPS:
+        self_side += [n for n, _ in self_rows]
+    assert set(buff_xml.INCOMING_DAMAGE_TYPES) == set(self_side)
+    assert set(buff_xml.INCOMING_DAMAGE_TYPES) <= set(dis.ALL_SOURCE_NAMES)
+
+
+def test_normalize_color():
+    assert dis.normalize_color('#ABCDEF') == 'ABCDEF'
+    assert dis.normalize_color('0xabcdef') == 'ABCDEF'
+    assert dis.normalize_color('abcdef') == 'ABCDEF'
+    assert dis.normalize_color('12345') is None    # too short
+    assert dis.normalize_color('GGGGGG') is None   # non-hex
+    assert dis.normalize_color(123) is None         # non-str
+
+
+def test_validate_source_colors_filters_and_normalizes():
+    out = dis.validate_source_colors({
+        'self_attacked': '#ffcc00',   # hash → bare upper
+        'other_healed': '0x00FF00',   # 0x → bare upper
+        'mana_lost': 'aabbcc',        # bare → upper
+        'not_a_source': 'FFFFFF',     # unknown name dropped
+        'self_dodged': 'xyz',         # invalid hex dropped
+        'xp_gained': 123,             # non-str dropped
+    })
+    assert out == {'self_attacked': 'FFCC00', 'other_healed': '00FF00', 'mana_lost': 'AABBCC'}
+
+
+def test_validate_source_colors_non_dict():
+    assert dis.validate_source_colors(None) == {}
+    assert dis.validate_source_colors('nope') == {}
+
+
+def test_source_colors_validated_in_all_settings():
+    out = dis.validate_all_settings({'source_colors': {'self_attacked': '#ff0000', 'bogus': '00ff00'}})
+    assert out['source_colors'] == {'self_attacked': 'FF0000'}
+
+
+def test_source_colors_round_trip(tmp_path):
+    s = dis.get_default_settings()
+    s['source_colors'] = {'self_attacked': 'FF0000', 'other_healed': '00FF00'}
+    assert dis.save_settings(tmp_path, s)
+    loaded = dis.load_settings(tmp_path)
+    assert loaded['source_colors'] == {'self_attacked': 'FF0000', 'other_healed': '00FF00'}

@@ -1,6 +1,6 @@
 """Tests for the pure Start/Stop toggle-button state mapping."""
 
-from kazbars.ui_widgets import toggle_button_state
+from kazbars.ui_forms import toggle_button_state
 
 
 def test_idle_enabled_is_green_start():

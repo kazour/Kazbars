@@ -20,7 +20,10 @@ from pathlib import Path
 from tkinter import ttk
 
 from . import damageinfo_settings as dis
+from .damageinfo_colors_panel import open_damage_number_colors_panel
 from .ui_components import create_scrollable_frame
+from .ui_forms import create_card, create_slider_row
+from .ui_headers import create_dialog_header, create_tip_bar
 from .ui_helpers import (
     FONT_BODY,
     MODULE_COLORS,
@@ -29,14 +32,7 @@ from .ui_helpers import (
     PAD_XS,
     THEME_COLORS,
 )
-from .ui_widgets import (
-    add_tooltip,
-    app_toast,
-    create_card,
-    create_dialog_header,
-    create_slider_row,
-    create_tip_bar,
-)
+from .ui_widgets import add_tooltip, app_toast
 from .window_position import bind_window_position_save, restore_window_position
 
 logger = logging.getLogger(__name__)
@@ -44,16 +40,14 @@ logger = logging.getLogger(__name__)
 _W = 470
 _H = 620
 
-# Cards, in display order: (title, [setting keys]). Distance leads — it's the
-# headline fix (ranged numbers shrinking to nothing).
+# Cards, in display order: (title, [setting keys]). Behavior leads (all toggles, off by
+# default); number/label size is intentionally absent (AoC's own Options slider covers it).
 _CARDS = (
-    ('Distance', ['shrink_start', 'distance_falloff', 'min_scale']),
+    ('Behavior', ['ranged_keep', 'essential_labels_only', 'other_resource_loss_to_target', 'fixed_col_split']),
     ('Shadow', ['shadow_mode', 'shadow_distance', 'shadow_blur']),
-    ('Size', ['text_scale']),
     ('Above-target position', ['dir1_x_offset', 'dir1_y_offset']),
-    ('Fixed columns', ['fixed_col_x', 'fixed_col_y', 'fixed_col_split', 'col_b_x', 'col_b_y']),
+    ('Fixed columns', ['fixed_col_x', 'fixed_col_y', 'col_b_x', 'col_b_y']),
     ('Zig-zag (static)', ['fixed_x_base', 'fixed_y_base', 'spread_spacing']),
-    ('Behavior', ['show_titles', 'other_resource_loss_to_target']),
 )
 
 
@@ -108,6 +102,7 @@ class DamageNumbersPanel(tk.Toplevel):
         body = ttk.Frame(inner, padding=(PAD_TAB, 0))
         body.pack(fill="both", expand=True)
 
+        self._build_colors_button(body)
         self._build_presets(body)
         for title, keys in _CARDS:
             card = create_card(body, title)
@@ -138,6 +133,19 @@ class DamageNumbersPanel(tk.Toplevel):
             )
             btn.pack(side="left", padx=(0, PAD_XS))
             self._all_controls.append(btn)
+
+    def _build_colors_button(self, parent: tk.Misc) -> None:
+        """Launch button for the per-source color editor (greys with the master enable)."""
+        row = ttk.Frame(parent)
+        row.pack(fill="x", pady=(0, PAD_ROW))
+        btn = ttk.Button(
+            row, text="Damage number colors…", bootstyle="secondary",
+            command=lambda: open_damage_number_colors_panel(self.master),
+        )
+        btn.pack(side="left")
+        add_tooltip(btn, "Set the color of each combat-number source "
+                         "(applies on Build & Install, like the rest of this panel).")
+        self._all_controls.append(btn)
 
     def _build_control(self, card: ttk.LabelFrame, key: str) -> None:
         if key == 'spread_spacing':  # composite radio driving two baked offsets

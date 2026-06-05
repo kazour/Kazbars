@@ -25,6 +25,7 @@ from tkinter import filedialog, ttk
 
 from ttkbootstrap.dialogs import Messagebox
 
+from .ui_headers import create_dialog_header
 from .ui_helpers import (
     BTN_DIALOG,
     FONT_BODY,
@@ -37,7 +38,7 @@ from .ui_helpers import (
     PAD_XS,
     THEME_COLORS,
 )
-from .ui_widgets import app_toast, create_dialog_header
+from .ui_widgets import app_toast
 from .window_position import restore_window_position
 
 logger = logging.getLogger(__name__)

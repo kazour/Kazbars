@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from . import buff_xml
 from .build_utils import strip_marker_block, update_script_with_marker
 from .grids_generator import build_grids
 
@@ -35,6 +36,11 @@ LEGACY_AUTO_LOAD_MARKERS = ("# KzGrids auto-load",)
 DAMAGEINFO_FILE = "DamageInfo.swf"
 DAMAGEINFO_BACKUP = "DamageInfo.swf.kazbars.bak"
 
+# Damage Numbers "Group my resource numbers" toggle: flips the resource-loss flytext
+# directions in the skin's TextColors.xml (Customized/ if present, else Default/). The
+# flip is surgical + reversible, so we restore by rewriting it back, not from a backup.
+TEXTCOLORS_RELPATH = "TextColors.xml"
+
 
 def _files_equal(a, b):
     """True only if both paths exist and have byte-identical contents."""
@@ -57,6 +63,18 @@ def _atomic_install(src, dst):
     dst = Path(dst)
     tmp = dst.with_name(dst.name + ".kaztmp")
     shutil.copy2(src, tmp)
+    try:
+        os.replace(tmp, dst)
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
+def _atomic_write_text(dst, text):
+    """Write ``text`` to ``dst`` atomically (temp + os.replace), like _atomic_install."""
+    dst = Path(dst)
+    tmp = dst.with_name(dst.name + ".kaztmp")
+    tmp.write_text(text, encoding="utf-8")
     try:
         os.replace(tmp, dst)
     except OSError:
@@ -90,7 +108,8 @@ def compile_to_staging(grids, database, assets_path, compiler, app_version,
 
 
 def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None,
-                      damageinfo_pristine=None):
+                      damageinfo_pristine=None, group_resources=False, source_colors=None,
+                      split_incoming=False):
     """Install compiled SWF + scripts to the game folder.
 
     ``damageinfo_swf`` (a staged modded DamageInfo.swf, or None) drives the Damage
@@ -98,6 +117,11 @@ def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None,
     reverts to the stock file from that backup if one exists. ``damageinfo_pristine``
     is the bundled genuine stock SWF — used to seed/recognize the backup so it can
     never capture a mod. See ``_apply_damageinfo``.
+
+    ``group_resources`` ("Group my resource numbers"), ``split_incoming`` ("Split into two
+    columns" → incoming/self damage+heal directions), and ``source_colors`` (per-source
+    color map) — all gated on the master enable by the caller — customize the skin's
+    TextColors.xml, regenerated from a one-time stock backup. See ``_apply_textcolors``.
 
     Returns (success, error_message).
     """
@@ -119,6 +143,15 @@ def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None,
             return False, (
                 "Couldn't update Damage Numbers (DamageInfo.swf).\n\n"
                 "Close Age of Conan and build again — the game locks this file while "
+                "it's running. Your grids were not changed."
+            )
+
+        try:
+            _apply_textcolors(game_path, group_resources, source_colors, split_incoming)
+        except OSError:
+            return False, (
+                "Couldn't update Damage Numbers (TextColors.xml).\n\n"
+                "Close Age of Conan and build again — the game can lock this file while "
                 "it's running. Your grids were not changed."
             )
 
@@ -169,6 +202,45 @@ def _apply_damageinfo(flash_path, staged_swf, pristine_swf=None):
         _atomic_install(backup, target)
 
 
+def _apply_textcolors(game_path, group_resources, source_colors=None, split_incoming=False):
+    """Patch (or restore) the skin's TextColors.xml for the Damage Numbers features.
+
+    Three independent things customize TextColors.xml and must compose: the "Group my
+    resource numbers" toggle (``group_resources`` → resource-loss flytext directions), the
+    "Split into two columns" toggle (``split_incoming`` → the incoming/self damage + heal
+    directions, so everything that lands on you drops into the columns), and the per-source
+    color editor (``source_colors`` → a ``{name: "RRGGBB"}`` map). Colors have no
+    deterministic inverse, so instead of editing in place we keep a one-time genuine-stock
+    backup (``TextColors.xml.kazbars.bak``) and **regenerate** the live file from it each
+    build: stock → direction flips → color overrides. Nothing active ⇒ restore from the
+    backup (kept across a disable, dropped on uninstall). Edits the file the game reads
+    (Customized/ if present, else Default/) atomically. Raises OSError on a locked/failed
+    write (the caller turns that into a "close the game" message).
+    """
+    source_colors = source_colors or {}
+    _default, _customized, source = buff_xml._resolve_paths(game_path, TEXTCOLORS_RELPATH)
+    if source is None:
+        return
+    backup = source.with_name(source.name + buff_xml.BACKUP_SUFFIX)
+    current = source.read_text(encoding="utf-8")
+
+    if group_resources or split_incoming or source_colors:
+        buff_xml._backup_once(source)  # seed genuine stock once (first edit)
+        base = backup.read_text(encoding="utf-8") if backup.exists() else current
+        if group_resources:
+            base, _ = buff_xml.set_resource_loss_to_column(base, True)
+        if split_incoming:
+            base, _ = buff_xml.set_directions(base, buff_xml.INCOMING_DAMAGE_TYPES, True)
+        for name, color in source_colors.items():
+            base, _ = buff_xml.set_source_color(base, name, color)
+        if base != current:
+            _atomic_write_text(source, base)
+    elif backup.exists():
+        stock = backup.read_text(encoding="utf-8")
+        if stock != current:
+            _atomic_write_text(source, stock)
+
+
 def cleanup_legacy_files(game_path):
     """Remove leftover SWFs and Aoc-module folders from predecessor versions
     (Kaz Flash Mods, Kaz Grids, the original KazBars mod) before the fresh install.
@@ -216,6 +288,16 @@ def uninstall_from_client(game_path, damageinfo_pristine=None):
               and di_target.exists() and not _files_equal(di_target, damageinfo_pristine)):
             _atomic_install(damageinfo_pristine, di_target)
             removed.append("DamageInfo.swf (restored stock from bundled copy)")
+
+        # Damage Numbers: restore TextColors.xml from our one-time stock backup (covers
+        # both the resource-direction toggle and the per-source colors) and drop the backup.
+        _d, _c, tc_source = buff_xml._resolve_paths(game_path, TEXTCOLORS_RELPATH)
+        if tc_source is not None:
+            tc_backup = tc_source.with_name(tc_source.name + buff_xml.BACKUP_SUFFIX)
+            if tc_backup.exists():
+                _atomic_install(tc_backup, tc_source)
+                tc_backup.unlink(missing_ok=True)
+                removed.append("TextColors.xml (restored stock)")
 
         aoc_dir = Path(game_path) / "Data" / "Gui" / "Aoc" / "KazBars"
         if aoc_dir.exists():
