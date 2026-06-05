@@ -39,16 +39,15 @@ logger = logging.getLogger(__name__)
 _W = 470
 _H = 620
 
-# Cards, in display order: (title, [setting keys]). Distance leads — it's the
-# headline fix (ranged numbers shrinking to nothing).
+# Cards, in display order: (title, [setting keys]). The keep-ranged-big toggle (the
+# headline distance fix) lives in Behavior alongside the other on/off behaviours.
 _CARDS = (
-    ('Distance', ['shrink_start', 'distance_falloff', 'min_scale']),
     ('Shadow', ['shadow_mode', 'shadow_distance', 'shadow_blur']),
     ('Size', ['text_scale']),
     ('Above-target position', ['dir1_x_offset', 'dir1_y_offset']),
     ('Fixed columns', ['fixed_col_x', 'fixed_col_y', 'fixed_col_split', 'col_b_x', 'col_b_y']),
     ('Zig-zag (static)', ['fixed_x_base', 'fixed_y_base', 'spread_spacing']),
-    ('Behavior', ['show_titles', 'other_resource_loss_to_target']),
+    ('Behavior', ['ranged_keep', 'show_titles', 'other_resource_loss_to_target']),
 )
 
 

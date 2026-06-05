@@ -53,7 +53,7 @@ def test_every_bake_pattern_matches_shipped_source(key):
 # offset 0 == stock: GAME_DEFAULTS for offset keys, these baselines for the absolute
 # keys (no GAME_DEFAULTS entry). This pins the load-bearing offset-bake invariant — the
 # bake-then-read tests below can't catch a source constant drifting off its game default.
-_ABSOLUTE_SHIPPED = {'shadow_mode': 2, 'shrink_start': 0, 'min_scale': 0}
+_ABSOLUTE_SHIPPED = {'shadow_mode': 2, 'ranged_keep': 0}
 
 
 @pytest.mark.parametrize("key", list(dis.GLOBAL_SETTINGS))
@@ -106,9 +106,7 @@ def _value(out, key):
 
 def test_defaults_bake_to_game_defaults(tmp_path):
     out = _bake(tmp_path, dis.get_default_settings())
-    assert _value(out, 'distance_falloff') == '60'
-    assert _value(out, 'shrink_start') == '0'
-    assert _value(out, 'min_scale') == '0'
+    assert _value(out, 'ranged_keep') == '1'   # our chosen default (on); source ships 0 = off/stock
     assert _value(out, 'shadow_mode') == '2'
     assert _value(out, 'dir1_x_offset') == '-50'
     assert _value(out, 'show_duration') == '0.2'
@@ -117,12 +115,12 @@ def test_defaults_bake_to_game_defaults(tmp_path):
 
 def test_offset_bakes_to_final_value(tmp_path):
     s = dis.get_default_settings()
-    s['distance_falloff'] = 10   # 60 + 10
-    s['shrink_start'] = 15       # absolute
-    s['dir1_y_offset'] = -50
+    s['ranged_keep'] = 0         # absolute bool, overriding the default 1 (the stored value IS the baked constant)
+    s['shadow_distance'] = 2     # offset key: 4 + 2 = 6
+    s['dir1_y_offset'] = -50     # offset key over base 0
     out = _bake(tmp_path, s)
-    assert _value(out, 'distance_falloff') == '70'
-    assert _value(out, 'shrink_start') == '15'
+    assert _value(out, 'ranged_keep') == '0'
+    assert _value(out, 'shadow_distance') == '6'
     assert _value(out, 'dir1_y_offset') == '-50'
 
 
@@ -168,7 +166,7 @@ def test_generate_fails_loudly_on_drifted_source(tmp_path):
     shutil.copytree(SRC_PKG, drifted)
     dnm = drifted / "DamageNumberManager.as"
     dnm.write_text(
-        dnm.read_text(encoding='utf-8').replace("SHRINK_START", "SHRINK_BEGIN"),
+        dnm.read_text(encoding='utf-8').replace("RANGED_KEEP", "RANGED_HOLD"),
         encoding='utf-8',
     )
     out = tmp_path / "__Packages"
@@ -176,10 +174,10 @@ def test_generate_fails_loudly_on_drifted_source(tmp_path):
 
 
 def test_bake_leaves_untouched_constants_alone(tmp_path):
-    # A bake of only distance_falloff must not perturb other constants in the same file.
+    # Baking show_titles must not perturb the other constants in the same file (regex precision).
     s = dis.get_default_settings()
-    s['distance_falloff'] = 20
+    s['show_titles'] = 1
     out = _bake(tmp_path, s)
-    assert _value(out, 'shrink_start') == '0'
-    assert _value(out, 'min_scale') == '0'
-    assert _value(out, 'show_titles') == '0'
+    assert _value(out, 'show_titles') == '1'
+    assert _value(out, 'ranged_keep') == '1'                   # default (on), untouched
+    assert _value(out, 'other_resource_loss_to_target') == '0'

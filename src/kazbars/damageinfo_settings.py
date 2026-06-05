@@ -9,8 +9,8 @@ stay in lockstep with the constants declared in ``assets/damageinfo/src``. The
 ``test_damageinfo_generator`` regex-coupling test guards that lockstep.
 
 A few keys are *absolute*, not offsets — they have no ``GAME_DEFAULTS`` entry, so
-``compute_final_value`` returns the stored value directly: ``shadow_mode`` (enum),
-``shrink_start`` and ``min_scale`` (new knobs whose stock baseline is 0).
+``compute_final_value`` returns the stored value directly: ``shadow_mode`` (enum) and
+``ranged_keep`` (the keep-ranged-big toggle; its source constant ships at 0 = off/stock).
 
 ``enabled`` is the master gate (not baked — it decides whether the modded SWF is
 built and installed at all). Pure data; no Tk. Mirrors ``deeps_settings.py``.
@@ -39,28 +39,6 @@ SETTINGS_FILENAME = 'damageinfo_settings.json'
 # 'pattern' has two capture groups: (declaration-prefix)(numeric-value); the bake
 # rewrites group 2. shadow_blur is the one exception (dual-axis — see the generator).
 GLOBAL_SETTINGS: dict[str, dict[str, Any]] = {
-    # --- Distance (NEW — fixes ranged numbers shrinking to nothing) ---
-    'shrink_start': {
-        'default': 0, 'min': 0, 'max': 40, 'step': 5, 'unit': 'm',
-        'description': 'Full-size zone',
-        'tooltip': 'Numbers stay full size out to this distance before they start shrinking. 0 = shrink immediately (stock).',
-        'file': 'DamageNumberManager.as',
-        'pattern': r'(static var SHRINK_START\s*=\s*)(-?\d+)',
-    },
-    'distance_falloff': {
-        'default': 0, 'min': -40, 'max': 40, 'step': 5, 'unit': 'm',
-        'description': 'Vanish distance',
-        'tooltip': 'How far away numbers fade to nothing. Higher = numbers stay readable further out (helps ranged classes).',
-        'file': 'DamageNumberManager.as',
-        'pattern': r'(static var DISTANCE_FALLOFF\s*=\s*)(-?\d+)',
-    },
-    'min_scale': {
-        'default': 0, 'min': 0, 'max': 20, 'step': 1, 'unit': '',
-        'description': 'Minimum size',
-        'tooltip': 'A floor on how small distant numbers get. 0 = stock (can shrink to nothing). Raise so far-off numbers stay visible.',
-        'file': 'DamageNumberManager.as',
-        'pattern': r'(static var MIN_SCALE\s*=\s*)(-?\d+)',
-    },
     # --- Shadow ---
     'shadow_mode': {
         'default': 2, 'min': 0, 'max': 2, 'step': 1, 'type': 'enum',
@@ -167,6 +145,21 @@ GLOBAL_SETTINGS: dict[str, dict[str, Any]] = {
         'pattern': r'(static var TEXT_Y_OFFSET\s*=\s*)(-?\d+)',
     },
     # --- Behavior ---
+    # Keep-ranged-big is a toggle: ON freezes ranged hits (real avatar→target distance ≥ 15 m)
+    # at the size a 15 m hit gets, so they stop shrinking with distance; OFF = stock. Melee
+    # (< 15 m) is never touched either way. "Real" distance is recovered in the AS2 — the SWF
+    # is handed only camera-to-target distance, so it subtracts a live camera-zoom sample
+    # (camera→own-avatar); see DamageNumberManager.as. Absolute key (no GAME_DEFAULTS); the
+    # source constant ships at 0 (= off/stock).
+    'ranged_keep': {
+        'default': 1, 'min': 0, 'max': 1, 'step': 1, 'type': 'bool', 'unit': '',
+        'description': 'Keep ranged numbers big',
+        'tooltip': 'Stops ranged damage numbers (hits past ~15 real metres) from shrinking with '
+                   'distance — they hold the size of a 15 m hit. Off = stock (they shrink). '
+                   'Close-range (melee) numbers are never affected.',
+        'file': 'DamageNumberManager.as',
+        'pattern': r'(static var RANGED_KEEP\s*=\s*)(-?\d+)',
+    },
     'show_titles': {
         'default': 0, 'min': 0, 'max': 1, 'step': 1, 'type': 'bool', 'unit': '',
         'description': 'Show all labels',
@@ -210,9 +203,8 @@ GLOBAL_SETTINGS: dict[str, dict[str, Any]] = {
 }
 
 # Stock game value each offset is added to. Keys absent here are absolute
-# (compute_final_value returns the stored value): shadow_mode, shrink_start, min_scale.
+# (compute_final_value returns the stored value): shadow_mode, ranged_keep.
 GAME_DEFAULTS: dict[str, float] = {
-    'distance_falloff': 60,
     'shadow_distance': 4,
     'shadow_blur': 3,
     'dir1_x_offset': -50,  # ships -50 → +=, so 0 offset = 50px left of head (stock), + = right
@@ -290,8 +282,8 @@ def is_offset_key(key: str) -> bool:
     """True if this key stores an offset from a game default (vs an absolute value).
 
     Offset keys have a symmetric range whose midpoint (0) is the stock value, so the
-    panel centre-notches them; absolute keys (``shrink_start``/``min_scale``/
-    ``shadow_mode``) start at their floor and get no notch.
+    panel centre-notches them; absolute keys (``ranged_keep``/``shadow_mode``) start at
+    their floor and get no notch.
     """
     return key in GAME_DEFAULTS
 

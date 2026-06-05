@@ -39,8 +39,8 @@ def test_game_defaults_keys_are_known():
 
 
 def test_absolute_keys_absent_from_game_defaults():
-    # shadow_mode/shrink_start/min_scale are absolute (offset == value).
-    for key in ('shadow_mode', 'shrink_start', 'min_scale'):
+    # shadow_mode/ranged_keep are absolute (offset == value).
+    for key in ('shadow_mode', 'ranged_keep'):
         assert key not in dis.GAME_DEFAULTS
 
 
@@ -52,9 +52,9 @@ def test_is_float_key():
 
 
 def test_is_offset_key():
-    for key in ('distance_falloff', 'dir1_x_offset', 'text_scale', 'shadow_blur'):
+    for key in ('dir1_x_offset', 'text_scale', 'shadow_blur', 'shadow_distance'):
         assert dis.is_offset_key(key)
-    for key in ('shrink_start', 'min_scale', 'shadow_mode'):  # absolute → no notch
+    for key in ('ranged_keep', 'shadow_mode'):  # absolute → no notch
         assert not dis.is_offset_key(key)
 
 
@@ -142,7 +142,6 @@ def test_readout_inverted_keeps_right_positive():
 
 def test_readout_absolute_keys_show_game_value():
     # Non-position sliders keep showing the resulting game value, not a shift.
-    assert dis.readout('distance_falloff', 0) == '60m'
     assert dis.readout('shadow_distance', 0) == '4px'
     assert dis.readout('text_scale', 0) == '1x'
     assert dis.readout('text_scale', 0.3) == '1.3x'
@@ -202,8 +201,8 @@ def test_validate_all_drops_unknown_and_fills_missing():
 
 
 def test_validate_all_clamps_each():
-    out = dis.validate_all_settings({'min_scale': 999, 'shadow_blur': -999})
-    assert out['min_scale'] == 20
+    out = dis.validate_all_settings({'dir1_x_offset': 99999, 'shadow_blur': -999})
+    assert out['dir1_x_offset'] == 200
     assert out['shadow_blur'] == -3
 
 
@@ -211,16 +210,15 @@ def test_validate_all_clamps_each():
 # compute_final_value
 # --------------------------------------------------------------------------- #
 def test_compute_final_offset_keys():
-    assert dis.compute_final_value('distance_falloff', 0) == 60
-    assert dis.compute_final_value('distance_falloff', 10) == 70
     assert dis.compute_final_value('shadow_distance', 0) == 4
+    assert dis.compute_final_value('shadow_distance', 2) == 6
     assert dis.compute_final_value('dir1_x_offset', 0) == -50  # 50px left of head, + = right
 
 
 def test_compute_final_absolute_keys():
     assert dis.compute_final_value('shadow_mode', 1) == 1
-    assert dis.compute_final_value('shrink_start', 20) == 20
-    assert dis.compute_final_value('min_scale', 6) == 6
+    assert dis.compute_final_value('ranged_keep', 0) == 0
+    assert dis.compute_final_value('ranged_keep', 1) == 1
 
 
 def test_compute_final_float_keys():
@@ -275,12 +273,12 @@ def test_apply_preset_preserves_unrelated_keys():
 def test_save_load_round_trip(tmp_path):
     s = dis.get_default_settings()
     s['enabled'] = True
-    s['distance_falloff'] = 20
+    s['ranged_keep'] = 0  # off (default is on) — round-trips a changed bool
     s['shadow_mode'] = 1
     assert dis.save_settings(tmp_path, s)
     loaded = dis.load_settings(tmp_path)
     assert loaded['enabled'] is True
-    assert loaded['distance_falloff'] == 20
+    assert loaded['ranged_keep'] == 0
     assert loaded['shadow_mode'] == 1
 
 
@@ -295,16 +293,16 @@ def test_load_corrupt_returns_defaults(tmp_path):
 
 def test_load_partial_fills_defaults(tmp_path):
     (tmp_path / dis.SETTINGS_FILENAME).write_text(
-        json.dumps({'enabled': True, 'min_scale': 4}), encoding='utf-8')
+        json.dumps({'enabled': True, 'ranged_keep': 0}), encoding='utf-8')
     loaded = dis.load_settings(tmp_path)
     assert loaded['enabled'] is True
-    assert loaded['min_scale'] == 4
+    assert loaded['ranged_keep'] == 0
     assert loaded['shadow_mode'] == 2  # filled
 
 
 def test_save_validates_out_of_range(tmp_path):
     s = dis.get_default_settings()
-    s['min_scale'] = 999  # out of range
+    s['dir1_x_offset'] = 99999  # out of range
     dis.save_settings(tmp_path, s)
     on_disk = json.loads((tmp_path / dis.SETTINGS_FILENAME).read_text(encoding='utf-8'))
-    assert on_disk['min_scale'] == 20  # clamped before write
+    assert on_disk['dir1_x_offset'] == 200  # clamped before write

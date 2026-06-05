@@ -12,6 +12,8 @@ class DamageNumberManager
    var _elementsUID = 0;
    var _running = false;
    var _lastTime = 0;
+   // CUSTOMIZATION: live camera-zoom estimate (camera->own-avatar), sampled from self-events.
+   var _cameraZoom;
    
    // PHASE2: Type 9 is the only type that keeps title text (Dodge/Parry/Resist labels)
    static var KEEP_TITLE_TYPE = 9;
@@ -24,10 +26,16 @@ class DamageNumberManager
    // instead of at your fixed column position
    static var OTHER_RESOURCE_LOSS_TO_TARGET = 0;  // 0 = off, 1 = show at enemy position
 
-   // CUSTOMIZATION: Distance-to-scale model (fixes ranged numbers shrinking to nothing)
-   static var SHRINK_START = 0;       // near-field flat zone: full size until this distance
-   static var DISTANCE_FALLOFF = 60;  // distance at which numbers vanish (promoted from inline 60)
-   static var MIN_SCALE = 0;          // minimum on-screen size floor
+   // CUSTOMIZATION: Distance-to-scale. Melee hits (real avatar->target distance below
+   // RANGED_CUTOFF metres) always use AoC's untouched stock size curve. When RANGED_KEEP is
+   // on, ranged hits are frozen at the cutoff-distance size so they stop shrinking with
+   // distance. "Real" distance = camera->target (the only distance the game hands us) minus
+   // the camera zoom, which we sample live from numbers over our own avatar (see
+   // SlotCreateDamageNumber), seeded with CAMERA_ZOOM_SEED.
+   static var DISTANCE_FALLOFF = 60;   // stock size curve base/vanish (fixed -- keeps melee exactly stock)
+   static var RANGED_CUTOFF = 15;      // real metres; at/above this a hit counts as ranged
+   static var RANGED_KEEP = 0;         // 0/1 toggle: freeze ranged hits at the cutoff-distance size
+   static var CAMERA_ZOOM_SEED = 10;   // initial camera-zoom estimate until the first self-event
 
    // PHASE3: Object pools for memory efficiency
    var _movieClipPool;
@@ -55,6 +63,7 @@ class DamageNumberManager
    function _init()
    {
       this._collection = new helpers.NumbersFontsCollection();
+      this._cameraZoom = DamageNumberManager.CAMERA_ZOOM_SEED;
       this._signalGroup = new com.Utils.SignalGroup();
       com.GlobalSignal.SignalDamageInfo.Connect(this._signalGroup, com.helperFramework.utils.Relegate.create(this, this.SlotCreateDamageNumber));
       com.GlobalSignal.SignalDestroyDamageInfo.Connect(this._signalGroup, this.SlotClearAllNumbers);
@@ -284,8 +293,25 @@ class DamageNumberManager
          return undefined;
       }
       
-      var _loc9_ = distance < DamageNumberManager.SHRINK_START ? 0 : distance - DamageNumberManager.SHRINK_START;
-      var _loc7_ = Math.max(DamageNumberManager.MIN_SCALE, DamageNumberManager.DISTANCE_FALLOFF - _loc9_) * this._numbersScale * 0.5;
+      // CUSTOMIZATION: distance-to-scale (single "keep ranged numbers big" knob).
+      // Sample camera zoom from numbers over our own avatar (there distance == camera->self);
+      // skip resource-loss types, which the game flags defenderIsClient even when they land
+      // on an enemy (so their distance is camera->enemy, not the zoom).
+      if(defenderIsClient && !this._isResourceLossType(flyingTextType))
+      {
+         this._cameraZoom = distance;
+      }
+      var realDist = distance - this._cameraZoom;  // ~ avatar->target, in real metres
+      // Stock size curve (the melee path, untouched): full near, linear to nothing at DISTANCE_FALLOFF.
+      var sizeBase = Math.max(0, DamageNumberManager.DISTANCE_FALLOFF - distance);
+      if(realDist >= DamageNumberManager.RANGED_CUTOFF && DamageNumberManager.RANGED_KEEP > 0)
+      {
+         // Ranged + toggle on: freeze the size at what a hit at the cutoff distance gets,
+         // so ranged numbers stop shrinking past ~15 real metres.
+         var cutoffDist = this._cameraZoom + DamageNumberManager.RANGED_CUTOFF;
+         sizeBase = Math.max(0, DamageNumberManager.DISTANCE_FALLOFF - cutoffDist);
+      }
+      var _loc7_ = sizeBase * this._numbersScale * 0.5;
       
       // PHASE3: Acquire MovieClip from pool instead of creating
       var _loc8_ = this._movieClipPool.acquire();
