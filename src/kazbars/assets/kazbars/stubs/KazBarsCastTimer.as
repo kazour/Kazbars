@@ -36,7 +36,7 @@ class KazBarsCastTimer {
     // Cast state
     private var playerData:Object;
     private var targetData:Object;
-    private var updateInterval:Number;
+    private var driverClip:MovieClip;
     private var previewMode:Boolean;
 
     public function KazBarsCastTimer(kb:Object, root:MovieClip) {
@@ -72,6 +72,11 @@ class KazBarsCastTimer {
     public function createFields():Void {
         if (ENABLE_P) m_PlayerClip = makeClip("kbCastP", PLAYER_X, PLAYER_Y);
         if (ENABLE_T) m_TargetClip = makeClip("kbCastT", TARGET_X, TARGET_Y);
+        // Frame-coherent update driver. Its own onEnterFrame reads getTimer() and
+        // GetCommandProgress() on the same engine tick, so the EMA estimate can't
+        // see a fresh clock against a stale progress -- the desync a free-running
+        // setInterval produced, which spiked the estimate during lag/interrupts.
+        driverClip = rootClip.createEmptyMovieClip("kbCastDrv", rootClip.getNextHighestDepth());
     }
 
     private function makeClip(name:String, px:Number, py:Number):MovieClip {
@@ -186,7 +191,7 @@ class KazBarsCastTimer {
         }
         clip._visible = true;
         setText(clip, "");
-        ensureInterval();
+        startDriver();
         update();
     }
 
@@ -196,22 +201,21 @@ class KazBarsCastTimer {
             if (previewMode) setText(clip, placeholder());
             else { clip._visible = false; setText(clip, ""); }
         }
-        if (!playerData.casting && !targetData.casting) stopInterval();
+        if (!playerData.casting && !targetData.casting) stopDriver();
     }
 
-    private function ensureInterval():Void {
-        if (updateInterval == null || updateInterval == undefined) {
-            var self:KazBarsCastTimer = this;
-            updateInterval = setInterval(function() { self.update(); }, 60);
-        }
+    private function startDriver():Void {
+        if (driverClip == null) return;
+        var self:KazBarsCastTimer = this;
+        driverClip.onEnterFrame = function() { self.update(); };
     }
 
-    private function stopInterval():Void {
-        if (updateInterval != null) { clearInterval(updateInterval); updateInterval = null; }
+    private function stopDriver():Void {
+        if (driverClip != null) driverClip.onEnterFrame = null;
     }
 
     private function update():Void {
-        if (!playerData.casting && !targetData.casting) { stopInterval(); return; }
+        if (!playerData.casting && !targetData.casting) { stopDriver(); return; }
         var now:Number = getTimer();
         if (playerData.casting && playerChar != null && m_PlayerClip != null) {
             setText(m_PlayerClip, render(playerData, clamp01(safeProgress(playerChar)), now));
@@ -363,12 +367,13 @@ class KazBarsCastTimer {
     }
 
     public function cleanup():Void {
-        stopInterval();
+        stopDriver();
         disconnectPlayer();
         setTarget(null);
         previewMode = false;
         if (m_PlayerClip != null) { m_PlayerClip.removeMovieClip(); m_PlayerClip = null; }
         if (m_TargetClip != null) { m_TargetClip.removeMovieClip(); m_TargetClip = null; }
+        if (driverClip != null) { driverClip.removeMovieClip(); driverClip = null; }
     }
 
     private function clamp01(v:Number):Number {
