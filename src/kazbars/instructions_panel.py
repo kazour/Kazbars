@@ -386,6 +386,45 @@ class InstructionsPanel(ttk.Frame):
             "first.",
         ])
 
+        # --- Damage Numbers ---
+
+        damage_section = self._add_section(inner, "Damage Numbers", [
+            "Game → Damage number Mod... installs a leaner rewrite of Age of "
+            "Conan's floating combat numbers, in place of the stock ones. The "
+            "headline fix: ranged hits stop shrinking to nothing at distance.",
+            [("It's off by default behind a master ", None),
+             ("Enable", THEME_COLORS['success']),
+             (" toggle. Your stock file is backed up the first time, so "
+              "turning it off and rebuilding restores the original.", None)],
+        ])
+        self._add_subsection(damage_section.content, "Turn it on", [
+            [("Open the panel, flip ", None),
+             ("Enable the Damage Numbers mod", THEME_COLORS['success']),
+             (", set your options, then ", None),
+             ("Build & Install", THEME_COLORS['success']),
+             (". Changes apply on your next build, same as grids.", None)],
+        ])
+        self._add_subsection(damage_section.content, "What you can tune", [
+            "Keep ranged numbers big — holds the size of ranged hits (past "
+            "~15 real metres) so they don't fade with distance. Melee numbers "
+            "are never touched.",
+            "Shadow, pop-in and fade speed, and where numbers land — above "
+            "the target, in fixed columns, or a zig-zag stack — with Default "
+            "and Performance presets.",
+            "Group my resource numbers — routes your own mana / stamina "
+            "losses into the same column as your resource gains. Resources "
+            "you drain from enemies still float over them.",
+            "Separate resources into Column B — drops everything that lands "
+            "on you into fixed columns: incoming damage in one, heals / mana / "
+            "stamina in the next.",
+        ])
+        self._add_subsection(damage_section.content, "Colors", [
+            "Game → Damage number Colors... recolors every combat-number "
+            "source on its own — incoming vs outgoing hits, crits, spells, "
+            "combos, heals, mana, and stamina — laid out self on the left, "
+            "your target on the right. Applies on Build & Install.",
+        ])
+
         # --- Backup & Restore ---
 
         backup_section = self._add_section(inner, "Backup and Restore", [

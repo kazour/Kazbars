@@ -11,7 +11,7 @@ When a flow crosses a dialog→app boundary (any modal `Toplevel` whose buttons 
 Trigger: User clicks "Build & Install" button in the bottom bar or presses Ctrl+B
 
 Steps:
-1. `KazBarsApp._build()` — src/kazbars/app.py:571 — one-line delegator to `build_action.build(self)`
+1. `KazBarsApp._build()` — src/kazbars/app.py:586 — one-line delegator to `build_action.build(self)`
 2. `build_action.build()` — src/kazbars/build_action.py:25 — checks `_building` re-entry guard; validates game folder, compiler path, grids list, total slot count; flags grids that would render empty (no whitelist or no static slot assignments); blocks build if Aoc.exe mode and an AoC game process is running
 3. `get_profile_data()` — src/kazbars/grids_panel.py:399 — calls `save_settings()` then returns `self.grids`
 4. `save_settings()` — src/kazbars/grids_panel.py:513 — iterates all `GridEditorPanel` instances, calling `save_to_config()` on each
@@ -19,9 +19,9 @@ Steps:
 6. `find_compiler()` — src/kazbars/build_utils.py:24 — checks three candidate paths for `mtasc.exe`; returns `Path` or `None`
 7. `profile_io.do_save_profile(silent=True)` — src/kazbars/profile_io.py:206 — auto-saves the current profile (if one is loaded) before the build locks. `silent=True` suppresses the post-save "Saved: …" toast + status flash so they don't pile up against the "Built — …" toast a few steps later
 8. Build is locked: `app._building = True`, build button disabled, Ctrl+B unbound
-9. `compile_to_staging()` — src/kazbars/build_executor.py:33 — creates a `tempfile.mkdtemp` staging dir and calls `build_grids()`; returns `(staging_dir, (success, message))`. Forwards `include_console` (read by `build_action` from `settings['build_console']`, default `False`) and `cast_config` (read by `build_action` from `grids_panel.get_cast_timer_config()`) to `build_grids`
-10. `build_grids()` — src/kazbars/grids_generator.py:489 — instantiates `CodeGenerator(..., include_console=include_console, cast_config=cast_config)`, writes `KazBars.as` and `KazBarsData.as` to a second temp dir, copies `base.swf`, calls `compile_as2()`
-11. `CodeGenerator.generate()` — src/kazbars/grids_generator.py:87 — returns `(KazBars.as, KazBarsData.as)` source strings; calls `_resolve_grid()` per grid to expand primary IDs. `_data_class()` also emits `d.CUSTOMICON[<id>] = "<linkage>"` for any tracked buff in `CUSTOM_ICON_LINKAGE` (buffs AoC serves with no icon → a baked `base.swf` symbol; consumed by `KazBars_core` `loadIcon`/`attachBaked`). When `include_console=False`, `_member_variables()` and `_constructor()` skip the `console`/`consolePinned` declarations and instantiations, and `_core_methods()` substitutes the eight `{{CONSOLE_*}}` placeholders in `KazBars_core.as.template` with empty strings — the generated `KazBars.as` has zero references to `KazBarsConsole`, so MTASC doesn't pull the class from the stubs classpath. The cast-timer overlay works the same way: `include_cast_timer` (derived from `cast_config` via `cast_timer.is_enabled`, so False unless the master enable is on — the strip drives both sides together as `enableP == enableT == enabled`) gates the `castTimer:KazBarsCastTimer` declaration/instantiation, the nine `{{CAST_*}}` placeholders, and the `d.CAST` block in `KazBarsData` — off means zero `KazBarsCastTimer` references, so MTASC skips the class
+9. `compile_to_staging()` — src/kazbars/build_executor.py:87 — creates a `tempfile.mkdtemp` staging dir and calls `build_grids()`; returns `(staging_dir, (success, message))`. Forwards `include_console` (read by `build_action` from `settings['build_console']`, default `False`) and `cast_config` (read by `build_action` from `grids_panel.get_cast_timer_config()`) to `build_grids`
+10. `build_grids()` — src/kazbars/grids_generator.py:503 — instantiates `CodeGenerator(..., include_console=include_console, cast_config=cast_config)`, writes `KazBars.as` and `KazBarsData.as` to a second temp dir, copies `base.swf`, calls `compile_as2()`
+11. `CodeGenerator.generate()` — src/kazbars/grids_generator.py:100 — returns `(KazBars.as, KazBarsData.as)` source strings; calls `_resolve_grid()` per grid to expand primary IDs. `_data_class()` also emits `d.CUSTOMICON[<id>] = "<linkage>"` for any tracked buff in `CUSTOM_ICON_LINKAGE` (buffs AoC serves with no icon → a baked `base.swf` symbol; consumed by `KazBars_core` `loadIcon`/`attachBaked`). When `include_console=False`, `_member_variables()` and `_constructor()` skip the `console`/`consolePinned` declarations and instantiations, and `_core_methods()` substitutes the eight `{{CONSOLE_*}}` placeholders in `KazBars_core.as.template` with empty strings — the generated `KazBars.as` has zero references to `KazBarsConsole`, so MTASC doesn't pull the class from the stubs classpath. The cast-timer overlay works the same way: `include_cast_timer` (derived from `cast_config` via `cast_timer.is_enabled`, so False unless the master enable is on — the strip drives both sides together as `enableP == enableT == enabled`) gates the `castTimer:KazBarsCastTimer` declaration/instantiation, the nine `{{CAST_*}}` placeholders, and the `d.CAST` block in `KazBarsData` — off means zero `KazBarsCastTimer` references, so MTASC skips the class
 12. `compile_as2()` — src/kazbars/build_utils.py:36 — assembles MTASC command with classpaths, runs subprocess, returns `(bool, stderr)`
 13. **(Damage Numbers — only when enabled)** `damageinfo_generator.build_damageinfo()` — src/kazbars/damageinfo_generator.py — `build_action` loads `damageinfo_settings` up front (validating the assets exist in the pre-build checks); if `enabled`, after the grids compile it bakes the offset settings into the lean AS2 tree and MTASC-injects a copy of the pristine `DamageInfo.swf` to `staging/DamageInfo.swf` (`loading.advance_step("Baking damage numbers...")`). A bake/compile failure aborts before any install — both SWFs are staged before deploy, so nothing is partially installed. Disabled ⇒ `damageinfo_swf` stays `None`
 14. `install_to_client(..., damageinfo_swf=..., damageinfo_pristine=..., group_resources=..., source_colors=..., split_incoming=...)` — src/kazbars/build_executor.py — calls `cleanup_legacy_files()`; `_prepare_damageinfo()` and `_prepare_textcolors()` stage the two game-file changes to `.kaztmp` files (the slow copy/compute), then the caller commits them back-to-back with `os.replace` (the only lock-prone step) before copying `KazBars.swf` to `Data/Gui/Default/Flash/`, so a running-client file lock leaves the grids untouched. `_prepare_damageinfo()` stages the modded `DamageInfo.swf` install (capturing a one-time stock backup at `DamageInfo.swf.kazbars.bak` — seeded from the live file only when it is byte-identical to the bundled pristine stock, otherwise from the bundled pristine itself, so the backup can never capture a mod) or, when `damageinfo_swf` is `None`, a restore of stock from that backup; `_prepare_textcolors()` stages a regenerated skin `TextColors.xml` (Customized/ if present, else Default/) when `group_resources` (the "Group my resource numbers" toggle), `split_incoming` (the "Separate resources into Column B" toggle → incoming/self damage+heal directions), or `source_colors` (per-source color picks) is active — all AND-ed with the master enable in `build_action` — by keeping a one-time genuine-stock backup and **regenerating** the live file from it (stock → direction flips → per-source color overrides), else restoring stock from that backup; calls `write_xml_add_files()` in Aoc mode; calls `create_scripts()`
@@ -40,7 +40,7 @@ End state: `KazBars.swf` installed under the game folder; `Scripts/reloadgrids` 
 Trigger: User selects File > Open Profile... (or presses Ctrl+O) and confirms a `.json` path
 
 Steps:
-1. `KazBarsApp._open_profile()` — src/kazbars/app.py:553 — one-line delegator to `profile_io.open_profile(self)`
+1. `KazBarsApp._open_profile()` — src/kazbars/app.py:568 — one-line delegator to `profile_io.open_profile(self)`
 2. `profile_io.open_profile()` — src/kazbars/profile_io.py:41 — runs the unsaved-changes guard via `_check_unsaved_changes()`; opens `filedialog.askopenfilename`; composes `read_profile_file()` + `apply_profile_data()`
 3. `profile_io.read_profile_file()` + `apply_profile_data()` — src/kazbars/profile_io.py:72 + 84 — split as of 2026-04-27 to make the boss-timer fan-out visible at every call site. `read_profile_file` is pure I/O (returns `(data, is_corrupt)`); `apply_profile_data` dispatches grids, missing-buff warning, boss-timer (when alive), reference_resolution, current_profile, settings, title. See step 8 for the boss-timer dispatch detail.
 4. `load_profile_data(grids, profile_path)` — src/kazbars/grids_panel.py:451 — iterates raw grid dicts; migrates, validates, rebuilds panel list; restores `_build_done` from `settings['last_build_signature']` when both the profile path and grids hash match; returns `{grid_name: [missing_refs]}` for buffs that couldn't be resolved
@@ -60,7 +60,7 @@ End state: `GridsPanel` displays validated grid cards; `app.modified` is `False`
 Trigger: User selects File > Save Profile (Ctrl+S) or File > Save Profile As...
 
 Steps:
-1. `KazBarsApp._save_profile()` — src/kazbars/app.py:559 — one-line delegator to `profile_io.save_profile(self)`
+1. `KazBarsApp._save_profile()` — src/kazbars/app.py:574 — one-line delegator to `profile_io.save_profile(self)`
 2. `profile_io.save_profile()` — src/kazbars/profile_io.py:141 — routes to `do_save_profile(app, current_path)` if a path exists, or to `save_profile_as()` otherwise
 3. `profile_io.do_save_profile(silent=False)` — src/kazbars/profile_io.py:206 — orchestrator: `build_profile_payload()` → `write_profile_file()` → `_commit_saved_profile(silent=silent)`, with try/except for `OSError`. The `silent` flag (default `False` for direct save; `True` for the pre-build piggyback save in Flow 1) suppresses the post-commit toast + status flash. Note: the `boss_timer` key is pulled from the live tracker (when one is open) inside `build_profile_payload()` (src/kazbars/profile_io.py:169) — see step 7.
 4. `get_profile_data()` — src/kazbars/grids_panel.py:399 — calls `save_settings()` then returns `self.grids`
@@ -111,7 +111,7 @@ End state: `grid_config['whitelist']` updated with new primary spell ID list; pa
 Trigger: `KazBarsApp.__init__` detects no `game_path` in settings; schedules 100ms after `deiconify()`
 
 Steps:
-1. `_show_first_launch_dialog()` — src/kazbars/app.py:604 — one-line delegator to `run_first_launch(self, APP_NAME)`
+1. `_show_first_launch_dialog()` — src/kazbars/app.py:619 — one-line delegator to `run_first_launch(self, APP_NAME)`
 2. `run_first_launch()` — src/kazbars/first_launch.py:300 — defines the `on_game_set`, `on_aoc_bypass_set`, `on_load_default`, `on_resolution_set`, `on_dialog_closed` closures; calls `show_first_launch_dialog()`
 3. `show_first_launch_dialog()` — src/kazbars/first_launch.py:34 — builds modal dialog with game folder entry, common-paths shortcuts, an Aoc.exe Yes/No section (revealed on demand), resolution picker, and two option cards ("Use Defaults" / "Start Empty")
 4. `detect_aoc_launcher()` — src/kazbars/build_executor.py:151 — called whenever the path entry changes; checks for `aoc.exe` or `Aoc.log` under `Data/Gui/Aoc/`; reveals the Aoc.exe radio group if found
@@ -157,7 +157,7 @@ End state: new buff entry visible in treeview; `by_id` and `by_name` indexes upd
 Trigger: User selects Game > Uninstall from game client... and confirms the dialog
 
 Steps:
-1. `KazBarsApp._uninstall_game()` — src/kazbars/app.py:493 — one-line delegator to `game_folder.uninstall_game(self)`
+1. `KazBarsApp._uninstall_game()` — src/kazbars/app.py:508 — one-line delegator to `game_folder.uninstall_game(self)`
 2. `game_folder.uninstall_game()` — src/kazbars/game_folder.py:149 — guards on `app.game_path`; confirms with the user; calls `uninstall_from_client()`
 3. `uninstall_from_client()` — src/kazbars/build_executor.py — deletes `Data/Gui/Default/Flash/KazBars.swf`, the `Data/Gui/Aoc/KazBars/` directory (if present), and `Scripts/reloadgrids` + `Scripts/unloadgrids`; strips the auto-load marker block from `Scripts/auto_login`; if a `DamageInfo.swf.kazbars.bak` exists (Damage Numbers was installed), restores the stock `DamageInfo.swf` from it and removes the backup; if the backup is missing but a modded `DamageInfo.swf` remains, restores stock from the bundled pristine copy instead so uninstall never leaves a modded core file
 4. `strip_marker_block()` — src/kazbars/build_utils.py:60 — removes the `# KazBars auto-load` marker-delimited section (marker line through the next blank line) from the `auto_login` file content; the script is rewritten or, if empty after the strip, deleted
@@ -171,7 +171,7 @@ End state: `KazBars.swf`, the Aoc xml.add module folder, the reload scripts, and
 Trigger: User clicks the "⏱ Ethram-Fal" button in the bottom bar (right side, next to Build & Install)
 
 Steps:
-1. `_open_boss_timer()` — src/kazbars/app.py:450 — checks `_boss_timer_if_alive()`; if a panel exists, deiconifies/lifts/restores the overlay; otherwise constructs a new `LiveTrackerPanel`
+1. `_open_boss_timer()` — src/kazbars/app.py:455 — checks `_boss_timer_if_alive()`; if a panel exists, deiconifies/lifts/restores the overlay; otherwise constructs a new `LiveTrackerPanel`
 2. `LiveTrackerPanel.__init__()` — src/kazbars/live_tracker_panel.py — runs the one-shot `_migrate_window_position_key()` (renames legacy `window_pos_boss_timer` → `window_pos_live_tracker`); sets `transient(parent)`; restores window position; calls `load_settings()`; builds UI; creates overlay and **registers it with the app's `ForegroundWatcher`** (the single shared focus gate, owned by `KazBarsApp`, that hides every overlay whenever neither KazBars nor AoC is foreground); constructs `BossTimer` and `CombatLogMonitor`; auto-detects log path
 3. `load_settings()` — src/kazbars/live_tracker_settings.py:169 — runs the one-shot `_migrate_legacy_filename()` (renames legacy `timers_settings.json` → `live_tracker_settings.json`); reads `live_tracker_settings.json` from the settings folder; returns dict validated against `TIMERS_DEFAULTS` and `TIMERS_RANGES`
 4. `BossTimer.__init__()` — src/kazbars/boss_timer.py:53 — initializes cycle state fields and `_last_phase = None` (the source-side dedupe cache); stores `LiveTrackerPanel._dispatch_overlay_update` (src/kazbars/live_tracker_panel.py:151) as `_update_callback` — that method hops cross-thread updates onto the Tk main loop via `self.after(0, partial(_apply_overlay_update, phase))` (src/kazbars/live_tracker_panel.py:157)
@@ -236,9 +236,9 @@ End state: `game_path`, `use_aoc_bypass`, and `game_resolution` persisted; no pr
 Trigger: User selects Game > Change game folder... from the menu, OR left/right-clicks the path label in the bottom bar and picks "Change game folder..." from the context menu
 
 Steps:
-1. `KazBarsApp._show_game_context_menu()` — src/kazbars/app.py:490 — one-line delegator to `game_folder.show_game_context_menu(self, event)`
+1. `KazBarsApp._show_game_context_menu()` — src/kazbars/app.py:505 — one-line delegator to `game_folder.show_game_context_menu(self, event)`
 2. `show_game_context_menu()` — src/kazbars/game_folder.py:117 — pops `app._game_context_menu` at the event coordinates; both `<Button-1>` and `<Button-3>` route here
-3. User picks "Change game folder..." → `KazBarsApp._change_game_folder()` — src/kazbars/app.py:481 — one-line delegator to `game_folder.change_game_folder(self)`. (When triggered via Game menu the cascade invokes the same delegator directly, skipping steps 1-2.)
+3. User picks "Change game folder..." → `KazBarsApp._change_game_folder()` — src/kazbars/app.py:496 — one-line delegator to `game_folder.change_game_folder(self)`. (When triggered via Game menu the cascade invokes the same delegator directly, skipping steps 1-2.)
 4. `change_game_folder()` — src/kazbars/game_folder.py:63 — opens `filedialog.askdirectory`; validates AoC folder structure (warns if `Data/Gui/Default` is missing); warns if the resulting `KazBars.swf` path exceeds 240 characters
 5. `save_game_path()` — src/kazbars/game_folder.py:122 — persists `game_path` to settings; calls `grids_panel.notify_game_path_changed()` so the panel can refresh
 6. **Reconcile (only when `resolved != previous`)**: `detect_aoc_launcher()` — src/kazbars/build_executor.py:151 — checks for `aoc.exe` or `Aoc.log` under `Data/Gui/Aoc/`. Two state-divergence branches fire:
@@ -255,7 +255,7 @@ End state: `game_path` and (when divergence triggered it) `use_aoc_bypass` persi
 Trigger: User selects Game > Default buff bars… from the menu
 
 Steps:
-1. `KazBarsApp._open_buff_display_editor()` — src/kazbars/app.py:496 — one-line delegator to `buff_display_editor.open_buff_display_editor(self)`
+1. `KazBarsApp._open_buff_display_editor()` — src/kazbars/app.py:511 — one-line delegator to `buff_display_editor.open_buff_display_editor(self)`
 2. `open_buff_display_editor()` — src/kazbars/buff_display_editor.py:567 — pre-flight: validates `app.game_path` is set and points to a real directory; on miss, shows a `Messagebox.show_warning` (the only modal in this module — toast can't render before the dialog exists) and returns
 3. `BuffDisplayDialog.__init__()` — src/kazbars/buff_display_editor.py:407 — `withdraw → transient → grab_set`; calls `_create_widgets()`; restores window position; binds `<Escape>` → `_on_cancel`, `<Return>` → `_on_apply`, `WM_DELETE_WINDOW` → `_on_close`; schedules `_set_initial_focus()` via `after_idle` so the toggle widget is fully realized
 4. `_create_widgets()` — src/kazbars/buff_display_editor.py:455 — packs CRT-styled header, plain-language subtitle, conditional custom-UI banner; **bottom button row packs first** (`side='bottom'`) so it reserves height before body claims expansion (Cancel + Apply stay visible at any window size); **scrollable body** wraps the section iteration via `create_scrollable_frame`; reads `SETTINGS_KEY_SECTION_OPEN` for per-section open/closed state
@@ -280,7 +280,7 @@ End state: changed sections written to `<game>/Data/Gui/Customized/Views/HUD/<fi
 Trigger: User selects Game > Game resolution... from the menu
 
 Steps:
-1. `KazBarsApp._change_game_resolution()` — src/kazbars/app.py:484 — one-line delegator to `game_resolution.change_game_resolution(self)`
+1. `KazBarsApp._change_game_resolution()` — src/kazbars/app.py:499 — one-line delegator to `game_resolution.change_game_resolution(self)`
 2. `change_game_resolution()` — src/kazbars/game_resolution.py:32 — reads current `game_resolution` setting via `get_game_resolution_or_default()`; builds a modal `Toplevel` with combobox of `["1920x1080", "2560x1440", "3840x2160"]` plus the OS-detected screen res prepended if not already in the list
 3. User picks a value and clicks Apply → `_apply()` closure inside the dialog
 4. `parse_resolution()` — src/kazbars/grid_model.py:122 — converts the chosen `"WxH"` string into `(w, h)`; on parse failure the dialog just closes

@@ -23,6 +23,7 @@ Buff/debuff grid overlay editor for **Age of Conan**. Design icon grids that sho
 - **Dynamic or Static slots** — auto-fill as buffs activate, or pin specific buffs to specific slots
 - **Buff database** — map numeric spell IDs to readable names and classify them as Buff, Debuff, or Misc
 - **Deeps** — real-time combat overlay showing DPS out, DPS in, HPS out, HPS in, and ΔHP in; the DPS-out cell pulses red past a threshold you set
+- **Damage Numbers** — a leaner rewrite of the game's floating combat numbers, so ranged hits stop shrinking at distance; tune shadow, speed, and placement, and recolor each source. Off by default; restores stock when you turn it off
 - **Cast-timer overlay** — optional on-screen readout of your and your target's current cast time, styled alongside your grids
 - **Default Buff Bars editor** — edit the in-game HUD widgets (icon size, spacing, columns, friendly/hostile filter) without hand-editing XML
 - **Ethram-Fal Seed Timer** — always-on-top overlay for the Viscous Seed / Lotus Fixation / Syphon cycle
