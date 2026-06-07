@@ -238,9 +238,19 @@ class KazBarsCastTimer {
 
         var est:Number = data.smoothedEstimate;
         var elapsedSec:Number;
-        if (data.midCast && est > 0) elapsedSec = progress * est;
-        else elapsedSec = elapsedMs / 1000;
-        if (est > 0 && elapsedSec > est) elapsedSec = est;
+        if (data.midCast && est > 0) {
+            elapsedSec = progress * est;
+        } else {
+            elapsedSec = elapsedMs / 1000;
+            // Elapsed is wall-clock truth; clipping it down to a low estimate is
+            // what stalled a real 2.0s cast at "1.9". Let it reach the true time
+            // and pull the shown total up to match (keeps "both" consistent). The
+            // +1s tolerance still bounds a stuck cast whose end signal was missed.
+            if (est > 0) {
+                if (elapsedSec > est + 1) elapsedSec = est + 1;
+                if (elapsedSec > est) est = Math.round(elapsedSec * 10) / 10;
+            }
+        }
 
         if (DISPLAY == "total") return (est > 0) ? formatTime(est) : "";
         var e:String = formatTime(Math.round(elapsedSec * 10) / 10);
