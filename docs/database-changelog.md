@@ -27,6 +27,9 @@ Add/change a buff in the database".
 
 ---
 
+## 2026-06-07
+- **Added:** `Spiritual Wrack` (#Global debuff) alias spell ID `4887864` (entry IDs now `3963068`, `4882958`, `4887864`).
+
 ## 2026-05-25
 - **Fixed:** `Affliction (Ethram)` (#T6 debuff) spell ID `5054120` → `5054121`; updated the matching `Default.json` whitelist + resynced the bundled fallback.
 

@@ -680,7 +680,8 @@
       "name": "Spiritual Wrack",
       "ids": [
         3963068,
-        4882958
+        4882958,
+        4887864
       ],
       "category": "#Global",
       "type": "debuff"
