@@ -40,17 +40,25 @@ def test_backup_restore_round_trip(tmp_path) -> None:
             "scratch.tmp": b"transient - must be skipped",
         },
     )
+    # The userdata/ allowlist: profiles/, settings/, database_user.json, prefs.json.
     profiles = tmp_path / "profiles"
     _make_tree(profiles, {"Default.json": b'{"grids": []}', "Alt.json": b"{}"})
     settings = tmp_path / "settings"
     _make_tree(
         settings,
         {
-            "kazbars_settings.json": b'{"game_path": "X"}',
             "deeps_settings.json": b'{"alarm_threshold": 2000}',
-            "live_tracker_settings.json": b'{"opacity": 0.8}',
+            "live_tracker_settings.json": b'{"bg_opacity": 0.8}',
+            "damageinfo_settings.json": b'{"enabled": false}',
         },
     )
+    database_user = tmp_path / "database_user.json"
+    database_user.write_bytes(b'{"version": 2, "buffs": [], "deleted": []}')
+    prefs = tmp_path / "prefs.json"
+    prefs.write_bytes(b'{"game_path": "X"}')
+    # The OTA content/ cache exists but is NOT a write_backup_zip parameter, so
+    # it can never enter a backup.
+    _make_tree(tmp_path / "content", {"Database.json": b"{}", ".bak/prev/Database.json": b"{}"})
 
     zip_path = tmp_path / "backup.zip"
     sections = write_backup_zip(
@@ -58,29 +66,45 @@ def test_backup_restore_round_trip(tmp_path) -> None:
         funcom_dir=funcom,
         profiles_dir=profiles,
         settings_dir=settings,
+        database_user=database_user,
+        prefs_file=prefs,
         app_version="9.9.9",
     )
 
     assert sections["funcom"]["files"] == 4  # .tmp excluded
-    assert sections["kazbars"] == {"profiles": 2, "settings": 3}  # all 3 settings files
+    assert sections["kazbars"] == {"profiles": 2, "settings": 3, "database_user": 1, "prefs": 1}
+
+    # content/ never leaks into the archive.
+    with zipfile.ZipFile(zip_path) as zf:
+        assert not any("content" in n for n in zf.namelist())
 
     manifest = read_manifest(zip_path)
     assert manifest["format"] == "kazbars-settings-backup"
     assert manifest["app_version"] == "9.9.9"
 
+    # Restore WITHOUT prefs (default): everything but prefs.json lands under userdata.
     funcom_dest = tmp_path / "restored_prefs"
-    kazbars_dest = tmp_path / "restored_app"
-    restored = restore_zip(zip_path, funcom_dest=funcom_dest, kazbars_dest=kazbars_dest)
-    assert restored == {"funcom": 4, "kazbars": 5}  # 2 profiles + 3 settings
+    userdata_dest = tmp_path / "restored_userdata"
+    restored = restore_zip(zip_path, funcom_dest=funcom_dest, userdata_dest=userdata_dest)
+    assert restored == {"funcom": 4, "kazbars": 6}  # 2 profiles + 3 settings + db_user, NOT prefs
 
     assert (funcom_dest / "Prefs_3.xml").read_bytes() == b"<Root/>"
     assert (funcom_dest / "acct/Char1/preview.bin").read_bytes() == b"\x00\x01\x02"
     assert not (funcom_dest / "scratch.tmp").exists()
-    assert (kazbars_dest / "profiles/Default.json").read_bytes() == b'{"grids": []}'
-    assert (kazbars_dest / "settings/kazbars_settings.json").read_bytes() == b'{"game_path": "X"}'
-    # Deeps + Live Tracker settings come along with the whole settings/ dir
-    assert (kazbars_dest / "settings/deeps_settings.json").exists()
-    assert (kazbars_dest / "settings/live_tracker_settings.json").exists()
+    assert (userdata_dest / "profiles/Default.json").read_bytes() == b'{"grids": []}'
+    assert (userdata_dest / "settings/deeps_settings.json").exists()
+    assert (userdata_dest / "settings/damageinfo_settings.json").exists()
+    assert (userdata_dest / "database_user.json").exists()
+    # prefs.json is machine-local — left out unless explicitly opted in.
+    assert not (userdata_dest / "prefs.json").exists()
+
+    # Restore WITH prefs opted in: prefs.json comes along too.
+    with_prefs = tmp_path / "restored_with_prefs"
+    restored2 = restore_zip(
+        zip_path, funcom_dest=tmp_path / "fp2", userdata_dest=with_prefs, include_prefs=True
+    )
+    assert restored2["kazbars"] == 7  # + prefs.json
+    assert (with_prefs / "prefs.json").read_bytes() == b'{"game_path": "X"}'
 
 
 def test_backup_omits_absent_sources(tmp_path) -> None:
@@ -129,7 +153,7 @@ def test_restore_blocks_zip_slip(tmp_path) -> None:
         zf.writestr("funcom/../escape.txt", "pwned")
         zf.writestr("funcom/ok.xml", "<ok/>")
     funcom_dest = tmp_path / "dest"
-    restored = restore_zip(z, funcom_dest=funcom_dest, kazbars_dest=tmp_path / "kz")
+    restored = restore_zip(z, funcom_dest=funcom_dest, userdata_dest=tmp_path / "kz")
     assert restored["funcom"] == 1  # only the in-tree entry
     assert (funcom_dest / "ok.xml").exists()
     assert not (tmp_path / "escape.txt").exists()

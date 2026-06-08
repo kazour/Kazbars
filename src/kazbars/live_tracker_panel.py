@@ -21,7 +21,6 @@ from .live_tracker_settings import (
     save_settings,
     validate_all_settings,
 )
-from .settings_manager import get_setting, set_setting
 from .timer_overlay import TimerOverlay
 from .ui_forms import (
     create_card,
@@ -61,15 +60,6 @@ TEST_RESET_DELAY_MS = 39500
 TEST_RESET_POLL_MS = 500
 
 
-def _migrate_window_position_key():
-    """One-time rename of the legacy 'window_pos_boss_timer' key to
-    'window_pos_live_tracker' after the module rebrand."""
-    legacy = get_setting('window_pos_boss_timer')
-    current = get_setting('window_pos_live_tracker')
-    if legacy and not current:
-        set_setting('window_pos_live_tracker', legacy)
-
-
 class LiveTrackerPanel(tk.Toplevel):
     """
     Boss Timer child window for KazBars.
@@ -96,7 +86,6 @@ class LiveTrackerPanel(tk.Toplevel):
         self.resizable(False, False)
         self.transient(parent)
 
-        _migrate_window_position_key()
         restore_window_position(
             self, 'live_tracker', _PANEL_DEFAULT_WIDTH, _PANEL_PROVISIONAL_HEIGHT,
             parent, resizable=False, offset=(48, 40),

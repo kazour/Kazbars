@@ -32,7 +32,8 @@ from kazbars.grids_panel import GridsPanel
 from kazbars.instructions_panel import InstructionsPanel
 from kazbars.live_tracker_panel import LiveTrackerPanel
 from kazbars.paths import ASSETS, KAZBARS_ASSETS, app_path
-from kazbars.settings_manager import SettingsManager, init_settings
+from kazbars.prefs import Prefs
+from kazbars.settings_manager import init_settings
 from kazbars.ui_components import (
     ToastManager,
     disable_mousewheel_on_inputs,
@@ -55,9 +56,8 @@ from kazbars.ui_widgets import (
     bind_button_press_effect,
     blend_alpha,
 )
+from kazbars.userdata import ensure_layout, profiles_dir, settings_dir, userdata_root
 from kazbars.window_position import bind_window_position_save, restore_window_position
-
-SETTINGS_FILE = "kazbars_settings.json"
 
 logger = logging.getLogger(__name__)
 
@@ -75,18 +75,19 @@ class KazBarsApp(ttkb.Window):
         self.title(f"{APP_NAME} — Untitled")
         self.iconname(APP_NAME)
 
-        # Paths — see kazbars.paths for the resolution rules.
+        # Paths — see kazbars.paths for the resolution rules. All user + machine
+        # data lives under userdata/, created fresh here on first launch (no
+        # legacy migration: any old settings/ or profiles/ next to the exe are
+        # ignored). assets/ stays read-only.
         self.app_path = app_path()
         self.assets_path = ASSETS
 
-        self.profiles_path = self.app_path / "profiles"
-        self.profiles_path.mkdir(exist_ok=True)
+        ensure_layout()
+        self.profiles_path = profiles_dir()
+        self.settings_path = settings_dir()
 
-        self.settings_path = self.app_path / "settings"
-        self.settings_path.mkdir(exist_ok=True)
-
-        # Settings
-        self.settings = SettingsManager(self.settings_path / SETTINGS_FILE)
+        # Machine-local prefs (prefs.json) via the strict settings_core engine.
+        self.settings = Prefs(userdata_root())
         init_settings(self.settings)
 
         # Database (with fallback recovery from bundled copy)
@@ -123,7 +124,6 @@ class KazBarsApp(ttkb.Window):
         self.focus_watcher.start()
 
         # Single game folder + Aoc.exe preference (set via first-launch prompt)
-        self._migrate_legacy_clients()
         self.game_path = self.settings.get('game_path') or None
         self.use_aoc_bypass = bool(self.settings.get('use_aoc_bypass', False))
 
@@ -487,9 +487,6 @@ class KazBarsApp(ttkb.Window):
     # ========================================================================
     # GAME FOLDER MANAGEMENT
     # ========================================================================
-    def _migrate_legacy_clients(self):
-        return game_folder.migrate_legacy_clients(self)
-
     def _refresh_game_path_label(self):
         return game_folder.refresh_game_path_label(self)
 

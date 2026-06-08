@@ -26,11 +26,30 @@ ui_helpers  ← custom_menu_bar
 
 ### App state
 ```
-settings_manager  ← settings_core  ← deeps_settings, live_tracker_settings, damageinfo_settings
-                  ← window_position
+settings_manager (get/set proxy + safe_save_json)
+  ← settings_core  ← deeps_settings, live_tracker_settings, damageinfo_settings
+                   ← prefs (PREFS_SCHEMA + Prefs facade)
+  ← window_position
+userdata (userdata/ paths + ensure_layout)  ← prefs, settings_backup, app
 ```
-- `settings_core` is the schema-driven settings engine (`Field`/`Schema`/`Migration`/`Store` + functional `load`/`save`/`validate_all`); it imports only `settings_manager.safe_save_json` and stdlib. The three typed settings modules declare a `Schema` and delegate validation + atomic I/O to it (`prefs.json` joins them in Phase 2). It is **strict drop-unknown** — undeclared keys are erased on save — so any dynamic key namespace is one structured-dict `Field`, never N top-level keys.
-- Window-position helpers reach settings via the public `get_setting`/`set_setting` API, not the `_settings` global directly.
+- `settings_core` is the schema-driven settings engine (`Field`/`Schema`/`Migration`/`Store` + functional `load`/`save`/`validate_all`); it imports only `settings_manager.safe_save_json` and stdlib. Every settings file declares a `Schema` and delegates validation + atomic I/O to it. It is **strict drop-unknown** — undeclared keys are erased on save — so any dynamic key namespace is one structured-dict `Field`, never N top-level keys.
+- `userdata` resolves the `userdata/` storage root (created fresh on first launch by `ensure_layout()`; **no legacy migration** — old `settings/`/`profiles/` next to the exe are ignored) and its named subpaths. `assets/` stays read-only.
+- `prefs` declares `PREFS_SCHEMA` (machine-local `prefs.json`, strict) + the `Prefs` facade: a `settings_core.Store` wrapper exposing the exact retired-`SettingsManager` surface (`get`/`set`/no-arg `save()`/`reload()`/`data`-with-`pop`). `init_settings(prefs)` keeps the `get_setting`/`set_setting` proxy working; `settings_manager` now holds only that proxy + `safe_save_json`. The strict guard is `tests/test_prefs_schema_covers_all_proxy_keys` — it greps every proxy key and fails if one isn't a declared Field.
+- `window_position` stores all window geometry under the single `window_positions` prefs dict field (keyed by window name), reached via the `get_setting`/`set_setting` proxy — not the `_settings` global, and not N top-level `window_pos_*` keys.
+
+**Storage layout / data lifecycle.** Three data classes by lifecycle, not by feature:
+```
+<install>/
+  KazBars.exe
+  assets/kazbars/{Database.json, Database.json.default, Default.json}  ← REFERENCE (read-only, shipped; app never writes here)
+  userdata/                       ← USER + MACHINE (created fresh by ensure_layout() on first launch)
+    prefs.json                    ← machine-local (window positions, game path, resolution, last/default profile, build toggles, UI state)
+    settings/{deeps,live_tracker,damageinfo}_settings.json
+    profiles/*.json
+    database_user.json            ← user buff deltas (seeded empty; Phase 3)
+    content/  content/.bak/       ← OTA reference content + rollback (Phase 4)
+```
+The editor and OTA updater **never write `assets/`**, so a reinstall always has a clean floor and the `Database.json` ⇄ `.default` byte-identity test holds. Backup/restore (`settings_backup`) covers an explicit `userdata/` allowlist — `profiles/`, `settings/`, `database_user.json`, and `prefs.json` — and never `content/` (regenerable OTA cache); `prefs.json` rides in the zip but is machine-local, so restore leaves it out unless the user ticks the opt-in checkbox.
 
 ### Grid editing
 ```
@@ -181,7 +200,10 @@ Plain-Python pytest cases guard the failure modes we've actually hit.
 - **`tests/test_deeps_meter.py`** — 36 cases on `newest_combat_log` selection, `MeterSnapshot` shape, `_process_line` dispatch (own-pet gate + pet-toggle), lifecycle (start/stop/restart), `set_window_seconds` tracker-recreation + in-flight reset, `OLD_LOG` detection on stale files, and a Windows-only end-to-end `TAILING` check using a held-open file.
 - **`tests/test_deeps_overlay.py`** — 30 cases on the pure helpers (`_format_rate`, `_format_signed_int`, `_lerp_color`), the five-cell IDs and labels, and `_DisplaySmoother` (snap-when-off, EMA easing + convergence, None-reset, coarse rounding, redraw-cadence hold). Visual behaviour is covered by manual `/smoke`.
 - **`tests/test_resolution_scaling.py`** — anchor-formula regression: `grid_model.scale_grid_position` predictions for 1080p → 1440p / 4K against `Default.json` (X center-anchored, Y bottom-anchored).
-- **`tests/test_settings_backup.py`** — `settings_backup` pure layer: backup→restore byte-identity (incl. Deeps + Live Tracker settings), `*.tmp` exclusion, manifest accept/reject, prefs locator, zip-slip guard.
+- **`tests/test_settings_backup.py`** — `settings_backup` pure layer: backup→restore over the `userdata/` allowlist (`profiles/`, `settings/`, `database_user.json`, `prefs.json`), the `content/` cache never archived, `prefs.json` restored only when opted in, `*.tmp` exclusion, manifest accept/reject, prefs locator, zip-slip guard.
+- **`tests/test_settings_core.py`** — `settings_core` engine: Field coercion, strict drop-unknown + fill-missing, migration ladder (ordering + idempotent fixpoint), atomic save (no leftover `.tmp`), corrupt→defaults, structured-dict round-trip, `Store` facade.
+- **`tests/test_userdata.py`** — `userdata.ensure_layout()` creates the tree + seeds an empty `database_user.json`, is idempotent (no reseed), and every subpath resolves under `userdata/`.
+- **`tests/test_prefs_schema_covers_all_proxy_keys.py`** — greps every settings-proxy key in the tree and asserts each is a declared `PREFS_SCHEMA` Field (the strict-mode data-loss guard).
 - **`tests/test_overlay_config.py`** — `OverlayConfig` dataclass + per-cluster adapters (Deeps `overlay_*` keys ↔ Live Tracker bare keys) round-trip without dropping fields.
 - **`tests/test_focus_watcher.py`** — `ForegroundWatcher` tick + fan-out: registered overlays get `set_focus_suppressed` flips driven by an injected probe (no display required).
 - **`tests/test_foreground.py`** — `app_or_game_foreground`: own-process gate (any KazBars window keeps the gate open), AoC match, and the show-on-probe-failure default.
@@ -214,14 +236,14 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/buff_display_editor.py` | 575 | Default Buff Bars dialog (UI). Pure XML helpers in `buff_xml.py` |
 | `src/kazbars/buff_xml.py` | 313 | AoC HUD XML helpers (regex-only): `<BuffListView>` reads/writes + `set_directions` (flip flytext directions for a group; `RESOURCE_LOSS_TYPES` and `INCOMING_DAMAGE_TYPES`) + `read_source_color`/`set_source_color` (per-source flytext `color="0x…"`, for the Damage Numbers color editor). Pure — no Tk/ttkbootstrap, importable from CI without UI extra |
 | `src/kazbars/buff_database.py` | 140 | `BuffDatabase` class — JSON load/save, in-memory indexes, search. Pure — no Tk |
-| `src/kazbars/app.py` | 642 | Entry point + `KazBarsApp` root window (widgets, menu, lifecycle) |
+| `src/kazbars/app.py` | 639 | Entry point + `KazBarsApp` root window (widgets, menu, lifecycle); `__init__` calls `ensure_layout()`, points `profiles_path`/`settings_path` at `userdata/`, and builds `self.settings = Prefs(userdata_root())` |
 | `src/kazbars/__main__.py` | 43 | Process entry point — logging setup + `KazBarsApp().mainloop()`; invoked by `python -m kazbars` |
 | `src/kazbars/__init__.py` | 4 | Package version + `APP_NAME`; `__version__` is the hatchling dynamic-version source |
 | `src/kazbars/ui_widgets.py` | 283 | Leaf "core glue": `blend_alpha`, `add_tooltip` (+ `_InAppToolTip`), `app_toast`, `flash_status_bar`, `debounced_callback`, and the event-binding helpers (`bind_card_events`/`bind_button_press_effect`/`bind_label_hover_colors`/`bind_label_press_effect`). Imports nothing from `ui_headers`/`ui_forms`/`ui_collapsible` — they depend on it |
 | `src/kazbars/ui_headers.py` | 197 | Dialog/app headers: `create_dialog_header`, `create_app_header`, `update_app_header_color`, `create_tip_bar`. Imports `blend_alpha` from `ui_widgets` |
 | `src/kazbars/ui_forms.py` | 437 | Form fields + shared settings-panel builders: `labeled_spinbox`/`labeled_combobox`/`position_entry`, `draw_grid_cells`, `create_rounded_rect`, `ColorSwatch` (rounded swatch + themed `ColorChooserDialog`), and the group both config panels share — `create_card`, `create_status_block`, `create_slider_row` (optional `value_width` for the readout label, `notch` for a centered default tick on symmetric sliders, `label_width` to align descriptor columns, and `label_sink` so a master gate can grey the row's descriptor + value labels alongside its control), `toggle_button_state`, `create_toggle_action_button`, `refresh_toggle_button`. Imports `add_tooltip` from `ui_widgets` |
 | `src/kazbars/ui_collapsible.py` | 232 | `CollapsibleSection` (with `set_dimmed`). Imports `blend_alpha` from `ui_widgets` |
-| `src/kazbars/live_tracker_panel.py` | 533 | Live Tracker Toplevel orchestrator |
+| `src/kazbars/live_tracker_panel.py` | 520 | Live Tracker Toplevel orchestrator |
 | `src/kazbars/timer_overlay.py` | 387 | In-game transparent Live Tracker overlay — a `HudOverlay` consumer (`_render_content`: two text rows + cycle-timer dock with 8-direction stroke; `_measure`: font-derived auto-size, no resize handle) |
 | `src/kazbars/ui_components.py` | 454 | `ToastManager` (coalesce-by-key, in-place text update), `DragReorderManager`, scrollable frame |
 | `src/kazbars/grids_generator.py` | 593 | AS2 code generation from grid configs (optional console hooks via `include_console`; optional cast-timer overlay hooks + `d.CAST` block via `cast_config` → `include_cast_timer`). Also holds `CUSTOM_ICON_LINKAGE` (null-icon buff IDs → baked `base.swf` symbol names), emitted into `KazBarsData.CUSTOMICON` |
@@ -233,9 +255,9 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/cast_timer_strip.py` | 344 | Frozen `CastTimerStrip` card (collapsed + master-off by default) for the cast-timer overlay. Header: one master Enabled toggle + title-adjacent Player/Target status tags + muted `overlay`. Body: a single settings row (independent Player/Target X/Y + Bold/Size/Display/Color, font fixed to Arial) + right-side sample preview. Master enables both sides together (`enableP == enableT == enabled`); X/Y grey out when off. Chrome mirrors a grid card — reserved handle gutter, shared `position_entry`, rose card border |
 | `src/kazbars/build_executor.py` | 455 | MTASC compile + deploy; Damage Numbers backup/restore (bundled pristine as the stock source of truth, install via stage-to-temp then back-to-back `os.replace` commit) + `_prepare_textcolors` (regenerate the skin's TextColors.xml from a one-time stock backup = resource-loss + incoming/self direction flips + per-source color overrides; restore on disable/uninstall) |
 | `src/kazbars/profile_io.py` | 228 | Profile load (read+apply split, with auto-anchor-scale on resolution mismatch) / save (build+write+commit, `silent=` for piggyback saves) / new / open + missing-buff warning. Persists the `cast_timer` block alongside `grids` |
-| `src/kazbars/game_folder.py` | 194 | Game folder UI + Aoc.exe bypass (with install/remove reconciler) + uninstall |
+| `src/kazbars/game_folder.py` | 176 | Game folder UI + Aoc.exe bypass (with install/remove reconciler) + uninstall |
 | `src/kazbars/game_resolution.py` | 104 | Game resolution dialog + anchor-rescale all loaded grids on apply |
-| `src/kazbars/settings_backup.py` | 394 | Backup & Restore dialog + pure zip layer (`write_backup_zip`/`read_manifest`/`restore_zip`, `funcom_prefs_path`, `_funcom_summary`) — bundles `%LOCALAPPDATA%\Funcom\Conan\Prefs` + KazBars `profiles/` + the whole `settings/` dir (app + Deeps + Live Tracker) into one zip; restore snapshots first, guards zip-slip, resyncs settings. Isolated satellite, no cross-imports |
+| `src/kazbars/settings_backup.py` | 464 | Backup & Restore dialog + pure zip layer (`write_backup_zip`/`read_manifest`/`restore_zip`, `funcom_prefs_path`, `_funcom_summary`) — bundles `%LOCALAPPDATA%\Funcom\Conan\Prefs` + the `userdata/` allowlist (`profiles/`, `settings/`, `database_user.json`, `prefs.json`) into one zip; the OTA `content/` cache is never a parameter so it can't leak. Restore snapshots first (outside `userdata/`), guards zip-slip, resyncs prefs; machine-local `prefs.json` is restored only when the dialog checkbox opts in. Isolated satellite, no cross-imports |
 | `tests/test_buff_xml.py` | 274 | Round-trip smoke test for the `buff_xml` helpers: `<BuffListView>` attrs + TextColors `set_directions`/`set_resource_loss_to_column` flips + `read_source_color`/`set_source_color` (0x form, idempotent, missing-element, direction-preserving) |
 | `src/kazbars/build_action.py` | 213 | Build & Install flow |
 | `src/kazbars/ui_helpers.py` | 200 | Design tokens + `setup_custom_styles` + `style_treeview_heading` |
@@ -248,9 +270,11 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/damageinfo_generator.py` | 134 | Bakes setting offsets into the lean AS2 tree and MTASC-injects the pristine `DamageInfo.swf` (`build_damageinfo` via `build_utils.compile_as2`). No Tk |
 | `src/kazbars/damageinfo_panel.py` | 410 | `DamageNumbersPanel` Toplevel (Game ▸ Damage number Mod…) — master enable gate, presets, then cards Behavior (all toggles, off by default) / Shadow / Direction 1 (Rising) / Direction -1 (Dropping) / Direction 0 (Zig-zag); offset sliders (centre-notched; vertical ones reversed) + the coupled `Spread-spacing` radio in a scrollable body, with the Column B rows hidden until the split toggle is on; persists to `damageinfo_settings.json`. No number/label size slider (AoC's own Options slider covers it). The per-source color editor is its own Game-menu entry (Damage number Colors…), not a child of this panel |
 | `src/kazbars/damageinfo_colors_panel.py` | 218 | `DamageNumberColorsPanel` Toplevel (opened from its own Game-menu entry, Damage number Colors…) — per-source flytext color editor: all 35 sources in a 2-column self/other card layout + a shared resources/misc card, each row a `ui_forms.ColorSwatch` + reset; reads baseline colors from the skin's TextColors.xml (backup-first) and saves picks to `source_colors`. Applied at Build & Install |
-| `src/kazbars/window_position.py` | 110 | Window geometry save/restore |
+| `src/kazbars/window_position.py` | 116 | Window geometry save/restore — all windows keyed under the single `window_positions` prefs dict field (`save_window_position`/`restore_window_position`/`bind_window_position_save`; `clamp_to_screen` is multi-monitor aware) |
 | `src/kazbars/settings_core.py` | 254 | Schema-driven settings engine (pure, no Tk): `Field`/`Schema`/`Migration` + a stateful `Store` + the functional `coerce`/`validate_all`/`get_defaults`/`load`/`save`. One load/migrate/validate/fill/atomic-save path behind every settings file. **Strict drop-unknown by default** — every persisted key must be a declared `Field` or it's erased on save, so dynamic key namespaces are declared as one structured-dict `Field` with a custom `validate=`. Migration ladder ships empty (clean start), machinery live for the first post-publish bump. Backs `deeps_settings`/`live_tracker_settings`/`damageinfo_settings` (and `prefs.json` in Phase 2). Imports only stdlib + `settings_manager.safe_save_json` |
-| `src/kazbars/settings_manager.py` | 104 | `SettingsManager` (incl. `reload()` to resync in-memory state from disk after a restore), JSON helpers, settings proxy |
+| `src/kazbars/settings_manager.py` | 51 | The `get_setting`/`set_setting` module proxy + `safe_save_json` (atomic temp+rename — what `settings_core` and `profile_io` build on). `SettingsManager` is retired; `init_settings` now receives a `prefs.Prefs` |
+| `src/kazbars/userdata.py` | 86 | `userdata/` storage root: path resolution (`userdata_root`/`prefs_path`/`settings_dir`/`profiles_dir`/`database_user_path`/`content_dir`/`content_backup_dir`) + `ensure_layout()` — creates the tree and seeds an empty `database_user.json` + `content/` dirs on first launch. Idempotent; the whole startup-data step (no archive, no migrate). Pure, no Tk |
+| `src/kazbars/prefs.py` | 120 | Machine-local prefs: `PREFS_SCHEMA` (strict `settings_core.Schema` for `prefs.json`, with the structured `window_positions` + `buff_display_section_open` dict fields) + the `Prefs` facade — a `Store` wrapper exposing the retired-`SettingsManager` surface (`get`/`set`/`save()`/`reload()`/`data`-with-`pop`) so the proxy + ~20 `app.settings` call sites are unchanged. Pure, no Tk |
 | `src/kazbars/update_check.py` | 69 | Background GitHub release check + named main-thread toast dispatcher |
 | `src/kazbars/ui_tk_style.py` | 67 | Raw-tk widget styling + dark titlebar |
 | `src/kazbars/foreground.py` | 111 | Pure ctypes foreground probe (`app_or_game_foreground`) — no Tk/PIL. Shared by both clusters + the `ForegroundWatcher`; defaults to "show" on any probe failure |
@@ -262,8 +286,10 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `tests/test_cast_timer.py` | 97 | `cast_timer` config defaults, clamping, color/enum sanitization, `is_enabled` build gate |
 | `tests/test_cluster_isolation.py` | 180 | Static-import guard for the Live Tracker AND Deeps clusters (no inbound except `app.py`; cluster imports stdlib + cluster + shared infrastructure only; no cross-import) |
 | `tests/test_resolution_scaling.py` | 93 | Anchor-formula regression test (`scale_grid_position` predictions for 1080p → 1440p / 4K against `Default.json`) |
-| `tests/test_settings_backup.py` | 135 | `settings_backup` pure layer — backup→restore byte-identity (incl. Deeps + Live Tracker settings), `*.tmp` exclusion, manifest accept/reject, prefs locator, zip-slip guard |
+| `tests/test_settings_backup.py` | 159 | `settings_backup` pure layer — backup→restore over the `userdata/` allowlist (profiles/settings/`database_user.json`/`prefs.json`), `content/` never archived, `prefs.json` restored only when opted in, `*.tmp` exclusion, manifest accept/reject, prefs locator, zip-slip guard |
 | `tests/test_settings_core.py` | 297 | `settings_core` engine unit gate — Field coercion (bool/int/float/choices/custom-validate/passthrough), strict drop-unknown + fill-missing, `get_defaults` freshness, migration ladder (ordering + idempotent fixpoint + empty no-op), atomic I/O (missing/corrupt → defaults, round-trip, no leftover `.tmp`, `schema_version` stamp, structured-dict round-trip), and the `Store` facade |
+| `tests/test_userdata.py` | 68 | `userdata` layout — `ensure_layout()` creates the tree + seeds an empty `database_user.json`, is idempotent (never reseeds existing data), and every named subpath resolves under `userdata/` (`app_path` monkeypatched to tmp) |
+| `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 | Strict-schema safety net — greps every `get_setting`/`set_setting`/`app.settings`/`self.settings`(app.py) proxy key in the tree (resolving `UPPER_CASE` constants) and asserts each is a declared `PREFS_SCHEMA` Field, so strict validation can't silently erase a real setting |
 | `tests/test_overlay_config.py` | 102 | `OverlayConfig` dataclass + per-cluster adapters (Deeps `overlay_*` keys / Live Tracker bare keys) round-trip |
 | `tests/test_focus_watcher.py` | 96 | `ForegroundWatcher` tick + fan-out suppression with an injected probe (no display needed) |
 | `tests/test_foreground.py` | 95 | `app_or_game_foreground` probe — own-process gate, AoC match, show-on-probe-failure default |

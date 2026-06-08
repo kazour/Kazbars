@@ -3,9 +3,16 @@ KazBars — Game settings backup & restore.
 
 Backs up the Age of Conan config tree (``%LOCALAPPDATA%\\Funcom\\Conan\\Prefs``
 — keybinds, HUD layouts, chat, graphics/audio, waypoints) plus KazBars's own
-user data (``profiles/`` + ``settings/kazbars_settings.json``) into a single
-portable zip, and restores it later — the recovery path after a Windows
-reformat or profile corruption, neither of which AoC guards against itself.
+user data from ``userdata/`` — an allowlist of ``profiles/``, ``settings/``, and
+``database_user.json`` (custom buffs), plus the machine-local ``prefs.json`` —
+into a single portable zip, and restores it later. It is the recovery path after
+a Windows reformat or profile corruption, neither of which AoC guards itself.
+
+The allowlist is deliberate: the OTA ``content/`` cache (and its ``.bak/``
+rollbacks) is regenerable and machine-bound, so it never enters a backup.
+``prefs.json`` IS written to the zip but is machine-local (window geometry, game
+path), so restore leaves it out by default — a checkbox opts in for a same-PC
+restore.
 
 Split into a pure layer (``funcom_prefs_path`` / ``locate_funcom_prefs`` /
 ``write_backup_zip`` / ``read_manifest`` / ``restore_zip`` — no Tk,
@@ -39,6 +46,13 @@ from .ui_helpers import (
     THEME_COLORS,
 )
 from .ui_widgets import app_toast
+from .userdata import (
+    DATABASE_USER_FILENAME,
+    PREFS_FILENAME,
+    database_user_path,
+    prefs_path,
+    userdata_root,
+)
 from .window_position import restore_window_position
 
 logger = logging.getLogger(__name__)
@@ -84,11 +98,34 @@ def _add_tree(zf, root, arc_prefix):
     return added, skipped
 
 
-def write_backup_zip(zip_path, *, funcom_dir, profiles_dir, settings_dir, app_version):
-    """Build a backup zip at `zip_path` from whichever sources exist: the
-    Funcom prefs tree under ``funcom/``, KazBars profiles + the whole
-    ``settings/`` dir (so `kazbars_settings.json` plus the Deeps and Live
-    Tracker settings come along) under ``kazbars/``. Writes ``manifest.json``
+def _add_file(zf, src, arcname):
+    """Add one file to `zf` as `arcname`; returns 1 if added, 0 if absent or
+    unreadable (logged, not fatal)."""
+    try:
+        if src and Path(src).is_file():
+            zf.write(src, arcname)
+            return 1
+    except OSError as e:
+        logger.warning("Backup skipped %s: %s", src, e)
+    return 0
+
+
+def write_backup_zip(
+    zip_path,
+    *,
+    funcom_dir,
+    profiles_dir,
+    settings_dir,
+    database_user=None,
+    prefs_file=None,
+    app_version,
+):
+    """Build a backup zip at `zip_path` from whichever sources exist: the Funcom
+    prefs tree under ``funcom/``, and the KazBars ``userdata/`` allowlist under
+    ``kazbars/`` — ``profiles/``, the whole ``settings/`` dir (Deeps + Live
+    Tracker + Damage Numbers), ``database_user.json`` (custom buffs), and the
+    machine-local ``prefs.json``. The OTA ``content/`` cache is intentionally
+    NOT a parameter, so it never lands in a backup. Writes ``manifest.json``
     last. Returns the `sections` dict."""
     sections = {}
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -102,6 +139,12 @@ def write_backup_zip(zip_path, *, funcom_dir, profiles_dir, settings_dir, app_ve
         if settings_dir and Path(settings_dir).is_dir():
             added, _ = _add_tree(zf, Path(settings_dir), f"{KAZBARS_ARC}/settings")
             kz["settings"] = added
+        if database_user:
+            kz["database_user"] = _add_file(
+                zf, database_user, f"{KAZBARS_ARC}/{DATABASE_USER_FILENAME}"
+            )
+        if prefs_file:
+            kz["prefs"] = _add_file(zf, prefs_file, f"{KAZBARS_ARC}/{PREFS_FILENAME}")
         if kz:
             sections["kazbars"] = kz
         zf.writestr(
@@ -132,12 +175,15 @@ def read_manifest(zip_path):
     return None
 
 
-def restore_zip(zip_path, *, funcom_dest, kazbars_dest):
-    """Extract a backup's sections to their destinations (created as needed —
-    a fresh machine has no Funcom folder yet). `funcom_dest` is the AoC prefs
-    dir; `kazbars_dest` is app_path() (``profiles/`` and ``settings/`` land
-    directly under it). Guards against zip-slip. Returns a per-section count."""
-    roots = {FUNCOM_ARC: Path(funcom_dest).resolve(), KAZBARS_ARC: Path(kazbars_dest).resolve()}
+def restore_zip(zip_path, *, funcom_dest, userdata_dest, include_prefs=False):
+    """Extract a backup's sections to their destinations (created as needed — a
+    fresh machine has no Funcom folder yet). `funcom_dest` is the AoC prefs dir;
+    `userdata_dest` is the ``userdata/`` root (``profiles/``, ``settings/``,
+    ``database_user.json`` land directly under it). The machine-local
+    ``prefs.json`` is restored only when `include_prefs` is True (default off, so
+    a cross-PC restore doesn't drag a dead game path / window geometry along).
+    Guards against zip-slip. Returns a per-section count."""
+    roots = {FUNCOM_ARC: Path(funcom_dest).resolve(), KAZBARS_ARC: Path(userdata_dest).resolve()}
     restored = {FUNCOM_ARC: 0, KAZBARS_ARC: 0}
     with zipfile.ZipFile(zip_path) as zf:
         for name in zf.namelist():
@@ -145,6 +191,8 @@ def restore_zip(zip_path, *, funcom_dest, kazbars_dest):
                 continue
             section, _, rel = name.partition("/")
             if section not in roots or not rel:
+                continue
+            if section == KAZBARS_ARC and rel == PREFS_FILENAME and not include_prefs:
                 continue
             dest_root = roots[section]
             target = (dest_root / rel).resolve()
@@ -246,7 +294,7 @@ def open_backup_dialog(app):
         ).pack(anchor="w", pady=(0, PAD_XS))
     ttk.Label(
         content,
-        text=f"•  KazBars data — {n_profiles} profile(s) + settings (app, Deeps, Live Tracker)",
+        text=f"•  KazBars data — {n_profiles} profile(s) + settings + custom buffs",
         font=FONT_BODY,
         foreground=THEME_COLORS["body"],
         wraplength=width - PAD_TAB * 4,
@@ -271,6 +319,16 @@ def open_backup_dialog(app):
         wraplength=width - PAD_TAB * 4,
     ).pack(anchor="w", pady=(0, PAD_SMALL))
 
+    # Machine-local prefs (window positions, game folder) ride along in the zip
+    # but are left out of a restore unless the user opts in — a same-PC restore
+    # wants them; a backup carried to another machine does not.
+    include_prefs_var = tk.BooleanVar(value=False)
+    ttk.Checkbutton(
+        content,
+        text="On restore, also bring back this PC's settings (window positions, game folder)",
+        variable=include_prefs_var,
+    ).pack(anchor="w", pady=(0, PAD_SMALL))
+
     btns = ttk.Frame(content)
     btns.pack(fill="x", pady=(PAD_SMALL, 0))
     ttk.Button(
@@ -285,7 +343,7 @@ def open_backup_dialog(app):
         text="Restore…",
         bootstyle="outline",
         width=BTN_DIALOG,
-        command=lambda: restore_settings(app, dialog),
+        command=lambda: restore_settings(app, dialog, include_prefs_var.get()),
     ).pack(side="left", padx=(PAD_XS, 0))
     ttk.Button(
         btns, text="Close", bootstyle="secondary", width=BTN_DIALOG, command=dialog.destroy
@@ -310,6 +368,8 @@ def backup_settings(app, dialog):
             funcom_dir=locate_funcom_prefs(),
             profiles_dir=app.profiles_path,
             settings_dir=app.settings_path,
+            database_user=database_user_path(),
+            prefs_file=prefs_path(),
             app_version=app.app_version,
         )
     except OSError as e:
@@ -325,9 +385,11 @@ def backup_settings(app, dialog):
     app_toast(app, f"Backed up {funcom_n} AoC files + {profiles_n} profile(s)", "success", 8)
 
 
-def restore_settings(app, dialog):
+def restore_settings(app, dialog, include_prefs=False):
     """Restore settings from a user-chosen backup zip, snapshotting current
-    state first so a bad restore is reversible."""
+    state first so a bad restore is reversible. `include_prefs` (from the dialog
+    checkbox, default off) decides whether the machine-local ``prefs.json`` is
+    restored too."""
     path = filedialog.askopenfilename(
         title="Restore Settings Backup",
         filetypes=[("Zip archive", "*.zip"), ("All files", "*.*")],
@@ -367,6 +429,8 @@ def restore_settings(app, dialog):
             funcom_dir=locate_funcom_prefs(),
             profiles_dir=app.profiles_path,
             settings_dir=app.settings_path,
+            database_user=database_user_path(),
+            prefs_file=prefs_path(),
             app_version=app.app_version,
         )
     except OSError as e:
@@ -374,7 +438,12 @@ def restore_settings(app, dialog):
         snapshot = None
 
     try:
-        restored = restore_zip(path, funcom_dest=funcom_dest, kazbars_dest=app.app_path)
+        restored = restore_zip(
+            path,
+            funcom_dest=funcom_dest,
+            userdata_dest=userdata_root(),
+            include_prefs=include_prefs,
+        )
     except OSError as e:
         tail = f"\n\nA pre-restore snapshot was saved to:\n{snapshot}" if snapshot else ""
         Messagebox.show_error(
@@ -382,8 +451,8 @@ def restore_settings(app, dialog):
         )
         return
 
-    # The running app holds settings in memory and re-saves on exit; resync from
-    # disk so the freshly-restored kazbars_settings.json isn't clobbered.
+    # The running app holds prefs in memory and re-saves on exit; resync from
+    # disk so a freshly-restored prefs.json (when opted in) isn't clobbered.
     app.settings.reload()
 
     dialog.destroy()

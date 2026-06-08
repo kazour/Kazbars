@@ -1,8 +1,11 @@
 """
 KazBars — Window position persistence.
 
-Save and restore window geometry (position + optional size) via the app's
-SettingsManager, clamping to the screen so no window ever opens off-visible.
+Save and restore window geometry (position + optional size) via the settings
+proxy, clamping to the screen so no window ever opens off-visible. Geometry for
+all windows lives under the single ``window_positions`` prefs field keyed by
+window name (a strict Schema can't enumerate per-window keys), not N top-level
+``window_pos_*`` keys.
 """
 
 import tkinter as tk
@@ -41,13 +44,16 @@ def clamp_to_screen(x, y, width, height):
 
 
 def save_window_position(window_name, x, y, width=None, height=None):
-    """Persist a window's position and optional size to settings."""
+    """Persist a window's position and optional size into the shared
+    ``window_positions`` prefs dict, keyed by window name."""
     pos_data = {'x': x, 'y': y}
     if width is not None:
         pos_data['width'] = width
     if height is not None:
         pos_data['height'] = height
-    set_setting(f'window_pos_{window_name}', pos_data)
+    positions = dict(get_setting('window_positions') or {})
+    positions[window_name] = pos_data
+    set_setting('window_positions', positions)
 
 
 def restore_window_position(window, window_name, default_width, default_height, parent=None, resizable=True, offset=(0, 0)):
@@ -57,7 +63,7 @@ def restore_window_position(window, window_name, default_width, default_height, 
     position is saved) — used to stagger sibling panels so they don't spawn
     exactly on top of each other.
     """
-    pos_data = get_setting(f'window_pos_{window_name}')
+    pos_data = (get_setting('window_positions') or {}).get(window_name)
 
     if pos_data:
         x = pos_data.get('x', 0)

@@ -1,10 +1,9 @@
 """
 KazBars — Game folder configuration.
 
-UI + persistence for the configured Age of Conan install folder. Includes
-legacy-settings migration, Aoc.exe launcher-bypass prompt, the "uninstall
-KazBars from the game" action, and build-button state sync. Functions
-take the KazBarsApp instance as first arg.
+UI + persistence for the configured Age of Conan install folder. Includes the
+Aoc.exe launcher-bypass prompt, the "uninstall KazBars from the game" action,
+and build-button state sync. Functions take the KazBarsApp instance as first arg.
 """
 
 from pathlib import Path
@@ -14,23 +13,6 @@ from ttkbootstrap.dialogs import Messagebox
 
 from .ui_helpers import PAD_XS, THEME_COLORS
 from .ui_widgets import add_tooltip, app_toast
-
-
-def migrate_legacy_clients(app):
-    """One-time migration: collapse old multi-client settings to single game_path."""
-    legacy = app.settings.get('game_clients')
-    if not legacy:
-        return
-    idx = int(app.settings.get('active_game_idx') or 0)
-    if not (0 <= idx < len(legacy)):
-        idx = 0
-    try:
-        app.settings.set('game_path', legacy[idx]['path'])
-    except (KeyError, TypeError, IndexError):
-        pass
-    app.settings.data.pop('game_clients', None)
-    app.settings.data.pop('active_game_idx', None)
-    app.settings.save()
 
 
 def refresh_game_path_label(app):

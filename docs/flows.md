@@ -49,7 +49,7 @@ Steps:
 7. `refresh_panels()` — src/kazbars/grids_panel.py:558 — destroys existing `GridEditorPanel` widgets; creates new ones for the validated list; shows empty state if list is empty
 8. If a Boss Timer panel is alive, `LiveTrackerPanel.load_profile_data()` — src/kazbars/live_tracker_panel.py:478 — applies the embedded `boss_timer.overlay` settings to the overlay (`apply_settings` then propagates opacity, font, transparent, lock, x/y/width/height, and visible state through `set_*(..., notify=False)` calls, with a single `_notify_settings_changed()` at the end so the parent saves once)
 9. `warn_missing_buffs()` — src/kazbars/profile_io.py:122 — if migration dropped any references, displays them (deferred 200ms when called during startup so the dialog doesn't race the welcome popup)
-10. `app.settings.set('last_profile', ...)` then `app.settings.save()` — persists `last_profile` path to `kazbars_settings.json` via atomic temp-rename in `safe_save_json` (src/kazbars/settings_manager.py:33)
+10. `app.settings.set('last_profile', ...)` then `app.settings.save()` — persists `last_profile` to `userdata/prefs.json` (`Prefs.save` → `settings_core.save` → atomic temp-rename in `safe_save_json`)
 
 End state: `GridsPanel` displays validated grid cards; `app.modified` is `False`; `last_profile` updated in settings; window title reflects loaded name
 
@@ -68,7 +68,7 @@ Steps:
 6. `save_to_config()` — src/kazbars/grid_editor_panel.py:338 — reads all widget values into the grid config dict
 7. If a Boss Timer panel is alive, `LiveTrackerPanel.get_profile_data()` — src/kazbars/live_tracker_panel.py:473 — returns `{'overlay': {...}}` for embedding
 8. `safe_save_json()` — src/kazbars/settings_manager.py:33 — writes JSON to `path.tmp` then `Path.replace`-renames it over the target atomically
-9. `app.settings.set('last_profile', ...)` then `app.settings.save()` — persists `last_profile` to `kazbars_settings.json`
+9. `app.settings.set('last_profile', ...)` then `app.settings.save()` — persists `last_profile` to `userdata/prefs.json`
 
 End state: profile `.json` written atomically; `app.modified` is `False`; title bar reflects saved name; toast `Saved: <filename>` shown and status bar pulses (both suppressed when `silent=True`, e.g. the pre-build auto-save path)
 
@@ -108,7 +108,7 @@ End state: `grid_config['whitelist']` updated with new primary spell ID list; pa
 
 ## 6. first-launch setup with defaults
 
-Trigger: `KazBarsApp.__init__` detects no `game_path` in settings; schedules 100ms after `deiconify()`
+Trigger: `KazBarsApp.__init__` has just created `userdata/` fresh via `ensure_layout()` and built `self.settings = Prefs(userdata_root())`; the new `prefs.json` has no `game_path`, so first launch is scheduled 100ms after `deiconify()`
 
 Steps:
 1. `_show_first_launch_dialog()` — src/kazbars/app.py:619 — one-line delegator to `run_first_launch(self, APP_NAME)`
@@ -271,7 +271,7 @@ Steps:
 14. Per-result toast via `app_toast`: success → `Saved: <names>` (`'success'`, default 6 s); failure → `Couldn't write <names>. Check folder permissions and disk space.` (`'danger'`, 10 s, `key='buff_apply_failed'` so retries coalesce); OS reasons go to the logger
 15. User closes dialog (X button, Escape, Cancel, or any path that hits `WM_DELETE_WINDOW`) → `BuffDisplayDialog._on_close()` — src/kazbars/buff_display_editor.py:552 — calls `_save_section_states()` (writes a per-label `is_open` dict to `settings[SETTINGS_KEY_SECTION_OPEN]`), then `destroy()`. Apply alone does not destroy the dialog — the user keeps editing.
 
-End state: changed sections written to `<game>/Data/Gui/Customized/Views/HUD/<file>.xml` (Player → CharPortraitLeft.xml, Target → CharPortraitRight.xml, Top → HUDView.xml, Floating → FloatingPortraitView.xml) with surgical regex edits and one-shot backups; section open/closed state persisted to `kazbars_settings.json`; user types `/reloadui` in-game to see the changes.
+End state: changed sections written to `<game>/Data/Gui/Customized/Views/HUD/<file>.xml` (Player → CharPortraitLeft.xml, Target → CharPortraitRight.xml, Top → HUDView.xml, Floating → FloatingPortraitView.xml) with surgical regex edits and one-shot backups; section open/closed state persisted to `userdata/prefs.json` (the `buff_display_section_open` field); user types `/reloadui` in-game to see the changes.
 
 ---
 
@@ -345,11 +345,11 @@ Trigger: User selects Game > Backup & restore game settings... from the menu, th
 
 Steps:
 1. `KazBarsApp._open_backup_dialog()` — src/kazbars/app.py — one-line delegator to `open_backup_dialog(self)`. Mirrors `_open_deeps_panel`.
-2. `open_backup_dialog(app)` — src/kazbars/settings_backup.py — builds a modal `Toplevel`; `locate_funcom_prefs()` resolves `%LOCALAPPDATA%\Funcom\Conan\Prefs`; `_funcom_summary()` returns the account names (the prefs dir's immediate subfolders), the character count (`Char*` subfolders across all accounts), and total size; counts `*.json` under `app.profiles_path`; renders the "What's included" lines (account names listed, KazBars settings noted as app/Deeps/Live Tracker), the "Close AoC first" warning, and Back up… / Restore… / Close buttons.
-3a. **Back up** → `backup_settings(app, dialog)` — `filedialog.asksaveasfilename` (default `KazBars_Backup_{date}.zip`) → `write_backup_zip()` archives the Funcom prefs tree under `funcom/` + `app.profiles_path` under `kazbars/profiles/` + the whole `app.settings_path` dir (`kazbars_settings.json` + `deeps_settings.json` + `live_tracker_settings.json`) under `kazbars/settings/`, skipping `*.tmp` and writing `manifest.json` last → dialog closes → `app_toast()` success with the file counts.
-3b. **Restore** → `restore_settings(app, dialog)` — `filedialog.askopenfilename` → `read_manifest()` rejects anything that isn't a KazBars backup → `Messagebox.yesno` confirm (+ AoC-closed warning) → best-effort pre-restore snapshot via `write_backup_zip()` to `app.app_path/KazBars_PreRestore_{timestamp}.zip` → `restore_zip()` extracts each section to its destination (`funcom_prefs_path()` for `funcom/`, `app.app_path` for `kazbars/`), creating dirs as needed and skipping zip-slip entries → `app.settings.reload()` (src/kazbars/settings_manager.py) resyncs in-memory settings from disk so the restored file isn't clobbered on exit → `Messagebox.show_info` reports the restored counts + snapshot path.
+2. `open_backup_dialog(app)` — src/kazbars/settings_backup.py — builds a modal `Toplevel`; `locate_funcom_prefs()` resolves `%LOCALAPPDATA%\Funcom\Conan\Prefs`; `_funcom_summary()` returns the account names (the prefs dir's immediate subfolders), the character count (`Char*` subfolders across all accounts), and total size; counts `*.json` under `app.profiles_path`; renders the "What's included" lines (account names listed, KazBars data noted as profiles + settings + custom buffs), the "Close AoC first" warning, an **off-by-default "also bring back this PC's settings" checkbox** (`include_prefs_var`), and Back up… / Restore… / Close buttons.
+3a. **Back up** → `backup_settings(app, dialog)` — `filedialog.asksaveasfilename` (default `KazBars_Backup_{date}.zip`) → `write_backup_zip()` archives the Funcom prefs tree under `funcom/` + the `userdata/` allowlist under `kazbars/`: `app.profiles_path` → `kazbars/profiles/`, the whole `app.settings_path` dir (`deeps`/`live_tracker`/`damageinfo` settings) → `kazbars/settings/`, `database_user_path()` → `kazbars/database_user.json`, and `prefs_path()` → `kazbars/prefs.json`. The OTA `content/` cache is not a parameter, so it never enters the zip. Skips `*.tmp`, writes `manifest.json` last → dialog closes → `app_toast()` success with the file counts.
+3b. **Restore** → `restore_settings(app, dialog, include_prefs)` — `filedialog.askopenfilename` → `read_manifest()` rejects anything that isn't a KazBars backup → `Messagebox.yesno` confirm (+ AoC-closed warning) → best-effort pre-restore snapshot via `write_backup_zip()` to `app.app_path/KazBars_PreRestore_{timestamp}.zip` (outside `userdata/`, so restore can't recurse into it) → `restore_zip(funcom_dest=funcom_prefs_path(), userdata_dest=userdata_root(), include_prefs=include_prefs)` extracts each section, creating dirs and skipping zip-slip entries; the machine-local `kazbars/prefs.json` is skipped unless the checkbox opted in → `app.settings.reload()` (`Prefs.reload`) resyncs prefs from disk so a freshly-restored `prefs.json` isn't clobbered on exit → `Messagebox.show_info` reports the restored counts + snapshot path.
 
-End state: backup writes a single portable zip (AoC prefs + KazBars profiles/settings); restore replaces both in place after snapshotting the prior state, with a KazBars restart recommended to fully apply the restored window/game-folder settings.
+End state: backup writes a single portable zip (AoC prefs + the KazBars `userdata/` allowlist); restore replaces them in place after snapshotting the prior state, leaving machine-local `prefs.json` untouched unless opted in, with a KazBars restart recommended to fully apply restored window/game-folder settings.
 
 ---
 
