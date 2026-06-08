@@ -42,7 +42,12 @@ from .userdata import content_dir
 
 logger = logging.getLogger(__name__)
 
-MANIFEST_URL = "https://raw.githubusercontent.com/kazour/Kazbars/main/ota/manifest.json"
+# The published manifest pointer. Overridable via env for local/CI OTA testing
+# (a fake manifest + payloads); unset = the live GitHub raw URL on main.
+MANIFEST_URL = os.environ.get(
+    "KAZBARS_OTA_MANIFEST_URL",
+    "https://raw.githubusercontent.com/kazour/Kazbars/main/ota/manifest.json",
+)
 RELEASES_URL = "https://github.com/kazour/Kazbars/releases/latest"
 DOWNLOAD_TIMEOUT = 8
 MANIFEST_NAME = "manifest.json"
