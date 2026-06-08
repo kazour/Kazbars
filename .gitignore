@@ -32,7 +32,10 @@ kazbars_graph_audit.html
 # bundle lives under src/kazbars/assets/damageinfo/; this root dir is dev-only scratch
 /Damageinfo/
 
-# User-specific runtime data
+# User-specific runtime data — the userdata/ root (prefs, settings, profiles,
+# custom-buff deltas, OTA content cache) is created fresh at runtime next to the
+# exe; never commit it. settings/ + profiles/ are the pre-overhaul locations.
+userdata/
 settings/*.json
 profiles/*.json
 logs/

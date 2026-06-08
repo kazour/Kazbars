@@ -10,8 +10,13 @@ trail when an ID or name moves.
 
 ## How to maintain it
 
-Whenever `Database.json` changes — however it was made (the in-app Database editor, a hand
-edit, or a Claude session) — add a bullet under a `## YYYY-MM-DD` heading at the top
+**Scope:** this log tracks the **shipped stock catalog** at `src/kazbars/assets/kazbars/Database.json`
+only. As of the three-layer split, the **in-app Database editor no longer writes assets** — user
+adds/edits/hidden-buffs are per-machine deltas in `userdata/database_user.json` (merged over stock at
+load; see `architecture.md` → "Buff database"). So entries here come from maintainer changes to the
+repo's stock file (a hand edit or a Claude session); per-user deltas are not logged.
+
+Whenever the stock `Database.json` changes, add a bullet under a `## YYYY-MM-DD` heading at the top
 (reuse today's heading if it already exists):
 
 - **Added:** `Buff Name` — `<spell id>`, #Category type.

@@ -83,6 +83,7 @@ files = [
     "src/kazbars/__main__.py",
     "src/kazbars/boss_timer.py",
     "src/kazbars/buff_database.py",
+    "src/kazbars/buff_db_layers.py",
     "src/kazbars/buff_xml.py",
     "src/kazbars/build_executor.py",
     "src/kazbars/build_utils.py",

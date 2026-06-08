@@ -4,7 +4,6 @@ Main application class.
 """
 
 import logging
-import shutil
 import tkinter as tk
 from pathlib import Path
 from tkinter import ttk
@@ -22,6 +21,7 @@ from kazbars import (
 )
 from kazbars import __version__ as APP_VERSION
 from kazbars.buff_database import BuffDatabase
+from kazbars.buff_db_layers import DeltaStore
 from kazbars.build_loading import show_about_popup
 from kazbars.custom_menu_bar import CustomMenuBar
 from kazbars.database_editor import DatabaseEditorTab
@@ -56,7 +56,14 @@ from kazbars.ui_widgets import (
     bind_button_press_effect,
     blend_alpha,
 )
-from kazbars.userdata import ensure_layout, profiles_dir, settings_dir, userdata_root
+from kazbars.userdata import (
+    content_dir,
+    database_user_path,
+    ensure_layout,
+    profiles_dir,
+    settings_dir,
+    userdata_root,
+)
 from kazbars.window_position import bind_window_position_save, restore_window_position
 
 logger = logging.getLogger(__name__)
@@ -90,20 +97,17 @@ class KazBarsApp(ttkb.Window):
         self.settings = Prefs(userdata_root())
         init_settings(self.settings)
 
-        # Database (with fallback recovery from bundled copy)
+        # Buff database — three layers merged, user always wins:
+        #   stock (assets, read-only) <- OTA content/ (Phase 4) <- user deltas.
+        # A corrupt stock file recovers from the bundled .default IN MEMORY; the
+        # app never writes assets/.
         self.database = BuffDatabase()
-        db_path = KAZBARS_ASSETS / "Database.json"
-        if not self.database.load(db_path):
-            bundled = KAZBARS_ASSETS / "Database.json.default"
-            if bundled.exists():
-                logger.warning("Database.json corrupt — restoring from bundled copy")
-                try:
-                    shutil.copy2(bundled, db_path)
-                    self.database.load(db_path)
-                except OSError as e:
-                    logger.error("Could not restore Database.json: %s", e)
-            else:
-                logger.warning("Database not found: %s", db_path)
+        self.database.load_layers(
+            KAZBARS_ASSETS / "Database.json",
+            content_dir() / "Database.json",
+            database_user_path(),
+            stock_fallback_path=KAZBARS_ASSETS / "Database.json.default",
+        )
 
         # State
         self.app_version = APP_VERSION
@@ -241,11 +245,14 @@ class KazBarsApp(ttkb.Window):
             on_modified=self._mark_modified,
         )
 
-        # Database view
+        # Database view — edits write user deltas to userdata/database_user.json
+        # (never assets/); get_floor supplies the stock<-content floor the editor
+        # diffs against and badges rows from.
         self.db_panel = DatabaseEditorTab(
             self.content_frame,
             database=self.database,
-            assets_path=self.assets_path / "kazbars",
+            delta_store=DeltaStore(database_user_path()),
+            get_floor=self.database.current_floor,
             on_modified=self._mark_modified,
             get_grids=lambda: self.grids_panel.grids,
         )

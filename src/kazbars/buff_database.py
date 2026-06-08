@@ -34,18 +34,59 @@ class BuffDatabase:
         self.by_id = {}
         self.by_name = {}
         self.grouped_buffs = []
+        self.provenance = {}        # ids[0] -> 'stock' | 'content' | 'user'
+        self._layer_paths = None    # remembered by load_layers so reload() can re-merge
 
     def load(self, json_path):
-        """Load database from JSON file."""
+        """Load a single v2 database file (back-compat / tests). For the app's
+        layered load use `load_layers`."""
         try:
             with open(json_path, encoding='utf-8') as f:
                 data = json.load(f)
             self.buffs = data.get('buffs', [])
+            self.provenance = {}
             self._rebuild_indexes()
             return True
         except (OSError, json.JSONDecodeError) as e:
             logger.error("Error loading buff database: %s", e)
             return False
+
+    def load_layers(self, stock_path, content_path=None, user_delta_path=None,
+                    stock_fallback_path=None):
+        """Merge stock <- content <- user deltas into `self.buffs` (user wins),
+        record `self.provenance`, and rebuild indexes. On unreadable stock, falls
+        back to `stock_fallback_path` (the bundled `.default`) **in memory** —
+        never writes `assets/`. Paths are remembered so `reload()` can re-merge
+        (e.g. after an OTA content swap). Returns True if any buff loaded."""
+        from . import buff_db_layers
+        self._layer_paths = (stock_path, content_path, user_delta_path, stock_fallback_path)
+        stock = buff_db_layers._read_buffs(stock_path)
+        if not stock and stock_fallback_path:
+            logger.warning("Stock buff DB unreadable — using bundled default (in memory)")
+            stock = buff_db_layers._read_buffs(stock_fallback_path)
+        content = buff_db_layers._read_buffs(content_path)
+        user_buffs, deleted = buff_db_layers._read_user_delta(user_delta_path)
+        self.buffs, self.provenance = buff_db_layers.merge_layers(
+            stock, content, user_buffs, deleted)
+        self._rebuild_indexes()
+        return bool(self.buffs)
+
+    def reload(self):
+        """Re-run the layered merge from the paths `load_layers` was last called
+        with. Used after the OTA updater swaps `content/` (Phase 4)."""
+        if self._layer_paths is not None:
+            self.load_layers(*self._layer_paths)
+
+    def current_floor(self):
+        """The stock <- content floor (no user deltas) the editor diffs against
+        to compute deltas and badge each row. Re-read from the remembered layer
+        paths, mirroring the boot-time corrupt-stock fallback. Returns
+        (floor_buffs, floor_provenance)."""
+        if self._layer_paths is None:
+            return [], {}
+        from . import buff_db_layers
+        stock_path, content_path, _user, fallback = self._layer_paths
+        return buff_db_layers.load_floor(stock_path, content_path, stock_fallback_path=fallback)
 
     def _rebuild_indexes(self):
         """Rebuild internal indexes after data changes."""

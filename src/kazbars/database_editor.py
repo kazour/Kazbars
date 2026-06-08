@@ -13,6 +13,7 @@ from tkinter import filedialog, ttk
 
 from ttkbootstrap.dialogs import Messagebox, Querybox
 
+from . import buff_db_layers
 from .buff_database import TYPE_FILTER_MAP
 from .ui_headers import create_dialog_header
 from .ui_helpers import (
@@ -38,6 +39,10 @@ from .ui_widgets import add_tooltip, app_toast, debounced_callback
 from .window_position import bind_window_position_save, restore_window_position
 
 logger = logging.getLogger(__name__)
+
+# Provenance badge shown in the Source column (and driving the delete copy):
+# where the effective buff comes from in the three-layer merge.
+_PROVENANCE_LABEL = {'stock': 'Built-in', 'content': 'Updated', 'user': 'Yours'}
 
 
 # ============================================================================
@@ -319,11 +324,12 @@ def migrate_legacy_buff_fields(buff):
 class DatabaseEditorTab(ttk.Frame):
     """Database editor panel for the main application."""
 
-    def __init__(self, parent, database, assets_path, on_modified=None, get_grids=None):
+    def __init__(self, parent, database, delta_store, get_floor, on_modified=None, get_grids=None):
         super().__init__(parent)
 
         self.database = database
-        self.assets_path = assets_path
+        self._delta_store = delta_store      # writes userdata/database_user.json
+        self._get_floor = get_floor          # () -> (floor_buffs, floor_provenance)
         self.on_modified = on_modified
         self._get_grids = get_grids
         self.modified = False
@@ -331,11 +337,35 @@ class DatabaseEditorTab(ttk.Frame):
         self.sort_column = 'type'
         self.sort_reverse = False
 
+        self._refresh_floor()
         self._debounced_refresh = debounced_callback(self, 200, self.refresh_list)
 
         self.create_widgets()
         self.update_categories()
         self.refresh_list()
+
+    def _refresh_floor(self):
+        """Pull the current stock<-content floor so rows can be badged and saves
+        can diff against it. Re-callable (Phase 4 OTA refreshes the floor)."""
+        self._floor_buffs, self._floor_provenance = self._get_floor()
+        self._floor_by_id = {}
+        for b in self._floor_buffs:
+            ids = b.get('ids')
+            if ids:
+                self._floor_by_id[ids[0]] = b
+
+    def _provenance_of(self, buff):
+        """Which layer this effective buff comes from: 'stock'/'content' if it
+        matches the floor unchanged, else 'user' (a user add or an override of a
+        floor buff)."""
+        ids = buff.get('ids')
+        key = ids[0] if ids else None
+        floor_b = self._floor_by_id.get(key) if key is not None else None
+        if floor_b is None:
+            return 'user'
+        if not buff_db_layers._buffs_equal(floor_b, buff):
+            return 'user'
+        return self._floor_provenance.get(key, 'stock')
 
     def create_widgets(self):
         self._build_filter_bar()
@@ -375,12 +405,13 @@ class DatabaseEditorTab(ttk.Frame):
 
         # (key, label, width, minwidth, stretch, anchor)
         column_specs = [
-            ('name',     'Name',     220, 100, True,  'w'),
-            ('ids',      'ID(s)',    180,  80, True,  'w'),
-            ('category', 'Category', 120,  80, True,  'w'),
+            ('name',     'Name',     210, 100, True,  'w'),
+            ('ids',      'ID(s)',    170,  80, True,  'w'),
+            ('category', 'Category', 115,  80, True,  'w'),
             ('type',     'Type',      60,  50, False, 'center'),
             ('stacking', 'Stack',     50,  40, False, 'center'),
             ('grids',    'Grids',     45,  35, False, 'center'),
+            ('source',   'Source',    70,  55, False, 'center'),
         ]
         self._column_labels = {key: label for key, label, *_ in column_specs}
         keys = list(self._column_labels)
@@ -422,7 +453,7 @@ class DatabaseEditorTab(ttk.Frame):
             ("Save Database", self.save,          BTN_MEDIUM, "Save all buff entries to database file",       True),
             ("Add",           self.add_buff,      BTN_SMALL,  "Create a new buff entry",                       False),
             ("Edit",          self.edit_buff,     BTN_SMALL,  "Edit the selected buff entry",                  False),
-            ("Delete",        self.delete_buff,   BTN_SMALL,  "Delete the selected buff entry",                True),
+            ("Delete",        self.delete_buff,   BTN_SMALL,  "Delete a buff you added, or hide a built-in one", True),
             ("Import...",     self.import_buffs,  BTN_MEDIUM, "Import buff entries from a JSON file",          False),
             ("Export...",     self.export_buffs,  BTN_MEDIUM, "Export the currently filtered buffs to a JSON file", False),
         ]
@@ -487,6 +518,7 @@ class DatabaseEditorTab(ttk.Frame):
                 buff_type.capitalize(),
                 format_stack_indicator(buff),
                 str(count) if count > 0 else "",
+                _PROVENANCE_LABEL.get(self._provenance_of(buff), ''),
             ), tags=tags)
 
         has_filters = search or category != "All" or type_filter != "All"
@@ -605,18 +637,32 @@ class DatabaseEditorTab(ttk.Frame):
             app_toast(self, f"Updated: {dialog.result['name']}", 'success')
 
     def delete_buff(self):
-        """Delete selected buff entry."""
+        """Delete a buff you added, or hide a built-in one (a reversible
+        tombstone — the shipped database is never touched)."""
         buff, ids = self._get_selected_buff()
         if buff is None:
             app_toast(self, "Select a buff to delete", 'warning')
             return
 
         ids_str = format_ids_display(ids)
+        if self._provenance_of(buff) == 'user':
+            confirmed = Messagebox.yesno(
+                f"Delete your buff '{buff['name']}' (IDs: {ids_str})?\n\n"
+                "This removes the buff you added.",
+                title="Delete Your Buff") == "Yes"
+            toast = f"Deleted: {buff['name']}"
+        else:
+            confirmed = Messagebox.yesno(
+                f"Hide the built-in buff '{buff['name']}' (IDs: {ids_str})?\n\n"
+                "It won't appear in grids. The shipped database is untouched, so "
+                "this can be undone.",
+                title="Hide Built-in Buff") == "Yes"
+            toast = f"Hidden: {buff['name']}"
 
-        if Messagebox.yesno(f"Delete '{buff['name']}' (IDs: {ids_str})?", title="Confirm Delete") == "Yes":
+        if confirmed:
             self.database.remove_buff(ids)
             self._after_db_change()
-            app_toast(self, f"Deleted: {buff['name']}", 'info')
+            app_toast(self, toast, 'info')
 
     def import_buffs(self):
         """Import buffs from JSON file."""
@@ -700,16 +746,26 @@ class DatabaseEditorTab(ttk.Frame):
             Messagebox.show_error(f"Failed to export buffs.\n\nCheck that the destination isn't read-only.\n\n({e})", title="Error")
 
     def save(self):
-        """Save database to file."""
-        self.assets_path.mkdir(exist_ok=True)
-        db_path = self.assets_path / "Database.json"
-
+        """Save your buff changes as deltas to userdata/database_user.json — the
+        shipped assets/ database is never written. Adds and edits become user
+        buffs (or overrides of a built-in); hidden built-ins become tombstones."""
+        delta = buff_db_layers.compute_delta(self._floor_buffs, self.database.buffs)
         try:
-            self.database.save(db_path)
+            self._delta_store.save(delta)
             self.modified = False
-            app_toast(self, "Database saved", 'success')
+            n_buffs = len(delta['buffs'])
+            n_hidden = len(delta['deleted'])
+            if n_buffs or n_hidden:
+                parts = []
+                if n_buffs:
+                    parts.append(f"{n_buffs} custom buff{'s' if n_buffs != 1 else ''}")
+                if n_hidden:
+                    parts.append(f"{n_hidden} hidden built-in{'s' if n_hidden != 1 else ''}")
+                app_toast(self, "Saved: " + ", ".join(parts), 'success')
+            else:
+                app_toast(self, "Saved — no custom changes", 'success')
         except OSError as e:
-            Messagebox.show_error(f"Failed to save the buff database.\n\nCheck that the file isn't in use by another program.\n\n({e})", title="Error")
+            Messagebox.show_error(f"Failed to save your buff changes.\n\nCheck that the file isn't in use by another program.\n\n({e})", title="Error")
 
     def _show_category_menu(self, event):
         """Show right-click context menu on category dropdown."""

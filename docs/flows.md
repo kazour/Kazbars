@@ -130,10 +130,10 @@ End state: `game_path`, `use_aoc_bypass`, and `game_resolution` persisted; defau
 Trigger: User clicks the "Save Database" button in the Database view's toolbar (no menu item, no keyboard shortcut — Ctrl+S is bound to profile save)
 
 Steps:
-1. `DatabaseEditorTab.save()` — src/kazbars/database_editor.py:701 — resolves `assets_path / "Database.json"`; calls `BuffDatabase.save()`
-2. `BuffDatabase.save()` — src/kazbars/buff_database.py:132 — serializes `self.buffs` into v2 JSON format (`{version: 2, description, buffs}`); writes to file directly (not atomic)
+1. `DatabaseEditorTab.save()` — src/kazbars/database_editor.py — computes a delta of the in-memory effective DB against the stock←content floor via `buff_db_layers.compute_delta(self._floor_buffs, self.database.buffs)`: user adds + edits-of-a-built-in (overrides) land in `buffs`; built-ins the user hid (floor buffs now missing from the effective list) become tombstoned `ids[0]` in `deleted`.
+2. `DeltaStore.save(delta)` — src/kazbars/buff_db_layers.py — writes `{version: 2, buffs, deleted}` to `userdata/database_user.json` atomically via `safe_save_json`. The shipped `assets/kazbars/Database.json` is **never** written.
 
-End state: `assets/kazbars/Database.json` updated; `DatabaseEditorTab.modified` set to `False`; toast `Database saved` shown
+End state: `userdata/database_user.json` holds the user's adds/overrides/tombstones; `DatabaseEditorTab.modified` → `False`; toast summarizes (`Saved: N custom buffs, M hidden built-ins`). On next launch `load_layers` re-merges the deltas over the shipped stock so they reappear.
 
 ---
 
@@ -148,7 +148,7 @@ Steps:
 4. `BuffDatabase._rebuild_indexes()` — src/kazbars/buff_database.py:50 — rebuilds `by_id`, `by_name`, `categories`, `grouped_buffs` from the full `buffs` list
 5. `DatabaseEditorTab._after_db_change()` — src/kazbars/database_editor.py:571 — post-mutation hook: marks the editor dirty, refreshes the category dropdown, and redraws the tree via `refresh_list()` (used uniformly by add/edit/delete/import/rename-category)
 
-End state: new buff entry visible in treeview; `by_id` and `by_name` indexes updated; toast `Added: <name>` shown; `DatabaseEditorTab.modified` set to `True`
+End state: new buff entry visible in treeview, badged "Yours" in the Source column; `by_id` and `by_name` indexes updated; toast `Added: <name>` shown; `DatabaseEditorTab.modified` set to `True`. On Save Database it is persisted as a user delta in `userdata/database_user.json` (Flow 7), never to assets.
 
 ---
 
