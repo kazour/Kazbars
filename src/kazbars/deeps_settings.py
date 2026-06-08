@@ -21,12 +21,13 @@ Not persisted: the alarm-active state (recomputed every tick from threshold
 auto-resume per the locked decision).
 """
 
-import json
 import logging
 from pathlib import Path
 from typing import Any
 
+from . import settings_core
 from .overlay_engine import FONT_FAMILY_CHOICES, OverlayConfig
+from .settings_core import Field, Schema
 
 logger = logging.getLogger(__name__)
 
@@ -196,61 +197,71 @@ _CHOICE_KEYS = {
 
 
 # =========================================================================== #
+# SCHEMA                                                                       #
+# =========================================================================== #
+# The persistence/validation contract, derived from the tables above so the two
+# can't drift. Domain logic (the preset normalisers, overlay adapters) stays
+# out of the load path — the engine owns only coercion + fill + atomic I/O.
+
+SETTINGS_FILENAME = "deeps_settings.json"
+
+_ENUM_CHOICES = {
+    "layout": _LAYOUT_CHOICES,
+    "overlay_font_family": tuple(FONT_FAMILY_CHOICES),
+    "readout_preset": _READOUT_PRESET_CHOICES,
+    "survival_preset": _SURVIVAL_PRESET_CHOICES,
+}
+
+
+def _validate_visible_cells(value: Any) -> list[str]:
+    """Keep only valid cell IDs; preserve given order but de-dupe. Empty list is
+    allowed (overlay renders nothing — recoverable via the panel checkboxes)."""
+    if not isinstance(value, (list, tuple)):
+        return list(DEEPS_DEFAULTS["visible_cells"])
+    seen: set[str] = set()
+    result: list[str] = []
+    for c in value:
+        if c in _ALL_CELL_IDS and c not in seen:
+            seen.add(c)
+            result.append(c)
+    return result
+
+
+def _build_fields() -> dict[str, Field]:
+    fields: dict[str, Field] = {}
+    for key, default in DEEPS_DEFAULTS.items():
+        if key in _BOOL_KEYS:
+            fields[key] = Field(default, kind="bool")
+        elif key in _ENUM_CHOICES:
+            fields[key] = Field(default, choices=_ENUM_CHOICES[key])
+        elif key in _CHOICE_KEYS:
+            fields[key] = Field(default, kind="int", choices=tuple(_CHOICE_KEYS[key]))
+        elif key == "visible_cells":
+            fields[key] = Field(default, validate=_validate_visible_cells)
+        elif key in DEEPS_RANGES:
+            spec = DEEPS_RANGES[key]
+            fields[key] = Field(default, min=spec["min"], max=spec["max"], kind=spec["kind"])
+        else:
+            fields[key] = Field(default)
+    return fields
+
+
+_SCHEMA = Schema(SETTINGS_FILENAME, 1, _build_fields())
+
+
+# =========================================================================== #
 # VALIDATION                                                                  #
 # =========================================================================== #
 
 def get_default_settings() -> dict:
     """Return a fresh copy of the default Deeps settings."""
-    return dict(DEEPS_DEFAULTS)
+    return settings_core.get_defaults(_SCHEMA)
 
 
 def validate_setting(key: str, value: Any):
-    """Validate and coerce a single setting. Returns the value to store."""
-    if key in _BOOL_KEYS:
-        return bool(value)
-
-    if key == "layout":
-        return value if value in _LAYOUT_CHOICES else DEEPS_DEFAULTS["layout"]
-
-    if key == "overlay_font_family":
-        return value if value in FONT_FAMILY_CHOICES else DEEPS_DEFAULTS["overlay_font_family"]
-
-    if key == "readout_preset":
-        return value if value in _READOUT_PRESET_CHOICES else DEEPS_DEFAULTS["readout_preset"]
-
-    if key == "survival_preset":
-        return value if value in _SURVIVAL_PRESET_CHOICES else DEEPS_DEFAULTS["survival_preset"]
-
-    if key in _CHOICE_KEYS:
-        try:
-            coerced = int(value)
-        except (ValueError, TypeError):
-            return DEEPS_DEFAULTS[key]
-        return coerced if coerced in _CHOICE_KEYS[key] else DEEPS_DEFAULTS[key]
-
-    if key == "visible_cells":
-        # Keep only valid cell IDs; preserve given order but de-dupe. Empty
-        # list is allowed (overlay just renders nothing — recoverable via
-        # the panel checkboxes).
-        if not isinstance(value, (list, tuple)):
-            return list(DEEPS_DEFAULTS["visible_cells"])
-        seen: set[str] = set()
-        result: list[str] = []
-        for c in value:
-            if c in _ALL_CELL_IDS and c not in seen:
-                seen.add(c)
-                result.append(c)
-        return result
-
-    if key in DEEPS_RANGES:
-        spec = DEEPS_RANGES[key]
-        try:
-            num = float(value) if spec["kind"] == "float" else int(value)
-        except (ValueError, TypeError):
-            return DEEPS_DEFAULTS[key]
-        return max(spec["min"], min(num, spec["max"]))
-
-    return value
+    """Validate and coerce a single setting. Returns the value to store.
+    Unknown keys pass through (validate_all_settings is what drops them)."""
+    return settings_core.coerce(_SCHEMA, key, value)
 
 
 def normalize_readout_preset(settings: dict) -> str:
@@ -288,11 +299,7 @@ def normalize_survival_preset(settings: dict) -> str:
 
 def validate_all_settings(settings: dict) -> dict:
     """Validate every known key, drop unknowns, fill missing with defaults."""
-    result = get_default_settings()
-    for key, value in settings.items():
-        if key in DEEPS_DEFAULTS:
-            result[key] = validate_setting(key, value)
-    return result
+    return settings_core.validate_all(_SCHEMA, settings)
 
 
 # =========================================================================== #
@@ -327,8 +334,7 @@ def apply_overlay_config_to_deeps(settings: dict, cfg: OverlayConfig) -> None:
 # =========================================================================== #
 # FILE I/O                                                                    #
 # =========================================================================== #
-
-SETTINGS_FILENAME = "deeps_settings.json"
+# `SETTINGS_FILENAME` is defined up in the SCHEMA section (the Schema needs it).
 
 
 def get_settings_path(settings_folder: str | Path) -> str:
@@ -337,35 +343,12 @@ def get_settings_path(settings_folder: str | Path) -> str:
 
 
 def load_settings(settings_folder: str | Path) -> dict:
-    """Load settings from JSON, validate, fill missing with defaults.
-
-    Returns the default settings if the file doesn't exist or can't be parsed.
-    Never raises — failures are logged at debug level and defaults are used.
-    """
-    settings_path = get_settings_path(settings_folder)
-    try:
-        if Path(settings_path).exists():
-            with open(settings_path, encoding="utf-8") as f:
-                loaded = json.load(f)
-            return validate_all_settings(loaded)
-    except (json.JSONDecodeError, OSError) as e:
-        logger.debug("Could not load Deeps settings: %s", e)
-    return get_default_settings()
+    """Load, migrate, validate, fill. Returns defaults if the file is missing or
+    unparseable — never raises (the engine logs failures at debug level)."""
+    return settings_core.load(_SCHEMA, settings_folder)
 
 
 def save_settings(settings_folder: str | Path, settings: dict) -> bool:
-    """Validate and write settings to JSON. Returns True on success.
-
-    Creates the settings folder if missing. Validation happens before write,
-    so the file is never left in a corrupt or out-of-range state.
-    """
-    try:
-        Path(settings_folder).mkdir(parents=True, exist_ok=True)
-        settings_path = get_settings_path(settings_folder)
-        validated = validate_all_settings(settings)
-        with open(settings_path, "w", encoding="utf-8") as f:
-            json.dump(validated, f, indent=2)
-        return True
-    except OSError as e:
-        logger.warning("Could not save Deeps settings: %s", e)
-        return False
+    """Validate and write atomically (temp + rename). Creates the folder if
+    missing; values are clamped before the write so disk never holds junk."""
+    return settings_core.save(_SCHEMA, settings_folder, settings)

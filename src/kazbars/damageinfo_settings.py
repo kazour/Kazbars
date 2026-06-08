@@ -16,11 +16,13 @@ A few keys are *absolute*, not offsets — they have no ``GAME_DEFAULTS`` entry,
 built and installed at all). Pure data; no Tk. Mirrors ``deeps_settings.py``.
 """
 
-import json
 import logging
 import re
 from pathlib import Path
 from typing import Any
+
+from . import settings_core
+from .settings_core import Field, Schema
 
 logger = logging.getLogger(__name__)
 
@@ -382,13 +384,6 @@ DAMAGEINFO_DEFAULTS: dict[str, Any] = _build_defaults()
 # ============================================================
 # VALIDATION
 # ============================================================
-def get_default_settings() -> dict[str, Any]:
-    """Return a fresh copy of the default Damage Numbers settings."""
-    d = dict(DAMAGEINFO_DEFAULTS)
-    d['source_colors'] = {}  # own dict per copy — never share the module-level default
-    return d
-
-
 def is_float_key(key: str) -> bool:
     """True if this key's baked value should be formatted as a float."""
     return key in _FLOAT_KEYS
@@ -404,34 +399,39 @@ def is_offset_key(key: str) -> bool:
     return key in GAME_DEFAULTS
 
 
-def validate_setting(key: str, value: Any) -> Any:
-    """Validate and coerce one setting to the value to store.
+# Schema derived from GLOBAL_SETTINGS (the bake-map doubles as the validation
+# table). Every offset/absolute key is a clamped numeric Field — the ``type:
+# 'bool'``/``'enum'`` metadata is a UI hint only, so those validate as clamped
+# ints (round + clamp), exactly as the hand-rolled validator did. ``enabled`` is
+# the one real bool; ``source_colors`` carries its own structured validator.
+def _build_schema_fields() -> dict[str, Field]:
+    fields: dict[str, Field] = {}
+    for key, meta in GLOBAL_SETTINGS.items():
+        kind = 'float' if is_float_key(key) else 'int'
+        fields[key] = Field(meta['default'], min=meta['min'], max=meta['max'], kind=kind)
+    fields['enabled'] = Field(False, kind='bool')
+    fields['source_colors'] = Field({}, validate=validate_source_colors)
+    return fields
 
-    Clamps offsets to [min, max], coerces float/int per the key's step. The master
-    ``enabled`` gate is the one bool that lives outside ``GLOBAL_SETTINGS``.
-    """
-    if key == 'enabled':
-        return bool(value)
-    if key == 'source_colors':
-        return validate_source_colors(value)
-    meta = GLOBAL_SETTINGS.get(key)
-    if meta is None:
-        return value
-    try:
-        num = float(value)
-    except (ValueError, TypeError):
-        return meta['default']
-    num = max(meta['min'], min(num, meta['max']))
-    return float(num) if is_float_key(key) else round(num)
+
+_SCHEMA = Schema(SETTINGS_FILENAME, 1, _build_schema_fields())
+
+
+def get_default_settings() -> dict[str, Any]:
+    """Return a fresh copy of the default Damage Numbers settings (each call gets
+    its own ``source_colors`` dict — never the module-level default)."""
+    return settings_core.get_defaults(_SCHEMA)
+
+
+def validate_setting(key: str, value: Any) -> Any:
+    """Validate and coerce one setting to the value to store. Unknown keys pass
+    through; the master ``enabled`` gate and ``source_colors`` validate bespoke."""
+    return settings_core.coerce(_SCHEMA, key, value)
 
 
 def validate_all_settings(settings: dict) -> dict[str, Any]:
     """Validate every known key, drop unknowns, fill missing with defaults."""
-    result = get_default_settings()
-    for key, value in settings.items():
-        if key in DAMAGEINFO_DEFAULTS:
-            result[key] = validate_setting(key, value)
-    return result
+    return settings_core.validate_all(_SCHEMA, settings)
 
 
 def compute_final_value(key: str, offset: Any) -> Any:
@@ -498,26 +498,9 @@ def get_settings_path(settings_folder: str | Path) -> str:
 
 def load_settings(settings_folder: str | Path) -> dict[str, Any]:
     """Load + validate settings; return defaults if missing or unparseable. Never raises."""
-    settings_path = get_settings_path(settings_folder)
-    try:
-        if Path(settings_path).exists():
-            with open(settings_path, encoding='utf-8') as f:
-                loaded = json.load(f)
-            return validate_all_settings(loaded)
-    except (json.JSONDecodeError, OSError) as e:
-        logger.debug('Could not load Damage Numbers settings: %s', e)
-    return get_default_settings()
+    return settings_core.load(_SCHEMA, settings_folder)
 
 
 def save_settings(settings_folder: str | Path, settings: dict) -> bool:
-    """Validate and write settings to JSON. Creates the folder if missing. Returns success."""
-    try:
-        Path(settings_folder).mkdir(parents=True, exist_ok=True)
-        settings_path = get_settings_path(settings_folder)
-        validated = validate_all_settings(settings)
-        with open(settings_path, 'w', encoding='utf-8') as f:
-            json.dump(validated, f, indent=2)
-        return True
-    except OSError as e:
-        logger.warning('Could not save Damage Numbers settings: %s', e)
-        return False
+    """Validate and write atomically (temp + rename). Creates the folder if missing."""
+    return settings_core.save(_SCHEMA, settings_folder, settings)

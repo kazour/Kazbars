@@ -59,6 +59,7 @@ ALLOWED_INBOUND = {"app"}
 INFRASTRUCTURE = {
     "paths",
     "settings_manager",
+    "settings_core",
     "window_position",
     "ui_helpers",
     "ui_widgets",
