@@ -15,6 +15,7 @@ from kazbars import (
     APP_NAME,
     buff_display_editor,
     build_action,
+    content_update,
     game_folder,
     profile_io,
     update_check,
@@ -161,6 +162,11 @@ class KazBarsApp(ttkb.Window):
         # First launch check
         if not self.game_path:
             self.after(100, self._show_first_launch_dialog)
+        else:
+            # Returning user — poll for OTA buff-content now. A fresh install runs
+            # this from the first-launch completion path instead (see first_launch),
+            # so a rare update never races the welcome flow.
+            content_update.check_and_apply(self, APP_VERSION, self.settings.get('content_version'))
 
         update_check.check_for_updates(self, APP_VERSION)
 
@@ -336,6 +342,7 @@ class KazBarsApp(ttkb.Window):
         self._menubar.pack(fill='x', before=self._header_canvas)
 
         self._build_console_var = tk.BooleanVar(value=bool(self.settings.get('build_console', False)))
+        self._auto_update_var = tk.BooleanVar(value=bool(self.settings.get('auto_update_content', True)))
 
         self._menubar.add_cascade(label="File", menu_def=[
             {'type': 'command', 'label': 'New Profile', 'accelerator': 'Ctrl+N',
@@ -372,6 +379,14 @@ class KazBarsApp(ttkb.Window):
             {'type': 'checkbutton', 'label': 'Include buff-discovery console in builds',
              'variable': self._build_console_var,
              'command': self._on_toggle_build_console},
+            {'type': 'separator'},
+            {'type': 'checkbutton', 'label': 'Automatically update the buff database (recommended)',
+             'variable': self._auto_update_var,
+             'command': self._on_toggle_auto_update},
+            {'type': 'command', 'label': 'Check for buff-database updates now',
+             'command': self._check_content_updates_now},
+            {'type': 'command', 'label': 'Revert last buff-database update',
+             'command': self._revert_content_update},
         ])
         self._menubar.add_command(label="About", command=self._show_about)
 
@@ -522,6 +537,21 @@ class KazBarsApp(ttkb.Window):
         msg = ("Buff-discovery console will be included in next build"
                if enabled else "Buff-discovery console excluded from next build")
         self.toast.show(msg, style='info', duration=4)
+
+    def _on_toggle_auto_update(self):
+        enabled = self._auto_update_var.get()
+        self.settings.set('auto_update_content', enabled)
+        self.settings.save()
+        msg = ("Buff database will update automatically" if enabled
+               else "Automatic buff-database updates turned off")
+        self.toast.show(msg, style='info', duration=4)
+
+    def _check_content_updates_now(self):
+        content_update.check_and_apply(
+            self, APP_VERSION, self.settings.get('content_version'), manual=True)
+
+    def _revert_content_update(self):
+        content_update.revert(self)
 
     # ========================================================================
     # PROFILE SYSTEM

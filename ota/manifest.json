@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "content_version": 1,
+  "min_app_version": "2.1.0",
+  "source_commit": "8aec6fc38bc4deda159d0772a70bf124d61a5854",
+  "notes": "Initial OTA manifest baseline.",
+  "files": {
+    "Database.json": {
+      "url": "https://raw.githubusercontent.com/kazour/Kazbars/8aec6fc38bc4deda159d0772a70bf124d61a5854/src/kazbars/assets/kazbars/Database.json",
+      "sha256": "be87c6f54376ab6cc14d4d24f36ae6ebe453b5ccd7d1a66f125dca3eb2e7f507"
+    },
+    "Default.json": {
+      "url": "https://raw.githubusercontent.com/kazour/Kazbars/8aec6fc38bc4deda159d0772a70bf124d61a5854/src/kazbars/assets/kazbars/Default.json",
+      "sha256": "c4ce7620614c5e29933324c9fb91c8ac1b24ec59e74d7b9121e8c365a44e6249"
+    }
+  }
+}

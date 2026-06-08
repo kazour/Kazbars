@@ -376,3 +376,31 @@ Steps:
 3. User picks a color → `_on_color(name, hex)` stores bare `RRGGBB` in `settings['source_colors'][name]` and `_save()`s. "↺" → `_reset_one(name)` drops the override and reverts the swatch to baseline; "Reset all to game default" → `_reset_all()` clears `source_colors`.
 
 End state: `damageinfo_settings.json`'s `source_colors` reflects the picks. Applied in-game only on the next Build & Install (Flow 1, step 14), gated by the master enable — `_prepare_textcolors` writes each `color="0x…"` into `TextColors.xml`; disabling/uninstalling restores stock from the backup.
+
+---
+
+## 22. OTA buff-database update on launch
+
+Trigger: `KazBarsApp.__init__` calls `content_update.check_and_apply(self, APP_VERSION, prefs.content_version)` after the layered DB load (returning user); on a fresh install `first_launch.on_dialog_closed` calls it once the welcome flow finishes (so an update never races the welcome popup). Auto-runs only if the "Automatically update the buff database" toggle is on.
+
+Steps:
+1. `content_update.check_and_apply()` — src/kazbars/content_update.py — bails immediately if (auto and the toggle is off); otherwise spawns a daemon worker thread.
+2. `_worker()` — fetches `ota/manifest.json` (raw URL on `main`); `parse_manifest` validates it. If `app_supports` is false (app older than `min_app_version`), schedules the once-per-session "New buffs are available — update KazBars" compat toast and stops. If not `is_newer(manifest, prefs.content_version)`, stops (manual run toasts "already up to date").
+3. Downloads each SHA-pinned payload (`Database.json`, `Default.json`); a `verify_sha256` mismatch aborts and swaps nothing. Then hops to the main thread via `app.after(0, _apply_on_main, …)`.
+4. `_apply_on_main()` — **apply guard:** if `db_panel.modified` or `app._building`, defer (do nothing — retry next launch). Else `apply_content(content_dir(), …)`: snapshot the current `content/` into `.bak/prev/`, `os.replace` each verified payload into `content/`, then write `content/manifest.json` LAST as the commit marker (a crash between the replace and the marker re-applies next launch — never half-applied).
+5. Persists `prefs.content_version = manifest.content_version`; `BuffDatabase.reload()` re-merges (stock←content←user); `db_panel._refresh_floor()` + `refresh_list()`. A re-merge exception auto-rolls-back from `.bak/prev/` and toasts failure.
+6. One `app_toast` — "Buff database updated — N added, M changed" (`summarize_changes`), click-through to a what-changed note + a Revert reminder. User deltas (`database_user.json`) are untouched throughout.
+
+End state: `userdata/content/` holds the new stock `Database.json` + `Default.json` + the `manifest.json` marker; `prefs.content_version` advanced; the live DB reflects the merge; `.bak/prev/` holds the prior content for Revert. Any failure or defer leaves everything on the shipped stock and changes nothing.
+
+---
+
+## 23. check / revert buff-database updates (manual)
+
+Trigger: Game ▸ "Check for buff-database updates now" or Game ▸ "Revert last buff-database update".
+
+Steps:
+- **Check now** → `KazBarsApp._check_content_updates_now()` → `content_update.check_and_apply(..., manual=True)` — the Flow 22 path, but runs regardless of the toggle and reports the outcome (applies an update, or toasts "already up to date" / "couldn't reach the update server").
+- **Revert** → `KazBarsApp._revert_content_update()` → `content_update.revert(app)` — `rollback(content_dir())` restores `content/` from `.bak/prev/` (a first-ever update clears `content/` back to the stock floor); sets `prefs.content_version` to the restored marker's version (or `CONTENT_BASELINE_VERSION`); `BuffDatabase.reload()` re-merges; refreshes the DB view; toasts. User deltas untouched. With nothing to revert, toasts so.
+
+End state: content reverted to the previous applied version (or the shipped stock); the live DB re-merged; prefs version aligned to what's on disk.

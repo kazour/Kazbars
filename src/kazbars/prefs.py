@@ -20,7 +20,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from . import settings_core
+from . import CONTENT_BASELINE_VERSION, settings_core
 from .settings_core import Field, Schema
 from .userdata import PREFS_FILENAME
 
@@ -84,6 +84,11 @@ PREFS_SCHEMA = Schema(
         "has_built_before": Field(False, kind="bool"),
         "last_build_signature": Field(None),
         "build_console": Field(False, kind="bool"),
+        # OTA reference content (Phase 4). content_version is the authoritative
+        # comparison key (vs the server manifest); it defaults to the shipped
+        # baseline so a fresh install knows it's current and fires no first-run OTA.
+        "content_version": Field(CONTENT_BASELINE_VERSION, kind="int"),
+        "auto_update_content": Field(True, kind="bool"),
         # Per-window geometry — ONE structured dict (see _validate_window_positions).
         "window_positions": Field({}, validate=_validate_window_positions),
         # UI state.

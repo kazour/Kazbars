@@ -1,0 +1,46 @@
+name: OTA Manifest
+
+# Push to main = live. When a commit changes the shipped stock buff files,
+# regenerate ota/manifest.json (sha256 + commit-pinned payload URLs + bumped
+# content_version) and stamp the same version into __init__.py as
+# CONTENT_BASELINE_VERSION, then commit both back so the published pointer and
+# the app baseline stay in lockstep (test_manifest.py guards this).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/kazbars/assets/kazbars/Database.json'
+      - 'src/kazbars/assets/kazbars/Default.json'
+
+permissions:
+  contents: write
+
+jobs:
+  manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      # gen_manifest pins payload URLs to the current HEAD (the stock-change
+      # commit just pushed), where the stock files already hold the new content.
+      - name: Regenerate manifest + stamp baseline
+        run: python scripts/gen_manifest.py "Automated buff-content update."
+
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- ota/manifest.json src/kazbars/__init__.py; then
+            echo "No manifest changes — nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ota/manifest.json src/kazbars/__init__.py
+          git commit -m "ci: regenerate OTA manifest + stamp CONTENT_BASELINE_VERSION"
+          git push
