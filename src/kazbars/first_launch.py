@@ -302,7 +302,7 @@ def run_first_launch(app, app_name):
     """Coordinate first-launch flow: show the dialog, then handle the chosen path
     (default-profile load + scale + welcome popup, or empty start). Owns the
     callbacks the dialog dispatches to."""
-    default_profile = app.assets_path / "kazbars" / "Default.json"
+    default_profile = profile_io.resolve_default_profile_path(app)
     welcome_data = {}
 
     def _save_resolution(resolution_str):

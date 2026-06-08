@@ -18,6 +18,7 @@ from kazbars import (
     content_update,
     game_folder,
     profile_io,
+    profile_manager,
     update_check,
 )
 from kazbars import __version__ as APP_VERSION
@@ -121,6 +122,7 @@ class KazBarsApp(ttkb.Window):
         self.deeps_panel = None
         self.damage_numbers_panel = None
         self.damage_number_colors_panel = None
+        self._profile_manager = None
 
         # One shared focus gate for every overlay: hides them whenever neither
         # KazBars nor AoC owns the foreground window. Overlays register on
@@ -355,6 +357,9 @@ class KazBarsApp(ttkb.Window):
              'command': self._save_profile},
             {'type': 'command', 'label': 'Save Profile As...',
              'command': self._save_profile_as},
+            {'type': 'separator'},
+            {'type': 'command', 'label': 'Manage Profiles…',
+             'command': self._open_profile_manager},
             {'type': 'separator'},
             {'type': 'command', 'label': 'Exit',
              'command': self._on_close},
@@ -610,6 +615,9 @@ class KazBarsApp(ttkb.Window):
 
     def _save_profile_as(self):
         return profile_io.save_profile_as(self)
+
+    def _open_profile_manager(self):
+        return profile_manager.open_profile_manager(self)
 
     def _get_profile_name(self):
         return profile_io.get_profile_name(self)

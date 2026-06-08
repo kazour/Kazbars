@@ -404,3 +404,20 @@ Steps:
 - **Revert** → `KazBarsApp._revert_content_update()` → `content_update.revert(app)` — `rollback(content_dir())` restores `content/` from `.bak/prev/` (a first-ever update clears `content/` back to the stock floor); sets `prefs.content_version` to the restored marker's version (or `CONTENT_BASELINE_VERSION`); `BuffDatabase.reload()` re-merges; refreshes the DB view; toasts. User deltas untouched. With nothing to revert, toasts so.
 
 End state: content reverted to the previous applied version (or the shipped stock); the live DB re-merged; prefs version aligned to what's on disk.
+
+---
+
+## 24. manage / export / import profiles
+
+Trigger: File ▸ "Manage Profiles…".
+
+Steps:
+1. `KazBarsApp._open_profile_manager()` — src/kazbars/app.py — delegator to `profile_manager.open_profile_manager(self)` (single-instance gate on `app._profile_manager`).
+2. `ProfileManagerDialog` — src/kazbars/profile_manager.py — modal Toplevel listing `userdata/profiles/*.json` in a Treeview (★ marks `prefs.default_profile`); buttons Load / Rename / Duplicate / Delete / Set Default + Export / Import.
+   - **Load** → `profile_io.read_profile_file` + `apply_profile_data` (the Flow 2 path) and closes.
+   - **Rename / Duplicate / Delete** → file ops under `userdata/profiles/`; `_rebind_path` keeps the `current_profile` + `default_profile` pointers valid.
+   - **Set Default** → `profile_io.set_default_profile` writes `prefs.default_profile` (does **not** change which profile reopens on relaunch — that stays `last_profile`).
+3. **Export** → reads the selected profile; `profile_share.collect_referenced_user_buffs(data, by_id, by_name, provenance)` gathers the user-provenance buffs it references; `profile_share.encode_profile` packs `{profile, buffs}` → `KZBARS1:<gzip+base64>` onto the clipboard; one toast notes the embedded-buff count.
+4. **Import** → paste a `KZBARS1:` string → `profile_share.decode_profile` (rejects corrupt/truncated) → one confirmation ("includes N custom buffs") → `write_profile_file` to `userdata/profiles/Imported Profile.json` (auto-incremented) + `profile_share.merge_imported_buffs` into `database_user.json` (skip-on-collision) → if any buff was added, `BuffDatabase.reload()` + DB-view refresh → one summary toast ("Imported '…' — N added, M already existed").
+
+End state: profiles managed in place; an export string is self-contained (custom buffs travel with it); an import writes the profile + merges any new custom buffs without clobbering existing ones. ("Load Default Profile" and first-launch resolve their target via `profile_io.resolve_default_profile_path`: the user's `default_profile` if set, else the OTA `content/Default.json`, else shipped stock.)

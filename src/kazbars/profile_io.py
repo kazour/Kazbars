@@ -24,8 +24,50 @@ from ttkbootstrap.dialogs import Messagebox
 from .grid_model import get_game_resolution_or_default
 from .settings_manager import safe_save_json
 from .ui_widgets import app_toast, flash_status_bar
+from .userdata import content_dir
 
 logger = logging.getLogger(__name__)
+
+# Profile-format version for the migration ladder — a separate integer from the
+# app-semver `version` field (which is stamped for display only and can't drive
+# a numeric ladder). The ladder ships empty (clean start); machinery is live for
+# the first post-publish profile-format bump.
+PROFILE_SCHEMA_VERSION = 1
+
+
+def _migrate_profile(data):
+    """Run the profile migration ladder keyed off the integer `profile_schema`.
+    Empty now — returns `data` unchanged; future format bumps add rungs here."""
+    return data
+
+
+def resolve_default_profile_path(app):
+    """The 'load default' / first-launch target: the user's set `default_profile`
+    when it exists, else the OTA-updated `content/Default.json`, else the shipped
+    stock `assets/kazbars/Default.json`."""
+    pref = app.settings.get('default_profile')
+    if pref and Path(pref).exists():
+        return Path(pref)
+    ota_default = content_dir() / "Default.json"
+    if ota_default.exists():
+        return ota_default
+    return app.assets_path / "kazbars" / "Default.json"
+
+
+def _shipped_default_paths(app):
+    """The shipped-template Default.json paths (stock + OTA) — loading one of
+    these forces Save As so a save can't overwrite the template/OTA cache."""
+    return {
+        (app.assets_path / "kazbars" / "Default.json").resolve(),
+        (content_dir() / "Default.json").resolve(),
+    }
+
+
+def set_default_profile(app, path):
+    """Mark `path` as the user's default profile (Profile Manager 'Set default').
+    Does not change which profile reopens on relaunch (that's `last_profile`)."""
+    app.settings.set('default_profile', str(path))
+    app.settings.save()
 
 
 def new_profile(app):
@@ -55,15 +97,13 @@ def open_profile(app):
 
 
 def load_default_profile(app):
-    """Load the bundled Default.json profile from assets/kazbars."""
+    """Load the default profile: the user's set `default_profile` if present,
+    else the OTA-updated `Default.json`, else the shipped stock."""
     if not app._check_unsaved_changes():
         return
-    default_path = app.assets_path / "kazbars" / "Default.json"
+    default_path = resolve_default_profile_path(app)
     if not default_path.exists():
-        Messagebox.show_warning(
-            "Default.json not found in assets/kazbars folder.",
-            title="Default Profile Missing"
-        )
+        Messagebox.show_warning("Default profile not found.", title="Default Profile Missing")
         return
     data, corrupt = read_profile_file(default_path)
     apply_profile_data(app, default_path, data, corrupt=corrupt)
@@ -97,11 +137,12 @@ def apply_profile_data(app, path, data, *, corrupt=False):
             title="Profile Warning"
         )
 
-    # Don't anchor saves to the bundled Default.json: a subsequent Save would
-    # overwrite the shipped templates. Force Save As instead. Also used as
+    data = _migrate_profile(data)
+
+    # Don't anchor saves to a shipped Default.json (stock or OTA): a subsequent
+    # Save would overwrite the template / OTA cache. Force Save As instead. Also
     # the profile identity in the build-signature comparison below.
-    bundled_default = (app.assets_path / "kazbars" / "Default.json").resolve()
-    profile_key = None if Path(path).resolve() == bundled_default else str(path)
+    profile_key = None if Path(path).resolve() in _shipped_default_paths(app) else str(path)
 
     grids = data.get('grids', [])
     missing_by_grid = app.grids_panel.load_profile_data(grids, profile_path=profile_key)
@@ -172,6 +213,7 @@ def build_profile_payload(app):
     live BossTimer if one is open**. Pure data assembly — no I/O."""
     data = {
         'version': app.app_version,
+        'profile_schema': PROFILE_SCHEMA_VERSION,
         'grids': app.grids_panel.get_profile_data(),
         'cast_timer': app.grids_panel.get_cast_timer_config(),
     }

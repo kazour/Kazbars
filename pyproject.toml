@@ -101,6 +101,7 @@ files = [
     "src/kazbars/live_tracker_settings.py",
     "src/kazbars/paths.py",
     "src/kazbars/prefs.py",
+    "src/kazbars/profile_share.py",
     "src/kazbars/settings_core.py",
     "src/kazbars/settings_manager.py",
     "src/kazbars/userdata.py",
