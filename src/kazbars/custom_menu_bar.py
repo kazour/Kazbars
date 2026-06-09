@@ -14,7 +14,7 @@ from .ui_helpers import _RETRO_COLORS, FONT_BODY, FONT_SMALL, THEME_COLORS, TK_C
 # CUSTOM DARK MENU BAR
 # ============================================================================
 _DD_MIN_WIDTH = 220
-_DD_BORDER_COLOR = '#3a3a3a'
+_DD_BORDER_COLOR = TK_COLORS['menu_border']
 
 
 class CustomMenuBar(tk.Canvas):
@@ -30,7 +30,7 @@ class CustomMenuBar(tk.Canvas):
     _MENU_HOVER_BG = TK_COLORS['input_bg']
     _MENU_ACTIVE_BG = TK_COLORS['input_bg']      # Same bg as hover; active differs via underline + white text
     _MENU_ACTIVE_FG = THEME_COLORS['heading']
-    _MENU_DISABLED_FG = '#666666'
+    _MENU_DISABLED_FG = TK_COLORS['menu_disabled_fg']
     _ACCEL_FG = THEME_COLORS['muted']
     _SEP_COLOR = TK_COLORS['separator']
     _FONT = FONT_BODY

@@ -56,6 +56,8 @@ TK_COLORS = {
     'separator':  '#333333',   # thin separator lines
     'status_bg':  '#1a1a1a',   # status bar background (darker than main bg)
     'dim_text':   '#888888',   # dimmed text on dark bg (unassigned slots, disabled labels)
+    'menu_border': '#3a3a3a',  # menu dropdown border (between separator and border)
+    'menu_disabled_fg': '#666666',  # disabled menu items (dimmer than dim_text)
 }
 
 # Overlay-specific colors (Windows transparency hack — not theme colors)
