@@ -22,14 +22,26 @@ def _b(i, name, **extra):
     return {"name": name, "ids": [i], "category": "#X", "type": "buff", **extra}
 
 
-def _manifest(version=2, min_app="2.0.0", files=None):
+def _files_for(payloads):
+    """A manifest `files` block carrying real sha256s for the given payloads, so
+    the written marker is internally consistent (what `_is_consistent` checks)."""
+    return {
+        name: {"url": f"http://x/{name}", "sha256": hashlib.sha256(data).hexdigest()}
+        for name, data in payloads.items()
+    }
+
+
+def _manifest(version=2, min_app="2.0.0", files=None, payloads=None):
+    if files is None:
+        files = (_files_for(payloads) if payloads is not None
+                 else {"Database.json": {"url": "http://x/db", "sha256": "0" * 64}})
     return {
         "schema": 1,
         "content_version": version,
         "min_app_version": min_app,
         "source_commit": "abc123",
         "notes": "some notes",
-        "files": files or {"Database.json": {"url": "http://x/db", "sha256": "0" * 64}},
+        "files": files,
     }
 
 
@@ -111,12 +123,36 @@ def test_apply_first_update_then_rollback_clears(tmp_path):
 
 def test_apply_twice_then_revert_to_previous(tmp_path):
     content = tmp_path / "content"
-    C.apply_content(content, _manifest(version=5), _payloads(db=b"V5"))
-    C.apply_content(content, _manifest(version=6), _payloads(db=b"V6"))
+    p5, p6 = _payloads(db=b"V5"), _payloads(db=b"V6")
+    C.apply_content(content, _manifest(version=5, payloads=p5), p5)
+    C.apply_content(content, _manifest(version=6, payloads=p6), p6)
     assert (content / "Database.json").read_bytes() == b"V6"
     assert C.rollback(content) is True
     assert (content / "Database.json").read_bytes() == b"V5"
     assert C._applied_version(content) == 5
+
+
+def test_half_applied_prior_not_snapshotted(tmp_path):
+    """A prior apply that died between the two os.replace calls leaves content/
+    half-new with a STALE marker. The next successful apply must NOT snapshot that
+    inconsistent pair as the rollback target — revert then clears content/ to the
+    stock floor instead of restoring a mismatched Database/Default pair."""
+    content = tmp_path / "content"
+    p5 = _payloads(db=b"DB5", default=b"DEF5")
+    C.apply_content(content, _manifest(version=5, payloads=p5), p5)
+    # Simulate a half-applied v6: Database.json already swapped, Default.json +
+    # marker still read v5 (the second replace / marker write never happened).
+    (content / "Database.json").write_bytes(b"DB6")
+    assert not C._is_consistent(content)               # {DB6, DEF5, marker v5}
+    # A later successful apply to v7.
+    p7 = _payloads(db=b"DB7", default=b"DEF7")
+    C.apply_content(content, _manifest(version=7, payloads=p7), p7)
+    assert (content / "Database.json").read_bytes() == b"DB7"
+    # Revert clears to the floor — the half state was never a rollback target.
+    assert C.rollback(content) is True
+    assert not (content / "Database.json").exists()
+    assert not (content / "Default.json").exists()
+    assert C._applied_version(content) == C.CONTENT_BASELINE_VERSION
 
 
 def test_mid_swap_self_heals(tmp_path):

@@ -149,12 +149,38 @@ def _applied_version(content_path):
     return v if isinstance(v, int) else CONTENT_BASELINE_VERSION
 
 
+def _is_consistent(content_path):
+    """True iff ``content/`` matches its own commit marker — every payload the
+    marker lists is present with the recorded sha256. Because the marker is
+    written LAST (step 5), a state that died mid-swap (a payload already replaced
+    while the marker still names the old one) fails this check. ``apply_content``
+    snapshots a prior state into ``.bak/prev/`` only when it is consistent, so a
+    half-applied attempt can never become a rollback target — revert then falls
+    back to the always-consistent stock floor instead of a mismatched
+    Database/Default pair. No marker (first-ever / cleared) → not consistent."""
+    m = _read_content_manifest(content_path)
+    if not m:
+        return False
+    files = m.get('files')
+    if not isinstance(files, dict) or not files:
+        return False
+    content_path = Path(content_path)
+    for name, info in files.items():
+        p = content_path / name
+        if not p.exists() or not isinstance(info, dict):
+            return False
+        if not verify_sha256(p.read_bytes(), info.get('sha256', '')):
+            return False
+    return True
+
+
 def apply_content(content_path, manifest, payloads):
     """Atomic swap (steps 3-5; download + verify happen in the caller):
-    snapshot the current ``content/`` into ``.bak/prev/``, ``os.replace`` each
-    verified payload, then write ``content/manifest.json`` LAST as the commit
-    marker. A crash between the replace and the marker re-applies next launch
-    (sha256 matches) — never a half-applied state. Returns the applied version."""
+    snapshot the current ``content/`` into ``.bak/prev/``, stage every verified
+    payload into ``.bak/incoming/`` and then ``os.replace`` them back-to-back,
+    and write ``content/manifest.json`` LAST as the commit marker. A crash
+    between the replaces and the marker re-applies next launch (sha256 matches) —
+    never a half-applied state. Returns the applied version."""
     content_path = Path(content_path)
     content_path.mkdir(parents=True, exist_ok=True)
     prev = content_path / ".bak" / "prev"
@@ -162,23 +188,32 @@ def apply_content(content_path, manifest, payloads):
     prev.mkdir(parents=True, exist_ok=True)
     incoming.mkdir(parents=True, exist_ok=True)
 
-    # 3. Snapshot current content/ (payload files + the marker) so revert can
-    #    restore it. An absent source is recorded as absent (its prev copy is
-    #    removed) so reverting a first-ever update clears content/ to the stock
-    #    floor.
+    # 3. Snapshot the current content/ (payload files + marker) into prev/ so
+    #    revert can restore it — but ONLY a state that matches its own commit
+    #    marker (see _is_consistent). A half-applied prior attempt, or a first-ever
+    #    update with no prior content, is recorded as absent (its prev copy is
+    #    removed), so a later revert falls back to the always-consistent stock
+    #    floor rather than a mismatched Database/Default pair.
+    committed = _is_consistent(content_path)
     for name in (*payloads, MANIFEST_NAME):
         src = content_path / name
         dst = prev / name
-        if src.exists():
+        if committed and src.exists():
             dst.write_bytes(src.read_bytes())
         elif dst.exists():
             dst.unlink()
 
-    # 4. Atomically replace each verified payload.
+    # 4. Stage every verified payload fully, THEN replace them back-to-back —
+    #    all the fallible work (writing the temp copies) happens before any swap,
+    #    so the only gap left is between consecutive same-volume os.replace calls:
+    #    the half-applied window is as tight as the filesystem allows.
+    staged = []
     for name, data in payloads.items():
         tmp = incoming / name
         tmp.write_bytes(data)
-        os.replace(tmp, content_path / name)
+        staged.append((tmp, content_path / name))
+    for tmp, dst in staged:
+        os.replace(tmp, dst)
 
     # 5. Marker LAST — the applied version only advances once both payloads land.
     (content_path / MANIFEST_NAME).write_text(json.dumps(manifest, indent=2), encoding='utf-8')
