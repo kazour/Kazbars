@@ -118,6 +118,7 @@ class KazBarsApp(ttkb.Window):
         self.modified = False
         self.current_view = 'grids'
         self._building = False
+        self._ota_app_update_notified = False
         self.boss_timer_panel = None
         self.deeps_panel = None
         self.damage_numbers_panel = None
