@@ -89,6 +89,7 @@ files = [
     "src/kazbars/build_utils.py",
     "src/kazbars/cast_timer.py",
     "src/kazbars/combat_monitor.py",
+    "src/kazbars/damageinfo_generator.py",
     "src/kazbars/damageinfo_settings.py",
     "src/kazbars/deeps_meter.py",
     "src/kazbars/deeps_parsers.py",
