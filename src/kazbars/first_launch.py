@@ -10,8 +10,8 @@ from tkinter import filedialog, ttk
 from ttkbootstrap.dialogs import Messagebox
 
 from . import content_update, game_folder, profile_io
+from .app_popups import show_welcome_popup
 from .build_executor import detect_aoc_launcher
-from .build_loading import show_welcome_popup
 from .grid_model import parse_resolution
 from .ui_headers import create_dialog_header
 from .ui_helpers import (

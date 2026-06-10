@@ -15,7 +15,8 @@ from ttkbootstrap.dialogs import Messagebox
 
 from . import damageinfo_settings as dis
 from . import game_folder, profile_io
-from .build_loading import BuildLoadingScreen, show_close_game_required_dialog
+from .app_popups import show_close_game_required_dialog
+from .build_loading import BuildLoadingScreen
 from .build_utils import find_compiler
 from .grids_generator import MAX_TOTAL_SLOTS
 from .ui_helpers import THEME_COLORS
