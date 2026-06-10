@@ -80,7 +80,7 @@ def flash_status_bar(bar, color=None, steps=8, interval=30):
     _step(0)
 
 
-def app_toast(widget, message, style="info", duration=6, key=None, on_click=None):
+def app_toast(widget, message, style="info", duration=None, key=None, on_click=None):
     """Show a toast via the app's runtime-attached ToastManager.
 
     Walks `widget` upward looking for a `.toast` attribute (set by
@@ -89,8 +89,9 @@ def app_toast(widget, message, style="info", duration=6, key=None, on_click=None
     no-ops if no manager is found, so callers can use this from dialogs
     that are sometimes parented to non-app roots (tests, isolated previews).
 
-    `key`, when set, makes repeat emits coalesce into the existing toast
-    rather than stacking — see ToastManager.show.
+    `duration=None` means the per-severity default (ToastModel.DEFAULT_DURATIONS);
+    pass seconds to override. `key`, when set, makes repeat emits coalesce into
+    the existing toast rather than stacking — see ToastManager.show.
     """
     w = widget
     while w is not None:

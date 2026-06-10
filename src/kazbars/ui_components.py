@@ -152,10 +152,108 @@ class DragReorderManager:
 # ============================================================================
 # TOAST NOTIFICATIONS
 # ============================================================================
-class ToastManager:
-    """Lightweight toast notifications placed at bottom-right of a parent widget.
+class _Toast:
+    """One notification's state. The renderer hangs its Tk frame on `widget`;
+    the model never touches it."""
 
-    Toasts slide up on entrance and fade out on exit for polished visual feedback.
+    def __init__(self, message, style, duration, key, on_click):
+        self.message = message
+        self.style = style
+        self.duration = duration
+        self.key = key
+        self.on_click = on_click
+        self.exiting = False
+        self.widget = None
+
+
+class ToastModel:
+    """Pure-state core of the toast system: arrival order, coalesce-by-key,
+    the visible cap, the overflow queue, and two-tier priority. No Tk —
+    ToastManager renders against it, tests drive it headlessly."""
+
+    MAX_VISIBLE = 3
+    HIGH_PRIORITY = ('warning', 'danger', 'error')
+    DEFAULT_DURATIONS = {'info': 4, 'success': 4, 'warning': 6, 'danger': 8, 'error': 8}
+
+    def __init__(self):
+        self.visible = []  # arrival order, newest last; exiting toasts hold their slot
+        self.queued = []   # overflow FIFO, high-priority styles ahead of low
+
+    def show(self, message, style='info', duration=None, key=None, on_click=None):
+        """Returns ('coalesced'|'visible'|'queued', toast). 'coalesced' updated
+        an existing record in place; 'visible' needs mounting; 'queued' waits
+        for remove() to free a slot."""
+        if duration is None:
+            duration = self.DEFAULT_DURATIONS.get(style, 6)
+        if key is not None:
+            live = next((t for t in self.visible if t.key == key and not t.exiting), None)
+            if live is not None:
+                live.message = message
+                live.duration = duration
+                return 'coalesced', live
+            waiting = next((t for t in self.queued if t.key == key), None)
+            if waiting is not None:
+                waiting.message = message
+                waiting.duration = duration
+                return 'queued', waiting
+        toast = _Toast(message, style, duration, key, on_click)
+        if len(self.visible) < self.MAX_VISIBLE:
+            self.visible.append(toast)
+            return 'visible', toast
+        self._enqueue(toast)
+        return 'queued', toast
+
+    def _enqueue(self, toast):
+        if toast.style in self.HIGH_PRIORITY:
+            idx = next((i for i, t in enumerate(self.queued)
+                        if t.style not in self.HIGH_PRIORITY), len(self.queued))
+            self.queued.insert(idx, toast)
+        else:
+            self.queued.append(toast)
+
+    def start_exit(self, toast):
+        """Begin dismissal: the toast keeps its slot until remove(), but no
+        longer coalesces."""
+        toast.exiting = True
+
+    def remove(self, toast):
+        """Drop a toast and promote queued ones into freed slots.
+        Returns the newly visible toasts (for the renderer to mount)."""
+        if toast in self.visible:
+            self.visible.remove(toast)
+        promoted = []
+        while self.queued and len(self.visible) < self.MAX_VISIBLE:
+            t = self.queued.pop(0)
+            self.visible.append(t)
+            promoted.append(t)
+        return promoted
+
+    @staticmethod
+    def slot_offsets(heights, base, gap):
+        """Bottom-anchored stack offsets. `heights` ordered oldest→newest;
+        returns each toast's bottom-edge distance from the parent's bottom
+        (newest sits at `base`, older ones step up by height + gap)."""
+        offsets = []
+        off = base
+        for h in reversed(heights):
+            offsets.append(off)
+            off += h + gap
+        offsets.reverse()
+        return offsets
+
+
+class ToastManager:
+    """Tk renderer for ToastModel: toast frames stacked bottom-right of a
+    parent widget, slide-up entrance, color-fade exit.
+
+    All placement flows through _layout(), the single layout authority. It
+    measures only after update_idletasks — a frame's requested size is
+    computed at idle, so reading it earlier returns 1 and stacks toasts on
+    top of each other — and places each frame at its model slot plus the
+    frame's own animation offset, so a relayout mid-slide is harmless.
+
+    Hover pauses the dismiss timer (restarts at full duration on leave);
+    click runs on_click if set, then dismisses.
     """
 
     STYLES = {
@@ -163,6 +261,7 @@ class ToastManager:
         'success': 'success',
         'warning': 'warning',
         'error':   'danger',
+        'danger':  'danger',
     }
 
     _SLIDE_STEPS = 6       # entrance animation frames
@@ -172,95 +271,139 @@ class ToastManager:
 
     def __init__(self, parent):
         self._parent = parent
-        self._toasts = []
-        self._keyed = {}   # key -> live toast Frame, removed on dismiss
+        self._model = ToastModel()
 
-    def show(self, message, style='info', duration=6, on_click=None, key=None):
-        # Coalesce: if a live toast with this key exists, update its text and
-        # reset the dismiss timer instead of spawning a new widget. Skips the
-        # entrance animation and _reposition pass — meant for spammy emitters
-        # like spinbox auto-repeat.
-        if key is not None:
-            existing = self._keyed.get(key)
-            if existing is not None and existing in self._toasts:
-                try:
-                    existing.message_label.configure(text=message)
-                    if existing.exit_after_id is not None:
-                        existing.after_cancel(existing.exit_after_id)
-                    existing.exit_after_id = existing.after(
-                        duration * 1000,
-                        lambda: self._animate_exit(existing, existing.accent_color))
-                    return
-                except tk.TclError:
-                    self._keyed.pop(key, None)
+    def show(self, message, style='info', duration=None, on_click=None, key=None):
+        state, toast = self._model.show(message, style, duration, key, on_click)
+        if state == 'coalesced':
+            toast.widget.message_label.configure(text=toast.message)
+            self._reset_exit_timer(toast)
+            self._layout()
+        elif state == 'visible':
+            self._mount(toast)
+        # 'queued': mounted later, when remove() promotes it
 
-        color = THEME_COLORS.get(self.STYLES.get(style, 'accent'), THEME_COLORS['accent'])
-
-        toast = tk.Frame(self._parent, bg=TK_COLORS['input_bg'],
+    def _mount(self, toast):
+        color = THEME_COLORS.get(self.STYLES.get(toast.style, 'accent'),
+                                 THEME_COLORS['accent'])
+        frame = tk.Frame(self._parent, bg=TK_COLORS['input_bg'],
                          highlightbackground=TK_COLORS['border'],
                          highlightcolor=TK_COLORS['border'], highlightthickness=1)
-        accent_bar = tk.Frame(toast, bg=color, width=3)
+        accent_bar = tk.Frame(frame, bg=color, width=3)
         accent_bar.pack(side='left', fill='y')
-        label = ttk.Label(toast, text=message, font=FONT_SMALL,
+        label = ttk.Label(frame, text=toast.message, font=FONT_SMALL,
                           foreground=THEME_COLORS['body'],
                           background=TK_COLORS['input_bg'],
                           wraplength=360, justify='left')
         label.pack(side='left', padx=(PAD_LF, PAD_TAB), pady=PAD_XS)
 
-        toast.message_label = label
-        toast.accent_color = color
-        toast.coalesce_key = key
+        frame.message_label = label
+        frame.accent_color = color
+        frame.exit_after_id = None
+        frame.hovered = False
+        toast.widget = frame
 
-        if on_click:
-            for w in (toast, accent_bar, label):
+        for w in (frame, accent_bar, label):
+            if toast.on_click:
                 w.configure(cursor='hand2')
-                w.bind('<Button-1>', lambda _e: on_click())
+            w.bind('<Button-1>', lambda _e: self._on_click(toast))
+            w.bind('<Enter>', lambda _e: self._on_hover(toast, True))
+            w.bind('<Leave>', lambda _e: self._on_hover(toast, False))
 
-        self._toasts.append(toast)
-        if key is not None:
-            self._keyed[key] = toast
-        self._reposition()
-
-        # Slide-up entrance animation
+        self._parent.update_idletasks()  # real reqheight before first placement
+        frame.anim_offset = frame.winfo_reqheight() + PAD_TAB
+        self._layout()
         self._animate_entrance(toast)
+        self._schedule_exit(toast)
 
-        # Schedule fade-out exit
-        toast.exit_after_id = toast.after(
-            duration * 1000, lambda: self._animate_exit(toast, color))
+    def _on_click(self, toast):
+        if toast.on_click is not None:
+            toast.on_click()
+        self._begin_exit(toast)
+
+    def _on_hover(self, toast, inside):
+        toast.widget.hovered = inside
+        if inside:
+            self._cancel_exit_timer(toast)
+        elif not toast.exiting:
+            self._schedule_exit(toast)
+
+    def _schedule_exit(self, toast):
+        frame = toast.widget
+        if frame.hovered:
+            return  # paused; rescheduled on <Leave>
+        frame.exit_after_id = frame.after(
+            toast.duration * 1000, lambda: self._begin_exit(toast))
+
+    def _cancel_exit_timer(self, toast):
+        frame = toast.widget
+        if frame.exit_after_id is not None:
+            frame.after_cancel(frame.exit_after_id)
+            frame.exit_after_id = None
+
+    def _reset_exit_timer(self, toast):
+        self._cancel_exit_timer(toast)
+        self._schedule_exit(toast)
+
+    def _begin_exit(self, toast):
+        if toast.exiting:
+            return
+        self._model.start_exit(toast)
+        self._cancel_exit_timer(toast)
+        self._animate_exit(toast)
+
+    def _layout(self):
+        """Single layout authority: measure, compute slots, place, restack."""
+        try:
+            self._parent.update_idletasks()
+            toasts = [t for t in self._model.visible if t.widget is not None]
+            heights = [t.widget.winfo_reqheight() for t in toasts]
+            offsets = ToastModel.slot_offsets(heights, PAD_TAB, PAD_XS)
+            for toast, offset in zip(toasts, offsets):
+                toast.widget.slot_y = -offset
+                self._place(toast.widget)
+                toast.widget.lift()  # oldest→newest order: newest ends on top
+        except tk.TclError:
+            pass
+
+    def _place(self, frame):
+        frame.place(relx=1.0, rely=1.0, anchor='se',
+                    x=-PAD_TAB, y=frame.slot_y + frame.anim_offset)
 
     def _animate_entrance(self, toast):
-        """Slide toast up from below its final position."""
-        toast.update_idletasks()
-        slide_dist = toast.winfo_reqheight() + PAD_TAB
-        try:
-            target_y = int(toast.place_info().get('y', 0))
-        except tk.TclError:
-            return
+        """Slide up from below the slot: eases the frame's anim_offset to 0,
+        re-placing against the current slot each step so a mid-slide relayout
+        (another toast arriving) is respected instead of stomped."""
+        frame = toast.widget
+        slide_dist = frame.anim_offset
 
         def _step(i):
-            if toast not in self._toasts:
+            if toast.widget is not frame:
                 return
             try:
-                # Ease-out: offset shrinks non-linearly toward the captured target_y
                 t = i / self._SLIDE_STEPS
-                offset = int(slide_dist * (1 - t) ** 2)
-                toast.place_configure(y=target_y + offset)
+                frame.anim_offset = int(slide_dist * (1 - t) ** 2)
+                self._place(frame)
                 if i < self._SLIDE_STEPS:
-                    toast.after(self._SLIDE_MS, lambda: _step(i + 1))
+                    frame.after(self._SLIDE_MS, lambda: _step(i + 1))
                 else:
-                    toast.place_configure(y=target_y)
+                    frame.anim_offset = 0
+                    self._place(frame)
             except tk.TclError:
                 pass
 
         _step(0)
 
-    def _animate_exit(self, toast, accent_color):
-        """Fade out toast by interpolating colors toward background, then remove."""
+    def _animate_exit(self, toast):
+        """Fade colors toward the background, then remove. The slot is held
+        for the whole fade so neighbors don't jump until the toast is gone."""
+        frame = toast.widget
         bg = TK_COLORS['input_bg']
         body_color = THEME_COLORS['body']
+        accent_color = frame.accent_color
 
         def _step(i):
-            if toast not in self._toasts:
+            if toast.widget is not frame:
                 return
             try:
                 t = i / self._FADE_STEPS
@@ -268,47 +411,37 @@ class ToastManager:
                 faded_fg = blend_alpha(body_color, TK_COLORS['bg'], int(100 * (1 - t)))
                 faded_accent = blend_alpha(accent_color, TK_COLORS['bg'], int(100 * (1 - t)))
                 faded_border = blend_alpha(TK_COLORS['border'], TK_COLORS['bg'], int(100 * (1 - t)))
-                toast.configure(bg=faded_bg,
+                frame.configure(bg=faded_bg,
                                 highlightbackground=faded_border,
                                 highlightcolor=faded_border)
-                for child in toast.winfo_children():
+                for child in frame.winfo_children():
                     if isinstance(child, tk.Frame):
                         child.configure(bg=faded_accent)
                     elif isinstance(child, ttk.Label):
                         child.configure(foreground=faded_fg, background=faded_bg)
                 if i < self._FADE_STEPS:
-                    toast.after(self._FADE_MS, lambda: _step(i + 1))
+                    frame.after(self._FADE_MS, lambda: _step(i + 1))
                 else:
-                    self._remove_toast(toast)
+                    self._finish_remove(toast)
             except tk.TclError:
-                self._remove_toast(toast)
+                self._finish_remove(toast)
 
         _step(1)
 
-    def _remove_toast(self, toast):
-        if toast in self._toasts:
-            self._toasts.remove(toast)
-        key = getattr(toast, 'coalesce_key', None)
-        if key is not None and self._keyed.get(key) is toast:
-            del self._keyed[key]
+    def _finish_remove(self, toast):
+        if toast.widget is None:
+            return
+        frame = toast.widget
+        toast.widget = None
+        promoted = self._model.remove(toast)
         try:
-            toast.place_forget()
-            toast.destroy()
+            frame.place_forget()
+            frame.destroy()
         except tk.TclError:
             pass
-        self._reposition()
-
-    def _reposition(self):
-        offset = PAD_TAB
-        for toast in reversed(self._toasts):
-            toast.place(relx=1.0, rely=1.0, anchor='se',
-                        x=-PAD_TAB, y=-offset)
-            toast.lift()
-            offset += toast.winfo_reqheight() + PAD_XS
-        try:
-            self._parent.update_idletasks()
-        except tk.TclError:
-            pass
+        self._layout()
+        for t in promoted:
+            self._mount(t)
 
 
 # ============================================================================
