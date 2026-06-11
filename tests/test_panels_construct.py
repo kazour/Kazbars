@@ -106,6 +106,7 @@ OPENERS = [
     ('_open_damage_number_colors', lambda a: a.damage_number_colors_panel),
     ('_open_profile_manager', lambda a: a._profile_manager),
     ('_open_buff_display_editor', _find_buff_display_dialog),
+    ('_open_stopwatch_settings', lambda a: a.stopwatch_dialog),
     ('_show_about', lambda a: a._about_popup),
 ]
 

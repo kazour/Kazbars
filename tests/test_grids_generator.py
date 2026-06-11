@@ -201,3 +201,56 @@ def test_cast_on_emits_hooks_and_data():
 
     # No leftover tokens
     assert "{{CAST_" not in main_code
+
+
+# --------------------------------------------------------------------------
+# In-game stopwatch toggle (include_stopwatch, derived from stopwatch_config)
+# --------------------------------------------------------------------------
+
+
+def test_stopwatch_off_emits_no_refs():
+    """No stopwatch_config (or enabled=False) must reference KazBarsStopwatch —
+    MTASC would otherwise fail to resolve the class — and leave no raw tokens."""
+    gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0", stopwatch_config=None)
+    main_code, data_code = gen.generate()
+    assert not gen.include_stopwatch
+    assert "KazBarsStopwatch" not in main_code
+    assert "stopwatch" not in main_code
+    assert "{{SW_" not in main_code
+    assert "d.SW" not in data_code
+
+
+def test_stopwatch_disabled_config_is_off():
+    gen = CodeGenerator(
+        [_minimal_grid()], _load_db(), "0.0.0",
+        stopwatch_config={"enabled": False, "x": 100, "y": 100},
+    )
+    main_code, _ = gen.generate()
+    assert not gen.include_stopwatch
+    assert "KazBarsStopwatch" not in main_code
+
+
+def test_stopwatch_on_emits_hooks_and_data():
+    gen = CodeGenerator(
+        [_minimal_grid()], _load_db(), "0.0.0",
+        stopwatch_config={"enabled": True, "x": 750, "y": 410, "startCollapsed": True},
+    )
+    main_code, data_code = gen.generate()
+    assert gen.include_stopwatch
+
+    # Instantiation + configure
+    assert "private var stopwatch:KazBarsStopwatch;" in main_code
+    assert "stopwatch = new KazBarsStopwatch(this, rootClip);" in main_code
+    assert "stopwatch.configure(d.SW);" in main_code
+
+    # Lifecycle hooks
+    assert "stopwatch.createPanel();" in main_code
+    assert "stopwatch.loadState(config);" in main_code
+    assert "stopwatch.saveState(config);" in main_code
+    assert "stopwatch.cleanup();" in main_code
+
+    # Data block
+    assert "d.SW = {x: 750, y: 410, collapsed: true};" in data_code
+
+    # No leftover tokens
+    assert "{{SW_" not in main_code

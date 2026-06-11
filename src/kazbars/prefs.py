@@ -22,6 +22,7 @@ from typing import Any
 
 from . import CONTENT_BASELINE_VERSION, settings_core
 from .settings_core import Field, Schema
+from .stopwatch import validate_config as _validate_stopwatch
 from .userdata import PREFS_FILENAME
 
 logger = logging.getLogger(__name__)
@@ -84,6 +85,8 @@ PREFS_SCHEMA = Schema(
         "has_built_before": Field(False, kind="bool"),
         "last_build_signature": Field(None),
         "build_console": Field(False, kind="bool"),
+        # In-game stopwatch — ONE structured dict (defaults/clamps in stopwatch.py).
+        "stopwatch": Field({}, validate=_validate_stopwatch),
         # OTA reference content (Phase 4). content_version is the authoritative
         # comparison key (vs the server manifest); it defaults to the shipped
         # baseline so a fresh install knows it's current and fires no first-run OTA.

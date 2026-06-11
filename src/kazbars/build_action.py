@@ -126,6 +126,7 @@ def build(app):
             grids, app.database, app.assets_path, compiler, app.app_version,
             include_console=bool(app.settings.get('build_console', False)),
             cast_config=app.grids_panel.get_cast_timer_config(),
+            stopwatch_config=app.settings.get('stopwatch'),
         )
 
         if not compile_result[0]:

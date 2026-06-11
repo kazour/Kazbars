@@ -114,7 +114,15 @@ def test_cast_timer_feature_compiles():
     assert ok, msg
 
 
+def test_stopwatch_feature_compiles():
+    sw = {"enabled": True, "x": 850, "y": 300, "startCollapsed": True}
+    ok, msg, _ = _compile([_grid()], stopwatch_config=sw)
+    assert ok, msg
+
+
 def test_all_features_together_compile():
     cast = {"enableP": True, "enableT": False, "playerX": 900, "playerY": 600}
-    ok, msg, _ = _compile([_grid()], include_console=True, cast_config=cast)
+    sw = {"enabled": True}
+    ok, msg, _ = _compile([_grid()], include_console=True, cast_config=cast,
+                          stopwatch_config=sw)
     assert ok, msg

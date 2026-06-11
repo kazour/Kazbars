@@ -650,6 +650,7 @@
             }
             {{CONSOLE_EXIT_PERSIST}}
             {{CAST_SAVE}}
+            {{SW_SAVE}}
         }
         {{CONSOLE_EXIT_REMOVE}}
         {{CAST_PREVIEW_OFF}}
@@ -663,6 +664,7 @@
         if (keyListener != null) { Key.removeListener(keyListener); keyListener = null; }
         {{CONSOLE_CLEANUP}}
         {{CAST_CLEANUP}}
+        {{SW_CLEANUP}}
         playerBuffs = new Array();
         targetBuffs = new Array();
         buffIndexCache = {player: {}, target: {}};
@@ -694,6 +696,7 @@
         Key.addListener(keyListener);
         createAllGrids();
         {{CAST_CREATE}}
+        {{SW_CREATE}}
         try {
             com.GameInterface.Game.CharacterBase.SignalClientCharacterAlive.Connect(SlotAlive, this);
             m_Player = com.GameInterface.Game.Character.GetClientCharacter();
@@ -716,6 +719,7 @@
             }
             {{CONSOLE_LOAD_PERSIST}}
             {{CAST_LOAD}}
+            {{SW_LOAD}}
         }
     }
 
@@ -729,6 +733,7 @@
             }
             {{CONSOLE_DEACTIVATE_PERSIST}}
             {{CAST_SAVE}}
+            {{SW_SAVE}}
         }
         cleanup();
         try { com.GameInterface.Game.CharacterBase.SignalClientCharacterAlive.Disconnect(SlotAlive, this); } catch (e:Object) {}
