@@ -97,7 +97,10 @@ def clear_game_path(app):
 
 
 def show_game_context_menu(app, event):
-    """Show the change/clear menu for the game-folder label."""
+    """Show the change/open/clear menu for the game-folder label."""
+    ok = bool(app.game_path) and Path(app.game_path).is_dir()
+    app._game_context_menu.entryconfigure(
+        "Open in Explorer", state='normal' if ok else 'disabled')
     app._game_context_menu.tk_popup(event.x_root, event.y_root)
 
 

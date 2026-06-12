@@ -84,12 +84,17 @@ def build(app):
 
     if empty:
         names = ', '.join(f"'{n}'" for n in empty)
-        Messagebox.show_error(
+        if Messagebox.yesno(
             f"These grids have no tracked buffs and would appear empty in-game:\n\n{names}\n\n"
-            "Add tracked buffs (or slot assignments for static grids), or disable the grid.",
+            "Disable them and build anyway?",
             title="Empty Grids"
-        )
-        return
+        ) != "Yes":
+            return
+        for g in grids:
+            if g['id'] in empty:
+                g['enabled'] = False
+        app._mark_modified()
+        app.grids_panel.refresh_panels(expand_index=-1)
 
     # Aoc.exe users only: block while the game is running, but only on the
     # first build. After a successful install, /reloadui handles the swap.

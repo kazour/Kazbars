@@ -28,7 +28,11 @@ def check_for_updates(app, current_version):
     threading.Thread(target=_worker, args=(app, current_version), daemon=True).start()
 
 
-def _worker(app, current_version):
+def fetch_latest(current_version):
+    """Blocking release lookup. Returns ('update', tag, url) when a newer
+    release exists, ('current', None, None) when up to date, or
+    ('error', None, None) on any network/parse failure. Shared by the launch
+    check and the About popup's manual check."""
     try:
         req = urllib.request.Request(
             LATEST_RELEASE_URL,
@@ -37,13 +41,20 @@ def _worker(app, current_version):
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read().decode('utf-8'))
         tag = (data.get('tag_name') or '').lstrip('v')
-        if not tag or tag == current_version:
-            return
-        if _parts(tag) <= _parts(current_version):
-            return
-        url = data.get('html_url', FALLBACK_RELEASES_URL)
+        if not tag or _parts(tag) <= _parts(current_version):
+            return ('current', None, None)
+        return ('update', tag, data.get('html_url', FALLBACK_RELEASES_URL))
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
+        return ('error', None, None)
+
+
+def _worker(app, current_version):
+    status, tag, url = fetch_latest(current_version)
+    if status != 'update':
+        return
+    try:
         app.after(0, _show_update_toast, app, tag, url)
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError, tk.TclError):
+    except tk.TclError:
         pass
 
 
@@ -65,5 +76,32 @@ def _show_update_toast(app, tag, url):
             'info', 12,
             on_click=lambda: webbrowser.open(url),
         )
+    except tk.TclError:
+        pass
+
+
+def check_for_updates_manual(app, current_version):
+    """Explicit user check (Updates ▸ Check for app updates now) — unlike the
+    silent launch check, always answers with a toast."""
+    def worker():
+        status, tag, url = fetch_latest(current_version)
+        try:
+            app.after(0, _show_manual_result, app, status, tag, url)
+        except tk.TclError:
+            pass
+    threading.Thread(target=worker, daemon=True).start()
+
+
+def _show_manual_result(app, status, tag, url):
+    """Main-thread dispatcher for the manual check."""
+    try:
+        if not app.winfo_exists():
+            return
+        if status == 'update':
+            _show_update_toast(app, tag, url)
+        elif status == 'current':
+            app_toast(app, "You're on the latest version", 'success')
+        else:
+            app_toast(app, "Couldn't reach GitHub — check your connection", 'warning')
     except tk.TclError:
         pass

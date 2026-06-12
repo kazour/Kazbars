@@ -247,8 +247,13 @@ class BuffEditDialog(tk.Toplevel):
             ) != "Yes":
                 return None
         if not ids:
-            Messagebox.show_error("Enter at least one buff ID. Find IDs on AoC database sites.",
-                                  title="Missing Buff ID")
+            Messagebox.show_error(
+                "Enter at least one buff ID.\n\n"
+                "IDs aren't published anywhere — find them in-game: turn on "
+                "Extras ▸ Include buff-discovery console in builds, then "
+                "Build & Install. In preview mode (Shift+Ctrl+Alt) the console "
+                "logs every effect's name and ID.",
+                title="Missing Buff ID")
             return None
 
         name = self.name_var.get().strip()

@@ -4,6 +4,7 @@ Main application class.
 """
 
 import logging
+import os
 import tkinter as tk
 from pathlib import Path
 from tkinter import ttk
@@ -304,7 +305,9 @@ class KazBarsApp(ttkb.Window):
 
         self._game_context_menu = tk.Menu(self, tearoff=0)
         self._game_context_menu.add_command(
-            label="Change game folder...", command=self._change_game_folder)
+            label="Change game folder…", command=self._change_game_folder)
+        self._game_context_menu.add_command(
+            label="Open in Explorer", command=self._open_game_in_explorer)
         self._game_context_menu.add_command(
             label="Clear", command=self._clear_game_path)
 
@@ -351,13 +354,13 @@ class KazBarsApp(ttkb.Window):
         self._menubar.add_cascade(label="File", menu_def=[
             {'type': 'command', 'label': 'New Profile', 'accelerator': 'Ctrl+N',
              'command': self._new_profile},
-            {'type': 'command', 'label': 'Open Profile...', 'accelerator': 'Ctrl+O',
+            {'type': 'command', 'label': 'Open Profile…', 'accelerator': 'Ctrl+O',
              'command': self._open_profile},
             {'type': 'command', 'label': 'Load Default Profile',
              'command': self._load_default_profile},
             {'type': 'command', 'label': 'Save Profile', 'accelerator': 'Ctrl+S',
              'command': self._save_profile},
-            {'type': 'command', 'label': 'Save Profile As...',
+            {'type': 'command', 'label': 'Save Profile As…',
              'command': self._save_profile_as},
             {'type': 'separator'},
             {'type': 'command', 'label': 'Manage Profiles…',
@@ -367,28 +370,31 @@ class KazBarsApp(ttkb.Window):
              'command': self._on_close},
         ])
         self._menubar.add_cascade(label="Game", menu_def=[
-            {'type': 'command', 'label': 'Default buff bars...',
-             'command': self._open_buff_display_editor},
-            {'type': 'command', 'label': 'Damage number Mod...',
-             'command': self._open_damage_numbers},
-            {'type': 'command', 'label': 'Damage number Colors...',
-             'command': self._open_damage_number_colors},
-            {'type': 'command', 'label': 'In-game stopwatch...',
-             'command': self._open_stopwatch_settings},
-            {'type': 'command', 'label': 'Backup & restore game settings...',
-             'command': self._open_backup_dialog},
-            {'type': 'separator'},
-            {'type': 'command', 'label': 'Change game folder...',
+            {'type': 'command', 'label': 'Change game folder…',
              'command': self._change_game_folder},
-            {'type': 'command', 'label': 'Game resolution...',
+            {'type': 'command', 'label': 'Game resolution…',
              'command': self._change_game_resolution},
-            {'type': 'command', 'label': 'Uninstall from game client...',
+            {'type': 'separator'},
+            {'type': 'command', 'label': 'Backup & restore game settings…',
+             'command': self._open_backup_dialog},
+            {'type': 'command', 'label': 'Uninstall from game client…',
              'command': self._uninstall_game},
+        ])
+        self._menubar.add_cascade(label="Extras", menu_def=[
+            {'type': 'command', 'label': 'Default buff bars…',
+             'command': self._open_buff_display_editor},
+            {'type': 'command', 'label': 'Damage number mod…',
+             'command': self._open_damage_numbers},
+            {'type': 'command', 'label': 'Damage number colors…',
+             'command': self._open_damage_number_colors},
+            {'type': 'command', 'label': 'In-game stopwatch…',
+             'command': self._open_stopwatch_settings},
             {'type': 'separator'},
             {'type': 'checkbutton', 'label': 'Include buff-discovery console in builds',
              'variable': self._build_console_var,
              'command': self._on_toggle_build_console},
-            {'type': 'separator'},
+        ])
+        self._menubar.add_cascade(label="Updates", menu_def=[
             {'type': 'checkbutton', 'label': 'Automatically update the buff database (recommended)',
              'variable': self._auto_update_var,
              'command': self._on_toggle_auto_update},
@@ -396,6 +402,9 @@ class KazBarsApp(ttkb.Window):
              'command': self._check_content_updates_now},
             {'type': 'command', 'label': 'Revert last buff-database update',
              'command': self._revert_content_update},
+            {'type': 'separator'},
+            {'type': 'command', 'label': 'Check for app updates now',
+             'command': self._check_app_updates_now},
         ])
         self._menubar.add_command(label="About", command=self._show_about)
 
@@ -566,6 +575,14 @@ class KazBarsApp(ttkb.Window):
 
     def _revert_content_update(self):
         content_update.revert(self)
+
+    def _open_game_in_explorer(self):
+        """Open the configured game folder in Windows Explorer."""
+        if self.game_path and Path(self.game_path).is_dir():
+            os.startfile(self.game_path)
+
+    def _check_app_updates_now(self):
+        return update_check.check_for_updates_manual(self, self.app_version)
 
     # ========================================================================
     # PROFILE SYSTEM

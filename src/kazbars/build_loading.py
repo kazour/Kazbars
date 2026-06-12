@@ -361,6 +361,25 @@ class BuildLoadingScreen(tk.Toplevel):
                 bbox = canvas.bbox(msg_id)
                 msg_h = (bbox[3] - bbox[1] + 12) if bbox else 28
                 y += msg_h
+
+                # Compiler output is canvas text (unselectable) — give support
+                # requests a one-click copy instead.
+                copy_id = canvas.create_text(46, y, text="Copy details", anchor='nw',
+                                             font=FONT_SMALL,
+                                             fill=THEME_COLORS['accent'])
+
+                def _copy_details(_e=None):
+                    self.clipboard_clear()
+                    self.clipboard_append(compile_msg)
+                    canvas.itemconfig(copy_id, text="Copied ✓",
+                                      fill=THEME_COLORS['success'])
+
+                canvas.tag_bind(copy_id, '<Button-1>', _copy_details)
+                canvas.tag_bind(copy_id, '<Enter>',
+                                lambda e: canvas.config(cursor='hand2'))
+                canvas.tag_bind(copy_id, '<Leave>',
+                                lambda e: canvas.config(cursor=''))
+                y += 24
         else:
             # Per-client result rows
             for name, ok, err in client_results:

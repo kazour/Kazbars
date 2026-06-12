@@ -80,13 +80,6 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
                                      parent=dialog)
         if p:
             path_var.set(p)
-            if not (Path(p) / "Data" / "Gui" / "Default").exists():
-                warn_label.configure(
-                    text="This doesn't look like an AoC install — missing Data/Gui/Default/",
-                    foreground=THEME_COLORS['warning']
-                )
-            else:
-                warn_label.configure(text="", foreground=THEME_COLORS['muted'])
 
     ttk.Button(path_frame, text="Browse", width=BTN_SMALL,
                command=browse).pack(side='right')
@@ -95,11 +88,24 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
                            foreground=THEME_COLORS['warning'])
     warn_label.pack(anchor='w')
 
+    def _validate_path_hint():
+        p = path_var.get().strip()
+        if p and not (Path(p) / "Data" / "Gui" / "Default").exists():
+            warn_label.configure(
+                text="This doesn't look like an AoC install — missing Data/Gui/Default/",
+                foreground=THEME_COLORS['warning'])
+        else:
+            warn_label.configure(text="")
+
     # Common locations (only show paths that exist)
     common_paths = [
         r"C:\Funcom\Age of Conan",
         r"D:\Games\Age of Conan",
         r"C:\Program Files (x86)\Funcom\Age of Conan",
+        r"C:\Program Files (x86)\Steam\steamapps\common\Age of Conan - Unchained",
+        r"C:\Steam\steamapps\common\Age of Conan - Unchained",
+        r"D:\Steam\steamapps\common\Age of Conan - Unchained",
+        r"D:\SteamLibrary\steamapps\common\Age of Conan - Unchained",
     ]
     existing_paths = [cp for cp in common_paths if Path(cp).exists()]
     if existing_paths:
@@ -187,6 +193,12 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
             on_dialog_closed()
 
     def load_default():
+        if not parse_resolution(res_var.get()):
+            Messagebox.show_warning(
+                f"\"{res_var.get()}\" isn't a valid resolution.\n\n"
+                "Use WIDTHxHEIGHT, like 1920x1080.",
+                title="Invalid Resolution", parent=dialog)
+            return
         _set_game_if_provided()
         on_load_default(res_var.get())
         _close()
@@ -196,6 +208,9 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
         _close()
 
     def skip():
+        # Keep a typed game path even on "Set up later" / X — losing it because
+        # the user closed the dialog is worse than skipping the re-arm.
+        _set_game_if_provided()
         _close()
 
     # --- Two equal-weight option cards ---
@@ -274,6 +289,7 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
         if btn_defaults:
             btn_defaults.configure(state=state)
         btn_empty.configure(state=state)
+        _validate_path_hint()
         _refresh_aoc_section()
 
     path_var.trace_add('write', _on_path_changed)

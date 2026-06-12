@@ -254,7 +254,7 @@ End state: `game_path` and (when divergence triggered it) `use_aoc_bypass` persi
 
 ## 15. open Buff Display editor and apply
 
-Trigger: User selects Game > Default buff bars… from the menu
+Trigger: User selects Extras > Default buff bars… from the menu
 
 Steps:
 1. `KazBarsApp._open_buff_display_editor()` — src/kazbars/app.py — one-line delegator to `buff_display_editor.open_buff_display_editor(self)`
@@ -357,7 +357,7 @@ End state: backup writes a single portable zip (AoC prefs + the KazBars `userdat
 
 ## 20. open Damage Numbers panel and tune settings
 
-Trigger: User selects Game ▸ Damage number Mod… from the menu, then adjusts a control in the panel that opens.
+Trigger: User selects Extras ▸ Damage number mod… from the menu, then adjusts a control in the panel that opens.
 
 Steps:
 1. `KazBarsApp._open_damage_numbers()` — src/kazbars/app.py — one-line delegator to `open_damage_numbers_panel(self)`. Mirrors `_open_deeps_panel`.
@@ -370,7 +370,7 @@ End state: `damageinfo_settings.json` reflects the chosen offsets + `enabled` fl
 
 ## 21. set per-source damage-number colors
 
-Trigger: User selects Game ▸ Damage number Colors… from the menu.
+Trigger: User selects Extras ▸ Damage number colors… from the menu.
 
 Steps:
 1. `KazBarsApp._open_damage_number_colors()` — src/kazbars/app.py — one-line delegator to `open_damage_number_colors_panel(self)` — src/kazbars/damageinfo_colors_panel.py — single-instance gate (mirrors Flow 20); constructs `DamageNumberColorsPanel(app, app.settings_path, app.game_path)`.
@@ -399,7 +399,7 @@ End state: `userdata/content/` holds the new stock `Database.json` + `Default.js
 
 ## 23. check / revert buff-database updates (manual)
 
-Trigger: Game ▸ "Check for buff-database updates now" or Game ▸ "Revert last buff-database update".
+Trigger: Updates ▸ "Check for buff-database updates now" or Updates ▸ "Revert last buff-database update".
 
 Steps:
 - **Check now** → `KazBarsApp._check_content_updates_now()` → `content_update.check_and_apply(..., manual=True)` — the Flow 22 path, but runs regardless of the toggle and reports the outcome (applies an update, or toasts "already up to date" / "couldn't reach the update server").
@@ -428,7 +428,7 @@ End state: profiles managed in place; an export string is self-contained (custom
 
 ## 25. configure the in-game stopwatch
 
-Trigger: User selects Game ▸ In-game stopwatch… from the menu.
+Trigger: User selects Extras ▸ In-game stopwatch… from the menu.
 
 Steps:
 1. `KazBarsApp._open_stopwatch_settings()` — src/kazbars/app.py — one-line delegator to `open_stopwatch_dialog(self)`.

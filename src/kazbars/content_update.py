@@ -338,7 +338,7 @@ def _apply_on_main(app, manifest, payloads):
 
 
 def revert(app):
-    """Game ▸ Revert last buff-database update — restore content/ from .bak/prev/
+    """Updates ▸ Revert last buff-database update — restore content/ from .bak/prev/
     and re-merge. User deltas are untouched."""
     if not rollback(content_dir()):
         _notify(app, "Nothing to revert — no buff-database update has been applied", 'info')
@@ -388,5 +388,5 @@ def _show_changes(added, changed, notes):
     body = f"{added} added, {changed} changed."
     if notes:
         body += f"\n\n{notes}"
-    body += "\n\nTo undo, use Game ▸ Revert last buff-database update."
+    body += "\n\nTo undo, use Updates ▸ Revert last buff-database update."
     Messagebox.show_info(body, title="Buff Database Updated")

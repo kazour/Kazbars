@@ -53,6 +53,7 @@ from .ui_helpers import (
 )
 from .ui_widgets import (
     add_tooltip,
+    app_toast,
     bind_label_hover_colors,
     bind_label_press_effect,
 )
@@ -547,13 +548,23 @@ class GridsPanel(ttk.Frame):
             self.refresh_panels(expand_index=len(self.grids) - 1)
 
     def delete_grid(self, panel):
-        """Delete a single grid."""
+        """Delete a single grid — undoable via toast instead of a confirm."""
         for i, p in enumerate(self.grid_panels):
             if p == panel:
-                del self.grids[i]
+                removed = self.grids.pop(i)
                 self._mark_modified()
-                self.refresh_panels()
+                self.refresh_panels(expand_index=-1)
+                app_toast(self, f"Deleted grid '{removed['id']}' — click to undo",
+                          'info', 8, key='grid-delete-undo',
+                          on_click=lambda g=removed, idx=i: self._undo_delete_grid(g, idx))
                 break
+
+    def _undo_delete_grid(self, grid, index):
+        """Reinsert a deleted grid at its old position (undo-toast click-through)."""
+        index = min(index, len(self.grids))
+        self.grids.insert(index, grid)
+        self._mark_modified()
+        self.refresh_panels(expand_index=index)
 
     def refresh_panels(self, expand_index=0):
         """Rebuild GridEditorPanel widgets or show empty state."""

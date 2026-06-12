@@ -194,7 +194,7 @@ class InstructionsPanel(ttk.Frame):
              (" again.", None)],
         ])
         self._add_subsection(build_section.content, "Buff-discovery console", [
-            "Don't know an effect's buff ID? Turn on Game → Include "
+            "Don't know an effect's buff ID? Turn on Extras → Include "
             "buff-discovery console in builds, then Build & Install. In "
             "preview mode (Shift+Ctrl+Alt), the console logs every effect's "
             "name and buff ID as it lands on you or your target — copy the "
@@ -204,7 +204,7 @@ class InstructionsPanel(ttk.Frame):
             "remove it.",
         ])
         self._add_subsection(build_section.content, "Removing KazBars from your game folder", [
-            "File → Uninstall from game client... removes KazBars.swf "
+            "Game → Uninstall from game client… removes KazBars.swf "
             "and related files from your Age of Conan install.",
         ])
 
@@ -371,7 +371,7 @@ class InstructionsPanel(ttk.Frame):
         # --- Default Buff Bars ---
 
         bars_section = self._add_section(inner, "Default Buff Bars", [
-            "Game → Default buff bars... edits Age of Conan's own built-in "
+            "Extras → Default buff bars… edits Age of Conan's own built-in "
             "buff bars — the Player and Target portrait icons, the top bar, "
             "and floating portraits. This is separate from your KazBars "
             "grids; KazBars isn't affected.",
@@ -389,7 +389,7 @@ class InstructionsPanel(ttk.Frame):
         # --- Damage Numbers ---
 
         damage_section = self._add_section(inner, "Damage Numbers", [
-            "Game → Damage number Mod... installs a leaner rewrite of Age of "
+            "Extras → Damage number mod… installs a leaner rewrite of Age of "
             "Conan's floating combat numbers, in place of the stock ones. The "
             "headline fix: ranged hits stop shrinking to nothing at distance.",
             [("It's off by default behind a master ", None),
@@ -419,7 +419,7 @@ class InstructionsPanel(ttk.Frame):
             "stamina in the next.",
         ])
         self._add_subsection(damage_section.content, "Colors", [
-            "Game → Damage number Colors... recolors every combat-number "
+            "Extras → Damage number colors… recolors every combat-number "
             "source on its own — incoming vs outgoing hits, crits, spells, "
             "combos, heals, mana, and stamina — laid out self on the left, "
             "your target on the right. Applies on Build & Install.",

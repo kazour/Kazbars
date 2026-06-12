@@ -7,6 +7,7 @@ imports the chrome from here.
 
 import logging
 import math
+import threading
 import time
 import tkinter as tk
 import tkinter.font as tkfont
@@ -26,6 +27,7 @@ from .ui_helpers import (
     TK_COLORS,
 )
 from .ui_widgets import blend_alpha
+from .update_check import fetch_latest
 
 # Layout — the popup family's shared frame (build_loading imports these)
 WIDTH = 420
@@ -249,7 +251,7 @@ def show_about_popup(parent, app_name, app_version):
     """About dialog — same frameless dark style as build popups, with an
     animated miniature buff-grid scene at the bottom.
     """
-    h = 342 if GITHUB_URL else 320
+    h = 364 if GITHUB_URL else 342
 
     popup, canvas = make_popup_shell(parent, h)
 
@@ -313,6 +315,54 @@ def show_about_popup(parent, app_name, app_version):
     if GITHUB_URL:
         make_link("▸ GitHub", GITHUB_URL, y)
         y += 22
+
+    # Check for updates — same row style as the links, but the result lands
+    # in place: a clickable "vX.Y.Z available", a muted "latest", or a warning.
+    check_item = canvas.create_text(WIDTH // 2, y, text="▸ Check for updates",
+                                    font=FONT_SECTION, fill=link_color)
+    y += 22
+    check_state = {'mode': 'idle', 'url': None}
+
+    def _apply_check_result(status, tag, url):
+        """Main-thread dispatcher — the popup may have closed mid-fetch."""
+        if not canvas.winfo_exists():
+            return
+        if status == 'update':
+            check_state.update(mode='url', url=url)
+            canvas.itemconfig(check_item, fill=link_color,
+                              text=f"▸ v{tag} available — release notes")
+        elif status == 'current':
+            check_state['mode'] = 'done'
+            canvas.itemconfig(check_item, fill=THEME_COLORS['muted'],
+                              text="You're on the latest version")
+        else:
+            check_state['mode'] = 'done'
+            canvas.itemconfig(check_item, fill=THEME_COLORS['warning'],
+                              text="Couldn't reach GitHub — check your connection")
+
+    def _run_check():
+        status, tag, url = fetch_latest(app_version)
+        try:
+            popup.after(0, _apply_check_result, status, tag, url)
+        except tk.TclError:
+            pass
+
+    def _on_check_click(_e=None):
+        if check_state['mode'] == 'url':
+            webbrowser.open(check_state['url'])
+        elif check_state['mode'] == 'idle':
+            check_state['mode'] = 'busy'
+            canvas.itemconfig(check_item, text="Checking…",
+                              fill=THEME_COLORS['muted'])
+            threading.Thread(target=_run_check, daemon=True).start()
+
+    def _on_check_hover(_e=None):
+        if check_state['mode'] in ('idle', 'url'):
+            canvas.config(cursor='hand2')
+
+    canvas.tag_bind(check_item, '<Button-1>', _on_check_click)
+    canvas.tag_bind(check_item, '<Enter>', _on_check_hover)
+    canvas.tag_bind(check_item, '<Leave>', lambda e: canvas.config(cursor=''))
 
     # Bottom separator + license
     y += 6

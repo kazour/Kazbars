@@ -1,7 +1,7 @@
 """KazBars — Damage Number Colors panel.
 
 A per-source color editor for AoC's floating combat numbers, opened from the Game menu
-("Damage number Colors…"). Every flytext source (see
+("Damage number colors…"). Every flytext source (see
 :data:`damageinfo_settings.PAIRED_GROUPS` / ``SHARED_SOURCES`` — ~35 types) gets its own
 swatch, laid out in two columns: **self** (numbers on you) on the left, **other** (numbers
 on your target) on the right, with the shared resource/XP/murder types in a full-width

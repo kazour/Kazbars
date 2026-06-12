@@ -10,8 +10,6 @@ this module — the container does not read them.
 import tkinter as tk
 from tkinter import ttk
 
-from ttkbootstrap.dialogs import Messagebox
-
 from .grid_dialogs import BuffSelectorDialog, SlotAssignmentDialog
 from .grid_model import (
     CLAMP_SPECS,
@@ -442,9 +440,9 @@ class GridEditorPanel(ttk.Frame):
                 self._on_whitelist_changed()
 
     def delete_grid(self):
-        if Messagebox.yesno(f"Delete grid '{self.id_var.get()}'?", title="Delete Grid") == "Yes":
-            if self.on_delete:
-                self.on_delete(self)
+        # No confirm — grids_panel shows an undo toast instead.
+        if self.on_delete:
+            self.on_delete(self)
 
     def _on_enabled_toggled(self):
         self._apply_enabled_styling(self.enabled_var.get())

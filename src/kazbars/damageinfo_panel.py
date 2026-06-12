@@ -1,6 +1,6 @@
 """KazBars — Damage Numbers panel (the configuration Toplevel).
 
-Opened from Game ▸ Damage Numbers…, this is the single surface for tuning AoC's
+Opened from Extras ▸ Damage number mod…, this is the single surface for tuning AoC's
 floating combat-number overlay. Unlike Deeps/Live Tracker it has no live overlay or
 meter: every value here is an *offset* baked into a modded ``DamageInfo.swf`` at the
 next Build & Install (see :mod:`damageinfo_settings` / :mod:`damageinfo_generator`).
