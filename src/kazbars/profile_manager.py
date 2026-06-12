@@ -89,7 +89,7 @@ class ProfileManagerDialog(tk.Toplevel):
         field_bg = ttk.Style().lookup('Treeview', 'fieldbackground') or TK_COLORS['bg']
         self._empty_hint = ttk.Label(
             self.tree,
-            text="No profiles yet. Save your setup with File ▸ Save Profile As…, "
+            text="No profiles yet. Save your setup with File ▸ Save profile as…, "
                  "or import one below.",
             font=FONT_BODY, foreground=THEME_COLORS['muted'], background=field_bg,
             justify='center', wraplength=self.WIDTH - PAD_TAB * 8)

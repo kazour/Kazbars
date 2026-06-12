@@ -8,7 +8,16 @@ Toplevel windows — no brief white flash on open, no native titlebar to style.
 
 import tkinter as tk
 
-from .ui_helpers import _RETRO_COLORS, FONT_BODY, FONT_SMALL, THEME_COLORS, TK_COLORS
+from .ui_helpers import (
+    _RETRO_COLORS,
+    FONT_BODY,
+    FONT_SMALL,
+    PAD_LF,
+    PAD_ROW,
+    PAD_SMALL,
+    THEME_COLORS,
+    TK_COLORS,
+)
 
 # ============================================================================
 # CUSTOM DARK MENU BAR
@@ -22,7 +31,8 @@ class CustomMenuBar(tk.Canvas):
 
     Uses a Canvas for the bar (immune to ttkbootstrap theme overrides) and a
     place()-based Frame overlay for dropdowns (no Toplevel = no Windows flash).
-    Supports accelerator text, separators, disabled items, and keyboard nav.
+    Supports accelerator text, separators, disabled items, and keyboard nav
+    (F10 opens the menu; arrows / Return / Escape navigate).
     """
 
     _MENU_BG = TK_COLORS['status_bg']
@@ -51,12 +61,20 @@ class CustomMenuBar(tk.Canvas):
         self._hover_mode = False   # After clicking, hover opens adjacent menus
         self._rows = []            # Rows in current dropdown (for keyboard nav)
         self._focused_row = -1     # Keyboard-focused row index
-        self._click_bind_id = None # Stored bind ID for safe unbinding
         self._cursor_x = 4        # Next cascade label x position
 
         self.bind('<Button-1>', self._bar_click)
         self.bind('<Motion>', self._bar_motion)
         self.bind('<Leave>', self._bar_leave)
+
+        # Root-level bindings are installed once (add=True) and gated on an
+        # open menu, never unbound: tkinter's unbind(seq, funcid) on
+        # Python <= 3.12 removes every handler for the sequence, not just ours.
+        root = self.winfo_toplevel()
+        root.bind('<Button-1>', self._on_root_click, add=True)
+        root.bind('<F10>', self._on_f10, add=True)
+        for seq in ('<Escape>', '<Up>', '<Down>', '<Return>', '<Left>', '<Right>'):
+            root.bind(seq, self._on_menu_key, add=True)
 
     def add_cascade(self, label, menu_def):
         """Add a top-level menu. Returns the menu_def list for later mutation."""
@@ -191,22 +209,22 @@ class CustomMenuBar(tk.Canvas):
             tk.Canvas(content, bg=color, width=1, height=height,
                       highlightthickness=0).pack(fill='x', padx=padx)
 
-        spacer(5)
+        spacer(PAD_SMALL)
         self._rows = []
         self._focused_row = -1
 
         for entry in menu_def:
             if entry['type'] == 'separator':
-                spacer(6)
-                spacer(1, color=self._SEP_COLOR, padx=8)
-                spacer(6)
+                spacer(PAD_ROW)
+                spacer(1, color=self._SEP_COLOR, padx=PAD_LF)
+                spacer(PAD_ROW)
                 continue
 
             row = tk.Frame(content, bg=self._MENU_BG)
             row.pack(fill='x')
 
             pill = tk.Frame(row, bg=self._MENU_BG)
-            pill.pack(fill='x', padx=5, ipady=5)
+            pill.pack(fill='x', padx=PAD_SMALL, ipady=PAD_SMALL)
 
             state = entry.get('state', 'normal')
             fg = self._MENU_FG if state == 'normal' else self._MENU_DISABLED_FG
@@ -229,13 +247,13 @@ class CustomMenuBar(tk.Canvas):
                 pill, text=label_text, bg=self._MENU_BG, fg=fg,
                 font=self._FONT, anchor='w',
             )
-            text_lbl.pack(side='left', fill='x', expand=True, padx=(8, 0))
+            text_lbl.pack(side='left', fill='x', expand=True, padx=(PAD_LF, 0))
 
             accel_lbl = tk.Label(
                 pill, text=entry.get('accelerator', ''), bg=self._MENU_BG, fg=accel_fg,
                 font=FONT_SMALL, anchor='e',
             )
-            accel_lbl.pack(side='right', padx=(14, 8))
+            accel_lbl.pack(side='right', padx=(14, PAD_LF))
 
             self._rows.append({
                 'row': row, 'pill': pill, 'text_lbl': text_lbl, 'accel_lbl': accel_lbl,
@@ -248,7 +266,7 @@ class CustomMenuBar(tk.Canvas):
                     w.bind('<Enter>', lambda e, ri=row_idx: self._set_focused_row(ri))
                     w.bind('<Button-1>', lambda e, c=cmd: self._invoke(c))
 
-        spacer(5)
+        spacer(PAD_SMALL)
 
         # Enforce minimum width
         content.update_idletasks()
@@ -270,17 +288,22 @@ class CustomMenuBar(tk.Canvas):
         self._dd_frame.place(x=dd_x, y=dd_y)
         self._dd_frame.lift()
 
-        # Keyboard bindings
-        root.bind('<Escape>', lambda e: self._close_dropdown())
-        root.bind('<Up>', lambda e: self._nav_rows(-1))
-        root.bind('<Down>', lambda e: self._nav_rows(1))
-        root.bind('<Return>', lambda e: self._invoke_focused())
-        root.bind('<Left>', lambda e: self._nav_cascade(-1))
-        root.bind('<Right>', lambda e: self._nav_cascade(1))
-
-        # Close on click outside (store bind ID for safe unbinding)
-        if not self._click_bind_id:
-            self._click_bind_id = root.bind('<Button-1>', self._on_root_click, add=True)
+    def _activate(self, idx):
+        """Open cascade idx's dropdown, or highlight it if it's a dropdown-less command."""
+        if self._cascades[idx][3] is not None:
+            self._open_at(idx)
+            return
+        # Top-level command (e.g. About): nothing to drop down. Highlight the
+        # label so keyboard focus stays visible; Return invokes it.
+        if self._open_index >= 0:
+            self._set_cascade_active(self._open_index, False)
+        if self._dd_frame:
+            self._dd_frame.place_forget()
+        self._open_index = idx
+        self._hover_mode = True
+        self._rows = []
+        self._focused_row = -1
+        self._set_cascade_active(idx, True)
 
     def _on_root_click(self, event):
         if self._open_index < 0:
@@ -303,20 +326,6 @@ class CustomMenuBar(tk.Canvas):
         self._close_dropdown()
 
     def _close_dropdown(self):
-        root = self.winfo_toplevel()
-        if self._click_bind_id:
-            try:
-                root.unbind('<Button-1>', self._click_bind_id)
-            except (tk.TclError, ValueError):
-                pass
-            self._click_bind_id = None
-
-        for key in ('<Escape>', '<Up>', '<Down>', '<Return>', '<Left>', '<Right>'):
-            try:
-                root.unbind(key)
-            except tk.TclError:
-                pass
-
         if self._dd_frame:
             self._dd_frame.place_forget()
         if self._open_index >= 0:
@@ -378,17 +387,42 @@ class CustomMenuBar(tk.Canvas):
 
     def _invoke_focused(self):
         if 0 <= self._focused_row < len(self._rows):
-            cmd = self._rows[self._focused_row].get('cmd')
-            self._invoke(cmd)
+            self._invoke(self._rows[self._focused_row].get('cmd'))
+        elif self._open_index >= 0 and self._cascades[self._open_index][3] is None:
+            # Highlighted dropdown-less command (e.g. About)
+            self._invoke(self._cascades[self._open_index][4])
 
     def _nav_cascade(self, direction):
-        n = len(self._cascades)
-        idx = self._open_index
-        for _ in range(n):
-            idx = (idx + direction) % n
-            if self._cascades[idx][3] is not None:
-                self._open_at(idx)
-                return
+        self._activate((self._open_index + direction) % len(self._cascades))
+
+    def _on_f10(self, event):
+        """Toggle keyboard menu mode (Windows menu-bar convention)."""
+        if self._open_index >= 0:
+            self._close_dropdown()
+        elif self._cascades:
+            self._activate(0)
+        return 'break'
+
+    def _on_menu_key(self, event):
+        """Keyboard nav while a menu is open; inert (not consumed) otherwise."""
+        if self._open_index < 0:
+            return None
+        key = event.keysym
+        if key == 'Escape':
+            self._close_dropdown()
+        elif key == 'Up':
+            self._nav_rows(-1)
+        elif key == 'Down':
+            self._nav_rows(1)
+        elif key == 'Return':
+            self._invoke_focused()
+        elif key == 'Left':
+            self._nav_cascade(-1)
+        elif key == 'Right':
+            self._nav_cascade(1)
+        else:
+            return None
+        return 'break'
 
     # --- Invoke and configure ---
 

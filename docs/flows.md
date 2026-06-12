@@ -39,7 +39,7 @@ End state: `KazBars.swf` installed under the game folder; `Scripts/reloadgrids` 
 
 ## 2. load profile from file
 
-Trigger: User selects File > Open Profile... (or presses Ctrl+O) and confirms a `.json` path
+Trigger: User selects File > Open profile... (or presses Ctrl+O) and confirms a `.json` path
 
 Steps:
 1. `KazBarsApp._open_profile()` — src/kazbars/app.py — one-line delegator to `profile_io.open_profile(self)`
@@ -59,7 +59,7 @@ End state: `GridsPanel` displays validated grid cards; `app.modified` is `False`
 
 ## 3. save profile to file
 
-Trigger: User selects File > Save Profile (Ctrl+S) or File > Save Profile As...
+Trigger: User selects File > Save profile (Ctrl+S) or File > Save profile as...
 
 Steps:
 1. `KazBarsApp._save_profile()` — src/kazbars/app.py — one-line delegator to `profile_io.save_profile(self)`
@@ -411,7 +411,7 @@ End state: content reverted to the previous applied version (or the shipped stoc
 
 ## 24. manage / export / import profiles
 
-Trigger: File ▸ "Manage Profiles…".
+Trigger: File ▸ "Manage profiles…".
 
 Steps:
 1. `KazBarsApp._open_profile_manager()` — src/kazbars/app.py — delegator to `profile_manager.open_profile_manager(self)` (single-instance gate on `app._profile_manager`).
@@ -422,7 +422,7 @@ Steps:
 3. **Export** → reads the selected profile; `profile_share.collect_referenced_user_buffs(data, by_id, by_name, provenance)` gathers the user-provenance buffs it references; `profile_share.encode_profile` packs `{profile, buffs}` → `KZBARS1:<gzip+base64>` onto the clipboard; one toast notes the embedded-buff count.
 4. **Import** → paste a `KZBARS1:` string → `profile_share.decode_profile` (rejects corrupt/truncated) → one confirmation ("includes N custom buffs") → `write_profile_file` to `userdata/profiles/Imported Profile.json` (auto-incremented) + `profile_share.merge_imported_buffs` into `database_user.json` (skip-on-collision) → if any buff was added, `BuffDatabase.reload()` + DB-view refresh → one summary toast ("Imported '…' — N added, M already existed").
 
-End state: profiles managed in place; an export string is self-contained (custom buffs travel with it); an import writes the profile + merges any new custom buffs without clobbering existing ones. ("Load Default Profile" and first-launch resolve their target via `profile_io.resolve_default_profile_path`: the user's `default_profile` if set, else the OTA `content/Default.json`, else shipped stock.)
+End state: profiles managed in place; an export string is self-contained (custom buffs travel with it); an import writes the profile + merges any new custom buffs without clobbering existing ones. ("Load default profile" and first-launch resolve their target via `profile_io.resolve_default_profile_path`: the user's `default_profile` if set, else the OTA `content/Default.json`, else shipped stock.)
 
 ---
 
