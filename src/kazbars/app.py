@@ -10,7 +10,7 @@ from pathlib import Path
 from tkinter import ttk
 
 import ttkbootstrap as ttkb
-from ttkbootstrap.dialogs import Messagebox
+from ttkbootstrap.dialogs import MessageDialog
 
 from kazbars import (
     APP_NAME,
@@ -328,14 +328,14 @@ class KazBarsApp(ttkb.Window):
             side='right', fill='y', padx=PAD_SMALL, pady=PAD_XS)
 
         tracker_btn = ttkb.Button(
-            self.bottom_bar, text="⏱ Ethram-Fal", bootstyle="outline",
+            self.bottom_bar, text="⏱ Ethram-Fal", bootstyle="info-outline",
             command=self._open_boss_timer
         )
         tracker_btn.pack(side='right', pady=PAD_SMALL)
         add_tooltip(tracker_btn, "Open the Ethram-Fal Seed Timer")
 
         deeps_btn = ttkb.Button(
-            self.bottom_bar, text="⚔ Deeps", bootstyle="outline",
+            self.bottom_bar, text="⚔ Deeps", bootstyle="info-outline",
             command=self._open_deeps_panel
         )
         deeps_btn.pack(side='right', padx=(0, PAD_SMALL), pady=PAD_SMALL)
@@ -602,8 +602,11 @@ class KazBarsApp(ttkb.Window):
             )
         else:
             message = "Save unsaved changes to the buff database?"
-        result = Messagebox.yesnocancel(message, title="Unsaved Changes")
-        if result == "Yes":
+        dialog = MessageDialog(message, title="Unsaved Changes", parent=self,
+                               buttons=['Cancel:secondary', "Don't save:secondary",
+                                        'Save:primary'])
+        dialog.show()
+        if dialog.result == "Save":
             ok = True
             if profile_dirty:
                 ok = self._save_profile() and ok
@@ -611,7 +614,7 @@ class KazBarsApp(ttkb.Window):
                 self.db_panel.save()
                 ok = (not self.db_panel.modified) and ok
             return ok
-        return result == "No"
+        return dialog.result == "Don't save"
 
     def _mark_modified(self):
         """Mark profile as having unsaved changes."""

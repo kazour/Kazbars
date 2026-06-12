@@ -31,9 +31,10 @@ from .ui_helpers import (
     PAD_TAB,
     PAD_XS,
     THEME_COLORS,
+    TK_COLORS,
     style_treeview_heading,
 )
-from .ui_widgets import app_toast
+from .ui_widgets import app_toast, confirm
 from .userdata import database_user_path
 from .window_position import bind_window_position_save, restore_window_position
 
@@ -53,6 +54,7 @@ def open_profile_manager(app):
 
 class ProfileManagerDialog(tk.Toplevel):
     WIDTH = 460
+    MIN_HEIGHT = 320
 
     def __init__(self, app):
         super().__init__(app)
@@ -76,20 +78,28 @@ class ProfileManagerDialog(tk.Toplevel):
         self.tree = ttk.Treeview(list_frame, columns=('name',), show='headings',
                                  selectmode='browse', height=10)
         style_treeview_heading()
-        self.tree.heading('name', text='Profile')
+        self.tree.heading('name', text='Profile', anchor='w')
         self.tree.column('name', width=self.WIDTH - PAD_TAB * 5, anchor='w')
         scrollbar = ttk.Scrollbar(list_frame, orient='vertical', command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.pack(side='left', fill='both', expand=True)
         scrollbar.pack(side='right', fill='y')
         self.tree.bind('<Double-1>', lambda e: self._load())
+        self.tree.bind('<Return>', lambda e: self._load())
+        field_bg = ttk.Style().lookup('Treeview', 'fieldbackground') or TK_COLORS['bg']
+        self._empty_hint = ttk.Label(
+            self.tree,
+            text="No profiles yet. Save your setup with File ▸ Save Profile As…, "
+                 "or import one below.",
+            font=FONT_BODY, foreground=THEME_COLORS['muted'], background=field_bg,
+            justify='center', wraplength=self.WIDTH - PAD_TAB * 8)
 
         manage = ttk.Frame(body)
         manage.pack(fill='x', pady=(PAD_SMALL, 0))
         for text, cmd in (("Load", self._load), ("Rename", self._rename),
                           ("Duplicate", self._duplicate), ("Delete", self._delete),
                           ("Set Default", self._set_default)):
-            ttk.Button(manage, text=text, width=BTN_DIALOG, command=cmd,
+            ttk.Button(manage, text=text, command=cmd,
                        bootstyle="secondary").pack(side='left', padx=PAD_XS)  # type: ignore[call-arg]
 
         share = ttk.Frame(body)
@@ -98,18 +108,21 @@ class ProfileManagerDialog(tk.Toplevel):
                   font=FONT_BODY, foreground=THEME_COLORS['body']).pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
         share_btns = ttk.Frame(share)
         share_btns.pack(fill='x')
-        ttk.Button(share_btns, text="Export to clipboard", width=BTN_DIALOG + 6,
+        ttk.Button(share_btns, text="Export to clipboard",
                    command=self._export, bootstyle="success").pack(side='left', padx=(0, PAD_XS))  # type: ignore[call-arg]
-        ttk.Button(share_btns, text="Import from string…", width=BTN_DIALOG + 6,
-                   command=self._import, bootstyle="outline").pack(side='left')  # type: ignore[call-arg]
+        ttk.Button(share_btns, text="Import from string…",
+                   command=self._import, bootstyle="info-outline").pack(side='left')  # type: ignore[call-arg]
         ttk.Button(share_btns, text="Close", width=BTN_DIALOG, command=self._close,
                    bootstyle="secondary").pack(side='right')  # type: ignore[call-arg]
 
-        self._refresh()
-        restore_window_position(self, "profile_manager", self.WIDTH, 420, app, resizable=False)
-        bind_window_position_save(self, "profile_manager", save_size=False)
+        self._refresh(select=self._initial_iid())
+        self.minsize(self.WIDTH, self.MIN_HEIGHT)
+        restore_window_position(self, "profile_manager", self.WIDTH, 420, app, resizable=True)
+        bind_window_position_save(self, "profile_manager")
         self.protocol("WM_DELETE_WINDOW", self._close)
+        self.bind('<Escape>', lambda e: self._close())
         self.deiconify()
+        self.tree.focus_set()
 
     # -- helpers ---------------------------------------------------------- #
     def _profiles(self):
@@ -119,12 +132,26 @@ class ProfileManagerDialog(tk.Toplevel):
         pref = self.app.settings.get('default_profile')
         return Path(pref).resolve() if pref else None
 
+    def _initial_iid(self):
+        """Row to preselect on open: the default profile if set, else the first."""
+        default = self._default_path()
+        profiles = self._profiles()
+        if default:
+            for path in profiles:
+                if path.resolve() == default:
+                    return path.name
+        return profiles[0].name if profiles else None
+
     def _refresh(self, select=None):
         self.tree.delete(*self.tree.get_children())
         default = self._default_path()
         for path in self._profiles():
             mark = "  ★" if default and path.resolve() == default else ""
             self.tree.insert('', 'end', iid=path.name, values=(path.stem + mark,))
+        if self.tree.get_children():
+            self._empty_hint.place_forget()
+        else:
+            self._empty_hint.place(relx=0.5, rely=0.4, anchor='center')
         if select and self.tree.exists(select):
             self.tree.selection_set(select)
             self.tree.focus(select)
@@ -170,7 +197,8 @@ class ProfileManagerDialog(tk.Toplevel):
         try:
             path.rename(target)
         except OSError as e:
-            Messagebox.show_error(f"Couldn't rename the profile.\n\n({e})", title="Rename Failed")
+            Messagebox.show_error(f"Couldn't rename the profile.\n\n({e})",
+                                  title="Rename Failed", parent=self)
             return
         self._rebind_path(path, target)
         self._refresh(select=target.name)
@@ -184,7 +212,8 @@ class ProfileManagerDialog(tk.Toplevel):
         try:
             target.write_bytes(path.read_bytes())
         except OSError as e:
-            Messagebox.show_error(f"Couldn't duplicate the profile.\n\n({e})", title="Duplicate Failed")
+            Messagebox.show_error(f"Couldn't duplicate the profile.\n\n({e})",
+                                  title="Duplicate Failed", parent=self)
             return
         self._refresh(select=target.name)
         app_toast(self, f"Duplicated as '{target.stem}'", 'success')
@@ -193,16 +222,19 @@ class ProfileManagerDialog(tk.Toplevel):
         path = self._selected()
         if not path:
             return
-        if Messagebox.yesno(f"Delete the profile '{path.stem}'?\n\nThis can't be undone.",
-                            title="Delete Profile") != "Yes":
+        if not confirm(f"Delete the profile '{path.stem}'?\n\nThis can't be undone.",
+                       title="Delete Profile", action="Delete profile",
+                       parent=self, danger=True):
             return
+        neighbor = self.tree.next(path.name) or self.tree.prev(path.name)
         try:
             path.unlink()
         except OSError as e:
-            Messagebox.show_error(f"Couldn't delete the profile.\n\n({e})", title="Delete Failed")
+            Messagebox.show_error(f"Couldn't delete the profile.\n\n({e})",
+                                  title="Delete Failed", parent=self)
             return
         self._rebind_path(path, None)
-        self._refresh()
+        self._refresh(select=neighbor)
         app_toast(self, f"Deleted '{path.stem}'", 'info')
 
     def _set_default(self):
@@ -239,19 +271,20 @@ class ProfileManagerDialog(tk.Toplevel):
         try:
             profile, embedded = profile_share.decode_profile(string)
         except ValueError as e:
-            Messagebox.show_error(str(e), title="Import Failed")
+            Messagebox.show_error(str(e), title="Import Failed", parent=self)
             return
         n = len(embedded)
         prompt = (f"This profile includes {n} custom buff{'s' if n != 1 else ''}. Import it?"
                   if n else "Import this profile?")
-        if Messagebox.yesno(prompt, title="Import Profile") != "Yes":
+        if not confirm(prompt, title="Import Profile", action="Import profile", parent=self):
             return
 
         target = self._unique_path("Imported Profile")
         try:
             profile_io.write_profile_file(target, profile)
         except OSError as e:
-            Messagebox.show_error(f"Couldn't save the imported profile.\n\n({e})", title="Import Failed")
+            Messagebox.show_error(f"Couldn't save the imported profile.\n\n({e})",
+                                  title="Import Failed", parent=self)
             return
 
         added, skipped = profile_share.merge_imported_buffs(

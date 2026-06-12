@@ -12,7 +12,7 @@ from tkinter import filedialog
 from ttkbootstrap.dialogs import Messagebox
 
 from .ui_helpers import PAD_XS, THEME_COLORS
-from .ui_widgets import add_tooltip, app_toast
+from .ui_widgets import add_tooltip, app_toast, confirm
 
 
 def refresh_game_path_label(app):
@@ -86,10 +86,10 @@ def clear_game_path(app):
     """Forget the current game folder."""
     if not app.game_path:
         return
-    if Messagebox.yesno(
+    if not confirm(
         "Clear the configured game folder?\n\nThis won't delete any game files.",
-        title="Clear Game Folder",
-    ) != "Yes":
+        title="Clear Game Folder", action="Clear game folder",
+    ):
         return
     app.game_path = None
     save_game_path(app)
@@ -123,6 +123,7 @@ def save_aoc_bypass(app, value):
 
 def prompt_aoc_bypass(app):
     """Ask the user whether they use Aoc.exe (launcher bypass)."""
+    # A genuine yes/no question, not a confirm — Yes/No are the right labels here.
     result = Messagebox.yesno(
         "Aoc.exe (third-party launcher bypass) was detected in this game folder.\n\n"
         "Is Aoc.exe enabled on your PC?",
@@ -139,11 +140,11 @@ def uninstall_game(app):
             title="No Game Folder"
         )
         return
-    if Messagebox.yesno(
+    if not confirm(
         "Remove KazBars files from your game folder?\n\n"
         "This deletes KazBars.swf, auto-load entries, and reload scripts.",
-        title="Uninstall from Game Folder"
-    ) != "Yes":
+        title="Uninstall from Game Folder", action="Remove KazBars files", danger=True
+    ):
         return
     from .build_executor import uninstall_from_client
     ok, msg = uninstall_from_client(

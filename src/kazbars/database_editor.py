@@ -35,7 +35,7 @@ from .ui_helpers import (
     style_treeview_heading,
 )
 from .ui_tk_style import style_tk_text
-from .ui_widgets import add_tooltip, app_toast, debounced_callback
+from .ui_widgets import add_tooltip, app_toast, confirm, debounced_callback
 from .window_position import bind_window_position_save, restore_window_position
 
 logger = logging.getLogger(__name__)
@@ -240,11 +240,11 @@ class BuffEditDialog(tk.Toplevel):
         ids, rejected = self._parse_ids()
         if rejected:
             preview = ', '.join(rejected[:5]) + ('...' if len(rejected) > 5 else '')
-            if Messagebox.yesno(
+            if not confirm(
                 f"These entries weren't valid numbers and will be skipped:\n\n"
                 f"{preview}\n\nSave anyway?",
-                title="Invalid IDs"
-            ) != "Yes":
+                title="Invalid IDs", action="Save anyway"
+            ):
                 return None
         if not ids:
             Messagebox.show_error(
@@ -651,17 +651,17 @@ class DatabaseEditorTab(ttk.Frame):
 
         ids_str = format_ids_display(ids)
         if self._provenance_of(buff) == 'user':
-            confirmed = Messagebox.yesno(
+            confirmed = confirm(
                 f"Delete your buff '{buff['name']}' (IDs: {ids_str})?\n\n"
                 "This removes the buff you added.",
-                title="Delete Your Buff") == "Yes"
+                title="Delete Your Buff", action="Delete buff", danger=True)
             toast = f"Deleted: {buff['name']}"
         else:
-            confirmed = Messagebox.yesno(
+            confirmed = confirm(
                 f"Hide the built-in buff '{buff['name']}' (IDs: {ids_str})?\n\n"
                 "It won't appear in grids. The shipped database is untouched, so "
                 "this can be undone.",
-                title="Hide Built-in Buff") == "Yes"
+                title="Hide Built-in Buff", action="Hide buff")
             toast = f"Hidden: {buff['name']}"
 
         if confirmed:

@@ -44,7 +44,7 @@ from .ui_helpers import (
     TK_COLORS,
 )
 from .ui_tk_style import style_tk_listbox
-from .ui_widgets import app_toast, blend_alpha, debounced_callback
+from .ui_widgets import app_toast, blend_alpha, confirm, debounced_callback
 from .window_position import bind_window_position_save, restore_window_position
 
 ADD_GRID_WIZARD_SIZE = (460, 600)
@@ -302,10 +302,10 @@ class AddGridWizard(tk.Toplevel):
 
         has_special = any(not (c.isalnum() or c == '_' or c == ' ') for c in grid_id)
         if has_special:
-            if Messagebox.yesno(
+            if not confirm(
                 f"Grid name '{grid_id}' contains special characters.\n"
                 "These will be converted to underscores.\nContinue?",
-                title="Special Characters") == "No":
+                title="Special Characters", action="Convert & continue"):
                 return
 
         if grid_id in self.existing_ids:

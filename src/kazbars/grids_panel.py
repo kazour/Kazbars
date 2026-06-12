@@ -56,6 +56,7 @@ from .ui_widgets import (
     app_toast,
     bind_label_hover_colors,
     bind_label_press_effect,
+    confirm,
 )
 
 
@@ -485,7 +486,10 @@ class GridsPanel(ttk.Frame):
         """Remove all grids with confirmation."""
         if not self.grids:
             return
-        if Messagebox.yesno(f"Remove all {len(self.grids)} grids?\n\nThis can't be undone.", title="Clear All Grids") == "No":
+        n = len(self.grids)
+        if not confirm(f"Remove all {n} grids?\n\nThis can't be undone.",
+                       title="Clear All Grids",
+                       action=f"Remove {n} grid{'s' if n != 1 else ''}", danger=True):
             return
         self.grids.clear()
         self._mark_modified()

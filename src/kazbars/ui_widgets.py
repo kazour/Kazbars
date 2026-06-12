@@ -3,13 +3,15 @@ KazBars — core UI glue: bindings, tooltip, toast, and small helpers.
 
 Event helpers (bind_card_events, bind_button_press_effect,
 bind_label_press_effect, bind_label_hover_colors), the in-app tooltip, a
-debounce utility, the alpha-blend color helper, the status-bar flash, and the
-app toast. The widget builders that used to live here moved to ui_headers
+debounce utility, the alpha-blend color helper, the status-bar flash, the
+verb-labeled confirm dialog, and the app toast. The widget builders that used to live here moved to ui_headers
 (headers/tip bar), ui_forms (fields + settings-panel builders), and
 ui_collapsible (CollapsibleSection).
 """
 
 import tkinter as tk
+
+from ttkbootstrap.dialogs import MessageDialog
 
 from .ui_helpers import (
     FONT_SMALL,
@@ -78,6 +80,22 @@ def flash_status_bar(bar, color=None, steps=8, interval=30):
             pass
 
     _step(0)
+
+
+def confirm(message, title, action, parent=None, danger=False):
+    """Modal confirmation whose affirmative button names the action
+    ("Delete profile", never "Yes"). Returns True only when the action
+    button is clicked — Cancel or closing the dialog both decline.
+
+    The action button sits rightmost with initial focus (Return confirms),
+    matching the Messagebox.yesno layout it replaces. danger=True styles
+    it for destructive actions.
+    """
+    dialog = MessageDialog(message, title=title, parent=parent,
+                           buttons=['Cancel:secondary',
+                                    f"{action}:{'danger' if danger else 'primary'}"])
+    dialog.show()
+    return dialog.result == action
 
 
 def app_toast(widget, message, style="info", duration=None, key=None, on_click=None):

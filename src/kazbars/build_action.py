@@ -20,7 +20,7 @@ from .build_loading import BuildLoadingScreen
 from .build_utils import find_compiler
 from .grids_generator import MAX_TOTAL_SLOTS
 from .ui_helpers import THEME_COLORS
-from .ui_widgets import app_toast, flash_status_bar
+from .ui_widgets import app_toast, confirm, flash_status_bar
 
 logger = logging.getLogger(__name__)
 
@@ -84,11 +84,11 @@ def build(app):
 
     if empty:
         names = ', '.join(f"'{n}'" for n in empty)
-        if Messagebox.yesno(
+        if not confirm(
             f"These grids have no tracked buffs and would appear empty in-game:\n\n{names}\n\n"
             "Disable them and build anyway?",
-            title="Empty Grids"
-        ) != "Yes":
+            title="Empty Grids", action="Disable & build"
+        ):
             return
         for g in grids:
             if g['id'] in empty:

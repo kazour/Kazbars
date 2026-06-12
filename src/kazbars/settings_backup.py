@@ -45,7 +45,7 @@ from .ui_helpers import (
     PAD_XS,
     THEME_COLORS,
 )
-from .ui_widgets import app_toast
+from .ui_widgets import app_toast, confirm
 from .userdata import (
     DATABASE_USER_FILENAME,
     PREFS_FILENAME,
@@ -341,7 +341,7 @@ def open_backup_dialog(app):
     ttk.Button(
         btns,
         text="Restore…",
-        bootstyle="outline",
+        bootstyle="info-outline",
         width=BTN_DIALOG,
         command=lambda: restore_settings(app, dialog, include_prefs_var.get()),
     ).pack(side="left", padx=(PAD_XS, 0))
@@ -409,15 +409,12 @@ def restore_settings(app, dialog, include_prefs=False):
         )
         return
 
-    if (
-        Messagebox.yesno(
-            f"Restore settings from this backup?\n\nCreated: {manifest.get('created', 'unknown')}\n\n"
-            "Your current Age of Conan and KazBars settings will be replaced — "
-            "close Age of Conan first.\n\n"
-            "A pre-restore snapshot of your current settings is saved automatically.",
-            title="Restore Settings",
-        )
-        != "Yes"
+    if not confirm(
+        f"Restore settings from this backup?\n\nCreated: {manifest.get('created', 'unknown')}\n\n"
+        "Your current Age of Conan and KazBars settings will be replaced — "
+        "close Age of Conan first.\n\n"
+        "A pre-restore snapshot of your current settings is saved automatically.",
+        title="Restore Settings", action="Restore settings", parent=dialog,
     ):
         return
 

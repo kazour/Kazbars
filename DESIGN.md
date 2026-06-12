@@ -222,10 +222,10 @@ A bootstrap-darkly grayscale base, semantic state colors borrowed from the same 
 
 ### Primary
 
-The system has no single brand color carrying the surface. The closest thing to a primary action is **Signal Success**, used on the Build & Install button (the moment of payoff).
+The system has no single brand color carrying the surface. The closest thing to a primary action is **Signal Success**: every surface's single primary button carries it, with Build & Install (the moment of payoff) as the flagship.
 
 - **Action Cyan** (`#3498db`): links, info-value text, the Player grid type, the Grids module accent. The "click here" color across the app.
-- **Signal Success** (`#00bc8c`): the Build & Install button, build-success status text. Carries the moment of payoff.
+- **Signal Success** (`#00bc8c`): the surface-primary button style (Build & Install, a dialog's Apply or Export, first-launch Load Default) and build-success status text. At most one per surface.
 
 ### Secondary
 
@@ -339,8 +339,9 @@ ttkbootstrap-darkly handles the heavy lifting (button, entry, frame, treeview, c
 ### Buttons
 
 - **Shape:** Sharp by default. Inherits ttkbootstrap-darkly's near-zero radius (0-3px). Never round buttons.
-- **Primary (success):** Signal Success bg with bright text. Used for Build & Install and Generate & Install. Width is `BTN_LARGE` (20 chars). Reserved for the moment-of-payoff action on a screen, never for "Save" or "Apply" generally.
-- **Default:** Surface Input bg with body-color text, ttkbootstrap-darkly default. Width `BTN_MEDIUM` (12 chars) for Export/Import/Reset/Browse, `BTN_SMALL` (7 chars) for Add/Edit/Delete/Clear/Copy.
+- **Primary (success):** Signal Success bg with bright text. Carries the single primary action of a surface: Build & Install / Generate & Install at `BTN_LARGE` (20 chars), and the one affirmative action of a dialog or panel (Apply, Export, Load Default, Start Monitoring) at dialog widths. At most one success button per surface. When it has a sibling action, the sibling takes the cyan outline style (Export ▸ success / Import ▸ outline), never a second success.
+- **Default:** Surface Input bg with body-color text, ttkbootstrap-darkly default. Width `BTN_MEDIUM` (12 chars) for Export/Import/Reset/Browse, `BTN_SMALL` (7 chars) for Add/Edit/Delete/Clear/Copy. Width tokens are for rows of short labels only — tkinter clips silently, so a label longer than its token is a bug. Sentence-length labels drop the width and size to their text.
+- **Outline (secondary accent):** transparent bg, Action Cyan border + label (`info-outline`). The secondary half of a success pair (Export ▸ success / Import ▸ outline) and the bottom-bar tool launchers. Never bare `outline`: darkly's primary (`#375a7f`) measures 2.2:1 on `#222`, failing even the large-text bar.
 - **Hover / Focus:** ttkbootstrap-darkly's built-in hover (slight lightness shift). Do not add custom glow, transform, or scale. The button does not move.
 
 ### Inputs / Fields
@@ -378,6 +379,12 @@ ttkbootstrap-darkly handles the heavy lifting (button, entry, frame, treeview, c
 
 - **Surface:** Surface Input bg, Text Bright fg, 2px radius, `PAD_LF` (8px) padding.
 - **Behavior:** stacked bottom-right of the root window, fade in / fade out. Auto-dismiss after a short interval. Never blocks input.
+
+### Confirmation Dialogs
+
+- **Buttons:** the affirmative button names the action ("Delete profile", "Save anyway", "Restore settings") — never Yes/No. Built via `confirm()` (ui_widgets): `Cancel:secondary` on the left, the action button rightmost with initial focus; `danger` style when the action destroys something, `primary` otherwise. Closing the dialog declines.
+- **Exception:** a genuine yes/no *question* (the Aoc.exe launcher-bypass prompt) keeps Yes/No — those labels answer the question; a verb would not.
+- **Three-way:** the unsaved-changes prompt uses Save / Don't save / Cancel via `MessageDialog` directly.
 
 ### Dialog Header (signature)
 
