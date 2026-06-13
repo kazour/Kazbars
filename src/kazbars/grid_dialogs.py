@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 from ttkbootstrap.dialogs import Messagebox
 
-from .grid_model import MAX_TOTAL_SLOTS, create_default_grid
+from .grid_model import MAX_TOTAL_SLOTS, create_default_grid, default_grid_name
 from .settings_manager import get_setting, set_setting
 from .ui_headers import create_dialog_header
 from .ui_helpers import (
@@ -92,6 +92,7 @@ class AddGridWizard(tk.Toplevel):
 
         self._mode_forced_static = False
         self._mode_before_force = "dynamic"
+        self._name_is_auto = True
 
         self.create_widgets()
         restore_window_position(self, 'add_grid_wizard', *ADD_GRID_WIZARD_SIZE, parent, resizable=False)
@@ -100,13 +101,9 @@ class AddGridWizard(tk.Toplevel):
         self.name_entry.focus_set()
         self.name_entry.select_range(0, 'end')
 
-    def generate_unique_name(self, base="Grid"):
-        counter = 1
-        while True:
-            name = f"{base}{counter}"
-            if name not in self.existing_ids:
-                return name
-            counter += 1
+    def _on_name_edited(self, _event=None):
+        """User typed in the name field — stop auto-filling it from the type."""
+        self._name_is_auto = False
 
     def create_widgets(self):
         create_dialog_header(self, "CREATE NEW GRID", MODULE_COLORS['grids'])
@@ -122,9 +119,10 @@ class AddGridWizard(tk.Toplevel):
         name_frame.pack(fill='x', pady=PAD_TINY)
         ttk.Label(name_frame, text="Grid Name:", font=FONT_FORM_LABEL,
                  foreground=THEME_COLORS['muted']).pack(side='left')
-        self.id_var = tk.StringVar(value=self.generate_unique_name())
+        self.id_var = tk.StringVar(value=default_grid_name('player', self.existing_ids))
         self.name_entry = ttk.Entry(name_frame, textvariable=self.id_var, width=20)
         self.name_entry.pack(side='left', padx=PAD_SMALL)
+        self.name_entry.bind('<KeyRelease>', self._on_name_edited)
 
         source_frame = _section(frame, "Source")
 
@@ -208,6 +206,8 @@ class AddGridWizard(tk.Toplevel):
         bs = 'info-outline' if self.type_var.get() == 'player' else 'warning-outline'
         for btn in self._preset_buttons:
             btn.configure(bootstyle=bs)
+        if self._name_is_auto:
+            self.id_var.set(default_grid_name(self.type_var.get(), self.existing_ids))
 
     def apply_preset(self, rows, cols):
         total = rows * cols

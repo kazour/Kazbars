@@ -21,6 +21,7 @@ from .grid_editor_panel import (
 from .grid_model import (
     MAX_TOTAL_SLOTS,
     create_default_grid,
+    default_grid_name,
     parse_resolution,
     scale_grid_position,
     validate_grid,
@@ -386,13 +387,9 @@ class GridsPanel(ttk.Frame):
             return
         grid_type = self._empty_type_var.get()
         existing = {g['id'] for g in self.grids}
-        base = f"{grid_type.title()}Grid"
-        i = 1
-        while f"{base}{i}" in existing:
-            i += 1
         grid_config = create_default_grid(
             grid_type=grid_type, rows=rows, cols=cols, mode=mode,
-            grid_id=f"{base}{i}"
+            grid_id=default_grid_name(grid_type, existing)
         )
         self.grids.append(grid_config)
         self._mark_modified()
@@ -570,8 +567,12 @@ class GridsPanel(ttk.Frame):
         self._mark_modified()
         self.refresh_panels(expand_index=index)
 
-    def refresh_panels(self, expand_index=0):
-        """Rebuild GridEditorPanel widgets or show empty state."""
+    def refresh_panels(self, expand_index=-1):
+        """Rebuild GridEditorPanel widgets or show empty state.
+
+        Cards collapse by default; only an explicit expand_index (a just-created
+        or restored grid) opens one. Startup and profile loads pass no index, so
+        every card starts collapsed."""
         self._drag_manager.clear()
 
         if not self.grids:

@@ -58,7 +58,7 @@ def create_default_grid(grid_type="player", rows=1, cols=10, mode="dynamic", gri
         fill_dir = "BL-TR"
 
     return {
-        'id': grid_id or f"{grid_type.title()}Grid1",
+        'id': grid_id or f"{grid_type.title()}Grid 1",
         'enabled': True,
         'type': grid_type,
         'rows': rows,
@@ -80,6 +80,15 @@ def create_default_grid(grid_type="player", rows=1, cols=10, mode="dynamic", gri
         'whitelist': [],
         'slotAssignments': {}
     }
+
+
+def default_grid_name(grid_type, existing_ids):
+    """First free 'PlayerGrid N' / 'TargetGrid N' for the given type."""
+    base = f"{grid_type.title()}Grid"
+    i = 1
+    while f"{base} {i}" in existing_ids:
+        i += 1
+    return f"{base} {i}"
 
 
 def validate_grid(grid):
