@@ -20,7 +20,7 @@ Buff/debuff grid overlay editor for **Age of Conan** — design icon grids that 
 1. **Set your game folder** — click the `Game:` label in the bottom bar and pick your Age of Conan install folder.
 2. **Add a grid** — in the Grids view, click `+ Add Grid`. A 1×10 horizontal bar is a good starting point.
 3. **Choose buffs to track** — click `Tracked Buffs...` and pick entries from the database.
-4. **Build & Install** — click the green button. Close the game for your first build; after that, rebuild anytime and type `/reloadui` in chat to apply changes.
+4. **Build & Install** — click the green button. If you use the Aoc.exe launcher bypass, close the game for your first build. After that, rebuild anytime and type `/reloadui` in chat to apply changes.
 
 Up to **64 slots total** across all your grids.
 

@@ -288,7 +288,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/ui_components.py` | 587 | Toast stack — pure `ToastModel` (cap 3 + queue, two-tier priority, coalesce-by-key) + `ToastManager` Tk renderer (single `_layout()` authority, hover-pause, click-dismiss) — plus `DragReorderManager`, scrollable frame |
 | `src/kazbars/grids_generator.py` | 633 | AS2 code generation from grid configs (optional console hooks via `include_console`; optional cast-timer overlay hooks + `d.CAST` block via `cast_config` → `include_cast_timer`; optional stopwatch hooks + `d.SW` block via `stopwatch_config` → `include_stopwatch`). Also holds `CUSTOM_ICON_LINKAGE` (null-icon buff IDs → baked `base.swf` symbol names), emitted into `KazBarsData.CUSTOMICON` |
 | `src/kazbars/boss_timer.py` | 399 | Boss timer state + UI |
-| `src/kazbars/instructions_panel.py` | 512 | Help/instructions view |
+| `src/kazbars/instructions_panel.py` | 759 | Help/instructions view — two-pane knowledge base: categorized nav + live search over a `SECTIONS` data model, content rendered per selection |
 | `src/kazbars/first_launch.py` | 368 | First-launch dialog + post-dialog orchestrator (`run_first_launch`); fires the deferred OTA content check on completion |
 | `src/kazbars/custom_menu_bar.py` | 430 | Canvas-based dark menu bar (active-cascade phosphor underline; ttkb-safe Canvas spacers; supports `command`, `separator`, `checkbutton` entries; keyboard access via F10 + arrows/Return/Escape — root key bindings installed once and gated, never unbound) |
 | `src/kazbars/combat_monitor.py` | 292 | Combat log parser feeding the tracker |
