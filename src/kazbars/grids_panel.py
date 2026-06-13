@@ -528,6 +528,10 @@ class GridsPanel(ttk.Frame):
         game_w, game_h = game_res
         if (ref_w, ref_h) == (game_w, game_h):
             return False
+        # Flush before scaling: we mutate x/y on the configs below and then
+        # rebuild, so unsaved card edits must be persisted first — and we scale
+        # the just-flushed x/y, not a stale last-saved value.
+        self.save_settings()
         for grid in self.grids:
             grid['x'], grid['y'] = scale_grid_position(
                 grid['x'], grid['y'], ref_w, ref_h, game_w, game_h)
@@ -544,6 +548,10 @@ class GridsPanel(ttk.Frame):
         wizard = AddGridWizard(self.winfo_toplevel(), existing_ids, current_slots)
         self.winfo_toplevel().wait_window(wizard)
         if wizard.result:
+            # refresh_panels() rebuilds every card from self.grids, so flush the
+            # live widget state of existing cards first — otherwise their unsaved
+            # edits (Enabled, icon size, position, …) revert to the last save.
+            self.save_settings()
             self.grids.append(wizard.result)
             self._mark_modified()
             self.refresh_panels(expand_index=len(self.grids) - 1)
@@ -552,6 +560,7 @@ class GridsPanel(ttk.Frame):
         """Delete a single grid — undoable via toast instead of a confirm."""
         for i, p in enumerate(self.grid_panels):
             if p == panel:
+                self.save_settings()  # flush sibling cards before refresh_panels rebuilds them
                 removed = self.grids.pop(i)
                 self._mark_modified()
                 self.refresh_panels(expand_index=-1)
@@ -563,12 +572,18 @@ class GridsPanel(ttk.Frame):
     def _undo_delete_grid(self, grid, index):
         """Reinsert a deleted grid at its old position (undo-toast click-through)."""
         index = min(index, len(self.grids))
+        self.save_settings()  # flush live cards before the rebuild
         self.grids.insert(index, grid)
         self._mark_modified()
         self.refresh_panels(expand_index=index)
 
     def refresh_panels(self, expand_index=-1):
         """Rebuild GridEditorPanel widgets or show empty state.
+
+        Destroys and recreates every card from self.grids, so the live widget
+        state of existing cards is discarded. Callers that mutate self.grids
+        while cards are open must save_settings() first or in-progress edits
+        revert to the last save (load/clear deliberately skip the flush).
 
         Cards collapse by default; only an explicit expand_index (a just-created
         or restored grid) opens one. Startup and profile loads pass no index, so
