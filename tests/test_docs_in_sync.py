@@ -14,7 +14,7 @@ architecture.md inventory — three checks, in increasing tolerance for churn:
   3. Line counts  -- each documented count is within a *generous* tolerance of
      reality (``max(40, 25%)``). Deliberately loose: a routine edit must never
      trip CI, but a file that grew by a quarter (the kind of change that also
-     stales its role blurb) should. Exact refresh is the agent's job; this only
+     stales its role blurb) should. Exact refresh is a manual chore; this only
      catches gross drift.
 
 flows.md — refs are function-anchored (`` `callable()` — src/kazbars/file.py ``),
@@ -27,7 +27,7 @@ never line numbers, so they survive edits. Three checks keep them live:
      ``name()`` tokens before the file ref) resolve to a def/class somewhere
      in that file's AST, so a rename fails CI instead of orphaning the doc.
 
-The ``/sync-docs`` command and the ``doc-maintainer`` agent refresh these; this
+Refreshing these docs is a manual chore; this
 test just makes the drift impossible to merge silently.
 """
 
@@ -86,7 +86,7 @@ def test_no_phantom_files():
     assert not phantoms, (
         'architecture.md inventory names files that no longer exist:\n  '
         + '\n  '.join(phantoms)
-        + '\nRun /sync-docs (or the doc-maintainer agent) to reconcile.'
+        + '\nUpdate the inventory to match the tree.'
     )
 
 
@@ -95,7 +95,7 @@ def test_inventory_is_complete():
     assert not missing, (
         "These source/test files aren't in architecture.md's inventory:\n  "
         + '\n  '.join(missing)
-        + '\nAdd a row (path, line count, role) or run /sync-docs.'
+        + '\nAdd a row (path, line count, role).'
     )
 
 
@@ -107,7 +107,7 @@ def test_line_count_within_tolerance(rel):
     assert abs(actual - claimed) <= tol, (
         f'{rel}: architecture.md says {claimed} lines, actual {actual} '
         f'(delta {actual - claimed:+d}, tolerance +/-{tol}). '
-        'Refresh the inventory via /sync-docs or the doc-maintainer agent.'
+        'Refresh the inventory row to match the tree.'
     )
 
 
@@ -177,7 +177,7 @@ def test_flows_referenced_files_exist():
     assert not missing, (
         'flows.md references files that no longer exist:\n  '
         + '\n  '.join(missing)
-        + '\nRun /sync-docs (or the doc-maintainer agent) to reconcile.'
+        + '\nUpdate the references to match the tree.'
     )
 
 
@@ -201,5 +201,5 @@ def test_flows_subject_callable_resolves(lineno, name, rel):
     assert leaf in _defined_names(rel), (
         f'flows.md line {lineno}: step references `{name}()` in {rel}, but no '
         f'def/class named "{leaf}" exists there. Renamed? Update the flow step '
-        '(or run /sync-docs).'
+        'accordingly.'
     )

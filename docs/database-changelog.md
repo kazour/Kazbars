@@ -14,7 +14,7 @@ trail when an ID or name moves.
 only. As of the three-layer split, the **in-app Database editor no longer writes assets** — user
 adds/edits/hidden-buffs are per-machine deltas in `userdata/database_user.json` (merged over stock at
 load; see `architecture.md` → "Buff database"). So entries here come from maintainer changes to the
-repo's stock file (a hand edit or a Claude session); per-user deltas are not logged.
+repo's stock file (a maintainer edit); per-user deltas are not logged.
 
 **OTA channel:** when a stock-file change lands on `main`, the
 `.github/workflows/ota-manifest.yml` Action regenerates `ota/manifest.json` (new sha256 +
@@ -34,8 +34,7 @@ Whenever the stock `Database.json` changes, add a bullet under a `## YYYY-MM-DD`
 Always include the **spell ID** — it's the canonical identifier grids and profiles bind to.
 And keep `Database.json` **and** `Database.json.default` in sync (`test_data_integrity.py`
 enforces byte-parity); if you change an existing buff's **ID**, also update any profile that
-whitelists the old one (e.g. `assets/kazbars/Default.json`). See CLAUDE.md → "Common Tasks →
-Add/change a buff in the database".
+whitelists the old one (e.g. `assets/kazbars/Default.json`).
 
 ---
 

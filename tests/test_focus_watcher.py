@@ -1,6 +1,6 @@
 """Tests for the shared ForegroundWatcher.
 
-The Tk `after` loop itself needs a display (covered by /smoke); here we drive
+The Tk `after` loop itself needs a display (covered by manual testing); here we drive
 `_tick` directly with an injected probe and assert the suppression fan-out plus
 register/unregister bookkeeping.
 """

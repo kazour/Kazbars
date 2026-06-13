@@ -3,7 +3,7 @@
 Limits: the overlay is a Tk Toplevel that paints to a Canvas. We don't
 spin up a display in CI — these tests cover the pure helpers
 (`_format_rate`, `_lerp_rgb`) and confirm the module is importable.
-Visual behaviour is covered by manual smoke (`/smoke` skill).
+Visual behaviour is covered by manual testing.
 
 Run: `pytest tests/test_deeps_overlay.py` (from repo root).
 """

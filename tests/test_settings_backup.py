@@ -5,7 +5,7 @@ Covers backup → restore byte-identity, *.tmp exclusion, manifest validation
 (accept ours, reject foreign/non-zip), the Funcom-prefs locator under a
 monkeypatched LOCALAPPDATA, and the zip-slip guard on restore. The Tk dialog
 layer (open_backup_dialog / backup_settings / restore_settings) is exercised
-manually via /smoke.
+manually.
 
 Run: `pytest tests/test_settings_backup.py` (from repo root).
 """

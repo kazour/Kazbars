@@ -1,10 +1,10 @@
 """Panel-construction smoke test — boots a real KazBarsApp and opens every
 satellite panel through its app-side opener, catching "panel won't even
 construct" breakage (bad widget kwarg, renamed design token, missing app
-attribute, broken import wiring) in seconds instead of at manual /smoke.
+attribute, broken import wiring) in seconds instead of at manual QA.
 
 Scope: construction + the panel's own close path only. Event flow, visual
-correctness, and drag/animation behavior stay /smoke. Deferred to v2 (need a
+correctness, and drag/animation behavior stay manual QA. Deferred to v2 (need a
 data context or block on wait_window): AddGridWizard, BuffSelectorDialog,
 SlotAssignmentDialog, BuffEditDialog, the first-launch dialog,
 show_close_game_required_dialog, BuildLoadingScreen, the settings_backup
@@ -26,7 +26,7 @@ import pytest
 
 pytestmark = pytest.mark.skipif(
     sys.platform != 'win32',
-    reason='Tk UI smoke is Windows-only (matches /smoke and CI)',
+    reason='Tk UI smoke is Windows-only (matches CI)',
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent

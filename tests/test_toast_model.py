@@ -1,7 +1,7 @@
 """Tests for kazbars.ui_components.ToastModel — the pure state core of the
 toast system: per-severity duration defaults, coalesce-by-key, the visible
 cap + overflow queue, two-tier priority, and bottom-anchored slot offsets
-(the overlap regression). The Tk renderer (ToastManager) stays /smoke
+(the overlap regression). The Tk renderer (ToastManager) stays manual-QA
 territory — animations and real geometry aren't unit-testable headlessly.
 
 Run: `pytest tests/test_toast_model.py` (from repo root).

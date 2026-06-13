@@ -5,7 +5,7 @@ per the audit), with no MTASC and no Tk: SWF + script deployment in both
 standard and Aoc.exe modes, legacy-artifact cleanup, the Aoc xml.add module
 files, launcher detection, uninstall, and the running-game-process argv. The
 actual MTASC compile is covered separately (test_build_compile.py); the Build &
-Install Tk flow is exercised manually (/smoke).
+Install Tk flow is exercised manually.
 
 Run: `pytest tests/test_build_executor.py` (from repo root).
 """

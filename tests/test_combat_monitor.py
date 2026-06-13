@@ -2,8 +2,8 @@
 
 Covers the log-line trigger dispatch (_process_line → BossTimer), player-name
 extraction, latest-log discovery + folder selection on a real tmp folder, and
-the start-without-folder guard. The daemon tail loop is exercised manually
-(/smoke), not here.
+the start-without-folder guard. The daemon tail loop is exercised manually,
+not here.
 
 Run: `pytest tests/test_combat_monitor.py` (from repo root).
 """

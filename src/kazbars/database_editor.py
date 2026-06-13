@@ -436,7 +436,7 @@ class DatabaseEditorTab(ttk.Frame):
         scrollbar.pack(side='right', fill='y')
 
         # Type tints — desaturated foreground per row, paired with the Type
-        # column label so classification survives without color (DESIGN.md).
+        # column label so classification survives without color.
         self.tree.tag_configure('type_debuff', foreground=THEME_COLORS['type_debuff'])
         self.tree.tag_configure('type_misc',   foreground=THEME_COLORS['type_misc'])
 

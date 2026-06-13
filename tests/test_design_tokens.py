@@ -1,6 +1,6 @@
 """Guard the design-token rule: no hardcoded theme colors outside ui_helpers.
 
-CLAUDE.md / docs/architecture.md say design tokens live in ``ui_helpers.py``
+docs/architecture.md says design tokens live in ``ui_helpers.py``
 (THEME_COLORS / TK_COLORS / …) and panels must not hardcode colors. Prose
 conventions teach by example — every leaked literal trains the next edit to
 leak another — so this test makes the rule fail loudly instead: it AST-scans

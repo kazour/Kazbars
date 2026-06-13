@@ -81,7 +81,7 @@ class _Palette:
                                          # and survival signals don't blend
 
 
-# Pull the alarm-peak from the theme so any palette tweak in DESIGN.md ripples.
+# Pull the alarm-peak from the theme so any palette tweak in ui_helpers.py ripples.
 try:
     _Palette.ALARM_PEAK = hex_to_rgb(THEME_COLORS["danger"])
 except Exception:

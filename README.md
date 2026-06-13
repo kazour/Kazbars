@@ -128,7 +128,7 @@ git tag v2.0.0
 git push origin v2.0.0
 ```
 
-The release workflow builds `KazBars.zip` + SHA256 checksum and publishes them as a GitHub release. See [`.github/release.md`](.github/release.md) for the full checklist.
+The release workflow builds `KazBars.zip` + SHA256 checksum and publishes them as a GitHub release.
 
 ## License
 

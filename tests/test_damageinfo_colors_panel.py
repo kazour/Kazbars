@@ -1,6 +1,6 @@
 """Data-layer test for damageinfo_colors_panel — baseline color reading (no Tk).
 
-The panel UI itself is Tk and verified via /smoke; ``_read_baseline_colors`` is pure
+The panel UI itself is Tk and verified manually; ``_read_baseline_colors`` is pure
 file I/O and is the load-bearing logic (which file to read, backup-first), so it is
 unit-tested here.
 
