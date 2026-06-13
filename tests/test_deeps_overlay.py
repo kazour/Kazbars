@@ -2,7 +2,7 @@
 
 Limits: the overlay is a Tk Toplevel that paints to a Canvas. We don't
 spin up a display in CI — these tests cover the pure helpers
-(`_format_rate`, `_lerp_color`) and confirm the module is importable.
+(`_format_rate`, `_lerp_rgb`) and confirm the module is importable.
 Visual behaviour is covered by manual smoke (`/smoke` skill).
 
 Run: `pytest tests/test_deeps_overlay.py` (from repo root).
@@ -21,7 +21,7 @@ from kazbars.deeps_overlay import (
     _dps_color,
     _format_rate,
     _format_signed_int,
-    _lerp_color,
+    _lerp_rgb,
     _net_color,
     _Palette,
     _RenderContext,
@@ -81,44 +81,42 @@ class TestFormatSignedInt:
 
 
 # =========================================================================== #
-# _lerp_color                                                                 #
+# _lerp_rgb                                                                   #
 # =========================================================================== #
 
-class TestLerpColor:
+class TestLerpRgb:
     def test_t_zero_is_first_color(self) -> None:
-        assert _lerp_color("#000000", "#ffffff", 0.0) == "#000000"
+        assert _lerp_rgb((0, 0, 0), (255, 255, 255), 0.0) == (0, 0, 0)
 
     def test_t_one_is_second_color(self) -> None:
-        assert _lerp_color("#000000", "#ffffff", 1.0) == "#ffffff"
+        assert _lerp_rgb((0, 0, 0), (255, 255, 255), 1.0) == (255, 255, 255)
 
     def test_t_half_is_midpoint(self) -> None:
-        assert _lerp_color("#000000", "#ffffff", 0.5) == "#808080"
+        assert _lerp_rgb((0, 0, 0), (255, 255, 255), 0.5) == (128, 128, 128)
 
     def test_t_clamped_below(self) -> None:
-        """Negative t shouldn't produce a malformed color."""
-        assert _lerp_color("#000000", "#ffffff", -10.0) == "#000000"
+        """Negative t shouldn't overshoot the first color."""
+        assert _lerp_rgb((0, 0, 0), (255, 255, 255), -10.0) == (0, 0, 0)
 
     def test_t_clamped_above(self) -> None:
-        assert _lerp_color("#000000", "#ffffff", 99.0) == "#ffffff"
+        assert _lerp_rgb((0, 0, 0), (255, 255, 255), 99.0) == (255, 255, 255)
 
     @pytest.mark.parametrize(
         ("c1", "c2", "t"),
         [
-            ("#e8e6e0", "#e74c3c", 0.0),
-            ("#e8e6e0", "#e74c3c", 0.5),
-            ("#e8e6e0", "#e74c3c", 1.0),
+            ((232, 230, 224), (231, 76, 60), 0.0),
+            ((232, 230, 224), (231, 76, 60), 0.5),
+            ((232, 230, 224), (231, 76, 60), 1.0),
         ],
     )
-    def test_alarm_pulse_endpoints_are_valid_hex(
-        self, c1: str, c2: str, t: float
+    def test_alarm_pulse_endpoints_in_byte_range(
+        self, c1: tuple[int, int, int], c2: tuple[int, int, int], t: float
     ) -> None:
-        """Sanity: the alarm pulse lerp produces parseable #RRGGBB strings."""
-        result = _lerp_color(c1, c2, t)
-        assert result.startswith("#")
-        assert len(result) == 7
-        # Each pair is a hex byte.
-        for i in (1, 3, 5):
-            int(result[i : i + 2], 16)
+        """Sanity: the alarm pulse lerp stays in the 0-255 byte range."""
+        result = _lerp_rgb(c1, c2, t)
+        assert len(result) == 3
+        for channel in result:
+            assert 0 <= channel <= 255
 
 
 # =========================================================================== #

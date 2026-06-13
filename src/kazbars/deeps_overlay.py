@@ -31,7 +31,7 @@ from PIL import ImageDraw, ImageFont
 
 from .deeps_meter import MeterSnapshot
 from .deeps_settings import overlay_config_from_deeps
-from .overlay_engine import HudOverlay, load_font
+from .overlay_engine import HudOverlay, hex_to_rgb, load_font
 from .ui_helpers import THEME_COLORS
 
 logger = logging.getLogger(__name__)
@@ -81,14 +81,9 @@ class _Palette:
                                          # and survival signals don't blend
 
 
-def _hex_to_rgb(hex_str: str) -> tuple[int, int, int]:
-    h = hex_str.lstrip("#")
-    return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
-
-
 # Pull the alarm-peak from the theme so any palette tweak in DESIGN.md ripples.
 try:
-    _Palette.ALARM_PEAK = _hex_to_rgb(THEME_COLORS["danger"])
+    _Palette.ALARM_PEAK = hex_to_rgb(THEME_COLORS["danger"])
 except Exception:
     logger.debug("Could not derive alarm-peak from theme; keeping default", exc_info=True)
 
@@ -100,12 +95,6 @@ def _lerp_rgb(c1: tuple[int, int, int], c2: tuple[int, int, int], t: float) -> t
         round(c1[1] + (c2[1] - c1[1]) * t),
         round(c1[2] + (c2[2] - c1[2]) * t),
     )
-
-
-# Legacy hex-string helper retained for the existing _lerp_color tests.
-def _lerp_color(c1: str, c2: str, t: float) -> str:
-    r, g, b = _lerp_rgb(_hex_to_rgb(c1), _hex_to_rgb(c2), t)
-    return f"#{r:02x}{g:02x}{b:02x}"
 
 
 def _format_rate(value: float | None) -> str:

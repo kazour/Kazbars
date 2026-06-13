@@ -101,6 +101,12 @@ def load_font(family: str, size: int, bold: bool = False) -> ImageFont.ImageFont
         return ImageFont.load_default()
 
 
+def hex_to_rgb(hex_str: str) -> tuple[int, int, int]:
+    """Parse a ``#rrggbb`` (or bare ``rrggbb``) hex string to an RGB tuple."""
+    h = hex_str.lstrip("#")
+    return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+
+
 # =========================================================================== #
 # Win32 constants + ctypes plumbing                                           #
 # =========================================================================== #

@@ -36,7 +36,7 @@ from .live_tracker_settings import (
     overlay_config_from_timer,
     overlay_config_to_timer,
 )
-from .overlay_engine import HudOverlay, load_font
+from .overlay_engine import HudOverlay, hex_to_rgb, load_font
 
 logger = logging.getLogger(__name__)
 
@@ -62,11 +62,6 @@ _WIDTH_SAMPLES = (
     "Seed: Charactername   Done",
     "Kill Scorpion!!!   0s",
 )
-
-
-def _hex_to_rgb(hex_str: str) -> tuple[int, int, int]:
-    h = hex_str.lstrip("#")
-    return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
 
 
 # --------------------------------------------------------------------------- #
@@ -375,7 +370,7 @@ class TimerOverlay:
         zero."""
         if not text:
             return 0
-        fill = (*_hex_to_rgb(color), 255)
+        fill = (*hex_to_rgb(color), 255)
         draw.text(
             (x, y), text, font=font, fill=fill, anchor=anchor,
             stroke_width=1, stroke_fill=(*_STROKE_RGB, 255),
