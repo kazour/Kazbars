@@ -15,13 +15,27 @@ A small fraction of users return to the editor when swapping characters, classes
 
 ## Product Purpose
 
-KazBars is a desktop companion for Age of Conan: one editor that compiles in-game overlays and drives live combat HUDs. The tools share infrastructure (the AS2/SWF build pipeline, the combat-log readers, the transparent always-on-top overlay layer), and each is a first-class job:
+KazBars is a desktop companion for Age of Conan. Everything it does is one of **three kinds of mod**, and the kind tells the player the one thing they care about: whether they ever need the app open again.
 
-- **Grids — buff-grid overlay compiler (the flagship).** The editor lets a player describe icon grids (player vs. target, dynamic vs. static, sort/group/timer/flash rules) and one click compiles them to ActionScript 2, then deploys them to the game folder. After that the player types `/reloadui` in chat and forgets the editor exists.
-- **Live Tracker — Ethram Fal cycle HUD.** An always-on-top overlay that reads the game's combat log and shows the current stage and timer of the seven-stage Viscous Seed / Lotus Fixation / Syphon cycle. Mandatory information for a smooth pull.
-- **Deeps — real-time damage/heal meter.** A transparent overlay showing five live numbers (DPS out, DPS in, HPS out, HPS in, and net ΔHP in), tailed from the combat log. Glanced at mid-fight the same way the Live Tracker is.
-- **Damage Numbers — floating-combat-text mod.** An Extras-menu popup that re-tunes AoC's stock `DamageInfo.swf` by baking per-setting offsets (position, color, column grouping) into the game's overlay. Opt-in and off by default; when off the stock file is left untouched.
-- **Stopwatch — in-game count-up timer.** A draggable Start/Pause/Reset panel compiled into the overlay, gated on so it ships only when the player wants it.
+**One-time setup — Build & Install, then close the app.** Two mechanisms, both applied in a single build and then forgotten. There are two ways KazBars changes the game:
+
+- **Flash API mods** compile to ActionScript 2 and deploy into the game's UI (`base.swf` / `DamageInfo.swf`):
+  - **Grids** — the flagship. The player describes buff/debuff icon grids (player vs. target, dynamic vs. static, sort/group/timer/flash rules); they render the player's active effects on top of the game.
+  - **Damage Numbers** — re-tunes AoC's floating combat text (position, layout) by baking per-setting offsets into the stock `DamageInfo.swf`. Opt-in, off by default.
+  - **Cast Timer** — a cast-progress strip compiled into the grid overlay when enabled.
+  - **Stopwatch** — a draggable in-game count-up panel, compiled in when enabled.
+- **XML patches** edit the game skin's XML directly, no recompile:
+  - **Damage number colors & resource grouping** — rewrites the skin's `TextColors.xml` (per-source flytext colors, column grouping for resource/heal numbers). The colors half of Damage Numbers, so that mod spans both mechanisms.
+  - **Default Buff Bars** — edits the stock buff-display XML (`<BuffListView>`) so the game's own buff bars match the player's setup.
+
+  After any of these the player types `/reloadui` in chat and never opens the editor again.
+
+**Live overlays — the app must stay running.** Two combat-log readers that tail the game log in real time and draw always-on-top desktop overlays. They only work while KazBars is open:
+
+- **Live Tracker (Ethram Fal)** — shows the current stage and timer of the seven-stage Viscous Seed / Lotus Fixation / Syphon cycle. A missed timer wipes the raid.
+- **Deeps** — a real-time meter showing five live numbers (DPS out, DPS in, HPS out, HPS in, and net ΔHP in).
+
+The infrastructure is shared (the AS2/SWF build pipeline, the XML patchers, the combat-log readers, the transparent overlay layer), but the split above is the one users feel: nearly all of the app is configure-once-and-forget; the two live overlays are the only things that need it running during play.
 
 Success is measured the way good tools are: a player who set their grids up six months ago should still have them working today, with no thought given to the editor; a raid running Ethram Fal should never wipe because someone's tracker glitched, distracted them, or rendered ambiguously.
 

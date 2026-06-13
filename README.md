@@ -4,7 +4,7 @@
 [![Latest release](https://img.shields.io/github/v/release/kazour/Kazbars?label=release)](https://github.com/kazour/Kazbars/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Buff/debuff grid overlay editor for **Age of Conan** — design icon grids that show your active effects on top of the game, then compile and install them in one click. It also drives live combat HUDs (the Ethram-Fal seed timer and a real-time deeps meter) and ships a handful of in-game extras.
+Buff/debuff grid overlay editor for **Age of Conan** — design icon grids that show your active effects on top of the game, then compile and install them in one click. Most of what it builds is set up once and runs on its own after you close the app; two live combat HUDs (the Ethram-Fal seed timer and a real-time deeps meter) keep working only while KazBars is open. A handful of in-game extras round it out.
 
 > **Upgrading from Kaz Grids?** Install over it — no uninstall needed. Your settings and game folder carry over automatically.
 
@@ -28,21 +28,51 @@ Up to **64 slots total** across all your grids.
 
 Questions, bug reports, and release news live on Discord. [Join the Discord](https://discord.gg/ubK5Guryfa).
 
-## Features
+## What it does
+
+Everything KazBars does is one of three kinds of mod, and the kind tells you the
+one thing you care about: **whether you ever need the app open again.**
+
+Almost everything is **set up once and forgotten** — you Build & Install, type
+`/reloadui`, and close the app. Only the two live overlays need KazBars running
+while you play.
+
+### Set up once — Build & Install, then close the app
+
+These compile into the game's UI or patch its skin files. After a build you type
+`/reloadui` in chat and never open the editor again, unless you want to change
+something.
+
+**Grids** are the flagship — they compile into the game and draw your icons:
 
 - **Player or Target grids** — track effects on you or your current target
 - **Dynamic mode** — slots auto-fill as buffs activate; choose fill direction, sort order, and grouping
 - **Static mode** — pin specific buffs to specific slots
-- **Buff database** — map numeric spell IDs to readable names and classify them as Buff (grey), Debuff (red), or Misc (golden)
-- **Buff-discovery console** — optional in-game overlay that logs effect names and their spell IDs as they land on you or your target, so you can find the numbers to add to the database
 - **Stacking** — show stack counts over icons for multi-stack effects
 - **Timers and flash warnings** — optional remaining-duration text and pulse-on-low-time
-- **Ethram-Fal Seed Timer** — always-on-top overlay for the Viscous Seed / Lotus Fixation / Syphon cycle
-- **Cast-timer overlay** — optional on-screen readout of your and your target's current cast time, positioned and styled alongside your grids
+- **Buff database** — map numeric spell IDs to readable names and classify them as Buff (grey), Debuff (red), or Misc (golden)
+- **Buff-discovery console** — optional in-game overlay that logs effect names and their spell IDs as they land on you or your target, so you can find the numbers to add to the database
+
+Optional extras that also compile into the overlay:
+
+- **Cast-timer overlay** — on-screen readout of your and your target's current cast time, positioned and styled alongside your grids
+- **In-game stopwatch** — a draggable Start/Pause/Reset count-up timer that works in fullscreen and never steals focus from the game. Off by default
+
+Two extras change the game's own combat text and HUD — same Build & Install:
+
+- **Damage Numbers** — a leaner rewrite of the game's floating combat numbers. Headline fix: ranged hits stop shrinking to nothing at distance. Also tune shadow, pop-in/fade speed, where numbers land (over the target, in fixed columns, or a zig-zag stack), and recolor each combat-number source. Off by default behind a master toggle; your stock file is backed up, so turning it off restores the original
+- **Default Buff Bars editor** — edit the game's own HUD `<BuffListView />` widgets (icon size, spacing, columns, friendly/hostile filter) without hand-editing XML
+
+### Runs while you play — keep KazBars open
+
+These read your combat log in real time and draw always-on-top desktop overlays.
+They only work while KazBars is running:
+
+- **Ethram-Fal Live Tracker** — always-on-top overlay for the Viscous Seed / Lotus Fixation / Syphon cycle. A missed timer wipes the raid, so the whole group watches it during the pull
 - **Deeps** — real-time combat overlay showing DPS out, DPS in, HPS out, HPS in, and ΔHP in. The DPS-out cell pulses red past a threshold you set; the incoming cells tint as your net HP drops
-- **Damage Numbers** — installs a leaner rewrite of the game's floating combat numbers. Headline fix: ranged hits stop shrinking to nothing at distance. Also tune shadow, pop-in/fade speed, and where numbers land (over the target, in fixed columns, or a zig-zag stack), and recolor each combat-number source. Off by default behind a master toggle; your stock file is backed up, so turning it off restores the original
-- **In-game stopwatch** — an optional draggable Start/Pause/Reset count-up timer compiled into the overlay, so it works in fullscreen and never steals focus from the game. Off by default
-- **Default Buff Bars editor** — edit the in-game HUD `<BuffListView />` widgets (icon size, spacing, columns, friendly/hostile filter) without hand-editing XML
+
+### And one housekeeping tool
+
 - **Backup & restore** — save your full Age of Conan config plus your KazBars profiles and settings to one portable zip, and restore it after a reformat or a corrupted profile
 
 ## Requirements

@@ -54,9 +54,11 @@ class InstructionsPanel(ttk.Frame):
 
         intro = ttk.Label(
             inner,
-            text="KazBars is a Windows app for designing buff and debuff "
-            "overlays for Age of Conan. Track effects on your own character "
-            "or on your current target.",
+            text="KazBars is a Windows app for modding Age of Conan. Most of "
+            "what it builds you set up once: Build & Install, type /reloadui, "
+            "and close the app — it keeps working on its own. Two live "
+            "overlays are the exception; they only run while KazBars is open. "
+            "See 'What KazBars Builds' below.",
             font=FONT_BODY, foreground=THEME_COLORS['body'],
             wraplength=_MAX_TEXT_WIDTH, justify='left',
         )
@@ -88,6 +90,31 @@ class InstructionsPanel(ttk.Frame):
               "to your game folder.", None)],
             "How you apply later changes depends on your setup — "
             "see 'Building and Installing' below.",
+        ])
+
+        # --- What KazBars Builds ---
+
+        builds = self._add_section(inner, "What KazBars Builds", [
+            "Everything KazBars does is one kind of mod or another, and the "
+            "kind tells you the one thing that matters: whether you ever need "
+            "the app open again.",
+        ])
+        self._add_subsection(builds.content, "Set up once — then close the app", [
+            [("Grids, the Cast Timer, the Stopwatch, Damage Numbers, and the "
+              "Default Buff Bars all install with one ", None),
+             ("Build & Install", THEME_COLORS['success']),
+             (". After that you type /reloadui in-game and you're done — they "
+              "keep working whether or not KazBars is running. Open it again "
+              "only when you want to change something.", None)],
+        ])
+        self._add_subsection(builds.content, "Runs while you play — keep KazBars open", [
+            [("The ", None),
+             ("Ethram-Fal Live Tracker", THEME_COLORS['accent']),
+             (" and ", None),
+             ("Deeps", THEME_COLORS['accent']),
+             (" are desktop overlays that read your combat log in real time. "
+              "They draw on top of the game while you play, so they only work "
+              "while KazBars is open.", None)],
         ])
 
         # --- Player vs Target ---
@@ -235,7 +262,8 @@ class InstructionsPanel(ttk.Frame):
         tracker = self._add_section(inner, "Ethram-Fal Live Tracker", [
             "Always-on-top overlay for the Viscous Seed cycle in the "
             "Ethram-Fal raid. Reads your combat log so the raid can "
-            "coordinate scorpion kills.",
+            "coordinate scorpion kills. It's a live overlay, so it only runs "
+            "while KazBars is open — keep the app running for the pull.",
         ])
         self._add_subsection(tracker.content, "Setup", [
             [("Click ", None),
@@ -265,7 +293,8 @@ class InstructionsPanel(ttk.Frame):
         deeps = self._add_section(inner, "Deeps", [
             "Always-on-top combat meter that reads your combat log. Five "
             "rolling numbers: DPS out, DPS in, HPS out, HPS in, and ΔHP in "
-            "(your net health change per second).",
+            "(your net health change per second). It's a live overlay, so it "
+            "only shows numbers while KazBars is open.",
         ])
         self._add_subsection(deeps.content, "Setup", [
             [("Click ", None),
