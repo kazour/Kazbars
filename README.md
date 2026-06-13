@@ -4,7 +4,7 @@
 [![Latest release](https://img.shields.io/github/v/release/kazour/Kazbars?label=release)](https://github.com/kazour/Kazbars/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Buff/debuff grid overlay editor for **Age of Conan**. Design icon grids that show your active effects on top of the game, then compile and install them in one click.
+Buff/debuff grid overlay editor for **Age of Conan** — design icon grids that show your active effects on top of the game, then compile and install them in one click. It also drives live combat HUDs (the Ethram-Fal seed timer and a real-time deeps meter) and ships a handful of in-game extras.
 
 > **Upgrading from Kaz Grids?** Install over it — no uninstall needed. Your settings and game folder carry over automatically.
 
@@ -41,6 +41,7 @@ Questions, bug reports, and release news live on Discord. [Join the Discord](htt
 - **Cast-timer overlay** — optional on-screen readout of your and your target's current cast time, positioned and styled alongside your grids
 - **Deeps** — real-time combat overlay showing DPS out, DPS in, HPS out, HPS in, and ΔHP in. The DPS-out cell pulses red past a threshold you set; the incoming cells tint as your net HP drops
 - **Damage Numbers** — installs a leaner rewrite of the game's floating combat numbers. Headline fix: ranged hits stop shrinking to nothing at distance. Also tune shadow, pop-in/fade speed, and where numbers land (over the target, in fixed columns, or a zig-zag stack), and recolor each combat-number source. Off by default behind a master toggle; your stock file is backed up, so turning it off restores the original
+- **In-game stopwatch** — an optional draggable Start/Pause/Reset count-up timer compiled into the overlay, so it works in fullscreen and never steals focus from the game. Off by default
 - **Default Buff Bars editor** — edit the in-game HUD `<BuffListView />` widgets (icon size, spacing, columns, friendly/hostile filter) without hand-editing XML
 - **Backup & restore** — save your full Age of Conan config plus your KazBars profiles and settings to one portable zip, and restore it after a reformat or a corrupted profile
 

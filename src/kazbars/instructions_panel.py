@@ -425,6 +425,29 @@ class InstructionsPanel(ttk.Frame):
             "your target on the right. Applies on Build & Install.",
         ])
 
+        # --- In-Game Stopwatch ---
+
+        stopwatch_section = self._add_section(inner, "In-Game Stopwatch", [
+            "Extras → In-game stopwatch… adds a count-up Start / Pause / Reset "
+            "timer that lives inside the game as part of the overlay, so it "
+            "works in fullscreen and never steals focus from AoC. Off by "
+            "default; when off, the build carries no stopwatch code at all.",
+        ])
+        self._add_subsection(stopwatch_section.content, "Turn it on", [
+            [("Open the dialog, flip ", None),
+             ("Enabled", THEME_COLORS['success']),
+             (", then ", None),
+             ("Build & Install", THEME_COLORS['success']),
+             (". It ships with your next build, same as grids.", None)],
+        ])
+        self._add_subsection(stopwatch_section.content, "Using it in-game", [
+            "A compact draggable panel shows h:mm:ss. The − button collapses "
+            "it to just the title bar, which then shows the running time.",
+            "Drag the title bar to move it; live coordinates show as you "
+            "drag. Type them into the dialog to pin a spot. Aoc.exe clients "
+            "remember the position and collapsed state on their own.",
+        ])
+
         # --- Backup & Restore ---
 
         backup_section = self._add_section(inner, "Backup and Restore", [

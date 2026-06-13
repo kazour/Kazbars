@@ -21,6 +21,9 @@ colors:
   signal-success: "#00bc8c"
   signal-warning: "#f39c12"
   signal-danger: "#e74c3c"
+  danger-text: "#f06a5d"
+  type-debuff: "#F0A0A0"
+  type-misc: "#E0C880"
   database-nav-purple: "#9b59b6"
   player-cyan: "#3498db"
   target-orange: "#e67e22"
@@ -224,7 +227,7 @@ A bootstrap-darkly grayscale base, semantic state colors borrowed from the same 
 
 The system has no single brand color carrying the surface. The closest thing to a primary action is **Signal Success**: every surface's single primary button carries it, with Build & Install (the moment of payoff) as the flagship.
 
-- **Action Cyan** (`#3498db`): links, info-value text, the Player grid type, the Grids module accent. The "click here" color across the app.
+- **Action Cyan** (`#3498db`): links, info-value text, the Player grid type, and the shared module-header accent — Grids, Live Tracker, Deeps, and Damage Numbers panels all key their header off it. The "click here" color across the app.
 - **Signal Success** (`#00bc8c`): the surface-primary button style (Build & Install, a dialog's Apply or Export, first-launch Load Default) and build-success status text. At most one per surface.
 
 ### Secondary
@@ -232,10 +235,19 @@ The system has no single brand color carrying the surface. The closest thing to 
 State colors. Semantic, never decorative.
 
 - **Signal Warning** (`#f39c12`): build warnings, missing-buff notices, attention-needed states.
-- **Signal Danger** (`#e74c3c`): errors, destructive confirmations, build failures.
+- **Signal Danger** (`#e74c3c`): error *fills, borders, and dots* — destructive confirmations, build failures. At ~4.2:1 on `#222` it clears the non-text / large-text bar but **fails AA as body text**; never set it as a readable label.
+- **Danger Text** (`#f06a5d`): the readable counterpart — error *labels and messages* on `#222` (~5.3:1, AA). The danger palette is two tokens by contract: saturated `#e74c3c` paints shapes, lighter `#f06a5d` carries words.
 - **Database Nav Purple** (`#9b59b6`): the Database top-nav tab accent. One of the only places purple appears; reserved for that one role.
 - **Target Orange** (`#e67e22`): the Target grid type, paired with Player Cyan to differentiate player-vs-target grids at a glance.
 - **Cast Timer Rose** (`#CF6F93`): identity accent for the frozen Cast Timer strip pinned above the grid list, carried by its 1px card border (greys to the neutral border via `set_dimmed` when the master enable is off). A muted dusty rose, the hue furthest from the Player/Target/Database palette, so the strip reads as its own thing among the grid cards. The **Player**/**Target** tags next to the title light in `player-cyan`/`target-orange` when the master enable is on (both sides run together) and grey when off; the `overlay` tag after them stays muted (a category label, not identity).
+
+### Buff classification tints
+
+Paired with the type label in the Database, never standalone (the color-blindness commitment). Buff itself carries no tint.
+
+- **Buff** — no tint; stays at **Text Body** (`#C0C7CE`). The unmarked default.
+- **Type Debuff** (`#F0A0A0`): muted red, ~7.6:1 AAA on `#222`.
+- **Type Misc** (`#E0C880`): warm gold, ~9.3:1 AAA on `#222`.
 
 ### Tertiary (live tracker semantics)
 
@@ -340,7 +352,7 @@ ttkbootstrap-darkly handles the heavy lifting (button, entry, frame, treeview, c
 
 - **Shape:** Sharp by default. Inherits ttkbootstrap-darkly's near-zero radius (0-3px). Never round buttons.
 - **Primary (success):** Signal Success bg with bright text. Carries the single primary action of a surface: Build & Install / Generate & Install at `BTN_LARGE` (20 chars), and the one affirmative action of a dialog or panel (Apply, Export, Load Default, Start Monitoring) at dialog widths. At most one success button per surface. When it has a sibling action, the sibling takes the cyan outline style (Export ▸ success / Import ▸ outline), never a second success.
-- **Default:** Surface Input bg with body-color text, ttkbootstrap-darkly default. Width `BTN_MEDIUM` (12 chars) for Export/Import/Reset/Browse, `BTN_SMALL` (7 chars) for Add/Edit/Delete/Clear/Copy. Width tokens are for rows of short labels only — tkinter clips silently, so a label longer than its token is a bug. Sentence-length labels drop the width and size to their text.
+- **Default:** Surface Input bg with body-color text, ttkbootstrap-darkly default. Width `BTN_MEDIUM` (12 chars) for Export/Import/Reset/Browse, `BTN_DIALOG` (10 chars) for the Cancel + verb pair in dialog footers, `BTN_SMALL` (7 chars) for Add/Edit/Delete/Clear/Copy. Width tokens are for rows of short labels only — tkinter clips silently, so a label longer than its token is a bug. Sentence-length labels drop the width and size to their text.
 - **Outline (secondary accent):** transparent bg, Action Cyan border + label (`info-outline`). The secondary half of a success pair (Export ▸ success / Import ▸ outline) and the bottom-bar tool launchers. Never bare `outline`: darkly's primary (`#375a7f`) measures 2.2:1 on `#222`, failing even the large-text bar.
 - **Hover / Focus:** ttkbootstrap-darkly's built-in hover (slight lightness shift). Do not add custom glow, transform, or scale. The button does not move.
 
@@ -438,5 +450,5 @@ ttkbootstrap-darkly handles the heavy lifting (button, entry, frame, treeview, c
 - **Don't** add corner radius greater than 3px to anything. If a button or input feels "too sharp", the problem is the surrounding spacing or contrast, not the radius.
 - **Don't** wrap the Live Tracker in tooltips, hover states, or decorative animations. It is sacred. (PRODUCT.md Principle 2.)
 - **Don't** give purple a second role outside the Database top-nav tab. The One-Purple Rule. (Incidental palette pairs are fine.)
-- **Don't** use color alone to convey buff classification (Buff grey / Debuff red / Misc gold). Always pair with a category label, per PRODUCT.md's color-blindness commitment.
+- **Don't** use color alone to convey buff classification (Buff stays at Text Body `#C0C7CE`, Debuff is muted red `#F0A0A0`, Misc is warm gold `#E0C880`). Always pair with a category label, per PRODUCT.md's color-blindness commitment.
 - **Don't** write marketing-shaped microcopy ("Pro tip", "Quick win", "Did you know?"). Hobby-project candor is the voice. (PRODUCT.md Principle 5.)
