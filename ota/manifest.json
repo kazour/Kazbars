@@ -2,15 +2,15 @@
   "schema": 1,
   "content_version": 3,
   "min_app_version": "2.1.0",
-  "source_commit": "0bd451fe9517ab7b796a8a66401eb005cc8b0561",
+  "source_commit": "aab274be9891baf77ebfb31d8d1ba6be69e1c294",
   "notes": "Added Spellweaving 1-6 stack tracking for Priest of Mitra, Tempest of Set, Demonologist, and Necromancer",
   "files": {
     "Database.json": {
-      "url": "https://raw.githubusercontent.com/kazour/Kazbars/0bd451fe9517ab7b796a8a66401eb005cc8b0561/src/kazbars/assets/kazbars/Database.json",
+      "url": "https://raw.githubusercontent.com/kazour/Kazbars/aab274be9891baf77ebfb31d8d1ba6be69e1c294/src/kazbars/assets/kazbars/Database.json",
       "sha256": "99a18b9b96c28f0c59a45dc3d1f7e7117394e146c90adb96c2e684e1be26839f"
     },
     "Default.json": {
-      "url": "https://raw.githubusercontent.com/kazour/Kazbars/0bd451fe9517ab7b796a8a66401eb005cc8b0561/src/kazbars/assets/kazbars/Default.json",
+      "url": "https://raw.githubusercontent.com/kazour/Kazbars/aab274be9891baf77ebfb31d8d1ba6be69e1c294/src/kazbars/assets/kazbars/Default.json",
       "sha256": "c4ce7620614c5e29933324c9fb91c8ac1b24ec59e74d7b9121e8c365a44e6249"
     }
   }
