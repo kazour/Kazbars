@@ -35,7 +35,10 @@ RAW_URL = "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/ass
 
 
 def _sha256(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    # Hash the LF-normalized bytes. Git stores these text files with LF and
+    # GitHub raw serves that blob, but the Windows working tree is CRLF — the
+    # client downloads the LF blob, so the manifest must record the LF hash.
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
 
 def _read_json(path):

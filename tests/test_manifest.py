@@ -42,7 +42,10 @@ def test_manifest_exists_and_wellformed():
 
 def test_manifest_sha256_matches_stock_files():
     for name, info in _manifest()["files"].items():
-        actual = hashlib.sha256((STOCK / name).read_bytes()).hexdigest()
+        # LF-normalized: GitHub raw serves the LF blob (git normalizes these text
+        # files on commit) while the Windows working tree is CRLF. The manifest and
+        # the client both key off the LF bytes, so this guards what's actually served.
+        actual = hashlib.sha256((STOCK / name).read_bytes().replace(b"\r\n", b"\n")).hexdigest()
         assert info["sha256"] == actual, (
             f"{name} sha256 in ota/manifest.json drifted from the shipped stock file — "
             "re-run scripts/gen_manifest.py"
