@@ -10,7 +10,7 @@
         4281288,
         4281289
       ],
-      "category": "#T3",
+      "category": "#Raid T3",
       "type": "debuff",
       "stacking": true
     },
@@ -19,7 +19,7 @@
       "ids": [
         4706108
       ],
-      "category": "#T3",
+      "category": "#Raid T3",
       "type": "debuff"
     },
     {
@@ -29,7 +29,7 @@
         4923159,
         4923160
       ],
-      "category": "#T3",
+      "category": "#Raid T3",
       "type": "debuff",
       "stacking": true
     },
@@ -42,7 +42,7 @@
         4260183,
         4260198
       ],
-      "category": "#T3",
+      "category": "#Raid T3",
       "type": "debuff",
       "stacking": true
     },
@@ -51,7 +51,7 @@
       "ids": [
         4281812
       ],
-      "category": "#T3",
+      "category": "#Raid T3",
       "type": "debuff"
     },
     {
@@ -59,7 +59,7 @@
       "ids": [
         4836698
       ],
-      "category": "#T3.5",
+      "category": "#Raid T3.5",
       "type": "debuff"
     },
     {
@@ -67,7 +67,7 @@
       "ids": [
         4757361
       ],
-      "category": "#T3.5",
+      "category": "#Raid T3.5",
       "type": "debuff"
     },
     {
@@ -75,7 +75,7 @@
       "ids": [
         4752750
       ],
-      "category": "#T3.5",
+      "category": "#Raid T3.5",
       "type": "debuff"
     },
     {
@@ -83,7 +83,7 @@
       "ids": [
         4752518
       ],
-      "category": "#T3.5",
+      "category": "#Raid T3.5",
       "type": "debuff"
     },
     {
@@ -95,7 +95,7 @@
         4757318,
         4757329
       ],
-      "category": "#T3.5",
+      "category": "#Raid T3.5",
       "type": "misc",
       "stacking": true
     },
@@ -104,7 +104,7 @@
       "ids": [
         4757285
       ],
-      "category": "#T3.5",
+      "category": "#Raid T3.5",
       "type": "buff"
     },
     {
@@ -112,7 +112,7 @@
       "ids": [
         4836609
       ],
-      "category": "#T3.5",
+      "category": "#Raid T3.5",
       "type": "debuff"
     },
     {
@@ -120,7 +120,7 @@
       "ids": [
         4757336
       ],
-      "category": "#T3.5",
+      "category": "#Raid T3.5",
       "type": "misc"
     },
     {
@@ -128,7 +128,7 @@
       "ids": [
         4836424
       ],
-      "category": "#T3.5",
+      "category": "#Raid T3.5",
       "type": "debuff"
     },
     {
@@ -136,7 +136,7 @@
       "ids": [
         4752520
       ],
-      "category": "#T3.5",
+      "category": "#Raid T3.5",
       "type": "debuff"
     },
     {
@@ -144,7 +144,7 @@
       "ids": [
         4836738
       ],
-      "category": "#T3.5",
+      "category": "#Raid T3.5",
       "type": "debuff"
     },
     {
@@ -152,7 +152,7 @@
       "ids": [
         4836739
       ],
-      "category": "#T3.5",
+      "category": "#Raid T3.5",
       "type": "debuff"
     },
     {
@@ -160,7 +160,7 @@
       "ids": [
         4383191
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "debuff"
     },
     {
@@ -168,7 +168,7 @@
       "ids": [
         4357732
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "debuff"
     },
     {
@@ -176,7 +176,7 @@
       "ids": [
         4552633
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "debuff"
     },
     {
@@ -184,7 +184,7 @@
       "ids": [
         4553214
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "debuff"
     },
     {
@@ -192,7 +192,7 @@
       "ids": [
         4924718
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "misc"
     },
     {
@@ -200,7 +200,7 @@
       "ids": [
         4552666
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "debuff"
     },
     {
@@ -208,7 +208,7 @@
       "ids": [
         5064063
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "debuff"
     },
     {
@@ -216,7 +216,7 @@
       "ids": [
         4857503
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "debuff"
     },
     {
@@ -224,7 +224,7 @@
       "ids": [
         4857484
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "debuff"
     },
     {
@@ -232,7 +232,7 @@
       "ids": [
         4380771
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "buff"
     },
     {
@@ -240,7 +240,7 @@
       "ids": [
         4383111
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "misc"
     },
     {
@@ -248,7 +248,7 @@
       "ids": [
         5014940
       ],
-      "category": "#T5",
+      "category": "#Raid T5",
       "type": "debuff"
     },
     {
@@ -256,7 +256,7 @@
       "ids": [
         5016429
       ],
-      "category": "#T5",
+      "category": "#Raid T5",
       "type": "debuff"
     },
     {
@@ -264,7 +264,7 @@
       "ids": [
         5015019
       ],
-      "category": "#T5",
+      "category": "#Raid T5",
       "type": "debuff"
     },
     {
@@ -272,7 +272,7 @@
       "ids": [
         5016796
       ],
-      "category": "#T5",
+      "category": "#Raid T5",
       "type": "debuff"
     },
     {
@@ -280,7 +280,7 @@
       "ids": [
         5014916
       ],
-      "category": "#T5",
+      "category": "#Raid T5",
       "type": "debuff"
     },
     {
@@ -288,7 +288,7 @@
       "ids": [
         5016222
       ],
-      "category": "#T5",
+      "category": "#Raid T5",
       "type": "debuff"
     },
     {
@@ -296,7 +296,7 @@
       "ids": [
         5015024
       ],
-      "category": "#T5",
+      "category": "#Raid T5",
       "type": "debuff"
     },
     {
@@ -308,7 +308,7 @@
         5051636,
         5051637
       ],
-      "category": "#T6",
+      "category": "#Raid T6",
       "type": "debuff",
       "stacking": true
     },
@@ -317,7 +317,7 @@
       "ids": [
         5054121
       ],
-      "category": "#T6",
+      "category": "#Raid T6",
       "type": "debuff"
     },
     {
@@ -325,7 +325,7 @@
       "ids": [
         5052352
       ],
-      "category": "#T6",
+      "category": "#Raid T6",
       "type": "debuff"
     },
     {
@@ -333,7 +333,7 @@
       "ids": [
         5052177
       ],
-      "category": "#T6",
+      "category": "#Raid T6",
       "type": "buff"
     },
     {
@@ -341,7 +341,7 @@
       "ids": [
         5052211
       ],
-      "category": "#T6",
+      "category": "#Raid T6",
       "type": "debuff"
     },
     {
@@ -353,7 +353,7 @@
         5051643,
         5051644
       ],
-      "category": "#T6",
+      "category": "#Raid T6",
       "type": "debuff",
       "stacking": true
     },
@@ -362,7 +362,7 @@
       "ids": [
         5052368
       ],
-      "category": "#T6",
+      "category": "#Raid T6",
       "type": "misc"
     },
     {
@@ -370,7 +370,7 @@
       "ids": [
         5064042
       ],
-      "category": "#T6",
+      "category": "#Raid T6",
       "type": "debuff"
     },
     {
@@ -378,7 +378,7 @@
       "ids": [
         5052277
       ],
-      "category": "#T6",
+      "category": "#Raid T6",
       "type": "debuff"
     },
     {
@@ -387,7 +387,7 @@
         5052693,
         5052694
       ],
-      "category": "#T6",
+      "category": "#Raid T6",
       "type": "buff"
     },
     {
@@ -395,7 +395,7 @@
       "ids": [
         5055907
       ],
-      "category": "#T6",
+      "category": "#Raid T6",
       "type": "debuff"
     },
     {
@@ -403,7 +403,7 @@
       "ids": [
         5052114
       ],
-      "category": "#T6",
+      "category": "#Raid T6",
       "type": "misc"
     },
     {
@@ -415,7 +415,7 @@
         5062626,
         5062627
       ],
-      "category": "#T6",
+      "category": "#Raid T6",
       "type": "debuff",
       "stacking": true
     },
@@ -424,7 +424,7 @@
       "ids": [
         5064459
       ],
-      "category": "#T6",
+      "category": "#Raid T6",
       "type": "debuff"
     },
     {
@@ -432,7 +432,7 @@
       "ids": [
         5056787
       ],
-      "category": "#T6",
+      "category": "#Raid T6",
       "type": "debuff"
     },
     {
@@ -440,7 +440,7 @@
       "ids": [
         5056777
       ],
-      "category": "#T6",
+      "category": "#Raid T6",
       "type": "debuff"
     },
     {
@@ -448,7 +448,7 @@
       "ids": [
         5052200
       ],
-      "category": "#T6",
+      "category": "#Raid T6",
       "type": "debuff"
     },
     {
@@ -456,7 +456,7 @@
       "ids": [
         5054493
       ],
-      "category": "#T6",
+      "category": "#Raid T6",
       "type": "debuff"
     },
     {
@@ -464,7 +464,7 @@
       "ids": [
         1094673
       ],
-      "category": "#Resistances",
+      "category": "#Immunities",
       "type": "debuff"
     },
     {
@@ -472,7 +472,7 @@
       "ids": [
         5017472
       ],
-      "category": "#Global",
+      "category": "#General",
       "type": "buff"
     },
     {
@@ -480,7 +480,7 @@
       "ids": [
         3191514
       ],
-      "category": "#Global",
+      "category": "#General",
       "type": "buff"
     },
     {
@@ -488,7 +488,7 @@
       "ids": [
         3963062
       ],
-      "category": "#Global",
+      "category": "#General",
       "type": "debuff"
     },
     {
@@ -500,7 +500,7 @@
         3963196,
         3963198
       ],
-      "category": "#Global",
+      "category": "#General",
       "type": "debuff",
       "stacking": true
     },
@@ -509,7 +509,7 @@
       "ids": [
         3963061
       ],
-      "category": "#Global",
+      "category": "#General",
       "type": "debuff"
     },
     {
@@ -525,7 +525,7 @@
       "ids": [
         3882133
       ],
-      "category": "#Resistances",
+      "category": "#Immunities",
       "type": "buff"
     },
     {
@@ -541,7 +541,7 @@
       "ids": [
         4487417
       ],
-      "category": "#Resistances",
+      "category": "#Immunities",
       "type": "buff"
     },
     {
@@ -549,7 +549,7 @@
       "ids": [
         4086624
       ],
-      "category": "#Resistances",
+      "category": "#Immunities",
       "type": "buff"
     },
     {
@@ -565,7 +565,7 @@
       "ids": [
         4784832
       ],
-      "category": "#Resistances",
+      "category": "#Immunities",
       "type": "buff"
     },
     {
@@ -574,7 +574,7 @@
         3963059,
         4743743
       ],
-      "category": "#Global",
+      "category": "#General",
       "type": "debuff"
     },
     {
@@ -586,7 +586,7 @@
         3963302,
         3963303
       ],
-      "category": "#Global",
+      "category": "#General",
       "type": "debuff",
       "stacking": true
     },
@@ -595,7 +595,7 @@
       "ids": [
         3963058
       ],
-      "category": "#Global",
+      "category": "#General",
       "type": "debuff"
     },
     {
@@ -603,7 +603,7 @@
       "ids": [
         3514544
       ],
-      "category": "#Resistances",
+      "category": "#Immunities",
       "type": "debuff"
     },
     {
@@ -611,7 +611,7 @@
       "ids": [
         3591149
       ],
-      "category": "#Resistances",
+      "category": "#Immunities",
       "type": "debuff"
     },
     {
@@ -620,7 +620,7 @@
         4372820,
         4372889
       ],
-      "category": "#Resistances",
+      "category": "#Immunities",
       "type": "buff"
     },
     {
@@ -628,7 +628,7 @@
       "ids": [
         1126127
       ],
-      "category": "#Resistances",
+      "category": "#Immunities",
       "type": "buff"
     },
     {
@@ -636,7 +636,7 @@
       "ids": [
         4931433
       ],
-      "category": "#Resistances",
+      "category": "#Immunities",
       "type": "buff"
     },
     {
@@ -644,7 +644,7 @@
       "ids": [
         3964324
       ],
-      "category": "#Resistances",
+      "category": "#Immunities",
       "type": "buff"
     },
     {
@@ -652,7 +652,7 @@
       "ids": [
         4079364
       ],
-      "category": "#Resistances",
+      "category": "#Immunities",
       "type": "buff"
     },
     {
@@ -660,7 +660,7 @@
       "ids": [
         3963070
       ],
-      "category": "#Global",
+      "category": "#General",
       "type": "debuff"
     },
     {
@@ -672,7 +672,7 @@
         3963271,
         3963272
       ],
-      "category": "#Global",
+      "category": "#General",
       "type": "debuff",
       "stacking": true
     },
@@ -683,7 +683,7 @@
         4882958,
         4887864
       ],
-      "category": "#Global",
+      "category": "#General",
       "type": "debuff"
     },
     {
@@ -691,7 +691,7 @@
       "ids": [
         4742630
       ],
-      "category": "#Resistances",
+      "category": "#Immunities",
       "type": "buff"
     },
     {
@@ -707,7 +707,7 @@
       "ids": [
         3882135
       ],
-      "category": "#Resistances",
+      "category": "#Immunities",
       "type": "buff"
     },
     {
@@ -969,7 +969,7 @@
         154775,
         151040
       ],
-      "category": "#Group HoT",
+      "category": "#Group Heals",
       "type": "misc"
     },
     {
@@ -993,7 +993,7 @@
       "ids": [
         5017458
       ],
-      "category": "#Group Buffs",
+      "category": "#Protections",
       "type": "buff"
     },
     {
@@ -1001,7 +1001,7 @@
       "ids": [
         5015761
       ],
-      "category": "#Resistances",
+      "category": "#Immunities",
       "type": "debuff"
     },
     {
@@ -1036,7 +1036,7 @@
       "ids": [
         143746
       ],
-      "category": "#Group HoT",
+      "category": "#Group Heals",
       "type": "misc"
     },
     {
@@ -1054,7 +1054,7 @@
         146124,
         146091
       ],
-      "category": "#Group Buffs",
+      "category": "#Protections",
       "type": "buff"
     },
     {
@@ -1063,7 +1063,7 @@
         146103,
         145828
       ],
-      "category": "#Group Buffs",
+      "category": "#Protections",
       "type": "buff"
     },
     {
@@ -1098,7 +1098,7 @@
       "ids": [
         4229891
       ],
-      "category": "#Resistances",
+      "category": "#Immunities",
       "type": "debuff"
     },
     {
@@ -1226,7 +1226,7 @@
       "ids": [
         4047227
       ],
-      "category": "#Group HoT",
+      "category": "#Group Heals",
       "type": "misc"
     },
     {
@@ -1264,7 +1264,7 @@
         145782,
         145762
       ],
-      "category": "#Group Buffs",
+      "category": "#Protections",
       "type": "buff"
     },
     {
@@ -1398,7 +1398,7 @@
         145790,
         145771
       ],
-      "category": "#Group Buffs",
+      "category": "#Protections",
       "type": "buff"
     },
     {
@@ -1479,7 +1479,7 @@
       "ids": [
         5015893
       ],
-      "category": "#Group HoT",
+      "category": "#Group Heals",
       "type": "misc"
     },
     {
@@ -1522,7 +1522,7 @@
         145626,
         145778
       ],
-      "category": "#Group Buffs",
+      "category": "#Protections",
       "type": "buff"
     },
     {
@@ -1570,7 +1570,7 @@
       "ids": [
         144105
       ],
-      "category": "#Group HoT",
+      "category": "#Group Heals",
       "type": "misc"
     },
     {
@@ -1586,7 +1586,7 @@
       "ids": [
         3202863
       ],
-      "category": "#Group Buffs",
+      "category": "#Protections",
       "type": "buff"
     },
     {
@@ -1603,7 +1603,7 @@
       "ids": [
         5017456
       ],
-      "category": "#Group Buffs",
+      "category": "#Protections",
       "type": "buff"
     },
     {
@@ -1611,7 +1611,7 @@
       "ids": [
         5015755
       ],
-      "category": "#Resistances",
+      "category": "#Immunities",
       "type": "debuff"
     },
     {
@@ -1628,7 +1628,7 @@
         154750,
         150672
       ],
-      "category": "#Group HoT",
+      "category": "#Group Heals",
       "type": "misc"
     },
     {
@@ -1758,7 +1758,7 @@
         146099,
         145802
       ],
-      "category": "#Group Buffs",
+      "category": "#Protections",
       "type": "buff"
     },
     {
@@ -1766,7 +1766,7 @@
       "ids": [
         5015762
       ],
-      "category": "#Resistances",
+      "category": "#Immunities",
       "type": "debuff"
     },
     {
@@ -1792,7 +1792,7 @@
         146122,
         146089
       ],
-      "category": "#Group Buffs",
+      "category": "#Protections",
       "type": "buff"
     },
     {
@@ -1800,7 +1800,7 @@
       "ids": [
         143948
       ],
-      "category": "#Group HoT",
+      "category": "#Group Heals",
       "type": "misc"
     },
     {
@@ -1809,7 +1809,7 @@
         154770,
         151030
       ],
-      "category": "#Group HoT",
+      "category": "#Group Heals",
       "type": "misc"
     },
     {
@@ -1860,7 +1860,7 @@
       "ids": [
         4330152
       ],
-      "category": "#Global",
+      "category": "#General",
       "type": "buff"
     },
     {
@@ -2055,7 +2055,7 @@
       "ids": [
         4489251
       ],
-      "category": "#Global",
+      "category": "#General",
       "type": "buff"
     },
     {
@@ -2079,7 +2079,7 @@
       "ids": [
         4478386
       ],
-      "category": "#Global",
+      "category": "#General",
       "type": "buff"
     },
     {
@@ -2152,7 +2152,7 @@
       "ids": [
         3192066
       ],
-      "category": "#Global",
+      "category": "#General",
       "type": "buff"
     },
     {
@@ -2160,7 +2160,7 @@
       "ids": [
         1136634
       ],
-      "category": "#Global",
+      "category": "#General",
       "type": "buff"
     },
     {
@@ -2358,7 +2358,7 @@
       "ids": [
         3227091
       ],
-      "category": "#Global",
+      "category": "#General",
       "type": "buff"
     },
     {
@@ -2391,7 +2391,7 @@
         4922964,
         4245371
       ],
-      "category": "#Group Buffs",
+      "category": "#Protections",
       "type": "buff"
     },
     {
@@ -2462,7 +2462,7 @@
       "ids": [
         1173273
       ],
-      "category": "#Global",
+      "category": "#General",
       "type": "buff"
     },
     {
@@ -2470,7 +2470,7 @@
       "ids": [
         3882154
       ],
-      "category": "#Resistances",
+      "category": "#Immunities",
       "type": "buff"
     },
     {
@@ -2478,7 +2478,7 @@
       "ids": [
         3882140
       ],
-      "category": "#Resistances",
+      "category": "#Immunities",
       "type": "buff"
     },
     {
@@ -2494,7 +2494,7 @@
       "ids": [
         3762921
       ],
-      "category": "#Global",
+      "category": "#General",
       "type": "buff"
     },
     {
@@ -2502,7 +2502,7 @@
       "ids": [
         3762648
       ],
-      "category": "#Global",
+      "category": "#General",
       "type": "buff"
     },
     {
@@ -2680,7 +2680,7 @@
       "ids": [
         4239993
       ],
-      "category": "#Group Buffs",
+      "category": "#Protections",
       "type": "buff"
     },
     {
@@ -2688,7 +2688,7 @@
       "ids": [
         143626
       ],
-      "category": "#Group HoT",
+      "category": "#Group Heals",
       "type": "misc"
     },
     {
@@ -2819,7 +2819,7 @@
       "ids": [
         4244612
       ],
-      "category": "#Group Buffs",
+      "category": "#Protections",
       "type": "buff"
     },
     {
@@ -2827,7 +2827,7 @@
       "ids": [
         4471707
       ],
-      "category": "#Group Buffs",
+      "category": "#Protections",
       "type": "buff"
     },
     {
@@ -2859,7 +2859,7 @@
       "ids": [
         4680545
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "debuff"
     },
     {
@@ -2987,7 +2987,7 @@
       "ids": [
         5017457
       ],
-      "category": "#Group Buffs",
+      "category": "#Protections",
       "type": "buff"
     },
     {
@@ -2998,7 +2998,7 @@
         5016776,
         5016777
       ],
-      "category": "#T5",
+      "category": "#Raid T5",
       "type": "debuff",
       "stacking": true
     },
@@ -3007,7 +3007,7 @@
       "ids": [
         5014929
       ],
-      "category": "#T5",
+      "category": "#Raid T5",
       "type": "buff"
     },
     {
@@ -3015,7 +3015,7 @@
       "ids": [
         5014930
       ],
-      "category": "#T5",
+      "category": "#Raid T5",
       "type": "buff"
     },
     {
@@ -3023,7 +3023,7 @@
       "ids": [
         5014931
       ],
-      "category": "#T5",
+      "category": "#Raid T5",
       "type": "buff"
     },
     {
@@ -3031,7 +3031,7 @@
       "ids": [
         5052584
       ],
-      "category": "#T6",
+      "category": "#Raid T6",
       "type": "misc"
     },
     {
@@ -3039,7 +3039,7 @@
       "ids": [
         4383426
       ],
-      "category": "#Resistances",
+      "category": "#Immunities",
       "type": "debuff"
     },
     {
@@ -3094,7 +3094,7 @@
       "ids": [
         4206340
       ],
-      "category": "#T3",
+      "category": "#Raid T3",
       "type": "buff"
     },
     {
@@ -3102,7 +3102,7 @@
       "ids": [
         4261544
       ],
-      "category": "#T3",
+      "category": "#Raid T3",
       "type": "debuff"
     },
     {
@@ -3110,7 +3110,7 @@
       "ids": [
         4189297
       ],
-      "category": "#T3",
+      "category": "#Raid T3",
       "type": "debuff"
     },
     {
@@ -3118,7 +3118,7 @@
       "ids": [
         5016792
       ],
-      "category": "#T5",
+      "category": "#Raid T5",
       "type": "debuff"
     },
     {
@@ -3126,7 +3126,7 @@
       "ids": [
         5014715
       ],
-      "category": "#T5",
+      "category": "#Raid T5",
       "type": "debuff"
     },
     {
@@ -3134,7 +3134,7 @@
       "ids": [
         5014799
       ],
-      "category": "#T5",
+      "category": "#Raid T5",
       "type": "debuff"
     },
     {
@@ -3142,7 +3142,7 @@
       "ids": [
         5014791
       ],
-      "category": "#T5",
+      "category": "#Raid T5",
       "type": "debuff"
     },
     {
@@ -3152,7 +3152,7 @@
         5014754,
         5014755
       ],
-      "category": "#T5",
+      "category": "#Raid T5",
       "type": "debuff",
       "stacking": true
     },
@@ -3161,7 +3161,7 @@
       "ids": [
         4704427
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "debuff"
     },
     {
@@ -3169,7 +3169,7 @@
       "ids": [
         4704872
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "debuff"
     },
     {
@@ -3177,7 +3177,7 @@
       "ids": [
         4701862
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "debuff"
     },
     {
@@ -3185,7 +3185,7 @@
       "ids": [
         4414104
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "misc"
     },
     {
@@ -3193,7 +3193,7 @@
       "ids": [
         4357818
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "debuff"
     },
     {
@@ -3201,7 +3201,7 @@
       "ids": [
         4383121
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "debuff"
     },
     {
@@ -3209,7 +3209,7 @@
       "ids": [
         5052580
       ],
-      "category": "#T6",
+      "category": "#Raid T6",
       "type": "misc"
     },
     {
@@ -3217,7 +3217,7 @@
       "ids": [
         4836737
       ],
-      "category": "#T3.5",
+      "category": "#Raid T3.5",
       "type": "debuff"
     },
     {
@@ -3225,7 +3225,7 @@
       "ids": [
         4857536
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "buff"
     },
     {
@@ -3233,7 +3233,7 @@
       "ids": [
         4857489
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "buff"
     },
     {
@@ -3241,7 +3241,7 @@
       "ids": [
         4857488
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "buff"
     },
     {
@@ -3249,7 +3249,7 @@
       "ids": [
         4857490
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "buff"
     },
     {
@@ -3257,7 +3257,7 @@
       "ids": [
         4857485
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "debuff"
     },
     {
@@ -3265,7 +3265,7 @@
       "ids": [
         4857492
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "debuff"
     },
     {
@@ -3273,7 +3273,7 @@
       "ids": [
         4924714
       ],
-      "category": "#T4",
+      "category": "#Raid T4",
       "type": "debuff"
     },
     {
@@ -3297,7 +3297,7 @@
       "ids": [
         5014793
       ],
-      "category": "#T5",
+      "category": "#Raid T5",
       "type": "debuff"
     }
   ]

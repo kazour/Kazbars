@@ -38,6 +38,14 @@ whitelists the old one (e.g. `assets/kazbars/Default.json`).
 
 ---
 
+## 2026-06-14
+**Category reorganization** for the first public release — display grouping only. No buff IDs, names, or types changed, so no grid/profile whitelist is affected (`Default.json` untouched).
+- **New category `#Protections`** — 15 group damage-mitigation buffs reclassified out of `#Group Buffs`: `Fierce Aegis (Poison)` `5017458`, `Rune of Resilience (BS)` `146124`, `Rune of Resistance (BS)` `146103`, `Mystic Suppression (Demo)` `145782`, `Arcane Abatement (HoX)` `145790`, `Quell the Ether (Necro)` `145626`, `Holy Cleansing (PoM)` `3202863`, `Radiant Aegis (Unholy)` `5017456`, `Damnation of Set (ToS)` `146099`, `Glorification of Set (ToS)` `146122`, `Litany of Protection (PoM)` `4922964`, `Spirit of Yggdrasil (BS)` `4239993`, `Emissary of Elysium (PoM)` `4244612`, `Eyes of Set (ToS)` `4471707`, `Vitalizing Aegis (Fire)` `5017457`.
+- **Renamed category:** `#Resistances` → `#Immunities` (21 buffs) — contents are CC-immunity / diminishing-returns flags, not gear resistances.
+- **Renamed category:** `#Global` → `#General` (20 buffs).
+- **Renamed category:** `#Group HoT` → `#Group Heals` (9 buffs).
+- **Renamed category:** `#T3` → `#Raid T3` (8), `#T3.5` → `#Raid T3.5` (13), `#T4` → `#Raid T4` (25), `#T5` → `#Raid T5` (17), `#T6` → `#Raid T6` (20) — the five raid tiers now cluster under `#Raid`.
+
 ## 2026-06-07
 - **Added:** `Spiritual Wrack` (#Global debuff) alias spell ID `4887864` (entry IDs now `3963068`, `4882958`, `4887864`).
 

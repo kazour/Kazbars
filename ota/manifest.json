@@ -1,16 +1,16 @@
 {
   "schema": 1,
-  "content_version": 1,
+  "content_version": 2,
   "min_app_version": "2.1.0",
-  "source_commit": "8aec6fc38bc4deda159d0772a70bf124d61a5854",
-  "notes": "Initial OTA manifest baseline.",
+  "source_commit": "dffbf431fc13ef0c089a4420a3c5ba78f178f82f",
+  "notes": "Buff catalog category cleanup (display grouping only \u2014 no tracked buffs changed)",
   "files": {
     "Database.json": {
-      "url": "https://raw.githubusercontent.com/kazour/Kazbars/8aec6fc38bc4deda159d0772a70bf124d61a5854/src/kazbars/assets/kazbars/Database.json",
-      "sha256": "be87c6f54376ab6cc14d4d24f36ae6ebe453b5ccd7d1a66f125dca3eb2e7f507"
+      "url": "https://raw.githubusercontent.com/kazour/Kazbars/dffbf431fc13ef0c089a4420a3c5ba78f178f82f/src/kazbars/assets/kazbars/Database.json",
+      "sha256": "fd7b386db6938b10bea57ad6fdf4d77168ec8827d2b060c2b8c17b6252657a13"
     },
     "Default.json": {
-      "url": "https://raw.githubusercontent.com/kazour/Kazbars/8aec6fc38bc4deda159d0772a70bf124d61a5854/src/kazbars/assets/kazbars/Default.json",
+      "url": "https://raw.githubusercontent.com/kazour/Kazbars/dffbf431fc13ef0c089a4420a3c5ba78f178f82f/src/kazbars/assets/kazbars/Default.json",
       "sha256": "c4ce7620614c5e29933324c9fb91c8ac1b24ec59e74d7b9121e8c365a44e6249"
     }
   }
