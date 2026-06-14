@@ -38,6 +38,13 @@ whitelists the old one (e.g. `assets/kazbars/Default.json`).
 
 ---
 
+## 2026-06-15
+- **Added:** `Spellweaving 1-6` stacking buffs (6 stack ranks each, type `buff`) for the four caster classes — each routed to its class category so the stack counter shows ranks 1–6:
+  - `Priest of Mitra` — `3761196`, `3761198`, `3761224`, `3761231`, `3761232`, `3761233`.
+  - `Necromancer` — `3663272`, `3663273`, `3663274`, `3663275`, `3663276`, `3663277`.
+  - `Tempest of Set` — `3761193`, `3761197`, `3761199`, `3761200`, `3761201`, `3761202`.
+  - `Demonologist` — `3663649`, `3663648`, `3663647`, `3663646`, `3663645`, `3663643`.
+
 ## 2026-06-14
 **Category reorganization** for the first public release — display grouping only. No buff IDs, names, or types changed, so no grid/profile whitelist is affected (`Default.json` untouched).
 - **New category `#Protections`** — 15 group damage-mitigation buffs reclassified out of `#Group Buffs`: `Fierce Aegis (Poison)` `5017458`, `Rune of Resilience (BS)` `146124`, `Rune of Resistance (BS)` `146103`, `Mystic Suppression (Demo)` `145782`, `Arcane Abatement (HoX)` `145790`, `Quell the Ether (Necro)` `145626`, `Holy Cleansing (PoM)` `3202863`, `Radiant Aegis (Unholy)` `5017456`, `Damnation of Set (ToS)` `146099`, `Glorification of Set (ToS)` `146122`, `Litany of Protection (PoM)` `4922964`, `Spirit of Yggdrasil (BS)` `4239993`, `Emissary of Elysium (PoM)` `4244612`, `Eyes of Set (ToS)` `4471707`, `Vitalizing Aegis (Fire)` `5017457`.

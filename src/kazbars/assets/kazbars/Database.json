@@ -3299,6 +3299,62 @@
       ],
       "category": "#Raid T5",
       "type": "debuff"
+    },
+    {
+      "name": "Spellweaving 1-6",
+      "ids": [
+        3761196,
+        3761198,
+        3761224,
+        3761231,
+        3761232,
+        3761233
+      ],
+      "category": "Priest of Mitra",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Spellweaving 1-6",
+      "ids": [
+        3663272,
+        3663273,
+        3663274,
+        3663275,
+        3663276,
+        3663277
+      ],
+      "category": "Necromancer",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Spellweaving 1-6",
+      "ids": [
+        3761193,
+        3761197,
+        3761199,
+        3761200,
+        3761201,
+        3761202
+      ],
+      "category": "Tempest of Set",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Spellweaving 1-6",
+      "ids": [
+        3663649,
+        3663648,
+        3663647,
+        3663646,
+        3663645,
+        3663643
+      ],
+      "category": "Demonologist",
+      "type": "buff",
+      "stacking": true
     }
   ]
 }
