@@ -1,10 +1,12 @@
 name: OTA Manifest
 
-# Push to main = live. When a commit changes the shipped stock buff files,
-# regenerate ota/manifest.json (sha256 + commit-pinned payload URLs + bumped
-# content_version) and stamp the same version into __init__.py as
-# CONTENT_BASELINE_VERSION, then commit both back so the published pointer and
-# the app baseline stay in lockstep (test_manifest.py guards this).
+# Push to main = live. The manifest is generated locally as part of any
+# stock-buff-file change (scripts/gen_manifest.py; the pre-commit pytest gate
+# won't let the change land without it). This job only VERIFIES that the
+# committed manifest is up to date — it regenerates and fails on drift. It does
+# NOT commit back, so it never fights branch protection. Payload URLs point at
+# the main ref; integrity is the per-payload sha256, which the client checks
+# before applying.
 
 on:
   push:
@@ -14,33 +16,26 @@ on:
       - 'src/kazbars/assets/kazbars/Default.json'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  manifest:
+  verify-manifest:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
-      # gen_manifest pins payload URLs to the current HEAD (the stock-change
-      # commit just pushed), where the stock files already hold the new content.
-      - name: Regenerate manifest + stamp baseline
-        run: python scripts/gen_manifest.py "Automated buff-content update."
-
-      - name: Commit if changed
+      # No notes arg => preserves the committed notes, so a clean tree means the
+      # committed manifest + baseline already match a fresh generation.
+      - name: Verify OTA manifest is up to date
         run: |
-          if git diff --quiet -- ota/manifest.json src/kazbars/__init__.py; then
-            echo "No manifest changes — nothing to commit."
-            exit 0
+          python scripts/gen_manifest.py
+          if ! git diff --quiet -- ota/manifest.json src/kazbars/__init__.py; then
+            echo "::error::ota/manifest.json or CONTENT_BASELINE_VERSION is stale — run 'python scripts/gen_manifest.py \"notes\"' and commit the result."
+            git --no-pager diff -- ota/manifest.json src/kazbars/__init__.py
+            exit 1
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add ota/manifest.json src/kazbars/__init__.py
-          git commit -m "ci: regenerate OTA manifest + stamp CONTENT_BASELINE_VERSION"
-          git push
+          echo "OTA manifest is up to date."

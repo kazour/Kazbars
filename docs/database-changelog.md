@@ -16,12 +16,13 @@ adds/edits/hidden-buffs are per-machine deltas in `userdata/database_user.json` 
 load; see `architecture.md` → "Buff database"). So entries here come from maintainer changes to the
 repo's stock file (a maintainer edit); per-user deltas are not logged.
 
-**OTA channel:** when a stock-file change lands on `main`, the
-`.github/workflows/ota-manifest.yml` Action regenerates `ota/manifest.json` (new sha256 +
-commit-pinned URLs + bumped `content_version`) and stamps the matching `CONTENT_BASELINE_VERSION`,
-so existing installs pull the update on next launch (silent, reversible — see `architecture.md` →
-"Reference content / OTA"). You don't edit the manifest by hand; just commit the stock change and log
-it here.
+**OTA channel:** a stock-file change requires regenerating `ota/manifest.json` **locally** in the same
+commit (`python scripts/gen_manifest.py "notes"`) — the pre-commit pytest gate won't let it land
+otherwise. That refreshes the sha256, the `main`-ref payload URLs, and the bumped `content_version`, and
+stamps the matching `CONTENT_BASELINE_VERSION`; once on `main`, existing installs pull the update on next
+launch (silent, reversible — see `architecture.md` → "Reference content / OTA"). The
+`.github/workflows/ota-manifest.yml` Action only **verifies** it (regenerate + fail on drift; never commits
+back). Don't hand-edit the manifest; regenerate and log the stock change here.
 
 Whenever the stock `Database.json` changes, add a bullet under a `## YYYY-MM-DD` heading at the top
 (reuse today's heading if it already exists):

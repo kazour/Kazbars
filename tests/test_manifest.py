@@ -2,8 +2,9 @@
 
 Two invariants, mirroring test_data_integrity's byte-level guard:
   1. the committed manifest's sha256 for each payload matches the committed
-     shipped stock file — so a published manifest can never point at content
-     that has since changed; and
+     shipped stock file — payload URLs ride the `main` ref (not a commit SHA), so
+     the sha256 is what guarantees integrity: the client rejects any payload whose
+     hash doesn't match; and
   2. CONTENT_BASELINE_VERSION == the manifest's content_version — the two are
      stamped together by scripts/gen_manifest.py, so a drift would make a fresh
      install either re-download content it shipped with (baseline < manifest) or
@@ -35,6 +36,7 @@ def test_manifest_exists_and_wellformed():
     assert set(m["files"]) == {"Database.json", "Default.json"}
     for info in m["files"].values():
         assert info["url"].startswith("https://raw.githubusercontent.com/")
+        assert "/main/" in info["url"], "payload URLs ride the main ref, not a commit SHA"
         assert len(info["sha256"]) == 64
 
 
