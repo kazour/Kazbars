@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "content_version": 4,
+  "content_version": 5,
   "min_app_version": "2.1.0",
-  "notes": "Added Spellweaving 1-6 stack tracking for Priest of Mitra, Tempest of Set, Demonologist, and Necromancer",
+  "notes": "Spelled out the SW abbreviation in 9 Spellweaving buff names",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
-      "sha256": "34ef1787ecd8a9b47f1e2f52a91635e0766663a87d5c7ac56a866d6be09f7504"
+      "sha256": "0b3f8e5f3061bb3163990f956d833093e060e2c2ba4a11272bfdffc1be3fb08d"
     },
     "Default.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.json",

@@ -45,6 +45,11 @@ whitelists the old one (e.g. `assets/kazbars/Default.json`).
   - `Necromancer` — `3663272`, `3663273`, `3663274`, `3663275`, `3663276`, `3663277`.
   - `Tempest of Set` — `3761193`, `3761197`, `3761199`, `3761200`, `3761201`, `3761202`.
   - `Demonologist` — `3663649`, `3663648`, `3663647`, `3663646`, `3663645`, `3663643`.
+- **Renamed:** spelled out the `SW ` (Spellweaving) abbreviation in 9 buff names — display only, IDs unchanged:
+  - `SW Arcane Renewal` → `Spellweaving Arcane Renewal` (`3762921`), `SW Arcane Surge` → `Spellweaving Arcane Surge` (`3762648`).
+  - `SW Parasite Host` → `Spellweaving Parasite Host` (`3663577`), `SW Death God` → `Spellweaving Death God` (`3762722`).
+  - `SW Benevolence of Mitra` → `Spellweaving Benevolence of Mitra` (`3763853`), `SW Mitra's Thunder` → `Spellweaving Mitra's Thunder` (`3763855`), `SW Mitra's Grace` → `Spellweaving Mitra's Grace` (`3763852`).
+  - `SW Set's Rebuke` → `Spellweaving Set's Rebuke` (`3764133`), `SW Power Surge` → `Spellweaving Power Surge` (`3764495`).
 
 ## 2026-06-14
 **Category reorganization** for the first public release — display grouping only. No buff IDs, names, or types changed, so no grid/profile whitelist is affected (`Default.json` untouched).
