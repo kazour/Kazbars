@@ -314,19 +314,34 @@
         var j:Number;
         var e:Object;
         var k:Number;
+        // Forced Engage is the only CC that applies its lock and its immunity in the same
+        // instant, so a shared static slot can't rely on "newest wins" to surface the lock
+        // first. Pin the lock; once it drops, the immunity is the sole remaining match and
+        // takes the slot on its own. Every other CC applies the two sequentially, so lockWins
+        // stays false and the comparison below is the unchanged most-recent-wins rule.
+        var FE_LOCK_ID:Number = 4325954;
+        var isLock:Boolean;
+        var lockWins:Boolean;
         while (i < total) {
             s = obj.slots[i];
             ids = sa[i];
             if (ids == null || ids.length == 0) { hideSlot(s); disp[i] = null; i++; continue; }
             active = null;
             latest = -1;
+            lockWins = false;
             j = 0;
             while (j < src.length) {
                 e = src[j];
                 if (e != null) {
                     k = 0;
                     while (k < ids.length) {
-                        if (e.id == ids[k] && e.at > latest) { latest = e.at; active = e; break; }
+                        if (e.id == ids[k]) {
+                            isLock = (e.id == FE_LOCK_ID);
+                            if ((isLock && !lockWins) || (isLock == lockWins && e.at > latest)) {
+                                lockWins = isLock; latest = e.at; active = e;
+                            }
+                            break;
+                        }
                         k++;
                     }
                 }
