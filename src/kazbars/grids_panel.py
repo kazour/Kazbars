@@ -377,8 +377,14 @@ class GridsPanel(ttk.Frame):
 
         state_widget = self._normal_view if has_grids else self._empty_state
         self._tip_frame.pack_forget()
-        self._tip_frame.pack(fill='x', padx=PAD_TAB, pady=(PAD_XS, PAD_XS),
-                             before=state_widget)
+        # state_widget can be mid-swap when _mark_modified() fires before
+        # refresh_panels() repacks the view (e.g. deleting the last grid
+        # un-ticks Build while _normal_view is still packed). Anchoring
+        # `before` an unpacked widget raises TclError, so skip the repack and
+        # let the follow-up _update_tip() place it once the view has swapped.
+        if state_widget.winfo_manager() == 'pack':
+            self._tip_frame.pack(fill='x', padx=PAD_TAB, pady=(PAD_XS, PAD_XS),
+                                 before=state_widget)
 
     def _create_from_empty_state(self, rows, cols, mode):
         """Create a grid from the empty state preset shortcuts."""
