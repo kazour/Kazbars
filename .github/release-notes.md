@@ -1,24 +1,12 @@
-## What's New in v2.2.0
+## What's New in v2.2.1
 
-New **Damage Numbers**, an in-game stopwatch, and a simpler Deeps alarm.
-
-### Added
-
-**Damage Numbers** — a leaner, faster version of the game's floating combat numbers. Ranged hits stop shrinking at distance, and you can recolor and reposition every number. Off by default.
-
-**Stopwatch** — a small, draggable count-up timer that sits in the game overlay and works in fullscreen. Off by default.
-
-### Changed
-
-**Deeps alarm** — now a simple slider, with two survival presets to choose from: Standard or Tank.
-
-**Buff catalog** — clearer categories, plainer names, and raid buffs grouped by tier.
-
-**Default profile** — redesigned starter grids: My Buffs, Raid Debuffs, Target Buffs, Target Debuffs.
+A patch release: two fixes.
 
 ### Fixed
 
-**Cast Timer** — no longer flashes a wrong time during lag or interrupted casts.
+**Show Desktop (Win+D) no longer traps the app.** Pressing Win+D while a popup was open — the Build & Install summary, the welcome popup, About, or the "close the game first" notice — could minimize KazBars with no way back; the taskbar and Alt-Tab did nothing. These popups now follow the main window and return, on top and usable, when you restore.
+
+**Veil of the Unliving (Zaal) now matches the in-game effect.** Its spell ID was wrong, so grids and profiles tracking it stayed dark; that's corrected and it lights up again. Existing installs already picked this up automatically as a content update.
 
 ---
 

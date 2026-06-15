@@ -4,10 +4,11 @@ All notable changes to KazBars will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [2.2.1] — 2026-06-16
 
 ### Fixed
 - **Frameless popups no longer trap the app after Show Desktop (Win+D).** Pressing Win+D while a borderless KazBars modal was open — the Build & Install summary, the welcome popup, About, or the "close the game first" notice — could leave the window minimized with no way back: clicking the taskbar or Alt-Tab did nothing, because these title-bar-less windows give Windows nothing to restore. They now track the main window — hiding when you minimize and returning, on top and usable, when you restore.
+- **Veil of the Unliving (Zaal) now matches the in-game effect.** Corrected the buff's spell ID, so grids and profiles tracking it light up again. (Already delivered to existing installs as a content update; see `database-changelog.md`.)
 
 ## [2.2.0] — 2026-06-15
 
