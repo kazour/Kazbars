@@ -4,77 +4,59 @@
 [![Latest release](https://img.shields.io/github/v/release/kazour/Kazbars?label=release)](https://github.com/kazour/Kazbars/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Buff/debuff grid overlay editor for **Age of Conan** — design icon grids that show your active effects on top of the game, then compile and install them in one click. Most of what it builds is set up once and runs on its own after you close the app; two live combat HUDs (the Ethram-Fal seed timer and a real-time deeps meter) keep working only while KazBars is open. A handful of in-game extras round it out.
+Buff/debuff overlay editor for **Age of Conan** — design icon grids and bars that show your active effects on top of the game, then compile and install them in one click. It also ships live combat HUDs and a handful of in-game extras: a cast timer, a stopwatch, leaner damage numbers, a real-time deeps meter, and the Ethram-Fal seed timer.
+
+Most of what KazBars builds is set up once and runs on its own after you close the app. Only the two live combat overlays — the deeps meter and the Ethram-Fal seed timer — keep working while KazBars is open.
 
 > **Upgrading from Kaz Grids?** Install over it — no uninstall needed. Your settings and game folder carry over automatically.
+
+## Features
+
+**KazBars** — custom icon overlays arranged in bars or grids that show only the buffs and debuffs you choose to track.
+
+- **Player and Target grids** — track effects on you and your current target
+- **Dynamic or Static slots** — auto-fill as buffs activate, or pin specific buffs to specific slots
+- **Buff database** — map numeric buff IDs to readable names and classify them as Buff, Debuff, or Misc
+
+**Cast Timer** — an on-screen readout of your and your target's current cast time, ready to sit over the game's cast bars. Off by default
+
+**Stopwatch** — a draggable Start / Pause / Reset count-up timer that works in fullscreen and never steals focus from the game. Off by default
+
+**Damage Numbers** — a leaner, faster rewrite of the game's floating combat numbers, with new layout and behavior settings. Needs the Aoc.exe launcher bypass: it replaces a stock `.swf` the game's patcher restores otherwise, so rebuild after each patcher run if you don't have the bypass. Off by default
+
+**Deeps by Veni** — a real-time meter that reads your combat log for DPS out, DPS in, HPS out, HPS in, and ΔHP in.
+
+**Ethram-Fal Seed Timer** — tracks the Viscous Seed / Lotus Fixation / Syphon cycle so the raid can time scorpion kills.
+
+## Utility tools
+
+**Default Buff Bars editor** — tune the game's own buff-bar HUD from one place: on/off, icon size, spacing, columns, friendly/hostile filter — no XML editing.
+
+**Damage number colors** — recolor every damage source from one place.
+
+**Backup & restore** — save your full Age of Conan config plus your KazBars profiles and settings to one portable zip, and restore it after a reformat or on a new PC.
 
 ## Install
 
 1. Download `KazBars.zip` from the [latest release](../../releases/latest) and extract it anywhere.
-2. Run `KazBars.exe`.
+
+2. Run `KazBars.exe` as Administrator.
+
+3. The first-run setup window opens. Point it at your Age of Conan folder.
+
+4. If it detects the Aoc.exe launcher bypass in that folder, say whether you use it.
+
+5. Choose **Use Defaults** — ready-made grids for common raid buffs and debuffs, sized to your screen. (Or **Start Empty** to build your own from scratch.)
+
+6. Click `Build & Install`. Close the game for your first build; after that, rebuild anytime and apply from chat — `/reloadui` if you use Aoc.exe, or `/reloadui` then `/reloadgrids` on the standard launcher.
+
+Once you know the flow, make it yours: `+ Add Grid` for your own layouts, then `Tracked Buffs...` to pick what each one watches. Up to **64 slots total** across all your grids.
 
 > **SmartScreen warning**: Windows may flag the `.exe` as unrecognized on first launch. Click **More info** → **Run anyway**. KazBars is unsigned because code signing certificates aren't justified for a hobby project.
-
-## Quick start
-
-1. **Set your game folder** — click the `Game:` label in the bottom bar and pick your Age of Conan install folder.
-2. **Start from the default profile** — first launch loads a ready-made set of grids (My Buffs, Raid Debuffs, Target Buffs, Target Debuffs). Build & Install it as-is, or tweak it first.
-3. **Add your own grid** (optional) — in the Grids view, click `+ Add Grid`. A 1×10 horizontal bar is a good starting point.
-4. **Choose buffs to track** — click `Tracked Buffs...` and pick entries from the database.
-5. **Build & Install** — click the green button. If you use the Aoc.exe launcher bypass, close the game for your first build. After that, rebuild anytime and type `/reloadui` in chat to apply changes.
-
-Up to **64 slots total** across all your grids.
 
 ## Community
 
 Questions, bug reports, and release news live on Discord. [Join the Discord](https://discord.gg/ubK5Guryfa).
-
-## What it does
-
-Everything KazBars does is one of three kinds of mod, and the kind tells you the
-one thing you care about: **whether you ever need the app open again.**
-
-Almost everything is **set up once and forgotten** — you Build & Install, type
-`/reloadui`, and close the app. Only the two live overlays need KazBars running
-while you play.
-
-### Set up once — Build & Install, then close the app
-
-These compile into the game's UI or patch its skin files. After a build you type
-`/reloadui` in chat and never open the editor again, unless you want to change
-something.
-
-**Grids** are the flagship — they compile into the game and draw your icons:
-
-- **Player or Target grids** — track effects on you or your current target
-- **Dynamic mode** — slots auto-fill as buffs activate; choose fill direction, sort order, and grouping
-- **Static mode** — pin specific buffs to specific slots
-- **Stacking** — show stack counts over icons for multi-stack effects
-- **Timers and flash warnings** — optional remaining-duration text and pulse-on-low-time
-- **Buff database** — a curated catalog that maps numeric spell IDs to readable names, classifies them as Buff (grey), Debuff (red), or Misc (golden), and sorts them into categories so you can find what you track
-- **Buff-discovery console** — optional in-game overlay that logs effect names and their spell IDs as they land on you or your target, so you can find the numbers to add to the database
-
-Optional extras that also compile into the overlay:
-
-- **Cast-timer overlay** — on-screen readout of your and your target's current cast time, positioned and styled alongside your grids
-- **In-game stopwatch** — a draggable Start/Pause/Reset count-up timer that works in fullscreen and never steals focus from the game. Off by default
-
-Two extras change the game's own combat text and HUD — same Build & Install:
-
-- **Damage Numbers** — a leaner rewrite of the game's floating combat numbers. Headline fix: ranged hits stop shrinking to nothing at distance. Also tune shadow, pop-in/fade speed, where numbers land (over the target, in fixed columns, or a zig-zag stack), and recolor each combat-number source. Off by default behind a master toggle; your stock file is backed up, so turning it off restores the original
-- **Default Buff Bars editor** — edit the game's own HUD `<BuffListView />` widgets (icon size, spacing, columns, friendly/hostile filter) without hand-editing XML
-
-### Runs while you play — keep KazBars open
-
-These read your combat log in real time and draw always-on-top desktop overlays.
-They only work while KazBars is running:
-
-- **Ethram-Fal Live Tracker** — always-on-top overlay for the Viscous Seed / Lotus Fixation / Syphon cycle. A missed timer wipes the raid, so the whole group watches it during the pull
-- **Deeps** — real-time combat overlay showing DPS out, DPS in, HPS out, HPS in, and ΔHP in. The DPS-out cell pulses red past a threshold you set; the incoming cells tint as your net HP drops
-
-### And one housekeeping tool
-
-- **Backup & restore** — save your full Age of Conan config plus your KazBars profiles and settings to one portable zip, and restore it after a reformat or a corrupted profile
 
 ## Requirements
 
