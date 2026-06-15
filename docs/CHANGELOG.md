@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Frameless popups no longer trap the app after Show Desktop (Win+D).** Pressing Win+D while a borderless KazBars modal was open — the Build & Install summary, the welcome popup, About, or the "close the game first" notice — could leave the window minimized with no way back: clicking the taskbar or Alt-Tab did nothing, because these title-bar-less windows give Windows nothing to restore. They now track the main window — hiding when you minimize and returning, on top and usable, when you restore.
+
 ## [2.2.0] — 2026-06-15
 
 ### Added

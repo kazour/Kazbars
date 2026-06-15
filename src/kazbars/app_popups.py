@@ -40,6 +40,61 @@ SCANLINE_STEP = 3
 # SHARED POPUP CHROME
 # ============================================================================
 
+def keep_modal_restorable(popup, parent):
+    """Let a frameless overrideredirect modal survive a Win+D minimize-all.
+
+    Such a popup has no WM frame, so Windows can't restore it from the taskbar
+    or Alt-Tab after a minimize — and its active grab then strands the whole
+    app. The frameless modal won't reliably see its own <Unmap>, but the
+    WM-managed root does, so mirror it: drop the grab + hide on minimize; on
+    restore, re-show and re-assert -topmost (deiconify() drops the WS_EX_TOPMOST
+    z-order on a frameless window, so it would come back hidden behind the root)
+    then re-grab. Self-cleans when the popup is destroyed.
+    """
+    binds = {}
+
+    def _on_minimize(event):
+        if event.widget is not parent or not popup.winfo_exists():
+            return
+        try:
+            popup.grab_release()
+            popup.withdraw()
+        except tk.TclError:
+            pass
+
+    def _on_restore(event):
+        if event.widget is not parent or not popup.winfo_exists():
+            return
+        # Defer so the re-show lands after the root finishes raising itself.
+        popup.after(50, _reshow)
+
+    def _reshow():
+        if not popup.winfo_exists():
+            return
+        try:
+            popup.deiconify()
+            popup.lift()
+            popup.attributes('-topmost', False)
+            popup.attributes('-topmost', True)
+            popup.grab_set()
+            popup.focus_set()
+        except tk.TclError:
+            pass
+
+    def _cleanup(event):
+        if event.widget is not popup:
+            return
+        try:
+            parent.unbind('<Unmap>', binds['unmap'])
+            parent.unbind('<Map>', binds['map'])
+        except (tk.TclError, KeyError):
+            pass
+
+    binds['unmap'] = parent.bind('<Unmap>', _on_minimize, add='+')
+    binds['map'] = parent.bind('<Map>', _on_restore, add='+')
+    popup.bind('<Destroy>', _cleanup, add='+')
+
+
 def make_popup_shell(parent, height):
     """Create a frameless dark Toplevel + canvas with KAZBARS chrome.
 
@@ -69,6 +124,7 @@ def make_popup_shell(parent, height):
     canvas.create_text(WIDTH // 2, 32, text='「 KAZBARS 」',
                        font=FONT_HEADING, fill=THEME_COLORS['accent'])
 
+    keep_modal_restorable(popup, parent)
     return popup, canvas
 
 

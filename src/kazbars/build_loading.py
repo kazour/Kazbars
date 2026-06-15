@@ -13,7 +13,14 @@ import tkinter as tk
 
 logger = logging.getLogger(__name__)
 
-from .app_popups import BG, BORDER_COLOR, SCANLINE_STEP, WIDTH, draw_close_button
+from .app_popups import (
+    BG,
+    BORDER_COLOR,
+    SCANLINE_STEP,
+    WIDTH,
+    draw_close_button,
+    keep_modal_restorable,
+)
 from .ui_helpers import (
     FONT_BODY,
     FONT_HEADING,
@@ -83,6 +90,10 @@ class BuildLoadingScreen(tk.Toplevel):
             self._escape_armed = True
         self._arm_timer = self.after(30000, _arm_escape)
         self.bind('<Escape>', self._on_escape)
+
+        # Win+D (minimize-all) hides this frameless modal where no WM frame can
+        # restore it; mirror the root's minimize/restore so it survives.
+        keep_modal_restorable(self, self._parent)
 
     def _on_escape(self, event=None):
         if self._escape_armed or self._phase == 'summary':
