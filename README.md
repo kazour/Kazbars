@@ -18,9 +18,10 @@ Buff/debuff grid overlay editor for **Age of Conan** — design icon grids that 
 ## Quick start
 
 1. **Set your game folder** — click the `Game:` label in the bottom bar and pick your Age of Conan install folder.
-2. **Add a grid** — in the Grids view, click `+ Add Grid`. A 1×10 horizontal bar is a good starting point.
-3. **Choose buffs to track** — click `Tracked Buffs...` and pick entries from the database.
-4. **Build & Install** — click the green button. If you use the Aoc.exe launcher bypass, close the game for your first build. After that, rebuild anytime and type `/reloadui` in chat to apply changes.
+2. **Start from the default profile** — first launch loads a ready-made set of grids (My Buffs, Raid Debuffs, Target Buffs, Target Debuffs). Build & Install it as-is, or tweak it first.
+3. **Add your own grid** (optional) — in the Grids view, click `+ Add Grid`. A 1×10 horizontal bar is a good starting point.
+4. **Choose buffs to track** — click `Tracked Buffs...` and pick entries from the database.
+5. **Build & Install** — click the green button. If you use the Aoc.exe launcher bypass, close the game for your first build. After that, rebuild anytime and type `/reloadui` in chat to apply changes.
 
 Up to **64 slots total** across all your grids.
 
@@ -50,7 +51,7 @@ something.
 - **Static mode** — pin specific buffs to specific slots
 - **Stacking** — show stack counts over icons for multi-stack effects
 - **Timers and flash warnings** — optional remaining-duration text and pulse-on-low-time
-- **Buff database** — map numeric spell IDs to readable names and classify them as Buff (grey), Debuff (red), or Misc (golden)
+- **Buff database** — a curated catalog that maps numeric spell IDs to readable names, classifies them as Buff (grey), Debuff (red), or Misc (golden), and sorts them into categories so you can find what you track
 - **Buff-discovery console** — optional in-game overlay that logs effect names and their spell IDs as they land on you or your target, so you can find the numbers to add to the database
 
 Optional extras that also compile into the overlay:

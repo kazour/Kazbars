@@ -1,17 +1,18 @@
-## What's New in v2.1.0
+## What's New in v2.2.0
 
-Deeps readout tuning, plus a couple of reliability fixes.
+New **Damage Numbers** overlay, an in-game stopwatch, and a simpler Deeps alarm.
 
 ### Added
-- **Deeps Readout presets.** A new Readout card in the Deeps panel: pick the rolling-window width (5 / 7 / 11 / 13 s) and a Style — **Live** (every spike shows), **Steady** (calm but responsive), or **Calm** (heavy smoothing, chunky numbers). Ships on Steady. The alarm and tints still track the raw values, so only the digits ease.
-- **Crash log on disk.** The app writes a rotating `logs/kazbars.log` next to the `.exe`, so a crash with no console still leaves a trail to share.
+- **Damage Numbers.** A leaner rewrite of Age of Conan's floating combat numbers, installed on your next Build & Install (Game ▸ Damage number Mod… / Damage number Colors…). The headline fix: ranged hits stop shrinking to nothing at distance — a **Keep ranged numbers big** toggle holds the size of ranged damage past about 15 metres without touching your melee numbers. You can also set the shadow style, the pop-in and fade speed, and where numbers land (above the target, in fixed columns, or a zig-zag stack), with **Default** and **Performance** presets. Two toggles group or split your resource numbers so your own mana/stamina reads in one steady place, and a **Damage number colors** editor recolors every source — incoming and outgoing hits, crits, spells, combos, heals, mana/stamina — for you and your target separately. Off by default behind one master toggle; your stock `DamageInfo.swf` is backed up once, so turning it off restores the original.
+- **In-game stopwatch.** An optional Start / Pause / Reset count-up timer that lives inside the game overlay (Game ▸ In-game stopwatch…), so it works in fullscreen and never steals focus from the game. A compact draggable panel showing `h:mm:ss`; the `−` button collapses it to its title bar, which then shows the running time. Off by default.
 
 ### Changed
-- **Smoother Deeps alarm.** The DPS-out alarm glides through its pulse instead of stuttering, and the incoming-damage / net-HP cells ramp through amber as the deficit grows instead of snapping on at one threshold.
-- **More in-app Help.** The Help view now covers Deeps, the Cast Timer, Backup & restore, the Default Buff Bars editor, the buff-discovery console, and game resolution.
+- **Deeps "Alarm & Tints" is simpler.** The DPS-out alarm is now a slider over a 1000–4000/s band instead of a typed value, and the survival tints collapse into two presets — **Standard** (DPS / healers) and **Tank** (a wider band). Your saved alarm value is kept and clamped into the slider's band.
+- **Buff catalog reorganized.** Clearer categories with a new **#Protections** group, plainer names (#Resistances → #Immunities, #Global → #General, #Group HoT → #Group Heals), and the raid tiers grouped under **#Raid T3…T6**.
+- **Refreshed default profile.** The out-of-the-box grids are redesigned with clear names: My Buffs, Raid Debuffs, Target Buffs, Target Debuffs.
 
 ### Fixed
-- **Unusual grid names can't break the build.** Grid names with quotes, newlines, or backslashes are now escaped when generating the overlay code, so they can't corrupt the build.
+- **Cast Timer no longer flashes a bogus estimate** during lag or cast interrupts. It now reads the clock and cast progress on the same frame, so a stutter can't spike the number.
 
 ---
 
@@ -25,6 +26,7 @@ Buff/debuff grid overlay editor for **Age of Conan**. Design icon grids that sho
 - **Deeps** — real-time combat overlay showing DPS out, DPS in, HPS out, HPS in, and ΔHP in; the DPS-out cell pulses red past a threshold you set
 - **Damage Numbers** — a leaner rewrite of the game's floating combat numbers, so ranged hits stop shrinking at distance; tune shadow, speed, and placement, and recolor each source. Off by default; restores stock when you turn it off
 - **Cast-timer overlay** — optional on-screen readout of your and your target's current cast time, styled alongside your grids
+- **In-game stopwatch** — a draggable Start / Pause / Reset count-up timer that works in fullscreen and never steals focus. Off by default
 - **Default Buff Bars editor** — edit the in-game HUD widgets (icon size, spacing, columns, friendly/hostile filter) without hand-editing XML
 - **Ethram-Fal Seed Timer** — always-on-top overlay for the Viscous Seed / Lotus Fixation / Syphon cycle
 - **Backup & restore** — save your full Age of Conan config plus your KazBars profiles and settings to one portable zip, and restore it after a reformat
