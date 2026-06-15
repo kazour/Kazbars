@@ -1,48 +1,64 @@
 ## What's New in v2.2.0
 
-New **Damage Numbers** overlay, an in-game stopwatch, and a simpler Deeps alarm.
+New **Damage Numbers**, an in-game stopwatch, and a simpler Deeps alarm.
 
 ### Added
-- **Damage Numbers.** A leaner rewrite of Age of Conan's floating combat numbers, installed on your next Build & Install (Game ▸ Damage number Mod… / Damage number Colors…). The headline fix: ranged hits stop shrinking to nothing at distance — a **Keep ranged numbers big** toggle holds the size of ranged damage past about 15 metres without touching your melee numbers. You can also set the shadow style, the pop-in and fade speed, and where numbers land (above the target, in fixed columns, or a zig-zag stack), with **Default** and **Performance** presets. Two toggles group or split your resource numbers so your own mana/stamina reads in one steady place, and a **Damage number colors** editor recolors every source — incoming and outgoing hits, crits, spells, combos, heals, mana/stamina — for you and your target separately. Off by default behind one master toggle; your stock `DamageInfo.swf` is backed up once, so turning it off restores the original.
-- **In-game stopwatch.** An optional Start / Pause / Reset count-up timer that lives inside the game overlay (Game ▸ In-game stopwatch…), so it works in fullscreen and never steals focus from the game. A compact draggable panel showing `h:mm:ss`; the `−` button collapses it to its title bar, which then shows the running time. Off by default.
+
+**Damage Numbers** — a leaner, faster version of the game's floating combat numbers. Ranged hits stop shrinking at distance, and you can recolor and reposition every number. Off by default.
+
+**Stopwatch** — a small, draggable count-up timer that sits in the game overlay and works in fullscreen. Off by default.
 
 ### Changed
-- **Deeps "Alarm & Tints" is simpler.** The DPS-out alarm is now a slider over a 1000–4000/s band instead of a typed value, and the survival tints collapse into two presets — **Standard** (DPS / healers) and **Tank** (a wider band). Your saved alarm value is kept and clamped into the slider's band.
-- **Buff catalog reorganized.** Clearer categories with a new **#Protections** group, plainer names (#Resistances → #Immunities, #Global → #General, #Group HoT → #Group Heals), and the raid tiers grouped under **#Raid T3…T6**.
-- **Refreshed default profile.** The out-of-the-box grids are redesigned with clear names: My Buffs, Raid Debuffs, Target Buffs, Target Debuffs.
+
+**Deeps alarm** — now a simple slider, with two survival presets to choose from: Standard or Tank.
+
+**Buff catalog** — clearer categories, plainer names, and raid buffs grouped by tier.
+
+**Default profile** — redesigned starter grids: My Buffs, Raid Debuffs, Target Buffs, Target Debuffs.
 
 ### Fixed
-- **Cast Timer no longer flashes a bogus estimate** during lag or cast interrupts. It now reads the clock and cast progress on the same frame, so a stutter can't spike the number.
+
+**Cast Timer** — no longer flashes a wrong time during lag or interrupted casts.
 
 ---
 
-Buff/debuff grid overlay editor for **Age of Conan**. Design icon grids that show your active effects on top of the game, then compile and install them in one click.
+Buff/debuff overlay editor for **Age of Conan**. Design icon grids or bars that show your active effects on top of the game, then compile and install them in one click.
 
 ## Highlights
 
-- **Player and Target grids** — track effects on you or your current target
+**KazBars** — custom icon overlays arranged in bars or grids that show only the buffs and debuffs you choose to track.
+- **Player and Target grids** — track effects on you and your current target
 - **Dynamic or Static slots** — auto-fill as buffs activate, or pin specific buffs to specific slots
-- **Buff database** — map numeric spell IDs to readable names and classify them as Buff, Debuff, or Misc
-- **Deeps** — real-time combat overlay showing DPS out, DPS in, HPS out, HPS in, and ΔHP in; the DPS-out cell pulses red past a threshold you set
-- **Damage Numbers** — a leaner rewrite of the game's floating combat numbers, so ranged hits stop shrinking at distance; tune shadow, speed, and placement, and recolor each source. Off by default; restores stock when you turn it off
-- **Cast-timer overlay** — optional on-screen readout of your and your target's current cast time, styled alongside your grids
-- **In-game stopwatch** — a draggable Start / Pause / Reset count-up timer that works in fullscreen and never steals focus. Off by default
-- **Default Buff Bars editor** — edit the in-game HUD widgets (icon size, spacing, columns, friendly/hostile filter) without hand-editing XML
-- **Ethram-Fal Seed Timer** — always-on-top overlay for the Viscous Seed / Lotus Fixation / Syphon cycle
-- **Backup & restore** — save your full Age of Conan config plus your KazBars profiles and settings to one portable zip, and restore it after a reformat
+- **Buff database** — map numeric buff IDs to readable names and classify them as Buff, Debuff, or Misc
+
+**Cast Timer** — an on-screen readout of your and your target's current cast time, ready to sit over the game's cast bars. Off by default
+
+**Stopwatch** — a simple, draggable Start / Pause / Reset count-up timer. Off by default
+
+**Damage Numbers** — a leaner, faster rewrite of the game's floating combat numbers with new layout and behavior settings. Needs the Aoc.exe launcher bypass: it replaces a stock `.swf` file that the game's patcher restores otherwise. Rebuild after each patcher run if you don't have launcher bypass. Off by default
+
+**Deeps by Veni** — a real-time meter that reads the combat log for your DPS out, DPS in, HPS out, HPS in, and ΔHP in
+
+**Ethram-Fal Seed Timer** — tracks the Viscous Seed / Lotus Fixation / Syphon cycle to help the raid time scorpion kills
+
+## Utility tools
+
+**Default Buff Bars editor** — tune the game's own buff-bar HUD from one place: on/off, icon size, spacing, columns, friendly/hostile filter — no XML editing
+
+**Damage number colors** — recolor every damage source from one place
+
+**Backup & restore** — save your full Age of Conan config plus your KazBars profiles and settings to one portable zip, and restore it after a reformat or on a new PC
 
 ## Install
 
 1. Download `KazBars.zip` below and extract it anywhere.
-2. Run `KazBars.exe`.
-3. Click the `Game:` label in the bottom bar and pick your Age of Conan folder.
-4. In the Grids view, click `+ Add Grid` — a 1×10 horizontal bar is a good starting point.
-5. Click `Tracked Buffs...` and pick entries from the database.
-6. Click `Build & Install`. Close the game for your first build; after that, rebuild anytime and type `/reloadui` in chat to apply changes.
+2. Run `KazBars.exe` as Administrator.
+3. The first-run setup window opens. Point it at your Age of Conan folder.
+4. If it detects the Aoc.exe launcher bypass in that folder, say whether you use it.
+5. Choose **Use Defaults** — ready-made grids for common raid buffs and debuffs, sized to your screen. (Or **Start Empty** to build your own from scratch.)
+6. Click `Build & Install`. Close the game for your first build; after that, rebuild anytime and apply from chat — `/reloadui` if you use Aoc.exe, or `/reloadui` then `/reloadgrids` on the standard launcher.
 
-## Upgrading from Kaz Grids
-
-Install over it — no uninstall needed. Your settings and game folder carry over automatically.
+Once you know the flow, make it yours: `+ Add Grid` for your own layouts, then `Tracked Buffs...` to pick what each one watches.
 
 > **SmartScreen warning**: Windows may flag the `.exe` as unrecognized on first launch. Click **More info** → **Run anyway**. KazBars is unsigned because code signing certificates aren't justified for a hobby project. If you want to verify the download, `KazBars.zip.sha256` is attached alongside the zip — compare it with `Get-FileHash "KazBars.zip"` in PowerShell.
 
