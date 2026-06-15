@@ -40,6 +40,7 @@ whitelists the old one (e.g. `assets/kazbars/Default.json`).
 ---
 
 ## 2026-06-15
+- **Fixed:** `Veil of the Unliving (Zaal)` (#Raid T3.5 debuff) spell ID `4752520` → `5064067`; updated the matching `Default.json` whitelist + resynced the bundled `.default`.
 - **Added:** `Spellweaving 1-6` stacking buffs (6 stack ranks each, type `buff`) for the four caster classes — each routed to its class category so the stack counter shows ranks 1–6:
   - `Priest of Mitra` — `3761196`, `3761198`, `3761224`, `3761231`, `3761232`, `3761233`.
   - `Necromancer` — `3663272`, `3663273`, `3663274`, `3663275`, `3663276`, `3663277`.

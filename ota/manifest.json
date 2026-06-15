@@ -1,16 +1,16 @@
 {
   "schema": 1,
-  "content_version": 7,
-  "min_app_version": "2.1.0",
-  "notes": "Polish default grid names for first public release",
+  "content_version": 8,
+  "min_app_version": "2.2.0",
+  "notes": "Fix Veil of the Unliving (Zaal) spell ID",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
-      "sha256": "0b3f8e5f3061bb3163990f956d833093e060e2c2ba4a11272bfdffc1be3fb08d"
+      "sha256": "af98e0b30d5f97ccbd24970a29134b582183a51e80131a00dcf56fe33d4a53af"
     },
     "Default.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.json",
-      "sha256": "a2e8c53c388da96814874a14d3df861efdb2df4f39f40bdd516b06f6812671ea"
+      "sha256": "a913b34c39cdd07a7270d33736f97e4d09d2ffa33f8bc787008845892f5304a7"
     }
   }
 }
