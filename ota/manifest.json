@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "content_version": 5,
+  "content_version": 6,
   "min_app_version": "2.1.0",
-  "notes": "Spelled out the SW abbreviation in 9 Spellweaving buff names",
+  "notes": "Default profile refresh for first public release",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
@@ -10,7 +10,7 @@
     },
     "Default.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.json",
-      "sha256": "90170f2391d95f2aba458a9a7ad348606af3beddd9c5a08dc9580fdbb950cf2d"
+      "sha256": "7c5a3125710b9d6e7b7984dba70f05d1a04dac0a71b63ac5d1fc9c9bafdca189"
     }
   }
 }

@@ -2,22 +2,14 @@
 Tests for `grid_model.scale_grid_position` — the anchor-based resolution scaler.
 
 Locks in the formula (X center-anchored at α=0.5, Y bottom-anchored at α=1.0)
-so future refactors don't silently regress it. The bundled `Default.json` is
-the canonical 1080p reference; predictions for 1440p and 4K are computed from
-it deterministically.
+so future refactors don't silently regress it. Predictions for 1440p and 4K are
+computed deterministically from fixed 1080p-authored coordinates, independent of
+any shipped profile.
 
 Run: `pytest tests/test_resolution_scaling.py` (from repo root).
 """
 
-import json
-
 from kazbars.grid_model import scale_grid_position
-from kazbars.paths import KAZBARS_ASSETS
-
-
-def _default_grids():
-    data = json.loads((KAZBARS_ASSETS / "Default.json").read_text(encoding='utf-8'))
-    return data['grids'], tuple(data['reference_resolution'])
 
 
 def test_scale_identity_when_ref_equals_game():
@@ -26,47 +18,33 @@ def test_scale_identity_when_ref_equals_game():
     assert scale_grid_position(0, 0, 1920, 1080, 1920, 1080) == (0, 0)
 
 
-def test_scale_default_to_1440p_matches_predicted():
-    """Anchor formula reproduces the predicted 1440p positions for every grid
-    in the bundled Default.json. Predicted values are documented in the
-    resolution-scaling plan and serve as the load-bearing regression check."""
-    grids, ref = _default_grids()
-    assert ref == (1920, 1080), "Default.json reference_resolution must be 1920x1080"
-
-    # (id, predicted_x_at_1440p, predicted_y_at_1440p)
+def test_scale_1080p_to_1440p_matches_predicted():
+    """Anchor formula reproduces predicted 1440p positions for fixed 1080p
+    coordinates spanning left/center/right and top/bottom, plus the (0,0)
+    corner. X shifts +320 (half the 640px width gain), Y shifts +360 (the
+    full height gain)."""
+    # (x, y) at 1080p -> (x, y) at 1440p
     expected = {
-        "Raid Debuffs":         (670, 1000),
-        "Heals & Protections":  (670, 1080),
-        "Grid1":                (594,  695),
-        "Fass Mod +":          (1720,  945),
-        "Debuffs":             (1720, 1080),
-        "Grid2":               (1904,  695),
+        (350, 640): (670, 1000),
+        (960, 1080): (1280, 1440),
+        (1570, 200): (1890, 560),
+        (0, 0): (320, 360),
     }
-    for grid in grids:
-        gid = grid['id']
-        if gid not in expected:
-            continue
-        got = scale_grid_position(grid['x'], grid['y'], 1920, 1080, 2560, 1440)
-        assert got == expected[gid], f"{gid}: expected {expected[gid]}, got {got}"
+    for (x, y), want in expected.items():
+        assert scale_grid_position(x, y, 1920, 1080, 2560, 1440) == want
 
 
-def test_scale_default_to_4k_matches_predicted():
-    """4K extrapolation is deterministic — verify the published values."""
-    grids, _ = _default_grids()
+def test_scale_1080p_to_4k_matches_predicted():
+    """Same formula extrapolated to 4K: X shifts +960, Y shifts +1080."""
+    # (x, y) at 1080p -> (x, y) at 4K
     expected = {
-        "Raid Debuffs":        (1310, 1720),
-        "Heals & Protections": (1310, 1800),
-        "Grid1":               (1234, 1415),
-        "Fass Mod +":          (2360, 1665),
-        "Debuffs":             (2360, 1800),
-        "Grid2":               (2544, 1415),
+        (350, 640): (1310, 1720),
+        (960, 1080): (1920, 2160),
+        (1570, 200): (2530, 1280),
+        (0, 0): (960, 1080),
     }
-    for grid in grids:
-        gid = grid['id']
-        if gid not in expected:
-            continue
-        got = scale_grid_position(grid['x'], grid['y'], 1920, 1080, 3840, 2160)
-        assert got == expected[gid], f"{gid}: expected {expected[gid]}, got {got}"
+    for (x, y), want in expected.items():
+        assert scale_grid_position(x, y, 1920, 1080, 3840, 2160) == want
 
 
 def test_scale_x_is_center_anchored():
