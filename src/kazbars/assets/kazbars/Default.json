@@ -3,7 +3,7 @@
   "profile_schema": 1,
   "grids": [
     {
-      "id": "Self_BUFFS",
+      "id": "My Buffs",
       "enabled": false,
       "type": "player",
       "rows": 3,
@@ -52,7 +52,7 @@
       "slotAssignments": {}
     },
     {
-      "id": "Raid_DEBUFFS",
+      "id": "Raid Debuffs",
       "enabled": true,
       "type": "player",
       "rows": 1,
@@ -147,7 +147,7 @@
       "slotAssignments": {}
     },
     {
-      "id": "Raid_BUFFS",
+      "id": "Target Buffs",
       "enabled": true,
       "type": "target",
       "rows": 2,
@@ -213,7 +213,7 @@
       }
     },
     {
-      "id": "Targ_DEBUFFS",
+      "id": "Target Debuffs",
       "enabled": false,
       "type": "target",
       "rows": 3,

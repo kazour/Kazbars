@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "content_version": 6,
+  "content_version": 7,
   "min_app_version": "2.1.0",
-  "notes": "Default profile refresh for first public release",
+  "notes": "Polish default grid names for first public release",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
@@ -10,7 +10,7 @@
     },
     "Default.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.json",
-      "sha256": "7c5a3125710b9d6e7b7984dba70f05d1a04dac0a71b63ac5d1fc9c9bafdca189"
+      "sha256": "a2e8c53c388da96814874a14d3df861efdb2df4f39f40bdd516b06f6812671ea"
     }
   }
 }
