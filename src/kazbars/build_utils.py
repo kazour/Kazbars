@@ -11,6 +11,13 @@ from .paths import ASSETS, COMPILER_ASSETS
 
 logger = logging.getLogger(__name__)
 
+# KazBars is a windowed (no-console) app; spawning a console child (mtasc, tasklist)
+# makes Windows stand up a console/conhost for it via the CSR subsystem, a handshake
+# that can stall ~5s per spawn on some systems (the child's initial thread blocks in
+# an Executive/CSR-LPC wait). CREATE_NO_WINDOW skips the console allocation entirely.
+# getattr keeps the module importable off-Windows (tests); the flag is a no-op there.
+CREATE_NO_WINDOW = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+
 
 def resolve_assets_path(assets_path=None):
     """Resolve the assets directory path. Caller-supplied path wins; otherwise
@@ -48,7 +55,8 @@ def compile_as2(compiler_path, classpaths, base_swf, source_as, cwd, timeout=60,
     else:
         cmd.append(str(source_as))
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(cwd), timeout=timeout)
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(cwd),
+                                timeout=timeout, creationflags=CREATE_NO_WINDOW)
     except subprocess.TimeoutExpired:
         return False, f"MTASC compilation timed out after {timeout}s"
     if result.returncode != 0:

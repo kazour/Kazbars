@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 
 from . import buff_xml
-from .build_utils import strip_marker_block, update_script_with_marker
+from .build_utils import CREATE_NO_WINDOW, strip_marker_block, update_script_with_marker
 from .grids_generator import build_grids
 
 logger = logging.getLogger(__name__)
@@ -384,7 +384,8 @@ def get_running_game_process():
         try:
             result = subprocess.run(
                 ['tasklist', '/FI', f'IMAGENAME eq {name}', '/NH'],
-                capture_output=True, text=True, timeout=5
+                capture_output=True, text=True, timeout=5,
+                creationflags=CREATE_NO_WINDOW
             )
             if name.lower() in result.stdout.lower():
                 return name
