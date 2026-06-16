@@ -4,6 +4,14 @@ All notable changes to KazBars will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.2.2] — 2026-06-17
+
+### Fixed
+- **Build & Install no longer freezes for ~15 seconds before it starts.** On some systems, clicking Build & Install would hang with nothing on screen for a beat while Windows prepared the helper processes the build needs (compiling the grids and checking whether the game is running). That preparation step now runs without the stall, so Build & Install starts near-instantly — roughly 16 seconds down to under one on affected machines.
+
+### Changed
+- **The build screen reads as clear steps instead of a flicker.** Now that the build is near-instant, its progress used to flash past too fast to follow. The compile and install run without freezing the loading animation, and each phase — Compiling, Baking damage numbers, Installing — holds on screen for a brief beat, so you can see what's happening.
+
 ## [2.2.1] — 2026-06-16
 
 ### Fixed

@@ -1,12 +1,14 @@
-## What's New in v2.2.1
+## What's New in v2.2.2
 
-A patch release: two fixes.
+A patch release: a faster, smoother Build & Install.
 
 ### Fixed
 
-**Show Desktop (Win+D) no longer traps the app.** Pressing Win+D while a popup was open — the Build & Install summary, the welcome popup, About, or the "close the game first" notice — could minimize KazBars with no way back; the taskbar and Alt-Tab did nothing. These popups now follow the main window and return, on top and usable, when you restore.
+**Build & Install no longer freezes before it starts.** On some systems, clicking Build & Install hung for about 15 seconds with nothing on screen before the build got going. That's fixed — it now starts near-instantly.
 
-**Veil of the Unliving (Zaal) now matches the in-game effect.** Its spell ID was wrong, so grids and profiles tracking it stayed dark; that's corrected and it lights up again. Existing installs already picked this up automatically as a content update.
+### Changed
+
+**The build screen reads as clear steps.** With the build now near-instant, its progress used to flash past too fast to follow. Each phase — Compiling, Baking damage numbers, Installing — now holds on screen for a brief beat, so you can see what's happening.
 
 ---
 
