@@ -40,7 +40,8 @@ APP_PY = REPO_ROOT / 'src' / 'kazbars' / 'app.py'
 def app(tmp_path_factory):
     """Boot one real KazBarsApp (withdrawn) shared by all tests in this module."""
     from kazbars import content_update, update_check, userdata
-    from kazbars.prefs import Prefs
+    from kazbars.prefs import PREFS_SCHEMA
+    from kazbars.settings_core import Store
 
     mp = pytest.MonkeyPatch()
     root = tmp_path_factory.mktemp('userdata_home')
@@ -54,7 +55,7 @@ def app(tmp_path_factory):
     # Pre-seed prefs with a game_path BEFORE the app constructs — __init__
     # reads it and schedules the first-launch modal when it's missing.
     userdata.ensure_layout()
-    prefs = Prefs(userdata.userdata_root())
+    prefs = Store(PREFS_SCHEMA, userdata.userdata_root())
     prefs.set('game_path', str(fake_game))
     prefs.save()
 

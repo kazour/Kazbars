@@ -35,7 +35,8 @@ from kazbars.grids_panel import GridsPanel
 from kazbars.instructions_panel import InstructionsPanel
 from kazbars.live_tracker_panel import LiveTrackerPanel
 from kazbars.paths import ASSETS, KAZBARS_ASSETS, app_path
-from kazbars.prefs import Prefs
+from kazbars.prefs import PREFS_SCHEMA
+from kazbars.settings_core import Store
 from kazbars.settings_manager import init_settings
 from kazbars.ui_components import (
     ToastManager,
@@ -97,7 +98,7 @@ class KazBarsApp(ttkb.Window):
         self.settings_path = settings_dir()
 
         # Machine-local prefs (prefs.json) via the strict settings_core engine.
-        self.settings = Prefs(userdata_root())
+        self.settings = Store(PREFS_SCHEMA, userdata_root())
         init_settings(self.settings)
 
         # Buff database — three layers merged, user always wins:
@@ -656,19 +657,6 @@ class KazBarsApp(ttkb.Window):
     # ========================================================================
     def _build(self):
         return build_action.build(self)
-
-    # ========================================================================
-    # EDIT MENU ACTIONS
-    # ========================================================================
-    def _add_grid(self):
-        """Add a new grid via the grids panel wizard."""
-        self._switch_view('grids')
-        self.grids_panel.add_grid()
-
-    def _clear_all_grids(self):
-        """Clear all grids via the grids panel."""
-        self._switch_view('grids')
-        self.grids_panel.clear_all_grids()
 
     def _show_about(self):
         """Show the About dialog (single-instance — focus existing if alive)."""

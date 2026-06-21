@@ -7,9 +7,9 @@ settings reference set via ``init_settings()`` so modules can call
 ``get_setting`` / ``set_setting`` without threading the prefs object through
 every API.
 
-The old ``SettingsManager`` class is retired: ``prefs.Prefs`` (a
-``settings_core.Store`` facade) is what ``init_settings`` now receives, and the
-three typed settings files route through ``settings_core`` directly.
+The old ``SettingsManager`` class is retired: a ``settings_core.Store`` built on
+``prefs.PREFS_SCHEMA`` is what ``init_settings`` now receives, and the three typed
+settings files route through ``settings_core`` directly.
 """
 
 import json

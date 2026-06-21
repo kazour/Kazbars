@@ -51,7 +51,7 @@ Steps:
 7. `refresh_panels()` — src/kazbars/grids_panel.py — destroys existing `GridEditorPanel` widgets; creates new ones for the validated list; shows empty state if list is empty
 8. If a Boss Timer panel is alive, `LiveTrackerPanel.load_profile_data()` — src/kazbars/live_tracker_panel.py — applies the embedded `boss_timer.overlay` settings to the overlay (`apply_settings` then propagates opacity, font, transparent, lock, x/y/width/height, and visible state through `set_*(..., notify=False)` calls, with a single `_notify_settings_changed()` at the end so the parent saves once)
 9. `warn_missing_buffs()` — src/kazbars/profile_io.py — if migration dropped any references, displays them (deferred 200ms when called during startup so the dialog doesn't race the welcome popup)
-10. `app.settings.set('last_profile', ...)` then `app.settings.save()` — persists `last_profile` to `userdata/prefs.json` (`Prefs.save` → `settings_core.save` → atomic temp-rename in `safe_save_json`)
+10. `app.settings.set('last_profile', ...)` then `app.settings.save()` — persists `last_profile` to `userdata/prefs.json` (`Store.save` → `settings_core.save` → atomic temp-rename in `safe_save_json`)
 
 End state: `GridsPanel` displays validated grid cards; `app.modified` is `False`; `last_profile` updated in settings; window title reflects loaded name
 
@@ -110,7 +110,7 @@ End state: `grid_config['whitelist']` updated with new primary spell ID list; pa
 
 ## 6. first-launch setup with defaults
 
-Trigger: `KazBarsApp.__init__` has just created `userdata/` fresh via `ensure_layout()` and built `self.settings = Prefs(userdata_root())`; the new `prefs.json` has no `game_path`, so first launch is scheduled 100ms after `deiconify()`
+Trigger: `KazBarsApp.__init__` has just created `userdata/` fresh via `ensure_layout()` and built `self.settings = Store(PREFS_SCHEMA, userdata_root())`; the new `prefs.json` has no `game_path`, so first launch is scheduled 100ms after `deiconify()`
 
 Steps:
 1. `_show_first_launch_dialog()` — src/kazbars/app.py — one-line delegator to `run_first_launch(self, APP_NAME)`

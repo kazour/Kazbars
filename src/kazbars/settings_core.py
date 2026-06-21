@@ -8,10 +8,10 @@ a `Schema` and routes its load/save/validate through here, so validation,
 drop-unknown, fill-missing, atomic writes, and forward migrations all live in one
 place instead of being hand-rolled per file.
 
-**Strict by default.** `validate_all(..., mode='strict')` keeps only declared
-fields — any persisted key that is not a `Field` is erased on the next save. A
-dynamic key namespace (e.g. per-window positions) must therefore be modelled as a
-single structured-dict `Field` with a custom `validate=`, not as N top-level keys.
+**Strict.** `validate_all` keeps only declared fields — any persisted key that is
+not a `Field` is erased on the next save. A dynamic key namespace (e.g. per-window
+positions) must therefore be modelled as a single structured-dict `Field` with a
+custom `validate=`, not as N top-level keys.
 
 Imports only stdlib + `settings_manager.safe_save_json` — safe on the mypy gate
 and importable from CI without the UI extra.
@@ -149,18 +149,15 @@ def get_defaults(schema: Schema) -> dict[str, Any]:
     return {key: copy.deepcopy(f.default) for key, f in schema.fields.items()}
 
 
-def validate_all(schema: Schema, raw: Any, *, mode: str = 'strict') -> dict[str, Any]:
-    """Start from defaults, coerce every declared key present in `raw`, and fill
-    the rest. In `'strict'` mode (the default and only one used in-app) any
-    undeclared key is dropped; any other mode keeps undeclared keys verbatim."""
+def validate_all(schema: Schema, raw: Any) -> dict[str, Any]:
+    """Start from defaults, coerce every declared key present in `raw`, and drop
+    the rest — any key that is not a declared `Field` is erased."""
     result = get_defaults(schema)
     if not isinstance(raw, dict):
         return result
     for key, value in raw.items():
         if key in schema.fields:
             result[key] = _coerce_field(schema.fields[key], value)
-        elif mode != 'strict':
-            result[key] = value
     return result
 
 
@@ -206,7 +203,7 @@ def load(schema: Schema, folder: str | Path) -> dict[str, Any]:
     raw = _read_json(Path(folder) / schema.filename)
     if raw is None:
         return get_defaults(schema)
-    return validate_all(schema, _migrate(schema, raw), mode='strict')
+    return validate_all(schema, _migrate(schema, raw))
 
 
 def save(schema: Schema, folder: str | Path, data: dict) -> bool:
@@ -214,7 +211,7 @@ def save(schema: Schema, folder: str | Path, data: dict) -> bool:
     rename via `safe_save_json`). Creates the folder if missing. Returns success."""
     try:
         Path(folder).mkdir(parents=True, exist_ok=True)
-        validated = validate_all(schema, data, mode='strict')
+        validated = validate_all(schema, data)
         validated[SCHEMA_VERSION_KEY] = schema.version
         safe_save_json(Path(folder) / schema.filename, validated)
         return True
