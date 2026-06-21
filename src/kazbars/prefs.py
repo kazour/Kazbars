@@ -1,4 +1,4 @@
-"""KazBars — machine-local preferences: PREFS_SCHEMA + the Prefs facade.
+"""KazBars — machine-local preferences: the PREFS_SCHEMA contract.
 
 ``prefs.json`` holds the machine-local settings — window positions, game folder,
 resolution, last/default profile, build state, and a few UI-state keys. It is
@@ -9,18 +9,16 @@ it is **strict**: every key the app reads/writes through the
 ``tests/test_prefs_schema_covers_all_proxy_keys.py`` greps the tree and fails CI
 if a real proxy key isn't declared.
 
-``Prefs`` wraps a ``settings_core.Store`` and re-exposes the exact surface the
-old ``SettingsManager`` had (``get`` / ``set`` / no-arg ``save()`` / ``reload()``
-+ a writable ``data`` mapping that supports ``pop``), so the proxy and the ~20
-``app.settings`` call sites keep working unchanged. ``SettingsManager`` is
-retired.
+``app.settings`` is a ``settings_core.Store`` built on this schema; the
+``get_setting``/``set_setting`` proxy and the ~20 ``app.settings`` call sites use
+its ``get`` / ``set`` / ``save()`` / ``reload()`` / ``data`` surface directly.
+``SettingsManager`` is retired.
 """
 
 import logging
-from pathlib import Path
 from typing import Any
 
-from . import CONTENT_BASELINE_VERSION, settings_core
+from . import CONTENT_BASELINE_VERSION
 from .settings_core import Field, Schema
 from .stopwatch import validate_config as _validate_stopwatch
 from .userdata import PREFS_FILENAME
@@ -100,29 +98,3 @@ PREFS_SCHEMA = Schema(
         "buff_display_section_open": Field({}, validate=_validate_section_open),
     },
 )
-
-
-class Prefs:
-    """SettingsManager-compatible facade over a ``settings_core.Store`` for
-    ``prefs.json``. ``get``/``set``/``save()``/``reload()`` + a writable ``data``
-    mapping (supports ``pop``) keep the proxy and the app.settings call sites
-    unchanged."""
-
-    def __init__(self, folder: str | Path) -> None:
-        self._store = settings_core.Store(PREFS_SCHEMA, folder)
-
-    @property
-    def data(self) -> dict:
-        return self._store.data
-
-    def get(self, key: str, default: Any = None) -> Any:
-        return self._store.get(key, default)
-
-    def set(self, key: str, value: Any) -> None:
-        self._store.set(key, value)
-
-    def save(self) -> bool:
-        return self._store.save()
-
-    def reload(self) -> None:
-        self._store.reload()

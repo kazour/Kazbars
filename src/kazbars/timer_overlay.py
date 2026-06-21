@@ -275,9 +275,6 @@ class TimerOverlay:
     def _row_line_height(self) -> int:
         return _timer_row_height(self._config.font_size)
 
-    def _min_height(self) -> int:
-        return _timer_min_height(self._config.font_size)
-
     def _measure(self) -> tuple[int, int]:
         return measure_timer_overlay(self._config.font_family, self._config.font_size)
 
@@ -377,6 +374,6 @@ class TimerOverlay:
         )
         try:
             bbox = draw.textbbox((x, y), text, font=font, anchor=anchor)
-            return max(0, bbox[2] - x)
+            return int(max(0, bbox[2] - x))
         except Exception:
             return 0

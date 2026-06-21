@@ -133,11 +133,6 @@ class TestValidateAll:
         out = settings_core.validate_all(s, {"bogus": 1})
         assert "bogus" not in out
 
-    def test_unknown_kept_lenient(self):
-        s = _schema()
-        out = settings_core.validate_all(s, {"bogus": 1}, mode="lenient")
-        assert out["bogus"] == 1
-
 
 # --------------------------------------------------------------------------- #
 # get_defaults freshness

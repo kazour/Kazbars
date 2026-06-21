@@ -15,8 +15,6 @@ from kazbars.deeps_trackers import (
     DamageOutTracker,
     HealsInTracker,
     HealsOutTracker,
-    TrackerSnapshot,
-    build_snapshot,
 )
 
 BASE = 1_000_000.0
@@ -238,32 +236,25 @@ class TestHealsOutTracker:
 # =========================================================================== #
 
 class TestSnapshot:
-    def test_fresh_trackers_produce_all_none_snapshot(self) -> None:
-        s = build_snapshot(
-            DamageOutTracker(),
-            DamageInTracker(),
-            HealsInTracker(),
-            HealsOutTracker(),
-            at(0),
-        )
-        assert s == TrackerSnapshot(dps=None, dpis=None, hps=None, hps_out=None)
+    def test_fresh_trackers_produce_all_none(self) -> None:
+        assert DamageOutTracker().rolling_rate(at(0)) is None
+        assert DamageInTracker().rolling_rate(at(0)) is None
+        assert HealsInTracker().rolling_rate(at(0)) is None
+        assert HealsOutTracker().rolling_rate(at(0)) is None
 
     def test_partial_warm_up_mixes_none_and_float(self) -> None:
-        """One tracker cleared, another warming up, another empty."""
+        """One tracker warmed past its window, another still warming up, others empty."""
         out_tr = DamageOutTracker()
         in_tr = DamageInTracker()
-        heals_tr = HealsInTracker()
-        heals_out_tr = HealsOutTracker()
-        # Out: cleared at t=5s.
+        # Out: warmed past its window at t=5s.
         out_tr.record(at(0), 1000)
         # In: still warming up at t=5s (only 2s in).
         in_tr.record(at(3000), 500)
+        assert out_tr.rolling_rate(at(5000)) == pytest.approx(200.0)
+        assert in_tr.rolling_rate(at(5000)) is None
         # Heals + Heals-out: empty.
-        s = build_snapshot(out_tr, in_tr, heals_tr, heals_out_tr, at(5000))
-        assert s.dps == pytest.approx(200.0)
-        assert s.dpis is None
-        assert s.hps is None
-        assert s.hps_out is None
+        assert HealsInTracker().rolling_rate(at(5000)) is None
+        assert HealsOutTracker().rolling_rate(at(5000)) is None
 
     def test_full_active(self) -> None:
         out_tr = DamageOutTracker()
@@ -274,15 +265,7 @@ class TestSnapshot:
         in_tr.record(at(0), 500)
         heals_tr.record(at(0), heal(HealKind.SPELL, 250))
         heals_out_tr.record(at(0), 400)
-        s = build_snapshot(out_tr, in_tr, heals_tr, heals_out_tr, at(5000))
-        assert s.dps == pytest.approx(200.0)
-        assert s.dpis == pytest.approx(100.0)
-        assert s.hps == pytest.approx(50.0)
-        assert s.hps_out == pytest.approx(80.0)
-
-    def test_snapshot_is_frozen(self) -> None:
-        """TrackerSnapshot is immutable so the UI can share it without
-        worrying about the meter mutating fields mid-read."""
-        s = TrackerSnapshot(dps=1.0, dpis=2.0, hps=3.0, hps_out=4.0)
-        with pytest.raises((AttributeError, Exception)):
-            s.dps = 999.0  # type: ignore[misc]
+        assert out_tr.rolling_rate(at(5000)) == pytest.approx(200.0)
+        assert in_tr.rolling_rate(at(5000)) == pytest.approx(100.0)
+        assert heals_tr.rolling_rate(at(5000)) == pytest.approx(50.0)
+        assert heals_out_tr.rolling_rate(at(5000)) == pytest.approx(80.0)

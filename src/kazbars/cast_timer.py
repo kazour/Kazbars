@@ -15,6 +15,7 @@ persist drag positions via the config archive.
 import logging
 
 from .grid_model import SCREEN_MAX_X, SCREEN_MAX_Y
+from .settings_core import Field, Schema, get_defaults, validate_all
 
 logger = logging.getLogger(__name__)
 
@@ -28,38 +29,6 @@ logger = logging.getLogger(__name__)
 #   "both"    — elapsed / total, e.g. "1.2 / 2.5"
 DISPLAY_MODES = ("elapsed", "total", "both")
 
-CAST_TIMER_DEFAULTS = {
-    # Master on/off for the whole overlay. Per-side enableP/enableT pick which
-    # sides show when the master is on. Off by default — nothing compiles until
-    # the user turns it on.
-    "enabled": False,
-    "enableP": False,
-    "enableT": False,
-    "playerX": 910,
-    "playerY": 620,
-    "targetX": 910,
-    "targetY": 560,
-    "bold": True,
-    "fontSize": 12,
-    "display": "elapsed",
-    "color": "FFFFFF",
-}
-
-# key → (default, min, max)
-_CLAMP = {
-    "playerX": (910, 0, SCREEN_MAX_X),
-    "playerY": (620, 0, SCREEN_MAX_Y),
-    "targetX": (910, 0, SCREEN_MAX_X),
-    "targetY": (560, 0, SCREEN_MAX_Y),
-    "fontSize": (12, 8, 48),
-}
-
-
-def get_default_config():
-    """Return a fresh copy of the default cast-timer config."""
-    return dict(CAST_TIMER_DEFAULTS)
-
-
 def validate_color(hex_str):
     """Validate a hex color string. Returns cleaned 6-char hex or white."""
     hex_str = str(hex_str).strip().lstrip("#").upper()
@@ -72,33 +41,40 @@ def validate_color(hex_str):
     return "FFFFFF"
 
 
+# Master on/off for the whole overlay; per-side enableP/enableT pick which sides
+# show when the master is on. Off by default — nothing compiles until the user
+# turns it on.
+_SCHEMA = Schema('cast_timer', 1, {
+    "enabled": Field(False, kind='bool'),
+    "enableP": Field(False, kind='bool'),
+    "enableT": Field(False, kind='bool'),
+    "playerX": Field(910, kind='int', min=0, max=SCREEN_MAX_X),
+    "playerY": Field(620, kind='int', min=0, max=SCREEN_MAX_Y),
+    "targetX": Field(910, kind='int', min=0, max=SCREEN_MAX_X),
+    "targetY": Field(560, kind='int', min=0, max=SCREEN_MAX_Y),
+    "bold": Field(True, kind='bool'),
+    "fontSize": Field(12, kind='int', min=8, max=48),
+    "display": Field("elapsed", choices=DISPLAY_MODES),
+    "color": Field("FFFFFF", validate=validate_color),
+})
+
+CAST_TIMER_DEFAULTS = get_defaults(_SCHEMA)
+
+
+def get_default_config():
+    """Return a fresh copy of the default cast-timer config."""
+    return get_defaults(_SCHEMA)
+
+
 def validate_config(config):
     """Validate/clamp a cast-timer config on load. Returns a sanitized dict
     containing exactly the default keys (unknown keys dropped, missing keys
     filled with defaults)."""
-    result = get_default_config()
-    if not isinstance(config, dict):
-        return result
-    for key in result:
-        if key not in config:
-            continue
-        value = config[key]
-        if key in ("enabled", "enableP", "enableT", "bold"):
-            result[key] = bool(value)
-        elif key == "display":
-            result[key] = value if value in DISPLAY_MODES else CAST_TIMER_DEFAULTS["display"]
-        elif key == "color":
-            result[key] = validate_color(value)
-        elif key in _CLAMP:
-            _default, lo, hi = _CLAMP[key]
-            try:
-                result[key] = max(lo, min(int(value), hi))
-            except (ValueError, TypeError):
-                result[key] = _default
+    result = validate_all(_SCHEMA, config)
     # Migrate profiles that predate the master enable: derive it from the sides
     # so an existing player/target-on config keeps rendering after the upgrade.
-    if "enabled" not in config:
-        result["enabled"] = bool(config.get("enableP")) or bool(config.get("enableT"))
+    if isinstance(config, dict) and "enabled" not in config:
+        result["enabled"] = result["enableP"] or result["enableT"]
     return result
 
 

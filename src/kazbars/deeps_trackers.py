@@ -1,7 +1,8 @@
 """KazBars — Deeps trackers: rolling DPS / DPIS / HPS counters.
 
-Three small classes, one per metric, plus a `TrackerSnapshot` dataclass that
-bundles the rolling rates into one read-only value for the UI tick.
+Three small classes, one per metric. Each exposes `rolling_rate(now)` — None
+during warm-up, 0.0 during post-warm-up silence, a float otherwise. The meter
+bundles the four rates into its `MeterSnapshot` at sample time.
 
 Slimmed from `Deeps/rust/deeps/src/trackers/`:
 
@@ -26,8 +27,6 @@ Contract for `rolling_rate(t)`:
     not a frozen last-known value.
   - Returns the sum-of-events-in-window divided by window-seconds otherwise.
 """
-
-from dataclasses import dataclass
 
 from .deeps_parsers import HealKind, IncomingHeal
 from .deeps_rolling_window import RollingWindow
@@ -181,41 +180,3 @@ class HealsOutTracker:
 
     def reset(self) -> None:
         self._window.reset()
-
-
-# =========================================================================== #
-# Snapshot — bundle the rolling rates for the UI tick                         #
-# =========================================================================== #
-
-@dataclass(frozen=True)
-class TrackerSnapshot:
-    """Read-only view of the rolling rates at a single instant.
-
-    Rate fields are float-per-second (possibly 0.0 during post-warm-up
-    silence) or None (warming up).
-    """
-
-    dps: float | None
-    dpis: float | None
-    hps: float | None
-    hps_out: float | None
-
-
-def build_snapshot(
-    out_tracker: DamageOutTracker,
-    in_tracker: DamageInTracker,
-    heals_tracker: HealsInTracker,
-    heals_out_tracker: HealsOutTracker,
-    t: float,
-) -> TrackerSnapshot:
-    """Compose a `TrackerSnapshot` from the four trackers at time `t`.
-
-    Lock-internal helper: the meter holds its lock while calling this so
-    the four reads are mutually consistent.
-    """
-    return TrackerSnapshot(
-        dps=out_tracker.rolling_rate(t),
-        dpis=in_tracker.rolling_rate(t),
-        hps=heals_tracker.rolling_rate(t),
-        hps_out=heals_out_tracker.rolling_rate(t),
-    )

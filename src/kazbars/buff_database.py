@@ -169,13 +169,3 @@ class BuffDatabase:
             if buff.get('category') == old_name:
                 buff['category'] = new_name
         self._rebuild_indexes()
-
-    def save(self, json_path):
-        """Save database to JSON file."""
-        data = {
-            "version": 2,
-            "description": "KazBars buff/debuff database v2",
-            "buffs": self.buffs
-        }
-        with open(json_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)

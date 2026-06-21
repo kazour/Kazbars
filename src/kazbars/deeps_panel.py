@@ -36,7 +36,6 @@ from .deeps_meter import DeepsMeter, MeterSnapshot, Status
 from .deeps_overlay import ALL_CELL_IDS as _ALL_CELL_IDS
 from .deeps_overlay import CELL_LABELS, DeepsOverlay
 from .deeps_settings import (
-    get_default_settings,
     load_settings,
     normalize_readout_preset,
     normalize_survival_preset,
@@ -928,13 +927,3 @@ def open_deeps_panel(app: tk.Misc) -> DeepsPanel:
     panel = DeepsPanel(app, app.settings_path, lambda: app.game_path)
     app.deeps_panel = panel  # type: ignore[attr-defined]
     return panel
-
-
-def _ensure_settings_seeded(settings_folder: str | Path) -> None:
-    """Write the defaults file if one doesn't exist yet — helps users see the
-    file location after first install. Called lazily by `open_deeps_panel`
-    only if needed; not exported."""
-    Path(settings_folder).mkdir(parents=True, exist_ok=True)
-    settings_file = Path(settings_folder) / "deeps_settings.json"
-    if not settings_file.exists():
-        save_settings(settings_folder, get_default_settings())
