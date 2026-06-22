@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "content_version": 8,
-  "min_app_version": "2.2.0",
-  "notes": "Fix Veil of the Unliving (Zaal) spell ID",
+  "content_version": 9,
+  "min_app_version": "2.2.2",
+  "notes": "Add Seal of Yog (Crit) and Seal of Yog (Mana) Dark Templar stacking buffs",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
-      "sha256": "af98e0b30d5f97ccbd24970a29134b582183a51e80131a00dcf56fe33d4a53af"
+      "sha256": "7fb7e95c78f1a723a62e5acbd6981745847e74c6412b51aa8f0414465613a9d7"
     },
     "Default.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.json",
