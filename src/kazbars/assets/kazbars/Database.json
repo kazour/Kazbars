@@ -3355,6 +3355,37 @@
       "category": "Demonologist",
       "type": "buff",
       "stacking": true
+    },
+    {
+      "name": "Seal of Yog (Crit)",
+      "ids": [
+        4204058,
+        4204059,
+        4204060,
+        4204061,
+        4204062,
+        4204063,
+        4204064,
+        4204065,
+        4204066,
+        4204067
+      ],
+      "category": "Dark Templar",
+      "type": "buff",
+      "stacking": true
+    },
+    {
+      "name": "Seal of Yog (Mana)",
+      "ids": [
+        4203944,
+        4203945,
+        4203946,
+        4203947,
+        4203948
+      ],
+      "category": "Dark Templar",
+      "type": "buff",
+      "stacking": true
     }
   ]
 }

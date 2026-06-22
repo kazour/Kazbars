@@ -39,6 +39,10 @@ whitelists the old one (e.g. `assets/kazbars/Default.json`).
 
 ---
 
+## 2026-06-22
+- **Added:** `Seal of Yog (Crit)` — Dark Templar stacking buff (10 stack ranks): `4204058`, `4204059`, `4204060`, `4204061`, `4204062`, `4204063`, `4204064`, `4204065`, `4204066`, `4204067`.
+- **Added:** `Seal of Yog (Mana)` — Dark Templar stacking buff (5 stack ranks): `4203944`, `4203945`, `4203946`, `4203947`, `4203948`.
+
 ## 2026-06-15
 - **Fixed:** `Veil of the Unliving (Zaal)` (#Raid T3.5 debuff) spell ID `4752520` → `5064067`; updated the matching `Default.json` whitelist + resynced the bundled `.default`.
 - **Added:** `Spellweaving 1-6` stacking buffs (6 stack ranks each, type `buff`) for the four caster classes — each routed to its class category so the stack counter shows ranks 1–6:
