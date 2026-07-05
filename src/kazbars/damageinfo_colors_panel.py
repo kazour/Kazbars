@@ -198,7 +198,7 @@ class DamageNumberColorsPanel(tk.Toplevel):
         app_toast(self, "Reset all colors to game default", "info", 3)
 
     def _save(self) -> None:
-        dis.save_settings(self.settings_folder, self.settings)
+        dis.save_source_colors(self.settings_folder, self.settings['source_colors'])
 
 
 def open_damage_number_colors_panel(app: tk.Misc) -> DamageNumberColorsPanel:

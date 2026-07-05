@@ -612,6 +612,16 @@ class DatabaseEditorTab(ttk.Frame):
         self.update_categories()
         self.refresh_list()
 
+    def refresh_from_database(self):
+        """Re-pull the floor + redraw the list after `self.database` was re-merged
+        outside the editor (OTA apply/revert, profile import, backup restore).
+        TclError-safe — the panel may be torn down when a background apply lands."""
+        try:
+            self._refresh_floor()
+            self.refresh_list()
+        except tk.TclError:
+            pass
+
     def add_buff(self):
         """Add a new buff entry."""
         dialog = BuffEditDialog(self.winfo_toplevel(), "Add Buff", self.database.categories,
@@ -690,9 +700,16 @@ class DatabaseEditorTab(ttk.Frame):
             existing_ids = {bid for buff in self.database.buffs for bid in buff.get('ids', [])}
             added = 0
             skipped = 0
+            invalid = 0
 
             for buff in import_buffs:
+                if not isinstance(buff, dict):
+                    invalid += 1
+                    continue
                 migrate_legacy_buff_fields(buff)
+                if not buff_db_layers.is_valid_buff(buff):
+                    invalid += 1
+                    continue
                 buff_ids = buff.get('ids', [])
                 if any(bid in existing_ids for bid in buff_ids):
                     skipped += 1
@@ -704,8 +721,13 @@ class DatabaseEditorTab(ttk.Frame):
             self._after_db_change()
 
             msg = f"Imported {added} buffs"
+            details = []
             if skipped > 0:
-                msg += f" ({skipped} duplicates skipped)"
+                details.append(f"{skipped} duplicates skipped")
+            if invalid > 0:
+                details.append(f"{invalid} malformed skipped")
+            if details:
+                msg += " (" + ", ".join(details) + ")"
             app_toast(self, msg, 'success')
 
         except (OSError, json.JSONDecodeError, ValueError) as e:

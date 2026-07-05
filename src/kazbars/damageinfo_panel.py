@@ -285,7 +285,7 @@ class DamageNumbersPanel(tk.Toplevel):
         return dis.validate_setting(key, round(round(raw / step) * step, 10))
 
     def _save(self) -> None:
-        dis.save_settings(self.settings_folder, self.settings)
+        dis.save_settings_preserving_colors(self.settings_folder, self.settings)
 
     def _register_dim(self, *labels: ttk.Label) -> None:
         """Track a static (non-interactive) text label so the master gate can grey it

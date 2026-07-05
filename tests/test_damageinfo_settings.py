@@ -388,3 +388,48 @@ def test_source_colors_round_trip(tmp_path):
     assert dis.save_settings(tmp_path, s)
     loaded = dis.load_settings(tmp_path)
     assert loaded['source_colors'] == {'self_attacked': 'FF0000', 'other_healed': '00FF00'}
+
+
+# --------------------------------------------------------------------------- #
+# merge-on-write (main panel vs colors panel share one file)
+# --------------------------------------------------------------------------- #
+def test_save_settings_preserving_colors_keeps_disk_colors(tmp_path):
+    # Colors panel wrote source_colors; the main panel (which loaded before that)
+    # saves offsets/toggles without clobbering the on-disk colors.
+    dis.save_source_colors(tmp_path, {'self_attacked': 'FF0000'})
+    s = dis.get_default_settings()          # a copy with empty source_colors
+    s['enabled'] = True
+    s['dir1_x_offset'] = 20
+    assert dis.save_settings_preserving_colors(tmp_path, s)
+    loaded = dis.load_settings(tmp_path)
+    assert loaded['source_colors'] == {'self_attacked': 'FF0000'}  # preserved
+    assert loaded['enabled'] is True
+    assert loaded['dir1_x_offset'] == 20
+
+
+def test_save_source_colors_keeps_disk_settings(tmp_path):
+    # Main panel wrote offsets/toggles; the colors panel saves only source_colors
+    # without clobbering enabled / offsets.
+    s = dis.get_default_settings()
+    s['enabled'] = True
+    s['dir1_x_offset'] = 20
+    assert dis.save_settings(tmp_path, s)
+    assert dis.save_source_colors(tmp_path, {'other_healed': '00FF00'})
+    loaded = dis.load_settings(tmp_path)
+    assert loaded['source_colors'] == {'other_healed': '00FF00'}
+    assert loaded['enabled'] is True        # preserved
+    assert loaded['dir1_x_offset'] == 20    # preserved
+
+
+def test_save_source_colors_validates_through_schema(tmp_path):
+    dis.save_source_colors(tmp_path, {'self_attacked': '#ff0000', 'bogus': '00ff00'})
+    loaded = dis.load_settings(tmp_path)
+    assert loaded['source_colors'] == {'self_attacked': 'FF0000'}  # unknown dropped, normalized
+
+
+def test_save_settings_preserving_colors_validates_settings(tmp_path):
+    s = dis.get_default_settings()
+    s['dir1_x_offset'] = 99999  # out of range
+    dis.save_settings_preserving_colors(tmp_path, s)
+    on_disk = json.loads((tmp_path / dis.SETTINGS_FILENAME).read_text(encoding='utf-8'))
+    assert on_disk['dir1_x_offset'] == 200  # clamped before write

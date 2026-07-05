@@ -210,3 +210,55 @@ def test_delta_store_load_missing(tmp_path):
 def test_delta_store_save_atomic_no_tmp(tmp_path):
     DeltaStore(tmp_path / "database_user.json").save({"buffs": [], "deleted": []})
     assert list(tmp_path.glob("*.tmp")) == []
+
+
+# --------------------------------------------------------------------------- #
+# malformed-entry filtering (hand-editable files must never crash the merge)
+# --------------------------------------------------------------------------- #
+
+def test_is_valid_buff():
+    assert L.is_valid_buff(_b(1, "Ok"))
+    assert not L.is_valid_buff("not-a-dict")
+    assert not L.is_valid_buff({"ids": [1]})                 # no name
+    assert not L.is_valid_buff({"name": "", "ids": [1]})     # empty name
+    assert not L.is_valid_buff({"name": "X"})                # no ids
+    assert not L.is_valid_buff({"name": "X", "ids": []})     # empty ids
+    assert not L.is_valid_buff({"name": "X", "ids": ["1"]})  # non-int id
+
+
+def test_read_buffs_drops_malformed_entries(tmp_path):
+    p = tmp_path / "Database.json"
+    p.write_text(json.dumps({"version": 2, "buffs": [
+        _b(1, "Good"), "junk", {"ids": [2]}, {"name": "NoIds"},
+    ]}), encoding="utf-8")
+    assert [b["name"] for b in L._read_buffs(p)] == ["Good"]
+
+
+def test_read_user_delta_drops_malformed_buffs_and_tombstones(tmp_path):
+    p = tmp_path / "database_user.json"
+    p.write_text(json.dumps({
+        "version": 2,
+        "buffs": [_b(1, "Mine"), {"no": "name"}, "junk"],
+        "deleted": [7, "8", [9], None],   # [9] would be unhashable in a set
+    }), encoding="utf-8")
+    buffs, deleted = L._read_user_delta(p)
+    assert [b["name"] for b in buffs] == ["Mine"]
+    assert deleted == {7}
+
+
+def test_delta_store_save_preserves_malformed_entries(tmp_path):
+    # A hand-edit typo (string ids, string tombstone) is invisible to the
+    # editor; a recompute-from-memory save must leave it in the file for the
+    # user to fix, not erase it.
+    p = tmp_path / "database_user.json"
+    typo = {"name": "Typo", "ids": ["123"]}
+    p.write_text(json.dumps({
+        "version": 2,
+        "buffs": [_b(1, "Mine"), typo],
+        "deleted": [7, "8"],
+    }), encoding="utf-8")
+    store = DeltaStore(p)
+    store.save({"buffs": [_b(2, "New")], "deleted": [7]})
+    on_disk = json.loads(p.read_text(encoding="utf-8"))
+    assert on_disk["buffs"] == [_b(2, "New"), typo]
+    assert on_disk["deleted"] == [7, "8"]

@@ -100,9 +100,14 @@ def validate_grid(grid):
         if key not in grid:
             grid[key] = val
 
-    # Clamp numeric ranges
+    # Clamp numeric ranges. Profiles are hand-editable JSON, so a junk value
+    # (null, "abc") falls back to the default instead of crashing the load.
     for key, (default, lo, hi) in CLAMP_SPECS.items():
-        grid[key] = max(lo, min(int(grid.get(key, default)), hi))
+        try:
+            value = int(grid.get(key, default))
+        except (TypeError, ValueError):
+            value = default
+        grid[key] = max(lo, min(value, hi))
 
     # Validate enums
     for key, (enum_default, valid) in ENUM_SPECS.items():
@@ -126,6 +131,29 @@ def validate_grid(grid):
         grid['slotAssignments'] = {}
 
     return grid
+
+
+def dedupe_grid_ids(grids):
+    """Rename duplicate grid ids in place (suffix _2, _3, …), first wins.
+
+    Names key the generated AS2 whitelist tables, so two grids sharing a name
+    would silently share one whitelist in-game. The interactive paths (wizard,
+    card rename) already block duplicates; hand-edited or shared profiles can
+    still carry them, so load-time sanitation renames rather than drops.
+    Returns [(old, new), …] for the caller to surface."""
+    seen = set()
+    renamed = []
+    for grid in grids:
+        name = grid.get('id', 'Grid')
+        if name in seen:
+            n = 2
+            while f"{name}_{n}" in seen:
+                n += 1
+            grid['id'] = f"{name}_{n}"
+            renamed.append((name, grid['id']))
+            name = grid['id']
+        seen.add(name)
+    return renamed
 
 
 def parse_resolution(resolution_str):

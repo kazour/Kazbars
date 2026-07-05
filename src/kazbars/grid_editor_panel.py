@@ -56,7 +56,8 @@ class GridEditorPanel(ttk.Frame):
     """A collapsible grid editor card."""
 
     def __init__(self, parent, database, grid_config, on_delete=None, initially_open=False,
-                 get_total_slots=None, on_resize=None, on_whitelist_changed=None):
+                 get_total_slots=None, on_resize=None, on_whitelist_changed=None,
+                 name_in_use=None):
         super().__init__(parent)
         self.database = database
         self.grid_config = grid_config
@@ -64,6 +65,7 @@ class GridEditorPanel(ttk.Frame):
         self._get_total_slots = get_total_slots
         self._on_resize = on_resize
         self._on_whitelist_changed = on_whitelist_changed
+        self._name_in_use = name_in_use
 
         grid_type = grid_config.get('type', 'player')
         self._accent_color = GRID_TYPE_COLORS.get(grid_type, GRID_TYPE_COLORS['player'])
@@ -327,13 +329,21 @@ class GridEditorPanel(ttk.Frame):
                         self._accent_color, GRID_PREVIEW_PX, GRID_PREVIEW_PX)
 
     def _validate_name(self):
-        """Red on empty, commit on valid. Never rewrites the field — deleting and blurring would otherwise snap the old name back."""
+        """Red on empty or duplicate, commit on valid. Never rewrites the field —
+        deleting and blurring would otherwise snap the old name back. Duplicates
+        are rejected because grid names key the generated AS2 whitelist tables:
+        two grids sharing a name would silently share one whitelist in-game."""
         name = self.id_var.get().strip()
         if not name:
             self._name_entry.configure(bootstyle='danger')  # type: ignore[call-overload]
-        else:
-            self._name_entry.configure(bootstyle='default')  # type: ignore[call-overload]
-            self.grid_config['id'] = name
+            return
+        if self._name_in_use is not None and self._name_in_use(name, self.grid_config):
+            self._name_entry.configure(bootstyle='danger')  # type: ignore[call-overload]
+            app_toast(self, f"Grid name '{name}' is already used by another grid",
+                      'warning', key='grid-name-dup')
+            return
+        self._name_entry.configure(bootstyle='default')  # type: ignore[call-overload]
+        self.grid_config['id'] = name
 
     def save_to_config(self):
         """Write current widget values back into the grid configuration dict."""

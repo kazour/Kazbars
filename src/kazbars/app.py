@@ -265,7 +265,6 @@ class KazBarsApp(ttkb.Window):
             database=self.database,
             delta_store=DeltaStore(database_user_path()),
             get_floor=self.database.current_floor,
-            on_modified=self._mark_modified,
             get_grids=lambda: self.grids_panel.grids,
         )
 
@@ -410,10 +409,19 @@ class KazBarsApp(ttkb.Window):
         self._menubar.add_command(label="About", command=self._show_about)
 
         # Keyboard shortcuts
-        self.bind_all('<Control-n>', lambda e: self._new_profile())
-        self.bind_all('<Control-o>', lambda e: self._open_profile())
-        self.bind_all('<Control-s>', lambda e: self._save_profile())
-        self.bind_all('<Control-b>', lambda e: self._build())
+        self.bind_all('<Control-n>', self._hotkey(self._new_profile))
+        self.bind_all('<Control-o>', self._hotkey(self._open_profile))
+        self.bind_all('<Control-s>', self._hotkey(self._save_profile))
+        self.bind_all('<Control-b>', self._hotkey(self._build))
+
+    def _hotkey(self, fn):
+        """Wrap a bind_all shortcut handler: shortcuts bypass the build modal's
+        grab (menu items are already blocked by it), so swallow them while a
+        build is running."""
+        def handler(_event):
+            if not self._building:
+                fn()
+        return handler
 
     # ========================================================================
     # NAV BAR

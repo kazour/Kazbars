@@ -25,6 +25,7 @@ state) and keeps this module focused on parsing + I/O.
 """
 
 import logging
+import os
 import sys
 import threading
 import time
@@ -199,6 +200,13 @@ class DeepsMeter:
         # start() and on log-rotation boundary.
         self._known_mobs: set[str] = set()
 
+        # Where the next _tail_file attach starts reading. False (normal
+        # attach) seeks to the end so pre-existing log content is never
+        # replayed into the rolling windows; True (set at a log boundary)
+        # reads from the top, because a truncated/new file's content IS the
+        # fresh session. Mirrors CombatLogMonitor's attach-at-EOF behavior.
+        self._resume_from_start = False
+
         # State updated only under `_lock`.
         self._status: Status = Status.NOT_STARTED
         self._log_filename: str | None = None
@@ -221,6 +229,7 @@ class DeepsMeter:
             self._game_folder = Path(game_folder)
             self._running = True
             self._reset_trackers_locked()
+            self._resume_from_start = False
             self._status = Status.NOT_STARTED
             self._log_filename = None
             self._snapshot = MeterSnapshot.empty()
@@ -319,7 +328,24 @@ class DeepsMeter:
         except OSError:
             return
         try:
+            # Normal attach: skip everything already in the file — a
+            # mid-session Start would otherwise replay the whole log into
+            # the rolling windows and show a huge false rate spike once
+            # warm-up clears. After a log boundary the flag flips and the
+            # (truncated/new) file is read from the top instead.
+            with self._lock:
+                resume = self._resume_from_start
+                self._resume_from_start = False
             last_size = 0
+            if not resume:
+                try:
+                    # Seed the truncation baseline BEFORE the seek: a rotation
+                    # landing between the two then reads as cur_size < last_size
+                    # at the first EOF check instead of slipping past it.
+                    last_size = path.stat().st_size
+                except OSError:
+                    return
+                f.seek(0, os.SEEK_END)
             last_tick = time.monotonic()
             while True:
                 with self._lock:
@@ -446,7 +472,10 @@ class DeepsMeter:
         self._known_mobs.clear()
 
     def _reset_for_log_boundary(self) -> None:
-        """Log rotated or truncated → zero trackers so the new session measures fresh."""
+        """Log rotated or truncated → zero trackers so the new session measures
+        fresh, and mark the next attach to read from the top (that content is
+        the new session, not history)."""
         with self._lock:
             self._reset_trackers_locked()
+            self._resume_from_start = True
             self._snapshot = self._build_snapshot_locked(time.monotonic())

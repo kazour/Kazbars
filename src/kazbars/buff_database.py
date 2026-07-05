@@ -18,6 +18,7 @@ v2 Format:
 
 import json
 import logging
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +41,12 @@ class BuffDatabase:
     def load(self, json_path):
         """Load a single v2 database file (back-compat / tests). For the app's
         layered load use `load_layers`."""
+        from . import buff_db_layers
         try:
             with open(json_path, encoding='utf-8') as f:
                 data = json.load(f)
-            self.buffs = data.get('buffs', [])
+            raw = data.get('buffs', []) if isinstance(data, dict) else []
+            self.buffs = buff_db_layers._keep_valid(raw, Path(json_path).name)
             self.provenance = {}
             self._rebuild_indexes()
             return True

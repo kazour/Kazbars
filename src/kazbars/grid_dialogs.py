@@ -44,7 +44,7 @@ from .ui_helpers import (
     TK_COLORS,
 )
 from .ui_tk_style import style_tk_listbox
-from .ui_widgets import app_toast, blend_alpha, confirm, debounced_callback
+from .ui_widgets import app_toast, blend_alpha, debounced_callback
 from .window_position import bind_window_position_save, restore_window_position
 
 ADD_GRID_WIZARD_SIZE = (460, 600)
@@ -76,7 +76,7 @@ def _section(parent, text):
 class AddGridWizard(tk.Toplevel):
     """Dialog wizard for creating a new grid with type, size, and mode options."""
 
-    def __init__(self, parent, existing_ids, current_total_slots):
+    def __init__(self, parent, existing_ids, current_total_slots, name_in_use=None):
         super().__init__(parent)
         self.withdraw()
         self.title("Add New Grid")
@@ -85,6 +85,9 @@ class AddGridWizard(tk.Toplevel):
         self.grab_set()
 
         self.existing_ids = existing_ids
+        # One owner for the uniqueness rule (grids_panel._grid_name_in_use);
+        # existing_ids stays for the default-name suggestion only.
+        self.name_in_use = name_in_use or (lambda name, _cfg: name in existing_ids)
         self.current_total_slots = current_total_slots
         self.available_slots = MAX_TOTAL_SLOTS - current_total_slots
         self.result = None
@@ -300,15 +303,7 @@ class AddGridWizard(tk.Toplevel):
             Messagebox.show_error("Enter a name for the grid.", title="Grid Name Required")
             return
 
-        has_special = any(not (c.isalnum() or c == '_' or c == ' ') for c in grid_id)
-        if has_special:
-            if not confirm(
-                f"Grid name '{grid_id}' contains special characters.\n"
-                "These will be converted to underscores.\nContinue?",
-                title="Special Characters", action="Convert & continue"):
-                return
-
-        if grid_id in self.existing_ids:
+        if self.name_in_use(grid_id, None):
             Messagebox.show_error(f"Grid name '{grid_id}' already exists.", title="Name Taken")
             return
 

@@ -409,11 +409,14 @@ def restore_settings(app, dialog, include_prefs=False):
         )
         return
 
+    db_panel = getattr(app, 'db_panel', None)
+    unsaved_db = ("\n\nYou have unsaved buff-database edits — restoring discards them."
+                  if db_panel is not None and db_panel.modified else "")
     if not confirm(
         f"Restore settings from this backup?\n\nCreated: {manifest.get('created', 'unknown')}\n\n"
         "Your current Age of Conan and KazBars settings will be replaced — "
         "close Age of Conan first.\n\n"
-        "A pre-restore snapshot of your current settings is saved automatically.",
+        f"A pre-restore snapshot of your current settings is saved automatically.{unsaved_db}",
         title="Restore Settings", action="Restore settings", parent=dialog,
     ):
         return
@@ -451,6 +454,14 @@ def restore_settings(app, dialog, include_prefs=False):
     # The running app holds prefs in memory and re-saves on exit; resync from
     # disk so a freshly-restored prefs.json (when opted in) isn't clobbered.
     app.settings.reload()
+
+    # Re-merge the buff DB from the restored database_user.json — else the next
+    # Database-editor save recomputes deltas from pre-restore memory and clobbers
+    # the restored custom buffs. Mirrors profile_manager._import.
+    app.database.reload()
+    if db_panel is not None:
+        db_panel.refresh_from_database()
+        db_panel.modified = False   # in-memory now equals the restored disk state
 
     dialog.destroy()
     snap_line = f"\n\nPre-restore snapshot: {snapshot}" if snapshot else ""

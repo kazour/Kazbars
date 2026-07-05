@@ -228,8 +228,11 @@ class CombatLogMonitor:
                             self.TRIGGER_SYPHON in line):
                             self._process_line(line)
 
-            except OSError:
-                # Handle file access errors gracefully
+            except (OSError, ValueError):
+                # Handle file access errors gracefully. stop_monitoring closes the
+                # handle from the caller thread; a mid-read() close raises ValueError
+                # ("I/O operation on closed file") — drop the handle and let the loop
+                # re-check self.monitoring.
                 if self.file_handle:
                     try:
                         self.file_handle.close()

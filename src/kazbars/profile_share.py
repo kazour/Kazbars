@@ -92,7 +92,9 @@ def collect_referenced_user_buffs(profile, by_id, by_name, provenance):
 def merge_imported_buffs(delta_store, embedded_buffs, existing_ids):
     """Merge embedded buffs into ``database_user.json`` via ``delta_store``,
     skipping any whose ``ids[0]`` already exists (in the effective DB or the
-    delta). Returns ``(added, skipped)``; writes only if something was added."""
+    delta). Structurally malformed embedded entries (a crafted/corrupt share
+    string) are dropped. Returns ``(added, skipped)``; writes only if
+    something was added."""
     delta = delta_store.load()
     have = set(existing_ids)
     for b in delta["buffs"]:
@@ -101,9 +103,9 @@ def merge_imported_buffs(delta_store, embedded_buffs, existing_ids):
             have.add(key)
     added = skipped = 0
     for b in embedded_buffs:
-        key = buff_db_layers._identity(b)
-        if key is None:
+        if not buff_db_layers.is_valid_buff(b):
             continue
+        key = buff_db_layers._identity(b)
         if key in have:
             skipped += 1
         else:

@@ -21,6 +21,7 @@ from .grid_editor_panel import (
 from .grid_model import (
     MAX_TOTAL_SLOTS,
     create_default_grid,
+    dedupe_grid_ids,
     default_grid_name,
     parse_resolution,
     scale_grid_position,
@@ -76,6 +77,7 @@ class GridsPanel(ttk.Frame):
         self.grid_panels = []
         self._tip_dismissed = False
         self._build_done = False
+        self._profile_generation = 0
 
         self._create_widgets()
         self.refresh_panels()
@@ -464,6 +466,9 @@ class GridsPanel(ttk.Frame):
         be resolved during migration. Caller decides when/how to surface it,
         so the warning doesn't race other startup/first-launch dialogs.
         """
+        # A pending delete-undo toast belongs to the outgoing profile; bump the
+        # generation so its click-through can't insert a stale grid into this one.
+        self._profile_generation += 1
         missing_by_grid = {}
         validated = []
         for g in grids:
@@ -476,6 +481,8 @@ class GridsPanel(ttk.Frame):
             if missing:
                 missing_by_grid[grid_name] = missing
             validated.append(validate_grid(g))
+        for old, new in dedupe_grid_ids(validated):
+            logger.warning("Duplicate grid name '%s' renamed to '%s'", old, new)
         self.grids = validated
         # Restore _build_done from the persisted signature only when both the
         # profile identity and the grids hash match: relaunch on the same
@@ -551,7 +558,8 @@ class GridsPanel(ttk.Frame):
         if current_slots >= MAX_TOTAL_SLOTS:
             Messagebox.show_warning(f"Maximum {MAX_TOTAL_SLOTS} total slots reached.\n\nRemove a grid or reduce grid sizes to free up slots.", title="Slot Limit")
             return
-        wizard = AddGridWizard(self.winfo_toplevel(), existing_ids, current_slots)
+        wizard = AddGridWizard(self.winfo_toplevel(), existing_ids, current_slots,
+                               name_in_use=self._grid_name_in_use)
         self.winfo_toplevel().wait_window(wizard)
         if wizard.result:
             # refresh_panels() rebuilds every card from self.grids, so flush the
@@ -570,13 +578,29 @@ class GridsPanel(ttk.Frame):
                 removed = self.grids.pop(i)
                 self._mark_modified()
                 self.refresh_panels(expand_index=-1)
+                gen = self._profile_generation
                 app_toast(self, f"Deleted grid '{removed['id']}' — click to undo",
                           'info', 8, key='grid-delete-undo',
-                          on_click=lambda g=removed, idx=i: self._undo_delete_grid(g, idx))
+                          on_click=lambda g=removed, idx=i, gn=gen: self._undo_delete_grid(g, idx, gn))
                 break
 
-    def _undo_delete_grid(self, grid, index):
-        """Reinsert a deleted grid at its old position (undo-toast click-through)."""
+    def _undo_delete_grid(self, grid, index, generation):
+        """Reinsert a deleted grid at its old position (undo-toast click-through).
+
+        A profile loaded since the delete invalidates the undo — reinserting would
+        drop the old profile's grid into the new one. Re-check the insert
+        invariants too: grids added since the delete may have taken the name
+        (names key the AS2 whitelist tables) or the slot budget."""
+        if generation != self._profile_generation:
+            app_toast(self, "Undo expired — a different profile was loaded", 'info', 4)
+            return
+        if any(g.get('id') == grid.get('id') for g in self.grids):
+            app_toast(self, f"Can't undo — a grid named '{grid.get('id')}' exists now",
+                      'warning', 4)
+            return
+        if self.get_total_slots() + grid['rows'] * grid['cols'] > MAX_TOTAL_SLOTS:
+            app_toast(self, "Can't undo — not enough free slots", 'warning', 4)
+            return
         index = min(index, len(self.grids))
         self.save_settings()  # flush live cards before the rebuild
         self.grids.insert(index, grid)
@@ -616,6 +640,7 @@ class GridsPanel(ttk.Frame):
                 get_total_slots=self.get_total_slots,
                 on_resize=self._on_grid_resized,
                 on_whitelist_changed=self._update_tip,
+                name_in_use=self._grid_name_in_use,
             )
             self.grid_panels.append(panel)
             self._attach_panel(panel, i)
@@ -650,6 +675,13 @@ class GridsPanel(ttk.Frame):
                 widget.pack_forget()  # type: ignore[attr-defined]
         for i, panel in enumerate(self.grid_panels):
             self._attach_panel(panel, i)
+
+    def _grid_name_in_use(self, name, exclude_config):
+        """True if a grid other than `exclude_config` already uses `name`.
+        Names key the generated AS2 whitelist tables, so they must stay unique
+        — the card's rename validator calls this to block duplicates (the Add
+        Grid wizard has its own check)."""
+        return any(g is not exclude_config and g.get('id') == name for g in self.grids)
 
     def _on_grid_resized(self):
         self._update_slot_counter()

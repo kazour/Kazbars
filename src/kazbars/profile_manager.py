@@ -292,8 +292,7 @@ class ProfileManagerDialog(tk.Toplevel):
         if added:
             self.app.database.reload()
             if getattr(self.app, 'db_panel', None):
-                self.app.db_panel._refresh_floor()
-                self.app.db_panel.refresh_list()
+                self.app.db_panel.refresh_from_database()
 
         self._refresh(select=target.name)
         tail = ""

@@ -263,12 +263,18 @@ class CodeGenerator:
             if entry:
                 entry_ids = entry.get("ids", [])
                 if entry.get("stacking", False):
+                    # Imported/hand-edited entries can carry junk stacking
+                    # fields; clamp so the slice below can't go negative/raise.
                     start = entry.get("stackStart", 1)
+                    if not isinstance(start, int) or start < 1:
+                        start = 1
                     if entry.get("partialList", False):
                         for i, bid in enumerate(entry_ids):
                             self._stack_labels[bid] = start + i
                     else:
-                        end = entry.get("stackEnd", 0) or len(entry_ids)
+                        end = entry.get("stackEnd", 0)
+                        if not isinstance(end, int) or end < 1:
+                            end = len(entry_ids)
                         filtered = entry_ids[start - 1 : end]
                         for i, bid in enumerate(filtered):
                             self._stack_labels[bid] = start + i

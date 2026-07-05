@@ -899,7 +899,11 @@ class DeepsPanel(tk.Toplevel):
         gets a chance to re-show in case AoC focus changed in the meantime.
         """
         if self.meter.is_running() and self.overlay is not None:
-            # Force a tick to refresh the status line + repaint the overlay.
+            # Force an immediate tick for a fresh status line + repaint.
+            # Cancel the pending one first: _tick reschedules itself, so a
+            # direct call alongside a live loop would spawn a second loop
+            # (one more per click, and _end_tick only cancels the newest).
+            self._end_tick()
             self._tick()
 
 

@@ -22,6 +22,7 @@ Run: `pytest tests/test_deeps_meter.py` (from repo root).
 import sys
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -314,6 +315,24 @@ class TestLifecycle:
         m = DeepsMeter()
         m.stop()  # never started — must not raise
 
+    def test_log_boundary_marks_resume_from_start(self) -> None:
+        """A boundary re-tail reads from the top (fresh session content);
+        everything else attaches at EOF so history is never replayed."""
+        m = DeepsMeter()
+        assert m._resume_from_start is False
+        m._reset_for_log_boundary()
+        assert m._resume_from_start is True
+
+    def test_start_clears_resume_flag(self, tmp_path: Path) -> None:
+        """A restart must attach at EOF even if a boundary flag was left set."""
+        m = DeepsMeter()
+        m._resume_from_start = True
+        m.start(tmp_path)
+        try:
+            assert m._resume_from_start is False
+        finally:
+            m.stop(timeout=1.0)
+
     def test_old_log_detected(self, tmp_path: Path) -> None:
         """A CombatLog file no one is writing → Status.OLD_LOG."""
         log = tmp_path / "CombatLog-stale.txt"
@@ -335,6 +354,43 @@ class TestLifecycle:
 # Integration: a held-open file should look "live" and reach TAILING          #
 # =========================================================================== #
 
+@contextmanager
+def _held_open(log: Path):
+    """Hold `log` open for append from another thread the way AoC would —
+    Python's open() on Windows shares FILE_SHARE_READ (not exclusive), enough
+    to make the exclusive-share is_live probe fail, i.e. read as "live".
+    Yields the append handle; releases it and joins the thread on exit."""
+    holder: dict[str, object] = {}
+    done = threading.Event()
+
+    def hold():
+        # 'a' mode keeps the file open for append without truncating.
+        holder["f"] = open(log, "a", encoding="utf-8")
+        done.wait()
+        holder["f"].close()
+
+    thread = threading.Thread(target=hold, daemon=True)
+    thread.start()
+    deadline = time.monotonic() + 1.0
+    while "f" not in holder and time.monotonic() < deadline:
+        time.sleep(0.02)
+    assert "f" in holder, "holder thread didn't open the file in time"
+    try:
+        yield holder["f"]
+    finally:
+        done.set()
+        thread.join(timeout=1.0)
+
+
+def _wait_for_tailing(meter: DeepsMeter, timeout: float = 2.0) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if meter.snapshot().status is Status.TAILING:
+            return
+        time.sleep(0.05)
+    pytest.fail(f"Meter never reached TAILING (last status: {meter.snapshot().status})")
+
+
 @pytest.mark.skipif(
     sys.platform != "win32",
     reason="is_live() uses Windows CreateFile semantics; integration "
@@ -347,47 +403,49 @@ def test_tailing_reached_with_held_open_file(tmp_path: Path) -> None:
     log = tmp_path / "CombatLog-live.txt"
     log.write_text("", encoding="utf-8")
 
-    # Hold the file open from another thread the way AoC would.
-    handle_holder: dict[str, object] = {}
+    with _held_open(log):
+        meter = DeepsMeter()
+        meter.start(tmp_path)
+        try:
+            # The meter scans, sees the file, probes is_live (fails because
+            # we hold the file → "live"), opens its own read handle, sits in
+            # tail_file. Give it time to settle.
+            _wait_for_tailing(meter)
+            assert meter.snapshot().log_filename == "CombatLog-live.txt"
+        finally:
+            meter.stop(timeout=1.0)
 
-    def hold():
-        # 'a' mode keeps the file open for append without truncating.
-        handle_holder["f"] = open(log, "a", encoding="utf-8")
-        # Block until the test signals done.
-        handle_holder["done"] = threading.Event()
-        handle_holder["done"].wait()
-        handle_holder["f"].close()
 
-    holder_thread = threading.Thread(target=hold, daemon=True)
-    holder_thread.start()
-    # Wait for the handle to be acquired.
-    deadline = time.monotonic() + 1.0
-    while "f" not in handle_holder and time.monotonic() < deadline:
-        time.sleep(0.02)
-    assert "f" in handle_holder, "holder thread didn't open the file in time"
+@pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="is_live() uses Windows CreateFile semantics; integration "
+    "test only meaningful on Windows.",
+)
+def test_attach_skips_preexisting_content(tmp_path: Path) -> None:
+    """A mid-session Start must not replay the log's existing content into the
+    trackers (it would read as a huge false rate spike once warm-up clears);
+    lines appended after the attach are still picked up."""
+    log = tmp_path / "CombatLog-live.txt"
+    log.write_text("Your Strike hits Arbanus for 105.\n" * 50, encoding="utf-8")
 
-    meter = DeepsMeter()
-    meter.start(tmp_path)
-    try:
-        # The meter scans, sees the file, probes is_live (fails because
-        # we hold the file → "live"), opens its own read handle, sits in
-        # tail_file. Give it time to settle.
-        deadline = time.monotonic() + 2.0
-        while time.monotonic() < deadline:
-            s = meter.snapshot()
-            if s.status is Status.TAILING:
-                break
-            time.sleep(0.05)
-        else:
-            pytest.fail(
-                f"Meter never reached TAILING (last status: {meter.snapshot().status})"
-            )
-        s = meter.snapshot()
-        assert s.log_filename == "CombatLog-live.txt"
-    finally:
-        meter.stop(timeout=1.0)
-        # Release the held handle.
-        done_event = handle_holder.get("done")
-        if isinstance(done_event, threading.Event):
-            done_event.set()
-        holder_thread.join(timeout=1.0)
+    with _held_open(log) as f:
+        meter = DeepsMeter()
+        meter.start(tmp_path)
+        try:
+            _wait_for_tailing(meter)
+
+            # Give the tail loop a beat: the 50 pre-existing hits must be skipped.
+            time.sleep(0.3)
+            assert len(meter._out_tracker._window._events) == 0
+
+            # A line appended after the attach IS parsed.
+            f.write("Your Strike hits Arbanus for 105.\n")
+            f.flush()
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                if len(meter._out_tracker._window._events) == 1:
+                    break
+                time.sleep(0.05)
+            assert len(meter._out_tracker._window._events) == 1
+        finally:
+            meter.stop(timeout=1.0)

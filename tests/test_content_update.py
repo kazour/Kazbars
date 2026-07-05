@@ -67,6 +67,15 @@ def test_parse_valid():
     json.dumps({"content_version": 1, "files": {"a": {"url": "u", "sha256": "s"}}}),
     json.dumps({"content_version": 1, "min_app_version": "1", "files": {}}),
     json.dumps({"content_version": 1, "min_app_version": "1", "files": {"a": {"url": "u"}}}),
+    # Unsafe payload names (become path segments in content/) reject the manifest.
+    json.dumps({"content_version": 1, "min_app_version": "1", "files": {"../evil.json": {"url": "u", "sha256": "s"}}}),
+    json.dumps({"content_version": 1, "min_app_version": "1", "files": {"a/b.json": {"url": "u", "sha256": "s"}}}),
+    json.dumps({"content_version": 1, "min_app_version": "1", "files": {"a\\b.json": {"url": "u", "sha256": "s"}}}),
+    # Drive-relative: Path('content') / 'C:evil.json' discards the base on Windows.
+    json.dumps({"content_version": 1, "min_app_version": "1", "files": {"C:evil.json": {"url": "u", "sha256": "s"}}}),
+    json.dumps({"content_version": 1, "min_app_version": "1", "files": {"": {"url": "u", "sha256": "s"}}}),
+    # manifest.json is the reserved commit marker apply_content writes last.
+    json.dumps({"content_version": 1, "min_app_version": "1", "files": {"manifest.json": {"url": "u", "sha256": "s"}}}),
 ])
 def test_parse_rejects(raw):
     assert C.parse_manifest(raw) is None

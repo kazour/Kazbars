@@ -84,7 +84,16 @@ def parse_manifest(raw):
     files = data.get('files')
     if not isinstance(files, dict) or not files:
         return None
-    for info in files.values():
+    for name, info in files.items():
+        # Payload names become path segments in content/ — reject anything that
+        # isn't a plain safe basename (platform-independent string checks so CI
+        # behaves the same on any OS; ':' because Windows pathlib treats
+        # "C:name" as drive-relative and discards the base dir on join).
+        # manifest.json is the commit marker apply_content writes LAST, so it
+        # can't also be a payload.
+        if (not name or '/' in name or '\\' in name or ':' in name
+                or name in ('.', '..') or name == MANIFEST_NAME):
+            return None
         if not isinstance(info, dict):
             return None
         if not isinstance(info.get('url'), str) or not isinstance(info.get('sha256'), str):
@@ -328,7 +337,7 @@ def _apply_on_main(app, manifest, payloads):
             app.database.reload()
             _notify(app, "Buff-database update failed — reverted to the previous version", 'warning')
             return
-        _refresh_db_views(app, db_panel)
+        _refresh_db_views(db_panel)
         added, changed = summarize_changes(old_buffs, app.database.buffs)
         notes = manifest.get('notes', '')
         _notify(app, f"Buff database updated — {added} added, {changed} changed", 'success',
@@ -346,20 +355,16 @@ def revert(app):
     app.settings.set('content_version', _applied_version(content_dir()))
     app.settings.save()
     app.database.reload()
-    _refresh_db_views(app, getattr(app, 'db_panel', None))
+    _refresh_db_views(getattr(app, 'db_panel', None))
     _notify(app, "Reverted to the previous buff database", 'success')
 
 
-def _refresh_db_views(app, db_panel):
-    """Re-pull the editor's floor + redraw the DB list after a live re-merge.
-    Grids resolve against `app.database` at build time, so no card rebuild is
-    forced (that would risk clobbering an in-progress grid edit)."""
+def _refresh_db_views(db_panel):
+    """Redraw the DB editor after a live re-merge (None-safe). Grids resolve
+    against `app.database` at build time, so no card rebuild is forced (that
+    would risk clobbering an in-progress grid edit)."""
     if db_panel is not None:
-        try:
-            db_panel._refresh_floor()
-            db_panel.refresh_list()
-        except tk.TclError:
-            pass
+        db_panel.refresh_from_database()
 
 
 def _notify(app, message, style='info', on_click=None):

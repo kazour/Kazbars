@@ -43,6 +43,33 @@ def _identity(buff: dict) -> Any:
     return ids[0] if ids else None
 
 
+def is_valid_buff(buff: Any) -> bool:
+    """Structural check for one buff entry: a dict with a non-empty string
+    ``name`` and a non-empty ``ids`` list of ints — the fields the merge, the
+    indexes, and the generator all rely on. Optional fields aren't checked.
+    Gate every ingestion of buffs the app didn't write itself (hand-edited
+    ``database_user.json``, JSON import, embedded share-string buffs) so one
+    malformed entry can't crash the boot merge or the index rebuild."""
+    return (
+        isinstance(buff, dict)
+        and isinstance(buff.get('name'), str)
+        and bool(buff['name'])
+        and isinstance(buff.get('ids'), list)
+        and bool(buff['ids'])
+        and all(isinstance(i, int) for i in buff['ids'])
+    )
+
+
+def _keep_valid(buffs: list, source: str) -> list:
+    """Drop structurally invalid entries (logged), keep the rest."""
+    valid = [b for b in buffs if is_valid_buff(b)]
+    dropped = len(buffs) - len(valid)
+    if dropped:
+        logger.warning("Dropped %d malformed buff entr%s from %s",
+                       dropped, 'y' if dropped == 1 else 'ies', source)
+    return valid
+
+
 def _canonical(buff: dict) -> dict:
     """Drop optional keys left at their default so equality ignores cosmetic
     differences (e.g. an explicit ``stackEnd: 0`` vs the key being absent)."""
@@ -54,7 +81,8 @@ def _buffs_equal(a: dict, b: dict) -> bool:
 
 
 def _read_buffs(path) -> list:
-    """Read a v2 buff file's ``buffs`` list, or ``[]`` on missing/corrupt."""
+    """Read a v2 buff file's ``buffs`` list (malformed entries dropped), or
+    ``[]`` on missing/corrupt."""
     if not path:
         return []
     try:
@@ -64,15 +92,16 @@ def _read_buffs(path) -> list:
             if isinstance(data, dict):
                 buffs = data.get('buffs', [])
                 if isinstance(buffs, list):
-                    return buffs
+                    return _keep_valid(buffs, p.name)
     except (json.JSONDecodeError, UnicodeDecodeError, OSError) as e:
         logger.warning('Could not read buff layer %s: %s', Path(path).name, e)
     return []
 
 
 def _read_user_delta(path) -> tuple[list, set]:
-    """Read ``database_user.json`` → (buffs, deleted-id set). Missing/corrupt →
-    ``([], set())``. Never raises."""
+    """Read ``database_user.json`` → (buffs, deleted-id set). Malformed buff
+    entries and non-int tombstones are dropped (the file is hand-editable).
+    Missing/corrupt → ``([], set())``. Never raises."""
     buffs: list = []
     deleted: set = set()
     if not path:
@@ -84,10 +113,10 @@ def _read_user_delta(path) -> tuple[list, set]:
             if isinstance(data, dict):
                 b = data.get('buffs', [])
                 if isinstance(b, list):
-                    buffs = b
+                    buffs = _keep_valid(b, p.name)
                 d = data.get('deleted', [])
                 if isinstance(d, list):
-                    deleted = set(d)
+                    deleted = {x for x in d if isinstance(x, int)}
     except (json.JSONDecodeError, UnicodeDecodeError, OSError) as e:
         logger.warning('Could not read user buff deltas: %s', e)
     return buffs, deleted
@@ -192,9 +221,32 @@ class DeltaStore:
         return {'version': USER_DB_VERSION, 'buffs': buffs, 'deleted': sorted(deleted)}
 
     def save(self, delta: dict) -> None:
+        # Carry over entries the load-time filter dropped: they never reached
+        # the editor, so a recompute-from-memory save would otherwise erase a
+        # hand-edit typo (e.g. string ids) permanently instead of leaving it
+        # in the file for the user to fix.
+        malformed, bad_tombstones = self._load_rejects()
         data = {
             'version': USER_DB_VERSION,
-            'buffs': delta.get('buffs', []),
-            'deleted': sorted(delta.get('deleted', [])),
+            'buffs': list(delta.get('buffs', [])) + malformed,
+            'deleted': sorted(delta.get('deleted', [])) + bad_tombstones,
         }
         safe_save_json(self.path, data)
+
+    def _load_rejects(self) -> tuple[list, list]:
+        """The on-disk entries `_read_user_delta` would drop, verbatim."""
+        malformed: list = []
+        bad_tombstones: list = []
+        try:
+            if self.path.exists():
+                data = json.loads(self.path.read_text(encoding='utf-8'))
+                if isinstance(data, dict):
+                    b = data.get('buffs', [])
+                    if isinstance(b, list):
+                        malformed = [x for x in b if not is_valid_buff(x)]
+                    d = data.get('deleted', [])
+                    if isinstance(d, list):
+                        bad_tombstones = [x for x in d if not isinstance(x, int)]
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+            pass
+        return malformed, bad_tombstones
