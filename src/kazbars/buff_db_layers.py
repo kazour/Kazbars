@@ -56,7 +56,9 @@ def is_valid_buff(buff: Any) -> bool:
         and bool(buff['name'])
         and isinstance(buff.get('ids'), list)
         and bool(buff['ids'])
-        and all(isinstance(i, int) for i in buff['ids'])
+        # type(), not isinstance(): bool is an int subclass, and True == 1
+        # would silently alias the buff whose id is 1.
+        and all(type(i) is int for i in buff['ids'])
     )
 
 
@@ -68,6 +70,28 @@ def _keep_valid(buffs: list, source: str) -> list:
         logger.warning("Dropped %d malformed buff entr%s from %s",
                        dropped, 'y' if dropped == 1 else 'ies', source)
     return valid
+
+
+def _partition_delta(data: Any) -> tuple[list, list, list, list]:
+    """Split parsed ``database_user.json`` content into ``(buffs, malformed,
+    tombstones, bad_tombstones)``. The single owner of the keep/reject rules,
+    so the load-time filter and the save-time carry-over can't drift apart.
+    Tombstones use ``type() is int`` for the same bool-aliasing reason as
+    ``is_valid_buff`` — ``true`` must not tombstone buff id 1."""
+    buffs: list = []
+    malformed: list = []
+    tombstones: list = []
+    bad_tombstones: list = []
+    if isinstance(data, dict):
+        b = data.get('buffs', [])
+        if isinstance(b, list):
+            for x in b:
+                (buffs if is_valid_buff(x) else malformed).append(x)
+        d = data.get('deleted', [])
+        if isinstance(d, list):
+            for x in d:
+                (tombstones if type(x) is int else bad_tombstones).append(x)
+    return buffs, malformed, tombstones, bad_tombstones
 
 
 def _canonical(buff: dict) -> dict:
@@ -102,24 +126,20 @@ def _read_user_delta(path) -> tuple[list, set]:
     """Read ``database_user.json`` → (buffs, deleted-id set). Malformed buff
     entries and non-int tombstones are dropped (the file is hand-editable).
     Missing/corrupt → ``([], set())``. Never raises."""
-    buffs: list = []
-    deleted: set = set()
     if not path:
-        return buffs, deleted
+        return [], set()
     try:
         p = Path(path)
         if p.exists():
             data = json.loads(p.read_text(encoding='utf-8'))
-            if isinstance(data, dict):
-                b = data.get('buffs', [])
-                if isinstance(b, list):
-                    buffs = _keep_valid(b, p.name)
-                d = data.get('deleted', [])
-                if isinstance(d, list):
-                    deleted = {x for x in d if isinstance(x, int)}
+            buffs, malformed, tombstones, _ = _partition_delta(data)
+            if malformed:
+                logger.warning("Dropped %d malformed buff entr%s from %s",
+                               len(malformed), 'y' if len(malformed) == 1 else 'ies', p.name)
+            return buffs, set(tombstones)
     except (json.JSONDecodeError, UnicodeDecodeError, OSError) as e:
         logger.warning('Could not read user buff deltas: %s', e)
-    return buffs, deleted
+    return [], set()
 
 
 def merge_layers(stock_buffs: list, content_buffs: list, user_buffs: list,
@@ -234,19 +254,14 @@ class DeltaStore:
         safe_save_json(self.path, data)
 
     def _load_rejects(self) -> tuple[list, list]:
-        """The on-disk entries `_read_user_delta` would drop, verbatim."""
-        malformed: list = []
-        bad_tombstones: list = []
+        """The on-disk entries `_read_user_delta` would drop, verbatim. Read
+        fresh at save time (not cached at load) so a save without a prior load
+        on this instance can never erase a hand-edit."""
         try:
             if self.path.exists():
                 data = json.loads(self.path.read_text(encoding='utf-8'))
-                if isinstance(data, dict):
-                    b = data.get('buffs', [])
-                    if isinstance(b, list):
-                        malformed = [x for x in b if not is_valid_buff(x)]
-                    d = data.get('deleted', [])
-                    if isinstance(d, list):
-                        bad_tombstones = [x for x in d if not isinstance(x, int)]
+                _, malformed, _, bad_tombstones = _partition_delta(data)
+                return malformed, bad_tombstones
         except (json.JSONDecodeError, UnicodeDecodeError, OSError):
             pass
-        return malformed, bad_tombstones
+        return [], []

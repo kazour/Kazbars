@@ -88,11 +88,14 @@ def parse_manifest(raw):
         # Payload names become path segments in content/ — reject anything that
         # isn't a plain safe basename (platform-independent string checks so CI
         # behaves the same on any OS; ':' because Windows pathlib treats
-        # "C:name" as drive-relative and discards the base dir on join).
-        # manifest.json is the commit marker apply_content writes LAST, so it
-        # can't also be a payload.
+        # "C:name" as drive-relative and discards the base dir on join; trailing
+        # dots/spaces because Win32 strips them, so "manifest.json." would write
+        # manifest.json — this also covers '.' and '..'). manifest.json is the
+        # commit marker apply_content writes LAST, so it can't also be a payload;
+        # compare case-insensitively because Windows paths are.
         if (not name or '/' in name or '\\' in name or ':' in name
-                or name in ('.', '..') or name == MANIFEST_NAME):
+                or name != name.rstrip('. ')
+                or name.lower() == MANIFEST_NAME):
             return None
         if not isinstance(info, dict):
             return None

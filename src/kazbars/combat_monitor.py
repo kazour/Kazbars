@@ -188,6 +188,7 @@ class CombatLogMonitor:
     def _monitor_loop(self):
         """Main monitoring loop - runs in daemon thread."""
         while self.monitoring:
+            new_content = ''
             try:
                 self._check_for_newer_log()
 
@@ -220,25 +221,26 @@ class CombatLogMonitor:
                 new_content = self.file_handle.read()
                 self.last_position = self.file_handle.tell()
 
-                # Process new lines
-                if new_content:
-                    for line in new_content.splitlines():
-                        if (self.TRIGGER_SEED in line or
-                            self.TRIGGER_FIXATION in line or
-                            self.TRIGGER_SYPHON in line):
-                            self._process_line(line)
-
             except (OSError, ValueError):
                 # Handle file access errors gracefully. stop_monitoring closes the
                 # handle from the caller thread; a mid-read() close raises ValueError
                 # ("I/O operation on closed file") — drop the handle and let the loop
-                # re-check self.monitoring.
+                # re-check self.monitoring. Line processing runs OUTSIDE this try so
+                # a parser bug can't masquerade as an I/O error.
                 if self.file_handle:
                     try:
                         self.file_handle.close()
                     except OSError:
                         pass
                     self.file_handle = None
+
+            # Process new lines
+            if new_content:
+                for line in new_content.splitlines():
+                    if (self.TRIGGER_SEED in line or
+                        self.TRIGGER_FIXATION in line or
+                        self.TRIGGER_SYPHON in line):
+                        self._process_line(line)
 
             # 100ms polling interval
             time.sleep(0.1)

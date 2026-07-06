@@ -220,6 +220,16 @@ def save(schema: Schema, folder: str | Path, data: dict) -> bool:
         return False
 
 
+def save_patch(schema: Schema, folder: str | Path, patch: dict) -> bool:
+    """Overwrite only `patch`'s keys in the on-disk settings (defaults when the
+    file is missing) and write the merged result atomically. For callers that
+    own one slice of a shared file — a blind `save` of a stale full copy would
+    clobber keys a sibling panel wrote since it loaded."""
+    current = load(schema, folder)
+    current.update(patch)
+    return save(schema, folder, current)
+
+
 # =========================================================================== #
 # STATEFUL STORE (load-once, get/set, save) — used by the prefs facade         #
 # =========================================================================== #

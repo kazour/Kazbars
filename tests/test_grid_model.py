@@ -32,6 +32,14 @@ def test_numeric_strings_still_coerce():
     assert grid["cols"] == 4
 
 
+def test_infinity_falls_back_to_default():
+    # json.loads parses 1e999 to inf, and int(inf) raises OverflowError —
+    # that's junk like any other, not a crash.
+    grid = validate_grid({"rows": float("inf"), "cols": float("-inf")})
+    assert grid["rows"] == CLAMP_SPECS["rows"][0]
+    assert grid["cols"] == CLAMP_SPECS["cols"][0]
+
+
 def test_out_of_range_values_clamp():
     grid = validate_grid({"rows": 999, "gap": -99})
     assert grid["rows"] == CLAMP_SPECS["rows"][2]  # max
@@ -54,6 +62,15 @@ def test_dedupe_grid_ids_skips_taken_suffixes():
     grids = [{"id": "X_2"}, {"id": "X"}, {"id": "X"}]
     dedupe_grid_ids(grids)
     assert [g["id"] for g in grids] == ["X_2", "X", "X_3"]
+
+
+def test_dedupe_grid_ids_rename_dodges_later_names():
+    # The rename for the second 'X' must not take 'X_2' — a later grid owns it,
+    # which would force a cascading second rename.
+    grids = [{"id": "X"}, {"id": "X"}, {"id": "X_2"}]
+    renamed = dedupe_grid_ids(grids)
+    assert [g["id"] for g in grids] == ["X", "X_3", "X_2"]
+    assert renamed == [("X", "X_3")]
 
 
 def test_dedupe_grid_ids_no_duplicates_is_a_no_op():

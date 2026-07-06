@@ -508,19 +508,17 @@ def save_settings(settings_folder: str | Path, settings: dict) -> bool:
 
 # The main panel (offsets/toggles) and the colors panel (source_colors) both live
 # in damageinfo_settings.json but each holds its own in-memory copy loaded at open.
-# A blind save from one clobbers the other's keys. These two write only their own
-# slice, re-reading the sibling's slice from disk first.
+# A blind save from one clobbers the other's keys, so each writes only its own
+# slice via `settings_core.save_patch`.
 def save_source_colors(settings_folder: str | Path, colors: dict) -> bool:
     """Persist only ``source_colors``, preserving whatever else is on disk (the main
     panel may have written offsets/toggles since the colors panel loaded)."""
-    current = load_settings(settings_folder)
-    current['source_colors'] = validate_source_colors(colors)
-    return save_settings(settings_folder, current)
+    return settings_core.save_patch(_SCHEMA, settings_folder,
+                                    {'source_colors': validate_source_colors(colors)})
 
 
 def save_settings_preserving_colors(settings_folder: str | Path, settings: dict) -> bool:
     """Persist ``settings`` but keep the on-disk ``source_colors`` (the colors panel
     may have written since this panel loaded)."""
-    merged = dict(settings)
-    merged['source_colors'] = load_settings(settings_folder)['source_colors']
-    return save_settings(settings_folder, merged)
+    patch = {k: v for k, v in settings.items() if k != 'source_colors'}
+    return settings_core.save_patch(_SCHEMA, settings_folder, patch)

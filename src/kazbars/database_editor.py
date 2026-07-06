@@ -329,13 +329,12 @@ def migrate_legacy_buff_fields(buff):
 class DatabaseEditorTab(ttk.Frame):
     """Database editor panel for the main application."""
 
-    def __init__(self, parent, database, delta_store, get_floor, on_modified=None, get_grids=None):
+    def __init__(self, parent, database, delta_store, get_floor, get_grids=None):
         super().__init__(parent)
 
         self.database = database
         self._delta_store = delta_store      # writes userdata/database_user.json
         self._get_floor = get_floor          # () -> (floor_buffs, floor_provenance)
-        self.on_modified = on_modified
         self._get_grids = get_grids
         self.modified = False
 
@@ -692,7 +691,16 @@ class DatabaseEditorTab(ttk.Frame):
             with open(path, encoding='utf-8') as f:
                 data = json.load(f)
 
-            import_buffs = data if isinstance(data, list) else data.get('buffs', [])
+            if isinstance(data, list):
+                import_buffs = data
+            elif isinstance(data, dict):
+                import_buffs = data.get('buffs', [])
+            else:
+                import_buffs = None
+            if not isinstance(import_buffs, list):
+                # Wrong container shape (scalar top level, or a non-list
+                # "buffs") — route to the friendly error dialog below.
+                raise ValueError("expected a buff list or a v2 database object")
             if not import_buffs:
                 app_toast(self, "No buff entries in this file", 'warning')
                 return
@@ -830,5 +838,3 @@ class DatabaseEditorTab(ttk.Frame):
 
     def _set_modified(self):
         self.modified = True
-        if self.on_modified:
-            self.on_modified()

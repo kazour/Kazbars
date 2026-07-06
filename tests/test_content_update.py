@@ -76,6 +76,12 @@ def test_parse_valid():
     json.dumps({"content_version": 1, "min_app_version": "1", "files": {"": {"url": "u", "sha256": "s"}}}),
     # manifest.json is the reserved commit marker apply_content writes last.
     json.dumps({"content_version": 1, "min_app_version": "1", "files": {"manifest.json": {"url": "u", "sha256": "s"}}}),
+    # Windows quirks: paths compare case-insensitively and Win32 strips trailing
+    # dots/spaces, so these would clobber the marker / another payload there.
+    json.dumps({"content_version": 1, "min_app_version": "1", "files": {"Manifest.json": {"url": "u", "sha256": "s"}}}),
+    json.dumps({"content_version": 1, "min_app_version": "1", "files": {"manifest.json.": {"url": "u", "sha256": "s"}}}),
+    json.dumps({"content_version": 1, "min_app_version": "1", "files": {"Database.json ": {"url": "u", "sha256": "s"}}}),
+    json.dumps({"content_version": 1, "min_app_version": "1", "files": {"..": {"url": "u", "sha256": "s"}}}),
 ])
 def test_parse_rejects(raw):
     assert C.parse_manifest(raw) is None

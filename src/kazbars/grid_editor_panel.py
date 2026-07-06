@@ -328,26 +328,34 @@ class GridEditorPanel(ttk.Frame):
         draw_grid_cells(self._preview_canvas, rows, cols,
                         self._accent_color, GRID_PREVIEW_PX, GRID_PREVIEW_PX)
 
-    def _validate_name(self):
+    def _validate_name(self, interactive=True):
         """Red on empty or duplicate, commit on valid. Never rewrites the field —
         deleting and blurring would otherwise snap the old name back. Duplicates
         are rejected because grid names key the generated AS2 whitelist tables:
-        two grids sharing a name would silently share one whitelist in-game."""
-        name = self.id_var.get().strip()
-        if not name:
-            self._name_entry.configure(bootstyle='danger')  # type: ignore[call-overload]
-            return
-        if self._name_in_use is not None and self._name_in_use(name, self.grid_config):
-            self._name_entry.configure(bootstyle='danger')  # type: ignore[call-overload]
-            app_toast(self, f"Grid name '{name}' is already used by another grid",
-                      'warning', key='grid-name-dup')
-            return
-        self._name_entry.configure(bootstyle='default')  # type: ignore[call-overload]
-        self.grid_config['id'] = name
+        two grids sharing a name would silently share one whitelist in-game.
+        `interactive=False` (the save_to_config flush) skips the toast so a
+        duplicate left sitting in the field doesn't re-warn on every save.
+        TclError-safe: the <FocusOut> binding can fire on a card mid-teardown
+        during refresh_panels."""
+        try:
+            name = self.id_var.get().strip()
+            if not name:
+                self._name_entry.configure(bootstyle='danger')  # type: ignore[call-overload]
+                return
+            if self._name_in_use is not None and self._name_in_use(name, self.grid_config):
+                self._name_entry.configure(bootstyle='danger')  # type: ignore[call-overload]
+                if interactive:
+                    app_toast(self, f"Grid name '{name}' is already used by another grid",
+                              'warning', key='grid-name-dup')
+                return
+            self._name_entry.configure(bootstyle='default')  # type: ignore[call-overload]
+            self.grid_config['id'] = name
+        except tk.TclError:
+            pass
 
     def save_to_config(self):
         """Write current widget values back into the grid configuration dict."""
-        self._validate_name()
+        self._validate_name(interactive=False)
         self.grid_config['enabled'] = self.enabled_var.get()
         var_map = {
             'rows': self._rows_var, 'cols': self._cols_var,

@@ -46,6 +46,8 @@ class BuffDatabase:
             with open(json_path, encoding='utf-8') as f:
                 data = json.load(f)
             raw = data.get('buffs', []) if isinstance(data, dict) else []
+            if not isinstance(raw, list):
+                raw = []
             self.buffs = buff_db_layers._keep_valid(raw, Path(json_path).name)
             self.provenance = {}
             self._rebuild_indexes()

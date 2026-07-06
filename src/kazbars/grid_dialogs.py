@@ -76,7 +76,7 @@ def _section(parent, text):
 class AddGridWizard(tk.Toplevel):
     """Dialog wizard for creating a new grid with type, size, and mode options."""
 
-    def __init__(self, parent, existing_ids, current_total_slots, name_in_use=None):
+    def __init__(self, parent, existing_ids, current_total_slots, name_in_use):
         super().__init__(parent)
         self.withdraw()
         self.title("Add New Grid")
@@ -87,7 +87,7 @@ class AddGridWizard(tk.Toplevel):
         self.existing_ids = existing_ids
         # One owner for the uniqueness rule (grids_panel._grid_name_in_use);
         # existing_ids stays for the default-name suggestion only.
-        self.name_in_use = name_in_use or (lambda name, _cfg: name in existing_ids)
+        self.name_in_use = name_in_use
         self.current_total_slots = current_total_slots
         self.available_slots = MAX_TOTAL_SLOTS - current_total_slots
         self.result = None

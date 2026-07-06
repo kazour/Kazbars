@@ -224,6 +224,7 @@ def test_is_valid_buff():
     assert not L.is_valid_buff({"name": "X"})                # no ids
     assert not L.is_valid_buff({"name": "X", "ids": []})     # empty ids
     assert not L.is_valid_buff({"name": "X", "ids": ["1"]})  # non-int id
+    assert not L.is_valid_buff({"name": "X", "ids": [True]})  # bool: True == 1 would alias buff 1
 
 
 def test_read_buffs_drops_malformed_entries(tmp_path):
@@ -239,7 +240,8 @@ def test_read_user_delta_drops_malformed_buffs_and_tombstones(tmp_path):
     p.write_text(json.dumps({
         "version": 2,
         "buffs": [_b(1, "Mine"), {"no": "name"}, "junk"],
-        "deleted": [7, "8", [9], None],   # [9] would be unhashable in a set
+        # [9] would be unhashable in a set; true would tombstone buff 1 (True == 1)
+        "deleted": [7, "8", [9], None, True],
     }), encoding="utf-8")
     buffs, deleted = L._read_user_delta(p)
     assert [b["name"] for b in buffs] == ["Mine"]

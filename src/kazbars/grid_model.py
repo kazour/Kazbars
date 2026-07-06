@@ -101,11 +101,12 @@ def validate_grid(grid):
             grid[key] = val
 
     # Clamp numeric ranges. Profiles are hand-editable JSON, so a junk value
-    # (null, "abc") falls back to the default instead of crashing the load.
+    # (null, "abc", 1e999 — json parses that to inf, and int(inf) raises
+    # OverflowError) falls back to the default instead of crashing the load.
     for key, (default, lo, hi) in CLAMP_SPECS.items():
         try:
             value = int(grid.get(key, default))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             value = default
         grid[key] = max(lo, min(value, hi))
 
@@ -141,17 +142,21 @@ def dedupe_grid_ids(grids):
     card rename) already block duplicates; hand-edited or shared profiles can
     still carry them, so load-time sanitation renames rather than drops.
     Returns [(old, new), …] for the caller to surface."""
+    names = [g.get('id', 'Grid') for g in grids]
+    # Suffix candidates must dodge not-yet-visited names too, or a rename can
+    # collide with a later grid and force a second, cascading rename.
+    taken = set(names)
     seen = set()
     renamed = []
-    for grid in grids:
-        name = grid.get('id', 'Grid')
+    for grid, name in zip(grids, names):
         if name in seen:
             n = 2
-            while f"{name}_{n}" in seen:
+            while f"{name}_{n}" in taken:
                 n += 1
             grid['id'] = f"{name}_{n}"
             renamed.append((name, grid['id']))
             name = grid['id']
+            taken.add(name)
         seen.add(name)
     return renamed
 

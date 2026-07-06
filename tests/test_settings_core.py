@@ -249,6 +249,24 @@ class TestFileIO:
         on_disk = json.loads((tmp_path / s.filename).read_text(encoding="utf-8"))
         assert on_disk["count"] == 100
 
+    def test_save_patch_overwrites_only_given_keys(self, tmp_path):
+        s = _schema()
+        data = settings_core.get_defaults(s)
+        data["count"] = 42
+        data["mode"] = "c"
+        settings_core.save(s, tmp_path, data)
+        assert settings_core.save_patch(s, tmp_path, {"mode": "b"}) is True
+        loaded = settings_core.load(s, tmp_path)
+        assert loaded["mode"] == "b"    # patched
+        assert loaded["count"] == 42    # sibling key preserved from disk
+
+    def test_save_patch_on_missing_file_starts_from_defaults(self, tmp_path):
+        s = _schema()
+        assert settings_core.save_patch(s, tmp_path, {"count": 7}) is True
+        loaded = settings_core.load(s, tmp_path)
+        assert loaded["count"] == 7
+        assert loaded["mode"] == "a"    # default filled
+
     def test_structured_dict_round_trip(self, tmp_path):
         s = _schema()
         data = settings_core.get_defaults(s)

@@ -60,6 +60,17 @@ def escape_as2_string(value):
     )
 
 
+def _stack_bound(value, fallback):
+    """Coerce a stackStart/stackEnd from an imported/hand-edited entry the way
+    the other loaders coerce ints (numeric strings count, junk falls back), so
+    the slice in `_expand_primary_ids` can't go negative or raise."""
+    try:
+        value = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return fallback
+    return value if value >= 1 else fallback
+
+
 class CodeGenerator:
     """Generate AS2 source code for the KazBars buff-tracking grid system."""
 
@@ -263,18 +274,12 @@ class CodeGenerator:
             if entry:
                 entry_ids = entry.get("ids", [])
                 if entry.get("stacking", False):
-                    # Imported/hand-edited entries can carry junk stacking
-                    # fields; clamp so the slice below can't go negative/raise.
-                    start = entry.get("stackStart", 1)
-                    if not isinstance(start, int) or start < 1:
-                        start = 1
+                    start = _stack_bound(entry.get("stackStart", 1), 1)
                     if entry.get("partialList", False):
                         for i, bid in enumerate(entry_ids):
                             self._stack_labels[bid] = start + i
                     else:
-                        end = entry.get("stackEnd", 0)
-                        if not isinstance(end, int) or end < 1:
-                            end = len(entry_ids)
+                        end = _stack_bound(entry.get("stackEnd", 0), len(entry_ids))
                         filtered = entry_ids[start - 1 : end]
                         for i, bid in enumerate(filtered):
                             self._stack_labels[bid] = start + i
