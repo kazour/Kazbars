@@ -180,6 +180,11 @@ class _InAppToolTip:
         widget.bind("<Enter>", self._schedule, add="+")
         widget.bind("<Leave>", self._cancel, add="+")
         widget.bind("<ButtonPress>", self._cancel, add="+")
+        # The tip frame lives on the root window, so it outlives the widget.
+        # An earlier binding can destroy the widget mid-event-chain (the delete
+        # × triggers a panel rebuild), which stops the chain before the
+        # ButtonPress hide above ever runs — <Destroy> covers every teardown.
+        widget.bind("<Destroy>", self._cancel, add="+")
 
     def _schedule(self, event=None):
         self._cancel()
@@ -193,6 +198,8 @@ class _InAppToolTip:
 
     def _show(self):
         self._hide()
+        if not self.widget.winfo_exists():
+            return
         root = self.widget.winfo_toplevel()
         tip = tk.Frame(
             root,

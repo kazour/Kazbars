@@ -58,7 +58,6 @@ from .ui_widgets import (
     app_toast,
     bind_label_hover_colors,
     bind_label_press_effect,
-    confirm,
 )
 
 
@@ -491,19 +490,6 @@ class GridsPanel(ttk.Frame):
         self._build_done = bool(stored_sig) and stored_sig == self._compute_grids_signature(profile_path)
         self.refresh_panels()
         return missing_by_grid
-
-    def clear_all_grids(self):
-        """Remove all grids with confirmation."""
-        if not self.grids:
-            return
-        n = len(self.grids)
-        if not confirm(f"Remove all {n} grids?\n\nThis can't be undone.",
-                       title="Clear All Grids",
-                       action=f"Remove {n} grid{'s' if n != 1 else ''}", danger=True):
-            return
-        self.grids.clear()
-        self._mark_modified()
-        self.refresh_panels()
 
     def get_total_slots(self):
         """Return total slot count across all grids."""
