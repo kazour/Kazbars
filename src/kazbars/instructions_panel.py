@@ -460,36 +460,55 @@ SECTIONS: list[_Section] = [
             'Extras → Damage number mod… installs a leaner rewrite of Age of '
             "Conan's floating combat numbers, in place of the stock ones. The "
             'headline fix: ranged hits stop shrinking to nothing at distance.',
-            [("It's off by default behind a master ", None),
-             ('Enable', _SUCCESS),
-             (' toggle. Your stock file is backed up the first time, so '
-              'turning it off and rebuilding restores the original.', None)],
             _sub('Turn it on', [
-                [('Open the panel, flip ', None),
-                 ('Enable the Damage Numbers mod', _SUCCESS),
+                [('Off by default. Flip ', None),
+                 ('Enable', _SUCCESS),
                  (', set your options, then ', None),
                  ('Build & Install', _SUCCESS),
-                 ('. Changes apply on your next build, same as grids.', None)],
+                 (' — it applies on your next build, same as grids.', None)],
+                'Your stock file is backed up the first time, so turning it off '
+                'and rebuilding restores the original.',
             ]),
             _sub('What you can tune', [
-                'Keep ranged numbers big — holds the size of ranged hits (past '
-                "~15 real metres) so they don't fade with distance. Melee numbers "
-                'are never touched.',
-                'Shadow, pop-in and fade speed, and where numbers land — above '
-                'the target, in fixed columns, or a zig-zag stack — with Default '
-                'and Performance presets.',
+                'Keep ranged numbers big — holds the size of ranged hits past '
+                "~15 real metres so they don't fade with distance. Melee is "
+                'never touched.',
+                'Shadow, pop-in, and fade speed — with Default and Performance '
+                'presets.',
+                'Where numbers land — above the target, in fixed columns, or a '
+                'zig-zag stack.',
                 'Group my resource numbers — routes your own mana / stamina '
-                'losses into the same column as your resource gains. Resources '
-                'you drain from enemies still float over them.',
+                'losses into the same column as your resource gains. Drains '
+                'from enemies still float over them.',
                 'Separate resources into Column B — drops everything that lands '
-                'on you into fixed columns: incoming damage in one, heals / mana / '
-                'stamina in the next.',
+                'on you into fixed columns: incoming damage in one, heals / '
+                'mana / stamina in the next.',
             ]),
-            _sub('Colors', [
-                'Extras → Damage number colors… recolors every combat-number '
-                'source on its own — incoming vs outgoing hits, crits, spells, '
-                'combos, heals, mana, and stamina — laid out self on the left, '
-                'your target on the right. Applies on Build & Install.',
+        ],
+    },
+    {
+        'cat': 'Extras',
+        'id': 'damage-number-colors',
+        'title': 'Damage Number Colors',
+        'body': [
+            'Extras → Damage number colors… recolors every combat-number '
+            'source on its own — incoming vs outgoing hits, crits, spells, '
+            'combos, heals, mana, and stamina — laid out self on the left, '
+            'your target on the right.',
+            [('Works like the ', None),
+             ('Default Buff Bars', _ACCENT),
+             (' editor: pick colors, hit ', None),
+             ('Apply', _SUCCESS),
+             (', then type /reloadui in-game to see them. No ', None),
+             ('Build & Install', _SUCCESS),
+             (' and no master toggle — it edits the game files directly.', None)],
+            _sub('It stands alone', [
+                "These are Age of Conan's own colors — you don't need the "
+                'Damage Numbers mod turned on to change them.',
+                'Reset to game default pulls the original color straight from '
+                'the game files.',
+                'Colors you set stick even if you turn the mod off or uninstall '
+                'it — use Reset if you want stock back.',
             ]),
         ],
     },

@@ -4,7 +4,10 @@ All notable changes to KazBars will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [2.2.2] — 2026-06-17
+## [Unreleased]
+
+### Changed
+- **Damage number colors now apply the moment you hit Apply — no build, no toggle.** The color editor (Extras ▸ Damage number colors…) works like the Default Buff Bars editor: pick your colors, click Apply, and type `/reloadui` in-game to see them. It edits the game's `TextColors.xml` directly instead of waiting for a Build & Install, and it no longer depends on the Damage Numbers mod being switched on — colors are the game's own feature, so they stand on their own. Edits land in your `Customized` skin folder (created for you if needed) and touch only the colors, so a game update can't wipe them and the Damage Numbers direction options never clash with your palette. "Reset to game default" pulls the original color straight from the game's stock files. Colors you set now stay put when you turn the Damage Numbers mod off or uninstall — use Reset if you want them back to stock.
 
 ### Fixed
 - **Build & Install no longer freezes for ~15 seconds before it starts.** On some systems, clicking Build & Install would hang with nothing on screen for a beat while Windows prepared the helper processes the build needs (compiling the grids and checking whether the game is running). That preparation step now runs without the stall, so Build & Install starts near-instantly — roughly 16 seconds down to under one on affected machines.

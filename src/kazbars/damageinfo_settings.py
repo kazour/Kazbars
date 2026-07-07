@@ -275,8 +275,9 @@ _FLOAT_KEYS = frozenset(
 # Catalog of AoC's flytext sources for the color editor, grouped for the 2-column
 # (self | other) panel. Names MUST match the htmlFontParser("...") calls in
 # assets/damageinfo/src/__Packages/helpers/NumbersFontsCollection.as — guarded by
-# test_damageinfo_settings. Colors live in TextColors.xml and apply at Build & Install
-# (build_executor._prepare_textcolors) — they are NOT baked into the SWF.
+# test_damageinfo_settings. Colors live in TextColors.xml and are written straight to
+# the skin by the Damage Number Colors panel (damageinfo_colors_panel) — they are NOT
+# stored in these settings and NOT baked into the SWF.
 
 # (group title, self [(name, label)], other [(name, label)]) — paired source groups.
 PAIRED_GROUPS: tuple[tuple[str, tuple[tuple[str, str], ...], tuple[tuple[str, str], ...]], ...] = (
@@ -358,23 +359,9 @@ def normalize_color(value: Any) -> str | None:
     return v.upper() if _HEX6_RE.match(v) else None
 
 
-def validate_source_colors(value: Any) -> dict[str, str]:
-    """Keep only known source names mapped to a valid 6-hex color (bare upper-case)."""
-    if not isinstance(value, dict):
-        return {}
-    out: dict[str, str] = {}
-    for name, color in value.items():
-        if name in ALL_SOURCE_NAMES:
-            norm = normalize_color(color)
-            if norm is not None:
-                out[name] = norm
-    return out
-
-
 def _build_defaults() -> dict[str, Any]:
     d: dict[str, Any] = {k: m['default'] for k, m in GLOBAL_SETTINGS.items()}
     d['enabled'] = False        # master gate — not baked
-    d['source_colors'] = {}     # per-source flytext colors → TextColors.xml (not baked)
     return d
 
 
@@ -403,14 +390,14 @@ def is_offset_key(key: str) -> bool:
 # table). Every offset/absolute key is a clamped numeric Field — the ``type:
 # 'bool'``/``'enum'`` metadata is a UI hint only, so those validate as clamped
 # ints (round + clamp), exactly as the hand-rolled validator did. ``enabled`` is
-# the one real bool; ``source_colors`` carries its own structured validator.
+# the one real bool. (Per-source colors are not settings — the colors panel writes
+# them straight to TextColors.xml.)
 def _build_schema_fields() -> dict[str, Field]:
     fields: dict[str, Field] = {}
     for key, meta in GLOBAL_SETTINGS.items():
         kind = 'float' if is_float_key(key) else 'int'
         fields[key] = Field(meta['default'], min=meta['min'], max=meta['max'], kind=kind)
     fields['enabled'] = Field(False, kind='bool')
-    fields['source_colors'] = Field({}, validate=validate_source_colors)
     return fields
 
 
@@ -418,14 +405,13 @@ _SCHEMA = Schema(SETTINGS_FILENAME, 1, _build_schema_fields())
 
 
 def get_default_settings() -> dict[str, Any]:
-    """Return a fresh copy of the default Damage Numbers settings (each call gets
-    its own ``source_colors`` dict — never the module-level default)."""
+    """Return a fresh copy of the default Damage Numbers settings."""
     return settings_core.get_defaults(_SCHEMA)
 
 
 def validate_setting(key: str, value: Any) -> Any:
     """Validate and coerce one setting to the value to store. Unknown keys pass
-    through; the master ``enabled`` gate and ``source_colors`` validate bespoke."""
+    through; the master ``enabled`` gate validates as a bool."""
     return settings_core.coerce(_SCHEMA, key, value)
 
 
@@ -504,21 +490,3 @@ def load_settings(settings_folder: str | Path) -> dict[str, Any]:
 def save_settings(settings_folder: str | Path, settings: dict) -> bool:
     """Validate and write atomically (temp + rename). Creates the folder if missing."""
     return settings_core.save(_SCHEMA, settings_folder, settings)
-
-
-# The main panel (offsets/toggles) and the colors panel (source_colors) both live
-# in damageinfo_settings.json but each holds its own in-memory copy loaded at open.
-# A blind save from one clobbers the other's keys, so each writes only its own
-# slice via `settings_core.save_patch`.
-def save_source_colors(settings_folder: str | Path, colors: dict) -> bool:
-    """Persist only ``source_colors``, preserving whatever else is on disk (the main
-    panel may have written offsets/toggles since the colors panel loaded)."""
-    return settings_core.save_patch(_SCHEMA, settings_folder,
-                                    {'source_colors': validate_source_colors(colors)})
-
-
-def save_settings_preserving_colors(settings_folder: str | Path, settings: dict) -> bool:
-    """Persist ``settings`` but keep the on-disk ``source_colors`` (the colors panel
-    may have written since this panel loaded)."""
-    patch = {k: v for k, v in settings.items() if k != 'source_colors'}
-    return settings_core.save_patch(_SCHEMA, settings_folder, patch)

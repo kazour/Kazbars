@@ -20,16 +20,10 @@ def test_defaults_has_every_global_key_plus_enabled():
     for key in dis.GLOBAL_SETTINGS:
         assert key in d
     assert d['enabled'] is False
-    assert d['source_colors'] == {}
-    # +2 non-baked keys outside GLOBAL_SETTINGS: the master 'enabled' gate + 'source_colors'.
-    assert len(d) == len(dis.GLOBAL_SETTINGS) + 2
-
-
-def test_get_default_settings_source_colors_not_shared():
-    # Each call must hand back its own source_colors dict (never the module-level default).
-    a = dis.get_default_settings()
-    a['source_colors']['self_attacked'] = 'FF0000'
-    assert dis.get_default_settings()['source_colors'] == {}
+    # +1 non-baked key outside GLOBAL_SETTINGS: the master 'enabled' gate. (Per-source
+    # colors are NOT settings — the colors panel edits TextColors.xml directly.)
+    assert len(d) == len(dis.GLOBAL_SETTINGS) + 1
+    assert 'source_colors' not in d
 
 
 def test_default_offsets_match_schema():
@@ -360,76 +354,20 @@ def test_normalize_color():
     assert dis.normalize_color(123) is None         # non-str
 
 
-def test_validate_source_colors_filters_and_normalizes():
-    out = dis.validate_source_colors({
-        'self_attacked': '#ffcc00',   # hash → bare upper
-        'other_healed': '0x00FF00',   # 0x → bare upper
-        'mana_lost': 'aabbcc',        # bare → upper
-        'not_a_source': 'FFFFFF',     # unknown name dropped
-        'self_dodged': 'xyz',         # invalid hex dropped
-        'xp_gained': 123,             # non-str dropped
-    })
-    assert out == {'self_attacked': 'FFCC00', 'other_healed': '00FF00', 'mana_lost': 'AABBCC'}
-
-
-def test_validate_source_colors_non_dict():
-    assert dis.validate_source_colors(None) == {}
-    assert dis.validate_source_colors('nope') == {}
-
-
-def test_source_colors_validated_in_all_settings():
-    out = dis.validate_all_settings({'source_colors': {'self_attacked': '#ff0000', 'bogus': '00ff00'}})
-    assert out['source_colors'] == {'self_attacked': 'FF0000'}
-
-
-def test_source_colors_round_trip(tmp_path):
+def test_source_colors_not_persisted(tmp_path):
+    # Colors are no longer a setting — an unknown 'source_colors' key is dropped on write
+    # (the colors panel edits TextColors.xml directly instead).
     s = dis.get_default_settings()
-    s['source_colors'] = {'self_attacked': 'FF0000', 'other_healed': '00FF00'}
+    s['source_colors'] = {'self_attacked': 'FF0000'}  # legacy key from an old install
     assert dis.save_settings(tmp_path, s)
-    loaded = dis.load_settings(tmp_path)
-    assert loaded['source_colors'] == {'self_attacked': 'FF0000', 'other_healed': '00FF00'}
+    on_disk = json.loads((tmp_path / dis.SETTINGS_FILENAME).read_text(encoding='utf-8'))
+    assert 'source_colors' not in on_disk
+    assert 'source_colors' not in dis.load_settings(tmp_path)
 
 
-# --------------------------------------------------------------------------- #
-# merge-on-write (main panel vs colors panel share one file)
-# --------------------------------------------------------------------------- #
-def test_save_settings_preserving_colors_keeps_disk_colors(tmp_path):
-    # Colors panel wrote source_colors; the main panel (which loaded before that)
-    # saves offsets/toggles without clobbering the on-disk colors.
-    dis.save_source_colors(tmp_path, {'self_attacked': 'FF0000'})
-    s = dis.get_default_settings()          # a copy with empty source_colors
-    s['enabled'] = True
-    s['dir1_x_offset'] = 20
-    assert dis.save_settings_preserving_colors(tmp_path, s)
-    loaded = dis.load_settings(tmp_path)
-    assert loaded['source_colors'] == {'self_attacked': 'FF0000'}  # preserved
-    assert loaded['enabled'] is True
-    assert loaded['dir1_x_offset'] == 20
-
-
-def test_save_source_colors_keeps_disk_settings(tmp_path):
-    # Main panel wrote offsets/toggles; the colors panel saves only source_colors
-    # without clobbering enabled / offsets.
-    s = dis.get_default_settings()
-    s['enabled'] = True
-    s['dir1_x_offset'] = 20
-    assert dis.save_settings(tmp_path, s)
-    assert dis.save_source_colors(tmp_path, {'other_healed': '00FF00'})
-    loaded = dis.load_settings(tmp_path)
-    assert loaded['source_colors'] == {'other_healed': '00FF00'}
-    assert loaded['enabled'] is True        # preserved
-    assert loaded['dir1_x_offset'] == 20    # preserved
-
-
-def test_save_source_colors_validates_through_schema(tmp_path):
-    dis.save_source_colors(tmp_path, {'self_attacked': '#ff0000', 'bogus': '00ff00'})
-    loaded = dis.load_settings(tmp_path)
-    assert loaded['source_colors'] == {'self_attacked': 'FF0000'}  # unknown dropped, normalized
-
-
-def test_save_settings_preserving_colors_validates_settings(tmp_path):
+def test_save_settings_validates_and_clamps(tmp_path):
     s = dis.get_default_settings()
     s['dir1_x_offset'] = 99999  # out of range
-    dis.save_settings_preserving_colors(tmp_path, s)
+    dis.save_settings(tmp_path, s)
     on_disk = json.loads((tmp_path / dis.SETTINGS_FILENAME).read_text(encoding='utf-8'))
     assert on_disk['dir1_x_offset'] == 200  # clamped before write

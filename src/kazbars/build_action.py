@@ -144,11 +144,11 @@ def build(app):
         'use_aoc': app.use_aoc_bypass,
         'di_enabled': di_enabled,
         'di_settings': di_settings,
-        # TextColors.xml customizations, gated by the master enable so disabling reverts
-        # them: "Group my resource numbers", "Split into two columns", per-source colors.
+        # TextColors.xml direction toggles, gated by the master enable so disabling
+        # reverts them: "Group my resource numbers", "Separate resources into Column B".
+        # (Per-source colors are not build state — the colors panel edits the file directly.)
         'group_resources': di_enabled and bool(di_settings.get('other_resource_loss_to_target')),
         'split_incoming': di_enabled and bool(di_settings.get('fixed_col_split')),
-        'source_colors': di_settings.get('source_colors', {}) if di_enabled else {},
         'profile_name': profile_name,
     }
 
@@ -221,8 +221,7 @@ def _build_worker(app, loading, ctx):
             staging_dir / "KazBars.swf", ctx['game_path'], ctx['use_aoc'],
             damageinfo_swf=damageinfo_swf,
             damageinfo_pristine=Path(ctx['assets_path']) / "damageinfo" / "DamageInfo.swf",
-            group_resources=ctx['group_resources'], source_colors=ctx['source_colors'],
-            split_incoming=ctx['split_incoming'],
+            group_resources=ctx['group_resources'], split_incoming=ctx['split_incoming'],
         )
         aoc_running = ctx['use_aoc'] and is_aoc_running()
         _hold_phase(started)
