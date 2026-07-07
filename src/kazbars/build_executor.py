@@ -36,9 +36,10 @@ LEGACY_AUTO_LOAD_MARKERS = ("# KzGrids auto-load",)
 DAMAGEINFO_FILE = "DamageInfo.swf"
 DAMAGEINFO_BACKUP = "DamageInfo.swf.kazbars.bak"
 
-# Damage Numbers "Group my resource numbers" toggle: flips the resource-loss flytext
-# directions in the skin's TextColors.xml (Customized/ if present, else Default/). The
-# flip is surgical + reversible, so we restore by rewriting it back, not from a backup.
+# Damage Numbers direction toggles: flip flytext directions in the skin's
+# TextColors.xml. Writes go to Customized/ (created from Default/ when missing — the
+# game patcher resets Default/, so edits there don't stick). The flip is surgical +
+# reversible (1 ↔ -1), so we restore by rewriting it back, not from a backup.
 TEXTCOLORS_RELPATH = "TextColors.xml"
 
 # Returned when a running client locks DamageInfo.swf / TextColors.xml. _LOCK_MSG is the
@@ -111,7 +112,7 @@ def compile_to_staging(grids, database, assets_path, compiler, app_version,
 
 
 def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None,
-                      damageinfo_pristine=None, group_resources=False, source_colors=None,
+                      damageinfo_pristine=None, group_resources=False,
                       split_incoming=False):
     """Install compiled SWF + scripts to the game folder.
 
@@ -121,10 +122,12 @@ def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None,
     is the bundled genuine stock SWF — used to seed/recognize the backup so it can
     never capture a mod. See ``_prepare_damageinfo``.
 
-    ``group_resources`` ("Group my resource numbers"), ``split_incoming`` ("Split into two
-    columns" → incoming/self damage+heal directions), and ``source_colors`` (per-source
-    color map) — all gated on the master enable by the caller — customize the skin's
-    TextColors.xml, regenerated from a one-time stock backup. See ``_prepare_textcolors``.
+    ``group_resources`` ("Group my resource numbers") and ``split_incoming`` ("Separate
+    resources into Column B" → incoming/self damage+heal directions) — both gated on the
+    master enable by the caller — flip flytext directions in the skin's
+    ``Customized/TextColors.xml`` with surgical, invertible edits. Per-source colors are
+    NOT part of the build — the Damage Number Colors panel writes them to the same file
+    directly, and the build never touches color attributes. See ``_prepare_textcolors``.
 
     Returns (success, error_message).
     """
@@ -148,7 +151,7 @@ def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None,
             di_pair = _prepare_damageinfo(flash_path, damageinfo_swf, damageinfo_pristine)
             if di_pair:
                 staged_pairs.append(di_pair)
-            tc_pair = _prepare_textcolors(game_path, group_resources, source_colors, split_incoming)
+            tc_pair = _prepare_textcolors(game_path, group_resources, split_incoming)
             if tc_pair:
                 staged_pairs.append(tc_pair)
         except OSError:
@@ -222,54 +225,48 @@ def _prepare_damageinfo(flash_path, staged_swf, pristine_swf=None):
     return tmp, target
 
 
-def _prepare_textcolors(game_path, group_resources, source_colors=None, split_incoming=False):
-    """Stage the skin's TextColors.xml patch/restore to a temp file without committing it.
+def _prepare_textcolors(game_path, group_resources, split_incoming):
+    """Stage the skin's TextColors.xml direction flips to a temp file without committing.
 
     Returns the ``(tmp, target)`` pair to os.replace, or ``None`` when nothing needs
-    writing (no managed change, or the result already matches the live file). Raises
-    OSError on a failed read/seed/temp-write, with the live file untouched.
+    writing (directions already match the wanted state, or there's nothing of ours to
+    revert). Raises OSError on a failed read/temp-write, with the live file untouched.
 
-    Three independent things customize TextColors.xml and must compose: the "Group my
-    resource numbers" toggle (``group_resources`` → resource-loss flytext directions), the
-    "Separate resources into Column B" toggle (``split_incoming`` → the incoming/self damage +
-    heal directions, so everything that lands on you drops into the columns), and the per-source
-    color editor (``source_colors`` → a ``{name: "RRGGBB"}`` map). Colors have no
-    deterministic inverse, so instead of editing in place we keep a one-time genuine-stock
-    backup (``TextColors.xml.kazbars.bak``) and **regenerate** the live file from it each
-    build: stock → direction flips → color overrides. Because the base is always the stock
-    backup (never the current file), any out-of-band hand-edit to the managed flytext
-    entries is intentionally overwritten on every build — KazBars owns those entries while
-    the feature is on. Nothing active ⇒ restore from the backup (kept across a disable,
-    dropped on uninstall). Targets the file the game reads (Customized/ if present, else
-    Default/).
+    Two toggles flip flytext directions: "Group my resource numbers" (``group_resources``
+    → resource-loss types) and "Separate resources into Column B" (``split_incoming`` →
+    the incoming/self damage + heal types). Both edits are surgical and invertible
+    (direction 1 ↔ -1), so each build simply writes the wanted state — on flips to -1,
+    off flips back to 1 — and never touches color attributes: per-source colors belong to
+    the Damage Number Colors panel, which edits the same file directly, and must survive
+    every build.
+
+    Writes always target ``Customized/TextColors.xml`` — the game patcher resets
+    ``Default/`` on update, so edits there don't stick. A missing Customized copy is
+    created from the Default file (that's how AoC skin overrides work); a pre-existing
+    one (a custom UI skin) gets a one-time ``.kazbars.bak`` first. With both toggles off
+    and no Customized file, there is nothing of ours to revert — return None rather than
+    create a pointless copy.
     """
-    source_colors = source_colors or {}
-    _default, _customized, source = buff_xml._resolve_paths(game_path, TEXTCOLORS_RELPATH)
+    _default, customized, source = buff_xml._resolve_paths(game_path, TEXTCOLORS_RELPATH)
     if source is None:
         return None
-    backup = source.with_name(source.name + buff_xml.BACKUP_SUFFIX)
-    current = source.read_text(encoding="utf-8")
+    if not (group_resources or split_incoming) and not customized.is_file():
+        return None
+    base = source.read_text(encoding="utf-8")
 
-    if group_resources or split_incoming or source_colors:
-        buff_xml._backup_once(source)  # seed genuine stock once (first edit)
-        base = backup.read_text(encoding="utf-8") if backup.exists() else current
-        if group_resources:
-            base, _ = buff_xml.set_resource_loss_to_column(base, True)
-        if split_incoming:
-            base, _ = buff_xml.set_directions(base, buff_xml.INCOMING_DAMAGE_TYPES, True)
-        for name, color in source_colors.items():
-            base, _ = buff_xml.set_source_color(base, name, color)
-        target_text = base
-    elif backup.exists():
-        target_text = backup.read_text(encoding="utf-8")
-    else:
+    new_text, _ = buff_xml.set_directions(base, buff_xml.RESOURCE_LOSS_TYPES, group_resources)
+    new_text, _ = buff_xml.set_directions(new_text, buff_xml.INCOMING_DAMAGE_TYPES, split_incoming)
+
+    if new_text == base:
+        # Already in the wanted state — base is the file the game reads (Customized
+        # if present, else Default), so there is nothing to write either way.
         return None
 
-    if target_text == current:
-        return None
-    tmp = source.with_name(source.name + ".kaztmp")
-    tmp.write_text(target_text, encoding="utf-8")
-    return tmp, source
+    customized.parent.mkdir(parents=True, exist_ok=True)
+    buff_xml._backup_once(customized)  # one-time backup of a pre-existing skin file
+    tmp = customized.with_name(customized.name + ".kaztmp")
+    tmp.write_text(new_text, encoding="utf-8")
+    return tmp, customized
 
 
 def cleanup_legacy_files(game_path):
@@ -320,15 +317,26 @@ def uninstall_from_client(game_path, damageinfo_pristine=None):
             _atomic_install(damageinfo_pristine, di_target)
             removed.append("DamageInfo.swf (restored stock from bundled copy)")
 
-        # Damage Numbers: restore TextColors.xml from our one-time stock backup (covers
-        # both the resource-direction toggle and the per-source colors) and drop the backup.
+        # Damage Numbers: flip any direction toggles back to stock (1) in the file the
+        # game reads. Surgical — per-source colors are the user's content (written by the
+        # Damage Number Colors panel, like the buff-bar edits) and survive an uninstall,
+        # as does any .kazbars.bak (the user's manual restore point).
         _d, _c, tc_source = buff_xml._resolve_paths(game_path, TEXTCOLORS_RELPATH)
         if tc_source is not None:
-            tc_backup = tc_source.with_name(tc_source.name + buff_xml.BACKUP_SUFFIX)
-            if tc_backup.exists():
-                _atomic_install(tc_backup, tc_source)
-                tc_backup.unlink(missing_ok=True)
-                removed.append("TextColors.xml (restored stock)")
+            tc_text = tc_source.read_text(encoding='utf-8')
+            new_text, f1 = buff_xml.set_directions(
+                tc_text, buff_xml.RESOURCE_LOSS_TYPES, False)
+            new_text, f2 = buff_xml.set_directions(
+                new_text, buff_xml.INCOMING_DAMAGE_TYPES, False)
+            if f1 or f2:
+                tmp = tc_source.with_name(tc_source.name + ".kaztmp")
+                tmp.write_text(new_text, encoding='utf-8')
+                try:
+                    os.replace(tmp, tc_source)
+                except OSError:
+                    tmp.unlink(missing_ok=True)
+                    raise
+                removed.append("TextColors.xml (number directions restored)")
 
         aoc_dir = Path(game_path) / "Data" / "Gui" / "Aoc" / "KazBars"
         if aoc_dir.exists():

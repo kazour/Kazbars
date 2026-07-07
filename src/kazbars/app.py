@@ -124,7 +124,6 @@ class KazBarsApp(ttkb.Window):
         self.boss_timer_panel = None
         self.deeps_panel = None
         self.damage_numbers_panel = None
-        self.damage_number_colors_panel = None
         self.stopwatch_dialog = None
         self._profile_manager = None
 
@@ -524,7 +523,7 @@ class KazBarsApp(ttkb.Window):
         open_damage_numbers_panel(self)
 
     def _open_damage_number_colors(self):
-        """Open the Damage Number Colors editor (single-instance)."""
+        """Open the Damage Number Colors editor (modal)."""
         from .damageinfo_colors_panel import open_damage_number_colors_panel
         open_damage_number_colors_panel(self)
 

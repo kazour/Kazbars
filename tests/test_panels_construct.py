@@ -95,6 +95,15 @@ def _find_buff_display_dialog(a):
     return None
 
 
+def _find_damage_number_colors_panel(a):
+    """open_damage_number_colors_panel is modal and stores no app reference — find it."""
+    from kazbars.damageinfo_colors_panel import DamageNumberColorsPanel
+    for w in a.winfo_children():
+        if isinstance(w, DamageNumberColorsPanel):
+            return w
+    return None
+
+
 # ============================================================================
 # OPENERS UNDER TEST
 # ============================================================================
@@ -104,7 +113,7 @@ OPENERS = [
     ('_open_boss_timer', lambda a: a.boss_timer_panel),
     ('_open_deeps_panel', lambda a: a.deeps_panel),
     ('_open_damage_numbers', lambda a: a.damage_numbers_panel),
-    ('_open_damage_number_colors', lambda a: a.damage_number_colors_panel),
+    ('_open_damage_number_colors', _find_damage_number_colors_panel),
     ('_open_profile_manager', lambda a: a._profile_manager),
     ('_open_buff_display_editor', _find_buff_display_dialog),
     ('_open_stopwatch_settings', lambda a: a.stopwatch_dialog),
