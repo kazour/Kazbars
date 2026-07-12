@@ -187,7 +187,11 @@ class CombatLogMonitor:
 
     def _monitor_loop(self):
         """Main monitoring loop - runs in daemon thread."""
-        while self.monitoring:
+        # The identity check kills a stale worker: stop_monitoring() doesn't
+        # join, so a quick Stop→Start can flip `monitoring` back to True before
+        # this thread wakes — without it, two workers would process the same
+        # log lines and double-fire the boss timer.
+        while self.monitoring and self.monitor_thread is threading.current_thread():
             new_content = ''
             try:
                 self._check_for_newer_log()

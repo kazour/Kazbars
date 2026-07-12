@@ -9,6 +9,8 @@ Run: `pytest tests/test_combat_monitor.py` (from repo root).
 """
 
 import os
+import threading
+import time
 
 from kazbars.combat_monitor import CombatLogMonitor
 
@@ -121,3 +123,28 @@ class TestStartGuard:
         m = _monitor()
         assert m.start_monitoring() is False
         assert m.monitoring is False
+
+
+# =========================================================================== #
+# Restart                                                                     #
+# =========================================================================== #
+
+class TestRestart:
+    def test_quick_restart_kills_stale_worker(self, tmp_path):
+        """stop_monitoring() → start_monitoring() inside the old worker's scan
+        sleep must not leave two threads double-firing the boss timer
+        (thread-identity guard): stop never joins, and the restart flips
+        `monitoring` back to True before the stale worker wakes."""
+        m = _monitor()
+        m.set_log_folder(str(tmp_path))  # empty folder → worker sits in the scan sleep
+        assert m.start_monitoring()
+        time.sleep(0.3)
+        m.stop_monitoring()              # no join — the old thread may still sleep
+        assert m.start_monitoring()
+        try:
+            time.sleep(1.5)              # past _SCAN_SLEEP: stale worker wakes, must exit
+            alive = [t for t in threading.enumerate()
+                     if t.name == "CombatLogMonitor"]
+            assert len(alive) == 1
+        finally:
+            m.stop_monitoring()

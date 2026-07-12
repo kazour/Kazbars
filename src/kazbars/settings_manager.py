@@ -21,10 +21,15 @@ logger = logging.getLogger(__name__)
 
 def safe_save_json(path, data):
     """Write JSON atomically — temp file + rename."""
+    safe_write_text(path, json.dumps(data, indent=2))
+
+
+def safe_write_text(path, text):
+    """Write text atomically — temp file + rename."""
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_suffix('.tmp')
-    tmp.write_text(json.dumps(data, indent=2), encoding='utf-8')
+    tmp.write_text(text, encoding='utf-8')
     tmp.replace(p)
 
 

@@ -25,6 +25,7 @@ from ttkbootstrap.dialogs import Messagebox
 
 from . import buff_xml
 from . import damageinfo_settings as dis
+from .settings_manager import safe_write_text
 from .ui_components import create_scrollable_frame
 from .ui_forms import ColorSwatch, create_card
 from .ui_headers import create_dialog_header, create_tip_bar
@@ -90,7 +91,7 @@ def apply_colors(game_path, colors: dict[str, str]) -> Path | None:
 
     customized.parent.mkdir(parents=True, exist_ok=True)
     buff_xml._backup_once(customized)  # one-time backup of a pre-existing skin file
-    customized.write_text(text, encoding="utf-8")
+    safe_write_text(customized, text)
     return customized
 
 
