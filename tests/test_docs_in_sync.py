@@ -31,8 +31,8 @@ docs/CHANGELOG.md — releases can't outrun the changelog:
 
   7. Every ``v*`` release tag has a ``## [X.Y.Z]`` section, so a release can't
      ship while its entries still sit under ``[Unreleased]`` (v2.2.2 did
-     exactly that). Skips when tags are unavailable — CI checkouts are shallow
-     and tagless — so the local pre-commit run is the enforcement point.
+     exactly that). CI checks out full history (``fetch-depth: 0``) so this
+     bites there too; it skips only where tags are genuinely unavailable.
 
 Refreshing these docs is a manual chore; this
 test just makes the drift impossible to merge silently.
@@ -241,10 +241,7 @@ def _release_versions():
 def test_every_release_tag_has_a_changelog_section():
     versions = _release_versions()
     if versions is None:
-        pytest.skip(
-            'git tags unavailable (shallow or tagless checkout) — '
-            'the local pre-commit run enforces this check'
-        )
+        pytest.skip('git tags unavailable (shallow or tagless checkout)')
     headings = set(
         re.findall(r'^## \[(\d+\.\d+\.\d+)\]', CHANGELOG_DOC.read_text(encoding='utf-8'), re.M)
     )
