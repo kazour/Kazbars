@@ -122,7 +122,7 @@ class BuildLoadingScreen(tk.Toplevel):
         cx, cy, r = self._cx, self._cy, RING_RADIUS
 
         # Background track
-        self._ring_track = self._canvas.create_oval(
+        self._canvas.create_oval(
             cx - r, cy - r, cx + r, cy + r,
             outline=RING_TRACK_COLOR, width=RING_WIDTH, tags='ring',
         )
@@ -262,10 +262,6 @@ class BuildLoadingScreen(tk.Toplevel):
         self._current_step += 1
         self._step_name = name
         self.update()
-
-    def update_step_name(self, name):
-        """Update step text without advancing the dot counter."""
-        self._step_name = name
 
     def show_summary(self, client_results, compile_result, profile_name=None,
                      aoc_installed=False, aoc_running=False):

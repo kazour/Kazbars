@@ -10,7 +10,6 @@ from tkinter import ttk
 # ============================================================================
 # SHARED FONT CONSTANTS
 # ============================================================================
-FONT_FAMILY = 'Segoe UI'
 FONT_HEADING = ('Segoe UI', 14, 'bold')
 FONT_BODY_LG = ('Segoe UI', 10)
 FONT_SECTION = ('Segoe UI', 10, 'bold')
@@ -59,13 +58,6 @@ TK_COLORS = {
     'menu_border': '#3a3a3a',  # menu dropdown border (between separator and border)
     'menu_disabled_fg': '#666666',  # disabled menu items (dimmer than dim_text)
 }
-
-# Overlay-specific colors (Windows transparency hack — not theme colors)
-OVERLAY_COLORS = {
-    'transparent': '#010101',  # Windows -transparentcolor key
-    'bg_outer':    '#0a0a0a',  # Outer background (near-black, distinct from transparent key)
-}
-
 
 # ============================================================================
 # LAYOUT CONSTANTS

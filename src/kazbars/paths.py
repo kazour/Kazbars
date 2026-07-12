@@ -36,7 +36,6 @@ def _resolve_assets() -> Path:
 ASSETS = _resolve_assets()
 KAZBARS_ASSETS = ASSETS / "kazbars"
 COMPILER_ASSETS = ASSETS / "compiler"
-COMMON_STUBS_ASSETS = ASSETS / "common_stubs"
 
 
 def app_path() -> Path:

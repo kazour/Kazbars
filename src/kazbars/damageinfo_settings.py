@@ -359,15 +359,6 @@ def normalize_color(value: Any) -> str | None:
     return v.upper() if _HEX6_RE.match(v) else None
 
 
-def _build_defaults() -> dict[str, Any]:
-    d: dict[str, Any] = {k: m['default'] for k, m in GLOBAL_SETTINGS.items()}
-    d['enabled'] = False        # master gate — not baked
-    return d
-
-
-DAMAGEINFO_DEFAULTS: dict[str, Any] = _build_defaults()
-
-
 # ============================================================
 # VALIDATION
 # ============================================================

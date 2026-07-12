@@ -48,10 +48,6 @@ class Field:
       - `kind in ('int', 'float')` — `float()`-coerce, clamp to `[min, max]`, then
         return an `int` (rounded) or `float`. Unparsable → default.
       - no spec — value passes through unchanged.
-
-    `**ui_metadata` (unit/description/tooltip/step/type/options/invert/relative …)
-    is stashed on `.ui` for panels that read field metadata; it never affects
-    persistence.
     """
 
     def __init__(
@@ -63,7 +59,6 @@ class Field:
         max: Any = None,
         kind: str | None = None,
         choices: tuple | None = None,
-        **ui_metadata: Any,
     ) -> None:
         self.default = default
         self.validate = validate
@@ -71,7 +66,6 @@ class Field:
         self.max = max
         self.kind = kind
         self.choices = choices
-        self.ui = ui_metadata
 
 
 class Migration:

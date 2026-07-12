@@ -67,7 +67,6 @@ class DragReorderManager:
     def _start_drag(self, index, event):
         self._dragging = True
         self._drag_index = index
-        self._drag_widget = event.widget
         event.widget.grab_set()
 
     def _find_insert_index(self, y_root):

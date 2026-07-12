@@ -15,7 +15,6 @@ from .boss_timer import BossTimer
 from .combat_monitor import CombatLogMonitor
 from .live_tracker_settings import (
     TIMERS_DEFAULTS,
-    get_default_settings,
     load_settings,
     sanitize_log_name,
     save_settings,
@@ -471,17 +470,6 @@ class LiveTrackerPanel(tk.Toplevel):
             if self.overlay:
                 self.overlay.apply_settings(self.timer_settings)
             self._sync_overlay_ui()
-
-    def reset_to_defaults(self):
-        """Reset all live tracker settings to defaults."""
-        self.timer_settings = get_default_settings()
-        if self.overlay:
-            self.overlay.apply_settings(self.timer_settings)
-        self._sync_overlay_ui()
-
-    def refresh_log_path(self):
-        """Refresh the combat log path (call when game path changes)."""
-        self._update_log_path()
 
     def _sync_overlay_ui(self):
         """Sync overlay control widgets to current timer_settings."""

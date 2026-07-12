@@ -261,10 +261,6 @@ class ColorSwatch(tk.Canvas):
         self._color = self._normalize(hex_color)
         self._draw(self._border_idle)
 
-    def get_color(self):
-        """Return the current displayed color as #RRGGBB."""
-        return self._color
-
     def _sync_from_var(self):
         raw = self._color_var.get().strip()
         if raw:

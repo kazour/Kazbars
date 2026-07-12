@@ -188,10 +188,6 @@ class TimerOverlay:
         if notify:
             self._notify_settings_changed()
 
-    # Backwards-compat alias — forwards to the bg-opacity setter.
-    def set_opacity(self, value: float, notify: bool = True) -> None:
-        self.set_bg_opacity(value, notify=notify)
-
     def set_font(self, family: str, size: int, notify: bool = True) -> None:
         size = int(size)
         if family == self._config.font_family and size == self._config.font_size:
@@ -205,9 +201,6 @@ class TimerOverlay:
     def set_font_size(self, size: int, notify: bool = True) -> None:
         """Backwards-compat — sets only the size, family unchanged."""
         self.set_font(self._config.font_family, size, notify=notify)
-
-    def set_font_family(self, family: str, notify: bool = True) -> None:
-        self.set_font(family, self._config.font_size, notify=notify)
 
     def show(self, notify: bool = True) -> None:
         self._hud.show()

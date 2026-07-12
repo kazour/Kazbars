@@ -257,18 +257,14 @@ class LayeredOverlay:
         render_callback: Callable[[int, int], Image.Image],
         width: int,
         height: int,
-        on_drag_end: Callable[[int, int], None] | None = None,
     ) -> None:
         self._render_callback = render_callback
-        self._on_drag_end = on_drag_end
         self._width = max(1, int(width))
         self._height = max(1, int(height))
         self._x = 0
         self._y = 0
         self._locked = False
         self._suppressed = False  # focus gate: hold the surface blank when off-focus
-        self._drag_dx = 0
-        self._drag_dy = 0
 
         # Tk Toplevel — owns the HWND + receives mouse events.
         self.root = tk.Toplevel(parent)
@@ -326,10 +322,8 @@ class LayeredOverlay:
         if not (ex_after & _WS_EX_LAYERED):
             logger.error("Failed to set WS_EX_LAYERED on overlay HWND")
 
-        # Default drag handlers are NOT installed automatically — consumers
-        # that want simple drag-to-move call `bind_drag_to_move()`. Overlays
-        # with richer interaction (lock-click + resize handle, etc.) bind
-        # their own handlers via `self.root.bind(...)`.
+        # No drag handlers are installed here — each overlay binds its own
+        # (lock-click + resize handle, etc.) via `self.root.bind(...)`.
 
         # Establish the layered surface NOW with a fully-transparent bitmap.
         # The HWND stays MAPPED for the engine's whole lifetime — visibility
@@ -443,19 +437,6 @@ class LayeredOverlay:
     def is_locked(self) -> bool:
         return self._locked
 
-    def bind_drag_to_move(self, on_drag_end: Callable[[int, int], None] | None = None) -> None:
-        """Install simple drag-to-move handlers on the Tk root.
-
-        Consumers that need richer input (hit-test on click, resize handle,
-        etc.) skip this and bind their own `<Button-1>` / `<B1-Motion>` /
-        `<ButtonRelease-1>` handlers on `self.root`.
-        """
-        if on_drag_end is not None:
-            self._on_drag_end = on_drag_end
-        self.root.bind("<Button-1>", self._on_drag_start)
-        self.root.bind("<B1-Motion>", self._on_drag)
-        self.root.bind("<ButtonRelease-1>", self._on_drag_release)
-
     def paint(self) -> None:
         """Invoke the render callback and push the resulting bitmap.
 
@@ -478,27 +459,6 @@ class LayeredOverlay:
             )
             return
         self._push_to_window(image)
-
-    # ------------------------------------------------------------------ #
-    # Drag handling                                                       #
-    # ------------------------------------------------------------------ #
-
-    def _on_drag_start(self, event: tk.Event) -> None:
-        if self._locked:
-            return
-        self._drag_dx = event.x_root - self._x
-        self._drag_dy = event.y_root - self._y
-
-    def _on_drag(self, event: tk.Event) -> None:
-        if self._locked:
-            return
-        self.set_position(event.x_root - self._drag_dx, event.y_root - self._drag_dy)
-
-    def _on_drag_release(self, _event: tk.Event) -> None:
-        if self._locked:
-            return
-        if self._on_drag_end is not None:
-            self._on_drag_end(self._x, self._y)
 
     # ------------------------------------------------------------------ #
     # Win32 plumbing                                                      #

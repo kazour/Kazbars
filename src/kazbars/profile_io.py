@@ -4,7 +4,7 @@ KazBars — Profile I/O.
 Load, save, create, and open profile JSON files. Functions take the
 KazBarsApp instance as first arg and mutate its state (grids_panel,
 current_profile, modified, reference_resolution, settings, title). Kept out
-of kazbars.py so the entry point file only carries root-window concerns.
+of app.py so the entry point file only carries root-window concerns.
 
 Load is split into a pure read step (`read_profile_file`) and a dispatch
 step (`apply_profile_data`) so the boss-timer fan-out is visible at every

@@ -185,7 +185,7 @@ class DeepsMeter:
 
         # Rolling-window width (seconds). User-selectable from the panel; sizing
         # the trackers' buffers, so a change recreates them (see
-        # `set_window_seconds`). `_make_trackers_locked` reads this field.
+        # `set_window_seconds`). `_reset_trackers_locked` reads this field.
         self._window_seconds: float = DEFAULT_WINDOW_SECONDS
         self._out_tracker = DamageOutTracker(self._window_seconds)
         self._in_tracker = DamageInTracker(self._window_seconds)
