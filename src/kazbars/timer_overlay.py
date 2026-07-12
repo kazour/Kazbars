@@ -199,7 +199,7 @@ class TimerOverlay:
             self._notify_settings_changed()
 
     def set_font_size(self, size: int, notify: bool = True) -> None:
-        """Backwards-compat — sets only the size, family unchanged."""
+        """Set only the size, family unchanged."""
         self.set_font(self._config.font_family, size, notify=notify)
 
     def show(self, notify: bool = True) -> None:
