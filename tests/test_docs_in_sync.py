@@ -27,6 +27,13 @@ never line numbers, so they survive edits. Three checks keep them live:
      ``name()`` tokens before the file ref) resolve to a def/class somewhere
      in that file's AST, so a rename fails CI instead of orphaning the doc.
 
+docs/CHANGELOG.md — releases can't outrun the changelog:
+
+  7. Every ``v*`` release tag has a ``## [X.Y.Z]`` section, so a release can't
+     ship while its entries still sit under ``[Unreleased]`` (v2.2.2 did
+     exactly that). Skips when tags are unavailable — CI checkouts are shallow
+     and tagless — so the local pre-commit run is the enforcement point.
+
 Refreshing these docs is a manual chore; this
 test just makes the drift impossible to merge silently.
 """
@@ -36,6 +43,7 @@ from __future__ import annotations
 import ast
 import math
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -202,4 +210,48 @@ def test_flows_subject_callable_resolves(lineno, name, rel):
         f'flows.md line {lineno}: step references `{name}()` in {rel}, but no '
         f'def/class named "{leaf}" exists there. Renamed? Update the flow step '
         'accordingly.'
+    )
+
+
+# =============================================================================
+# CHANGELOG.MD — every release tag has its section
+# =============================================================================
+
+CHANGELOG_DOC = REPO_ROOT / 'docs' / 'CHANGELOG.md'
+
+
+def _release_versions():
+    """Version strings for every v* tag, or None when tags are unavailable."""
+    try:
+        out = subprocess.run(
+            ['git', 'tag', '--list', 'v*'],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if out.returncode != 0:
+        return None
+    versions = [t.strip().removeprefix('v') for t in out.stdout.splitlines() if t.strip()]
+    return versions or None
+
+
+def test_every_release_tag_has_a_changelog_section():
+    versions = _release_versions()
+    if versions is None:
+        pytest.skip(
+            'git tags unavailable (shallow or tagless checkout) — '
+            'the local pre-commit run enforces this check'
+        )
+    headings = set(
+        re.findall(r'^## \[(\d+\.\d+\.\d+)\]', CHANGELOG_DOC.read_text(encoding='utf-8'), re.M)
+    )
+    missing = sorted(v for v in versions if v not in headings)
+    assert not missing, (
+        'docs/CHANGELOG.md has no section for released tag(s):\n  '
+        + '\n  '.join(f'v{v}' for v in missing)
+        + '\nA release shipped without its changelog entry — move what shipped '
+        'out of [Unreleased] into a dated [X.Y.Z] section.'
     )
