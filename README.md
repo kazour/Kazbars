@@ -98,7 +98,7 @@ The PyInstaller build is reproducible from the checked-in [`kazbars.spec`](kazba
 
 ## Documentation
 
-See **[`docs/README.md`](docs/README.md)** for the full doc map — every doc with its audience and when to update it (changelog, architecture, flows, brand brief, visual system).
+See **[`docs/README.md`](docs/README.md)** for the full doc map — every doc with its audience and when to update it (changelog, architecture, flows, database changelog).
 
 The project follows a `src/` layout — entry point is `python -m kazbars`, which loads `KazBarsApp` from [`src/kazbars/app.py`](src/kazbars/app.py).
 
