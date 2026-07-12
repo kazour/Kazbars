@@ -315,6 +315,24 @@ class TestLifecycle:
         m = DeepsMeter()
         m.stop()  # never started — must not raise
 
+    def test_quick_restart_kills_stale_worker(self, tmp_path: Path) -> None:
+        """stop() → start() inside the old worker's scan sleep must not leave
+        two threads feeding the same trackers (thread-identity guard): stop()'s
+        short join can't outlast SCAN_SLEEP, and the restart flips _running
+        back to True before the stale worker wakes."""
+        m = DeepsMeter()
+        m.start(tmp_path)
+        time.sleep(0.3)          # worker enters its WAITING_FOR_LOG scan sleep
+        m.stop(timeout=0.05)     # join gives up while the worker still sleeps
+        m.start(tmp_path)
+        try:
+            time.sleep(m.SCAN_SLEEP + 0.5)  # stale worker wakes and re-checks
+            alive = [t for t in threading.enumerate() if t.name == "deeps-meter"]
+            assert len(alive) == 1
+            assert m.snapshot().status is Status.WAITING_FOR_LOG
+        finally:
+            m.stop(timeout=1.0)
+
     def test_log_boundary_marks_resume_from_start(self) -> None:
         """A boundary re-tail reads from the top (fresh session content);
         everything else attaches at EOF so history is never replayed."""

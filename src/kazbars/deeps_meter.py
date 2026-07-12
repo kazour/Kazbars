@@ -294,7 +294,11 @@ class DeepsMeter:
         """Outer loop: scan for a live log, then tail it."""
         while True:
             with self._lock:
-                if not self._running:
+                # The identity check kills a stale worker: stop() joins only
+                # briefly, so a quick restart can flip _running back to True
+                # before this thread wakes — without it, two workers would
+                # tail the log and double-count into the shared trackers.
+                if not self._running or self._thread is not threading.current_thread():
                     return
                 game_folder = self._game_folder
 
@@ -349,7 +353,7 @@ class DeepsMeter:
             last_tick = time.monotonic()
             while True:
                 with self._lock:
-                    if not self._running:
+                    if not self._running or self._thread is not threading.current_thread():
                         return
 
                 now = time.monotonic()

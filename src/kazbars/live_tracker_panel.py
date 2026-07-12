@@ -341,7 +341,10 @@ class LiveTrackerPanel(tk.Toplevel):
         except Exception as e:
             logger.error("Timer loop error: %s", e)
         finally:
-            self._game_loop_id = self.after(GAME_TICK_MS, self._run_game_tick)
+            # A _stop_game_loop() call from inside the tick nulls the id —
+            # rescheduling unconditionally would silently resurrect the loop.
+            if self._game_loop_id is not None:
+                self._game_loop_id = self.after(GAME_TICK_MS, self._run_game_tick)
 
     def _sync_monitor_log(self):
         """Reflect the monitor's current log in the status line while monitoring.

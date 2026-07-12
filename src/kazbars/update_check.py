@@ -9,6 +9,7 @@ named main-thread dispatcher that toasts the user. The dispatcher is named
 
 import json
 import logging
+import re
 import threading
 import tkinter as tk
 import urllib.error
@@ -59,10 +60,16 @@ def _worker(app, current_version):
 
 
 def _parts(version):
-    try:
-        return tuple(int(p) for p in version.split('.'))
-    except ValueError:
-        return ()
+    """Leading digits of each dot-component, stopping at the first non-numeric
+    one — so a suffixed tag like '2.3.0-rc1' still compares as (2, 3, 0)
+    instead of silently reading as up-to-date."""
+    parts = []
+    for p in version.split('.'):
+        m = re.match(r'\d+', p)
+        if m is None:
+            break
+        parts.append(int(m.group()))
+    return tuple(parts)
 
 
 def _show_update_toast(app, tag, url):

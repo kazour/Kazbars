@@ -21,7 +21,7 @@ from .buff_xml import (
     _resolve_paths,
     _write_bufflistview,
 )
-from .settings_manager import get_setting, set_setting
+from .settings_manager import get_setting, safe_write_text, set_setting
 from .ui_collapsible import CollapsibleSection
 from .ui_components import create_scrollable_frame
 from .ui_headers import create_dialog_header
@@ -381,7 +381,7 @@ class _Section:
 
         self.customized_path.parent.mkdir(parents=True, exist_ok=True)
         _backup_once(self.customized_path)
-        self.customized_path.write_text(new_text, encoding='utf-8')
+        safe_write_text(self.customized_path, new_text)
 
     def load_after_write(self):
         """Re-read after a successful write so source_path/baseline reflect
