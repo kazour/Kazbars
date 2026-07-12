@@ -216,7 +216,7 @@ These modules are consumed only by `src/kazbars/app.py` by design — they hold 
 
 ## Smoke tests
 
-Plain-Python pytest cases guard the failure modes we’ve actually hit. Per-test detail lives in the **File inventory** below — one description per test file; don’t duplicate it here. Two conventions worth knowing up front: `tests/test_imports.py` auto-discovers every `src/kazbars/*.py` module (add nothing when a new module lands), and `tests/test_docs_in_sync.py` guards this doc itself plus `docs/flows.md` (inventory completeness, line-count tolerance, function-anchored refs).
+Plain-Python pytest cases guard the failure modes we’ve actually hit. Per-test detail lives in the **File inventory** below — one description per test file; don’t duplicate it here. Two conventions worth knowing up front: `tests/test_imports.py` auto-discovers every `src/kazbars/*.py` module (add nothing when a new module lands), and `tests/test_docs_in_sync.py` guards this doc, `docs/flows.md`, and the CHANGELOG's release sections (inventory completeness, line-count tolerance, function-anchored refs, tag↔section parity).
 
 Run before every commit touching code or data:
 ```bash
@@ -294,7 +294,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `src/kazbars/focus_watcher.py` | 85 | `ForegroundWatcher` — one app-owned ~250 ms tick that probes foreground once and fans `set_focus_suppressed` out to every registered overlay. Replaced the per-cluster focus polls |
 | `src/kazbars/paths.py` | 47 | Path constants: `PACKAGE_ROOT`/`ASSETS`/`KAZBARS_ASSETS` (bundled read-only assets, dev + frozen) + `app_path()` (user-writable runtime root next to the .exe) |
 | `tests/test_imports.py` | 33 | Import-graph smoke test |
-| `tests/test_docs_in_sync.py` | 205 | architecture.md inventory guard (no phantom rows, every `*.py` listed, line counts within `max(40, 25%)` tolerance) + flows.md ref guard (no `file:line` refs, referenced files exist, step subject callables resolve in the referenced file's AST) |
+| `tests/test_docs_in_sync.py` | 257 | architecture.md inventory guard (no phantom rows, every `*.py` listed, line counts within `max(40, 25%)` tolerance) + flows.md ref guard (no `file:line` refs, referenced files exist, step subject callables resolve in the referenced file's AST) + CHANGELOG release guard (every `v*` tag has a `## [X.Y.Z]` section; skips on tagless checkouts, so the pre-commit run enforces it) |
 | `tests/test_mypy_gate.py` | 74 | mypy-gate loop closer — the Tk-free module set (AST-derived) must equal `[tool.mypy] files` in both directions, no phantom entries |
 | `tests/test_app_contract.py` | 104 | satellite ⇄ `KazBarsApp` attribute contract — every `app.<attr>` access in app-taking functions must be defined on `KazBarsApp` (Tk `dir()` + `self.X` assigns), with a floor canary against vacuous passes; `getattr(app, …, default)` + `self.app.X` chains deliberately out of scope |
 | `tests/test_design_tokens.py` | 91 | design-token guard — no `#hex` literal outside `ui_helpers.py` (pure black/white blend anchors allowed; Live Tracker overlay palette allowlisted per-literal; stale-allowlist + detector canaries) |
