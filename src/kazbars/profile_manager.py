@@ -288,7 +288,8 @@ class ProfileManagerDialog(tk.Toplevel):
             return
 
         added, skipped = profile_share.merge_imported_buffs(
-            DeltaStore(database_user_path()), embedded, set(self.app.database.by_id))
+            DeltaStore(database_user_path()), embedded,
+            set(self.app.database.by_id), set(self.app.database.by_name))
         if added:
             self.app.database.reload()
             if getattr(self.app, 'db_panel', None):

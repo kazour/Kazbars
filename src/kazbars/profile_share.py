@@ -11,8 +11,9 @@ shipped database has never heard of them.
   - ``collect_referenced_user_buffs(profile, by_id, by_name, provenance)`` →
     exactly the referenced buffs whose provenance is ``user`` (resolving both
     int-ID and legacy name refs to ``ids[0]``), so the export is self-contained.
-  - ``merge_imported_buffs(delta_store, embedded_buffs, existing_ids)`` →
-    skip-on-collision merge of embedded buffs into ``database_user.json``.
+  - ``merge_imported_buffs(delta_store, embedded_buffs, existing_ids,
+    existing_names)`` → merge of embedded buffs into ``database_user.json``:
+    skip on an ID collision, rename on a name-only collision.
 
 Pure — stdlib + ``buff_db_layers`` (the ``ids[0]`` identity helper) only.
 """
@@ -89,29 +90,48 @@ def collect_referenced_user_buffs(profile, by_id, by_name, provenance):
     return out
 
 
-def merge_imported_buffs(delta_store, embedded_buffs, existing_ids):
-    """Merge embedded buffs into ``database_user.json`` via ``delta_store``,
-    skipping any whose ``ids[0]`` already exists (in the effective DB or the
-    delta). Structurally malformed embedded entries (a crafted/corrupt share
-    string) are dropped. Returns ``(added, skipped)``; writes only if
+def _unique_name(name, taken):
+    """A display name not in ``taken``: ``"X (imported)"``, then
+    ``"X (imported 2)"``, …. Mirrors the app's grid-name dedupe convention."""
+    candidate = f"{name} (imported)"
+    n = 2
+    while candidate in taken:
+        candidate = f"{name} (imported {n})"
+        n += 1
+    return candidate
+
+
+def merge_imported_buffs(delta_store, embedded_buffs, existing_ids, existing_names=frozenset()):
+    """Merge embedded buffs into ``database_user.json`` via ``delta_store``.
+
+    A buff colliding on ANY id with the effective DB or the on-disk delta is
+    skipped — a shared id would silently re-home an existing buff in ``by_id``.
+    A buff whose *name* collides (but whose ids are all new) is kept and renamed
+    unique (``"X (imported)"``): the profile's grids reference ids, not names, so
+    the buff still resolves while the DB editor stays unambiguous. Structurally
+    malformed embedded entries (a crafted/corrupt share string) are dropped.
+    Returns ``(added, skipped)`` — renamed buffs count as added; writes only if
     something was added."""
     delta = delta_store.load()
-    have = set(existing_ids)
+    have_ids = set(existing_ids)
+    have_names = set(existing_names)
     for b in delta["buffs"]:
-        key = buff_db_layers._identity(b)
-        if key is not None:
-            have.add(key)
+        have_ids.update(b.get("ids", []))
+        if b.get("name"):
+            have_names.add(b["name"])
     added = skipped = 0
     for b in embedded_buffs:
         if not buff_db_layers.is_valid_buff(b):
             continue
-        key = buff_db_layers._identity(b)
-        if key in have:
+        if any(bid in have_ids for bid in b["ids"]):
             skipped += 1
-        else:
-            delta["buffs"].append(b)
-            have.add(key)
-            added += 1
+            continue
+        if b["name"] in have_names:
+            b = {**b, "name": _unique_name(b["name"], have_names)}
+        delta["buffs"].append(b)
+        have_ids.update(b["ids"])
+        have_names.add(b["name"])
+        added += 1
     if added:
         delta_store.save(delta)
     return added, skipped

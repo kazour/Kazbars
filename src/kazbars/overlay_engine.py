@@ -669,18 +669,22 @@ class HudOverlay:
 
     def resize(self) -> None:
         """Re-measure, resize the surface, repaint. Consumers call this after a
-        content or appearance change that affects size."""
+        content or appearance change that affects size. The surface geometry
+        updates unconditionally so a later show() is correct, but the repaint is
+        gated on wanted-visible — an appearance tweak (font size, cells, layout)
+        made while the overlay is hidden must not float a ghost on screen."""
         w, h = self._measure()
         self._engine.set_size(w, h)
         self._engine.set_position(self._engine.x, self._engine.y)
-        self._engine.paint()
+        self.request_paint()
 
     def set_locked(self, locked: bool) -> None:
         """Set lock state (quiet — does NOT fire on_config_changed). Used by the
-        panel Lock button, which persists separately."""
+        panel Lock button, which persists separately. The repaint is gated on
+        wanted-visible so toggling Lock while stopped can't float a ghost."""
         self._config.locked = bool(locked)
         self._engine.set_locked(self._config.locked)
-        self._engine.paint()
+        self.request_paint()
 
     def is_locked(self) -> bool:
         return self._engine.is_locked()

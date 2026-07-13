@@ -187,13 +187,18 @@ class ToastModel:
         if key is not None:
             live = next((t for t in self.visible if t.key == key and not t.exiting), None)
             if live is not None:
-                live.message = message
-                live.duration = duration
+                self._update_in_place(live, message, style, duration, on_click)
                 return 'coalesced', live
             waiting = next((t for t in self.queued if t.key == key), None)
             if waiting is not None:
-                waiting.message = message
-                waiting.duration = duration
+                was_high = waiting.style in self.HIGH_PRIORITY
+                self._update_in_place(waiting, message, style, duration, on_click)
+                # Queue position is set by priority band at enqueue time; a
+                # coalesce that crosses the band (info→warning, or the reverse)
+                # must re-sort so promotion order stays honest.
+                if (style in self.HIGH_PRIORITY) != was_high:
+                    self.queued.remove(waiting)
+                    self._enqueue(waiting)
                 return 'queued', waiting
         toast = _Toast(message, style, duration, key, on_click)
         if len(self.visible) < self.MAX_VISIBLE:
@@ -201,6 +206,19 @@ class ToastModel:
             return 'visible', toast
         self._enqueue(toast)
         return 'queued', toast
+
+    @staticmethod
+    def _update_in_place(toast, message, style, duration, on_click):
+        """Refresh every mutable field of a coalesced toast so a same-key
+        re-emit fully replaces the prior one — not just its text. Carrying
+        `on_click` is load-bearing: consecutive grid deletes share one undo
+        key, and clicking the toast must undo the LATEST delete, not fire the
+        first delete's stale callback. `style` keeps the accent color honest
+        when severity changes across a coalesce (e.g. warning → success)."""
+        toast.message = message
+        toast.style = style
+        toast.duration = duration
+        toast.on_click = on_click
 
     def _enqueue(self, toast):
         if toast.style in self.HIGH_PRIORITY:
@@ -275,20 +293,27 @@ class ToastManager:
     def show(self, message, style='info', duration=None, on_click=None, key=None):
         state, toast = self._model.show(message, style, duration, key, on_click)
         if state == 'coalesced':
-            toast.widget.message_label.configure(text=toast.message)
-            self._reset_exit_timer(toast)
-            self._layout()
+            # A just-promoted toast sits in `visible` with widget=None until
+            # _mount() assigns it (the tail of _finish_remove). Coalescing onto
+            # it here is harmless: _mount() renders the already-updated model
+            # fields when it runs, so skip the live-widget update rather than
+            # deref None.
+            if toast.widget is not None:
+                toast.widget.message_label.configure(text=toast.message)
+                # A coalesce can bring a new severity or click action (a later
+                # grid delete reuses the undo key) — resync accent + cursor too.
+                self._apply_style_visual(toast)
+                self._reset_exit_timer(toast)
+                self._layout()
         elif state == 'visible':
             self._mount(toast)
         # 'queued': mounted later, when remove() promotes it
 
     def _mount(self, toast):
-        color = THEME_COLORS.get(self.STYLES.get(toast.style, 'accent'),
-                                 THEME_COLORS['accent'])
         frame = tk.Frame(self._parent, bg=TK_COLORS['input_bg'],
                          highlightbackground=TK_COLORS['border'],
                          highlightcolor=TK_COLORS['border'], highlightthickness=1)
-        accent_bar = tk.Frame(frame, bg=color, width=3)
+        accent_bar = tk.Frame(frame, width=3)
         accent_bar.pack(side='left', fill='y')
         label = ttk.Label(frame, text=toast.message, font=FONT_SMALL,
                           foreground=THEME_COLORS['body'],
@@ -297,14 +322,13 @@ class ToastManager:
         label.pack(side='left', padx=(PAD_LF, PAD_TAB), pady=PAD_XS)
 
         frame.message_label = label
-        frame.accent_color = color
+        frame.accent_bar = accent_bar
         frame.exit_after_id = None
         frame.hovered = False
         toast.widget = frame
+        self._apply_style_visual(toast)  # accent color + click cursor
 
         for w in (frame, accent_bar, label):
-            if toast.on_click:
-                w.configure(cursor='hand2')
             w.bind('<Button-1>', lambda _e: self._on_click(toast))
             w.bind('<Enter>', lambda _e: self._on_hover(toast, True))
             w.bind('<Leave>', lambda _e: self._on_hover(toast, False))
@@ -314,6 +338,20 @@ class ToastManager:
         self._layout()
         self._animate_entrance(toast)
         self._schedule_exit(toast)
+
+    def _apply_style_visual(self, toast):
+        """Sync a mounted frame's accent color + click cursor to the toast's
+        current style/on_click. Shared by _mount and the coalesce path so a
+        same-key re-emit that changes severity or click action doesn't leave
+        stale chrome (a hand cursor over a now-inert toast, or an old accent)."""
+        frame = toast.widget
+        color = THEME_COLORS.get(self.STYLES.get(toast.style, 'accent'),
+                                 THEME_COLORS['accent'])
+        frame.accent_color = color
+        frame.accent_bar.configure(bg=color)
+        cursor = 'hand2' if toast.on_click else ''
+        for w in (frame, frame.accent_bar, frame.message_label):
+            w.configure(cursor=cursor)
 
     def _on_click(self, toast):
         if toast.on_click is not None:

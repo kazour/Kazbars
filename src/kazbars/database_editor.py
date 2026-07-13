@@ -576,8 +576,11 @@ class DatabaseEditorTab(ttk.Frame):
         if not selection:
             return None, None
         item = self.tree.item(selection[0])
-        buff_name = item['values'][0]
-        buff_type = item['values'][3].lower()
+        # Tcl coerces an all-digit cell value to an int, so str() it back before
+        # matching against the (always-str) buff name — otherwise a buff named
+        # e.g. "100" would never match and Edit/Delete would silently no-op.
+        buff_name = str(item['values'][0])
+        buff_type = str(item['values'][3]).lower()
 
         for buff in self.database.grouped_buffs:
             if buff['name'] == buff_name and buff.get('type', 'buff') == buff_type:
@@ -706,6 +709,7 @@ class DatabaseEditorTab(ttk.Frame):
                 return
 
             existing_ids = {bid for buff in self.database.buffs for bid in buff.get('ids', [])}
+            existing_names = {buff['name'] for buff in self.database.buffs if buff.get('name')}
             added = 0
             skipped = 0
             invalid = 0
@@ -719,11 +723,17 @@ class DatabaseEditorTab(ttk.Frame):
                     invalid += 1
                     continue
                 buff_ids = buff.get('ids', [])
-                if any(bid in existing_ids for bid in buff_ids):
+                # Skip on ID *or* name collision. Manual add/edit enforce unique
+                # names (a name keys by_name + selection lookups), so import must
+                # too — otherwise the tree grows a twin row and _get_selected_buff,
+                # which resolves by name+type, would edit/delete the wrong entry.
+                if (any(bid in existing_ids for bid in buff_ids)
+                        or buff['name'] in existing_names):
                     skipped += 1
                     continue
                 self.database.add_buff(buff)
                 existing_ids.update(buff_ids)
+                existing_names.add(buff['name'])
                 added += 1
 
             self._after_db_change()

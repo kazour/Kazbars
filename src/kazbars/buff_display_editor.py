@@ -328,14 +328,23 @@ class _Section:
         if self._badge_var.get() != text:
             self._badge_var.set(text)
 
-    def focus_first(self):
-        """Move focus to this section's first focusable widget. Returns True
-        if focus was set, False if there's nothing focusable. Expands a
-        collapsed section so focus lands on a visible widget."""
+    def focus_first(self, only_if_open=False):
+        """Move focus to this section's toggle (open) or header (collapsed).
+        Returns True if focus was set, False if there's nothing focusable.
+        Never expands the section — restoring initial focus must not override
+        the user's saved collapsed state (which _save_section_states would then
+        persist). A collapsed section's content is unmapped, so its toggle
+        would take *invisible* keyboard focus (Space would silently flip it);
+        the header is the visible focus target there — it carries its own
+        focus highlight and Return/Space expands. With `only_if_open`, a
+        collapsed section is skipped so focus prefers an open one."""
         if self.state != self.STATE_OK or self._toggle is None:
             return False
         if self._frame is not None and not self._frame.is_open:
-            self._frame.expand()
+            if only_if_open:
+                return False
+            self._frame.header_left.focus_set()
+            return True
         self._toggle.focus_set()
         return True
 
@@ -447,6 +456,12 @@ class BuffDisplayDialog(tk.Toplevel):
             apply_dark_titlebar(self)
 
     def _set_initial_focus(self):
+        # Prefer an already-open section so focus lands on a visible widget
+        # without overriding the user's saved collapsed state. If nothing is
+        # open, fall back to the first OK section's toggle (still no expand).
+        for s in self.sections:
+            if s.focus_first(only_if_open=True):
+                return
         for s in self.sections:
             if s.focus_first():
                 return

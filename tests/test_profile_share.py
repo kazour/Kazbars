@@ -119,3 +119,34 @@ def test_merge_no_write_when_nothing_added(tmp_path):
     added, skipped = PS.merge_imported_buffs(DeltaStore(path), [_b(9, "Mine")], existing_ids={9})
     assert (added, skipped) == (0, 1)
     assert not path.exists()                            # nothing added → no write
+
+
+def test_merge_skips_on_secondary_id_collision(tmp_path):
+    # A shared id anywhere in the list (not just ids[0]) must skip — adding it
+    # would silently re-home the existing owner of that id in by_id.
+    store = DeltaStore(tmp_path / "database_user.json")
+    multi = {"name": "Multi", "ids": [10, 5], "category": "#X", "type": "buff"}
+    added, skipped = PS.merge_imported_buffs(store, [multi], existing_ids={5})
+    assert (added, skipped) == (0, 1)
+
+
+def test_merge_renames_on_name_collision(tmp_path):
+    # New id but a name that already exists → keep the buff (grids reference the
+    # id) but rename it unique so the DB editor stays unambiguous.
+    store = DeltaStore(tmp_path / "database_user.json")
+    added, skipped = PS.merge_imported_buffs(
+        store, [_b(999, "Frenzy")], existing_ids={111}, existing_names={"Frenzy"})
+    assert (added, skipped) == (1, 0)
+    saved = store.load()["buffs"]
+    assert len(saved) == 1
+    assert saved[0]["ids"] == [999]                     # id preserved → grid refs resolve
+    assert saved[0]["name"] == "Frenzy (imported)"      # renamed unique
+
+
+def test_merge_rename_bumps_on_repeat_collision(tmp_path):
+    store = DeltaStore(tmp_path / "database_user.json")
+    added, _ = PS.merge_imported_buffs(
+        store, [_b(999, "Frenzy")], existing_ids=set(),
+        existing_names={"Frenzy", "Frenzy (imported)"})
+    assert added == 1
+    assert store.load()["buffs"][0]["name"] == "Frenzy (imported 2)"
