@@ -162,8 +162,17 @@ def bind_card_events(card_border, color, hover_color=None):
 
 
 def add_tooltip(widget, text):
-    """Add a hover tooltip that stays inside the app window."""
-    _InAppToolTip(widget, text)
+    """Add a hover tooltip that stays inside the app window.
+
+    Idempotent per widget: a repeat call updates the existing tooltip's text
+    instead of stacking another live instance — refresh paths (the game-path
+    label re-adds its tooltip on every folder change) would otherwise
+    accumulate bindings and show overlapping stale tooltips on hover."""
+    tip = getattr(widget, '_kz_tooltip', None)
+    if tip is not None:
+        tip.text = text
+        return
+    widget._kz_tooltip = _InAppToolTip(widget, text)
 
 
 class _InAppToolTip:
@@ -281,12 +290,14 @@ def bind_label_hover_colors(label, normal_color, hover_color):
 
     Centralizes the 4-line bind block used by clickable header labels
     (delete ×, dismiss ×, etc.) so hover and keyboard-focus visuals stay
-    consistent.
+    consistent. Binds with add="+" so it composes with other Enter/Leave
+    consumers on the same widget (a tooltip added first would otherwise be
+    silently wiped).
     """
-    label.bind("<Enter>", lambda e: label.config(foreground=hover_color))
-    label.bind("<Leave>", lambda e: label.config(foreground=normal_color))
-    label.bind("<FocusIn>", lambda e: label.config(foreground=hover_color))
-    label.bind("<FocusOut>", lambda e: label.config(foreground=normal_color))
+    label.bind("<Enter>", lambda e: label.config(foreground=hover_color), add="+")
+    label.bind("<Leave>", lambda e: label.config(foreground=normal_color), add="+")
+    label.bind("<FocusIn>", lambda e: label.config(foreground=hover_color), add="+")
+    label.bind("<FocusOut>", lambda e: label.config(foreground=normal_color), add="+")
 
 
 def bind_label_press_effect(label, press_color=None):

@@ -314,6 +314,7 @@ UI behavior (Tk event flow, dialog timing, subprocess integration in the build f
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 | Strict-schema safety net — greps every `get_setting`/`set_setting`/`app.settings`/`self.settings`(app.py) proxy key in the tree (resolving `UPPER_CASE` constants) and asserts each is a declared `PREFS_SCHEMA` Field, so strict validation can't silently erase a real setting |
 | `tests/test_overlay_config.py` | 102 | `OverlayConfig` dataclass + per-cluster adapters (Deeps `overlay_*` keys / Live Tracker bare keys) round-trip |
 | `tests/test_hud_overlay.py` | 141 | `HudOverlay` visibility gate (stubbed engine, no win32) — `resize()`/`set_locked()` repaint only while wanted-visible (no ghost overlay while stopped) yet still apply geometry/lock state |
+| `tests/test_ui_widgets_tk.py` | 76 | Tk binding hygiene (Windows-gated) — `add_tooltip` is idempotent per widget (repeat call updates text, no stacked instances/bindings) and `bind_label_hover_colors` appends with add="+" so a prior tooltip survives |
 | `tests/test_focus_watcher.py` | 96 | `ForegroundWatcher` tick + fan-out suppression with an injected probe (no display needed) |
 | `tests/test_foreground.py` | 95 | `app_or_game_foreground` probe — own-process gate, AoC match, show-on-probe-failure default |
 | `tests/test_timer_sizing.py` | 41 | Live Tracker overlay font-derived auto-size (`_measure`) bounds |
