@@ -3,8 +3,10 @@ satellite panel through its app-side opener, catching "panel won't even
 construct" breakage (bad widget kwarg, renamed design token, missing app
 attribute, broken import wiring) in seconds instead of at manual QA.
 
-Scope: construction + the panel's own close path only. Event flow, visual
-correctness, and drag/animation behavior stay manual QA. Deferred to v2 (need a
+Scope: construction + the panel's own close path, plus ui_widgets binding
+hygiene (which must ride this module's Tk instance — see the section note at
+the bottom). Event flow, visual correctness, and drag/animation behavior stay
+manual QA. Deferred to v2 (need a
 data context or block on wait_window): AddGridWizard, BuffSelectorDialog,
 SlotAssignmentDialog, BuffEditDialog, the first-launch dialog,
 show_close_game_required_dialog, BuildLoadingScreen, the settings_backup
@@ -177,3 +179,68 @@ def test_openers_cover_known_panels():
     stale = (tested | set(DEFERRED)) - methods
     assert not stale, f'OPENERS/DEFERRED reference methods gone from app.py: {sorted(stale)}'
     assert len(OPENERS) >= 6
+
+
+# ============================================================================
+# UI-WIDGET BINDING HYGIENE (rides the same app instance)
+# ============================================================================
+# These attach to the module's live app rather than a tk.Tk() of their own:
+# ttkbootstrap wraps Tk.__init__ process-wide, and on the hosted CI runner a
+# SECOND Tcl interpreter (created after the first is destroyed) fails to
+# initialize (init.tcl unreadable in the toolcache Tcl tree). One interp per
+# process is the portable pattern.
+#
+# Two pinned behaviors (verified against a live Tk before fixing):
+#   1. `add_tooltip` is idempotent per widget — a repeat call updates the
+#      existing tooltip's text instead of stacking another live instance.
+#      Refresh paths (the game-path label re-adds its tooltip on every folder
+#      change) would otherwise accumulate <Enter> bindings and pop overlapping
+#      stale tooltips on a single hover.
+#   2. `bind_label_hover_colors` appends (add="+") rather than overwriting,
+#      so a tooltip bound to the same widget first keeps working.
+
+def _handler_count(widget, sequence):
+    script = widget.bind(sequence) or ''
+    return len([ln for ln in script.splitlines() if ln.strip()])
+
+
+def test_add_tooltip_is_idempotent_per_widget(app):
+    from kazbars.ui_widgets import add_tooltip
+    lbl = tk.Label(app, text='x')
+    try:
+        add_tooltip(lbl, 'first')
+        first_instance = lbl._kz_tooltip
+        assert _handler_count(lbl, '<Enter>') == 1
+
+        add_tooltip(lbl, 'second')
+        # Same instance, updated text, no stacked bindings.
+        assert lbl._kz_tooltip is first_instance
+        assert lbl._kz_tooltip.text == 'second'
+        assert _handler_count(lbl, '<Enter>') == 1
+    finally:
+        lbl.destroy()
+
+
+def test_add_tooltip_accepts_callable_text_on_update(app):
+    from kazbars.ui_widgets import add_tooltip
+    lbl = tk.Label(app, text='x')
+    try:
+        add_tooltip(lbl, 'static')
+        add_tooltip(lbl, lambda: 'dynamic')
+        assert lbl._kz_tooltip.text() == 'dynamic'
+    finally:
+        lbl.destroy()
+
+
+def test_hover_colors_preserves_existing_enter_bindings(app):
+    from kazbars.ui_widgets import add_tooltip, bind_label_hover_colors
+    lbl = tk.Label(app, text='x')
+    try:
+        add_tooltip(lbl, 'tip')
+        assert _handler_count(lbl, '<Enter>') == 1
+        bind_label_hover_colors(lbl, '#888888', '#ffffff')
+        # Appended, not replaced — the tooltip's handler survives.
+        assert _handler_count(lbl, '<Enter>') == 2
+        assert _handler_count(lbl, '<Leave>') == 2
+    finally:
+        lbl.destroy()
