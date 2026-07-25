@@ -174,7 +174,8 @@
     {
       "name": "Broken Armor Ruin (T4 adds)",
       "ids": [
-        4552633
+        4552633,
+        5064100
       ],
       "category": "#Raid T4",
       "type": "debuff"
@@ -220,7 +221,7 @@
       "type": "debuff"
     },
     {
-      "name": "Shackles (Shadur)",
+      "name": "Shackles (Saddur)",
       "ids": [
         4857484
       ],
@@ -366,7 +367,7 @@
       "type": "misc"
     },
     {
-      "name": "Derketo's Ruin (Yothians)",
+      "name": "Derketo's Ruin (Zelandra)",
       "ids": [
         5064042
       ],
@@ -486,7 +487,13 @@
     {
       "name": "Elemental Ruin",
       "ids": [
-        3963062
+        3963062,
+        4244576,
+        4244577,
+        4244578,
+        4244579,
+        4244580,
+        4244581
       ],
       "category": "#General",
       "type": "debuff"
@@ -572,7 +579,13 @@
       "name": "Physical Ruin",
       "ids": [
         3963059,
-        4743743
+        4743743,
+        4244715,
+        4244716,
+        4244717,
+        4244718,
+        4244719,
+        4244720
       ],
       "category": "#General",
       "type": "debuff"
@@ -658,7 +671,13 @@
     {
       "name": "Spiritual Ruin",
       "ids": [
-        3963070
+        3963070,
+        4244721,
+        4244722,
+        4244723,
+        4244724,
+        4244725,
+        4244726
       ],
       "category": "#General",
       "type": "debuff"
@@ -2566,13 +2585,14 @@
       "type": "buff"
     },
     {
-      "name": "Symbiotic Idol of Set 1-5",
+      "name": "Symbiotic Idol of Set 1-6",
       "ids": [
-        3776175,
+        3776171,
         3776176,
         3776177,
         3776178,
-        3776179
+        3776179,
+        3776180
       ],
       "category": "Tempest of Set",
       "type": "buff",
@@ -3253,7 +3273,7 @@
       "type": "buff"
     },
     {
-      "name": "Hopeless Reality Ruin (Shadur)",
+      "name": "Hopeless Reality Ruin (Saddur)",
       "ids": [
         4857485
       ],
@@ -3386,6 +3406,129 @@
       "category": "Dark Templar",
       "type": "buff",
       "stacking": true
+    },
+    {
+      "name": "Petrifying Ruin",
+      "ids": [
+        4989883,
+        5056521
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Viscous Ruin (Rocknoses)",
+      "ids": [
+        5054617
+      ],
+      "category": "#Raid T6",
+      "type": "debuff"
+    },
+    {
+      "name": "Underworld Ruin 1-5",
+      "ids": [
+        4046208,
+        4046209,
+        4046210,
+        4046211,
+        4046215
+      ],
+      "category": "#General",
+      "type": "debuff",
+      "stacking": true,
+      "stackEnd": 5
+    },
+    {
+      "name": "Splinter Ruin (T4 adds)",
+      "ids": [
+        4552688
+      ],
+      "category": "#Raid T4",
+      "type": "debuff"
+    },
+    {
+      "name": "Eldritch Ruin",
+      "ids": [
+        4866663,
+        4866666
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Mind Ruin",
+      "ids": [
+        4502966,
+        4502998,
+        4788836
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Venomous Ruin",
+      "ids": [
+        4283587,
+        4515792
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Malicious Ruin",
+      "ids": [
+        4515827
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Soul Ruin",
+      "ids": [
+        4257775
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Dulling Roar Ruin",
+      "ids": [
+        4268087
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Ravaging Howl Ruin",
+      "ids": [
+        4549364
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Flying Daggers Ruin",
+      "ids": [
+        4256152
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Netherfrost Nether Ruin",
+      "ids": [
+        4226929
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Demonic Ruin",
+      "ids": [
+        4507663
+      ],
+      "category": "#General",
+      "type": "debuff"
     }
   ]
 }

@@ -39,6 +39,42 @@ whitelists the old one (e.g. `assets/kazbars/Default.json`).
 
 ---
 
+## 2026-07-26
+**Ruin line — catalog expansion.** Fourteen ruin debuffs added and two existing entries
+corrected. No existing entry's primary ID changed, so no profile whitelist is affected
+(`Default.json` untouched).
+- **Added:** `Petrifying Ruin` — #General debuff: `4989883`, `5056521`.
+- **Added:** `Viscous Ruin (Rocknoses)` — #Raid T6 debuff: `5054617`.
+- **Added:** `Underworld Ruin 1-5` — #General debuff, stacking (5 ranks): `4046208`, `4046209`, `4046210`, `4046211`, `4046215`.
+- **Added:** `Splinter Ruin (T4 adds)` — #Raid T4 debuff: `4552688`.
+- **Added:** `Eldritch Ruin` — #General debuff: `4866663`, `4866666`.
+- **Added:** `Mind Ruin` — #General debuff: `4502966`, `4502998`, `4788836`.
+- **Added:** `Venomous Ruin` — #General debuff: `4283587`, `4515792`.
+- **Added:** `Malicious Ruin` — #General debuff: `4515827`.
+- **Added:** `Soul Ruin` — #General debuff: `4257775`.
+- **Added:** `Dulling Roar Ruin` — #General debuff: `4268087`.
+- **Added:** `Ravaging Howl Ruin` — #General debuff: `4549364`.
+- **Added:** `Flying Daggers Ruin` — #General debuff: `4256152`.
+- **Added:** `Netherfrost Nether Ruin` — #General debuff: `4226929`.
+- **Added:** `Demonic Ruin` — #General debuff: `4507663`.
+- **Added:** `Broken Armor Ruin (T4 adds)` (#Raid T4 debuff) alias spell ID `5064100` — the re-issued copy of the same esoteric ruin (entry IDs now `4552633`, `5064100`).
+- **Renamed:** `Derketo's Ruin (Yothians)` → `Derketo's Ruin (Zelandra)` (`5064042`) — corrected boss attribution; spell ID unchanged.
+- **Renamed:** `Hopeless Reality Ruin (Shadur)` → `Hopeless Reality Ruin (Saddur)` (`4857485`) — corrected boss-name spelling; spell ID unchanged.
+- **Renamed:** `Shackles (Shadur)` → `Shackles (Saddur)` (`4857484`) — same boss, same spelling correction; spell ID unchanged.
+- **Fixed:** `Symbiotic Idol of Set 1-5` → `Symbiotic Idol of Set 1-6` (Tempest of Set stacking buff). Rank 1 spell ID `3776175` → `3776171`: the old ID does not exist in the game, so rank 1 never resolved. Rank 6 `3776180` was missing and is now tracked, so the entry covers the buff's full 1-6 range (entry IDs now `3776171`, `3776176`, `3776177`, `3776178`, `3776179`, `3776180`). No profile whitelisted the old ID, so none needed updating.
+
+Ruins filed under `#General` carry the bare debuff name — no boss/instance suffix. Source
+suffixes are kept only where the entry sits in a raid-tier category.
+
+## 2026-07-25
+**Ruin line — alias spell IDs for the later re-issue of the generic Ruin family.** The three
+`#General` ruin debuffs only carried their original spell IDs, so they never matched the second
+set the game issued for later content. Names, categories, types, and each entry's primary ID are
+unchanged, so no grid or profile whitelist is affected (`Default.json` untouched).
+- **Added:** `Elemental Ruin` (#General debuff) alias spell IDs `4244576`, `4244577`, `4244578`, `4244579`, `4244580`, `4244581` (entry IDs now `3963062`, `4244576`, `4244577`, `4244578`, `4244579`, `4244580`, `4244581`).
+- **Added:** `Physical Ruin` (#General debuff) alias spell IDs `4244715`, `4244716`, `4244717`, `4244718`, `4244719`, `4244720` (entry IDs now `3963059`, `4743743`, `4244715`, `4244716`, `4244717`, `4244718`, `4244719`, `4244720`).
+- **Added:** `Spiritual Ruin` (#General debuff) alias spell IDs `4244721`, `4244722`, `4244723`, `4244724`, `4244725`, `4244726` (entry IDs now `3963070`, `4244721`, `4244722`, `4244723`, `4244724`, `4244725`, `4244726`).
+
 ## 2026-06-22
 - **Added:** `Seal of Yog (Crit)` — Dark Templar stacking buff (10 stack ranks): `4204058`, `4204059`, `4204060`, `4204061`, `4204062`, `4204063`, `4204064`, `4204065`, `4204066`, `4204067`.
 - **Added:** `Seal of Yog (Mana)` — Dark Templar stacking buff (5 stack ranks): `4203944`, `4203945`, `4203946`, `4203947`, `4203948`.
