@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "content_version": 9,
+  "content_version": 14,
   "min_app_version": "2.2.2",
-  "notes": "Add Seal of Yog (Crit) and Seal of Yog (Mana) Dark Templar stacking buffs",
+  "notes": "Symbiotic Idol of Set rank-1 ID fix and rank-6 addition",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
-      "sha256": "7fb7e95c78f1a723a62e5acbd6981745847e74c6412b51aa8f0414465613a9d7"
+      "sha256": "7bc6b33809dc70db042d7156273c00f425275d1bf5442e28c9206cbd91873cca"
     },
     "Default.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.json",
