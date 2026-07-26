@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "content_version": 14,
+  "content_version": 19,
   "min_app_version": "2.2.2",
-  "notes": "Symbiotic Idol of Set rank-1 ID fix and rank-6 addition",
+  "notes": "Ruin line: encounter-level attribution for three add-applied ruins",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
-      "sha256": "7bc6b33809dc70db042d7156273c00f425275d1bf5442e28c9206cbd91873cca"
+      "sha256": "effd16fc28f2966c31c0e9037c69c2e514cad35f7e4f3666acdb637ccb849c0e"
     },
     "Default.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.json",
