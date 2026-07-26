@@ -172,7 +172,7 @@
       "type": "debuff"
     },
     {
-      "name": "Broken Armor Ruin (T4 adds)",
+      "name": "Broken Armor Ruin (Sheng)",
       "ids": [
         4552633,
         5064100
@@ -3408,7 +3408,7 @@
       "stacking": true
     },
     {
-      "name": "Petrifying Ruin",
+      "name": "Petrifying Ruin (Basilisk)",
       "ids": [
         4989883,
         5056521
@@ -3417,15 +3417,7 @@
       "type": "debuff"
     },
     {
-      "name": "Viscous Ruin (Rocknoses)",
-      "ids": [
-        5054617
-      ],
-      "category": "#Raid T6",
-      "type": "debuff"
-    },
-    {
-      "name": "Underworld Ruin 1-5",
+      "name": "Underworld Ruin 1-5 (Kun Whu)",
       "ids": [
         4046208,
         4046209,
@@ -3439,15 +3431,7 @@
       "stackEnd": 5
     },
     {
-      "name": "Splinter Ruin (T4 adds)",
-      "ids": [
-        4552688
-      ],
-      "category": "#Raid T4",
-      "type": "debuff"
-    },
-    {
-      "name": "Eldritch Ruin",
+      "name": "Eldritch Ruin (Little Prince)",
       "ids": [
         4866663,
         4866666
@@ -3456,7 +3440,7 @@
       "type": "debuff"
     },
     {
-      "name": "Mind Ruin",
+      "name": "Mind Ruin (Necropolis)",
       "ids": [
         4502966,
         4502998,
@@ -3466,7 +3450,7 @@
       "type": "debuff"
     },
     {
-      "name": "Venomous Ruin",
+      "name": "Venomous Ruin (Kian Lai)",
       "ids": [
         4283587,
         4515792
@@ -3475,7 +3459,7 @@
       "type": "debuff"
     },
     {
-      "name": "Malicious Ruin",
+      "name": "Malicious Ruin (Cavern of Malice)",
       "ids": [
         4515827
       ],
@@ -3483,15 +3467,7 @@
       "type": "debuff"
     },
     {
-      "name": "Soul Ruin",
-      "ids": [
-        4257775
-      ],
-      "category": "#General",
-      "type": "debuff"
-    },
-    {
-      "name": "Dulling Roar Ruin",
+      "name": "Dulling Roar Ruin (Bhangi Khan)",
       "ids": [
         4268087
       ],
@@ -3499,7 +3475,7 @@
       "type": "debuff"
     },
     {
-      "name": "Ravaging Howl Ruin",
+      "name": "Ravaging Howl Ruin (Bhangi Khan)",
       "ids": [
         4549364
       ],
@@ -3507,15 +3483,7 @@
       "type": "debuff"
     },
     {
-      "name": "Flying Daggers Ruin",
-      "ids": [
-        4256152
-      ],
-      "category": "#General",
-      "type": "debuff"
-    },
-    {
-      "name": "Netherfrost Nether Ruin",
+      "name": "Netherfrost Nether Ruin (Yun Rau)",
       "ids": [
         4226929
       ],
@@ -3523,9 +3491,67 @@
       "type": "debuff"
     },
     {
-      "name": "Demonic Ruin",
+      "name": "Demonic Ruin (Enigmata of Yag)",
       "ids": [
         4507663
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Capture Ruin (Sethik Bloodblade)",
+      "ids": [
+        4826763
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Batswarm Ruin (I-Po)",
+      "ids": [
+        4051322
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Fiery Ruin (Dimensionalist)",
+      "ids": [
+        4932986
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Aptitude Ruin (Grand Vizier)",
+      "ids": [
+        4990471
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Kian Lai's Ruin (Kian Lai)",
+      "ids": [
+        4283403,
+        4804225,
+        4804226
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Visions of Ruin (Omni-Prophet)",
+      "ids": [
+        4991521
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Advisor's Ruin (Argo-satha)",
+      "ids": [
+        4732527
       ],
       "category": "#General",
       "type": "debuff"

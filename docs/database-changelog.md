@@ -39,7 +39,45 @@ whitelists the old one (e.g. `assets/kazbars/Default.json`).
 
 ---
 
+## 2026-07-27
+**Ruin line — four entries withdrawn.** Removed from the catalog after observed
+application data showed their source encounters are well represented yet never apply
+them; two also had incorrect attribution. Held aside for in-game verification and
+re-added if confirmed. No profile whitelisted any of these IDs.
+- **Removed:** `Flying Daggers Ruin` — `4256152`, #General debuff.
+- **Removed:** `Soul Ruin` — `4257775`, #General debuff. Its game-data note reads as an unfinished developer instruction rather than shipped behaviour.
+- **Removed:** `Viscous Ruin (Rocknoses)` — `5054617`, #Raid T6 debuff. The Rocknoses apply Elemental Ruin; this spell belongs to the Ethram set.
+- **Removed:** `Splinter Ruin (T4 adds)` — `4552688`, #Raid T4 debuff.
+
 ## 2026-07-26
+**Ruin line — five more boss ruins.** Debuffs confirmed against observed in-game
+application data, cross-checked with the boss rosters.
+- **Added:** `Capture Ruin (Sethik Bloodblade)` — #General debuff: `4826763`. A 10-second root, dispel-classed as a ruin.
+- **Added:** `Batswarm Ruin (I-Po)` — #General debuff: `4051322`.
+- **Added:** `Fiery Ruin (Dimensionalist)` — #General debuff: `4932986`. A 15-second stun, dispel-classed as a ruin.
+- **Added:** `Aptitude Ruin (Grand Vizier)` — #General debuff: `4990471`.
+- **Added:** `Kian Lai's Ruin (Kian Lai)` — #General debuff: `4283403`, `4804225`, `4804226`. A received-healing debuff; the game data classes it as a spiritual ruin for dispel purposes. Distinct from the boss's stacking armor debuff, which is a wrack.
+- **Added:** `Visions of Ruin (Omni-Prophet)` — #General debuff: `4991521`. Applied by the adds in that encounter.
+- **Added:** `Advisor's Ruin (Argo-satha)` — #General debuff: `4732527`. The ruin member of the boss's wrack/torment/ruin proc set; the game data stores it under the bare name `Advisor`.
+
+**Ruin line — applier attribution.** Eleven ruin debuffs gained the boss/encounter that
+applies them as a name suffix, matching the catalog's existing boss-source convention.
+Display only — no IDs, categories, or types changed, so no grid or profile is affected.
+- **Renamed:** `Broken Armor Ruin (T4 adds)` → `Broken Armor Ruin (Sheng)` (`4552633`, `5064100`) — the applying add belongs to that boss's encounter.
+- **Renamed:** `Malicious Ruin` → `Malicious Ruin (Cavern of Malice)` (`4515827`) — applied by an add in that instance.
+- **Renamed:** `Petrifying Ruin` → `Petrifying Ruin (Basilisk)` (`4989883`, `5056521`).
+- **Renamed:** `Netherfrost Nether Ruin` → `Netherfrost Nether Ruin (Yun Rau)` (`4226929`).
+- **Renamed:** `Eldritch Ruin` → `Eldritch Ruin (Little Prince)` (`4866663`, `4866666`).
+- **Renamed:** `Dulling Roar Ruin` → `Dulling Roar Ruin (Bhangi Khan)` (`4268087`).
+- **Renamed:** `Demonic Ruin` → `Demonic Ruin (Enigmata of Yag)` (`4507663`) — the three appliers are the one randomised boss of that encounter.
+- **Renamed:** `Underworld Ruin 1-5` → `Underworld Ruin 1-5 (Kun Whu)` (`4046208`, `4046209`, `4046210`, `4046211`, `4046215`).
+- **Renamed:** `Venomous Ruin` → `Venomous Ruin (Kian Lai)` (`4283587`, `4515792`).
+- **Renamed:** `Ravaging Howl Ruin` → `Ravaging Howl Ruin (Bhangi Khan)` (`4549364`).
+- **Renamed:** `Mind Ruin` → `Mind Ruin (Necropolis)` (`4502966`, `4502998`, `4788836`) — applied by an add in that instance.
+
+`Physical Ruin`, `Elemental Ruin`, and `Spiritual Ruin` keep bare names — they are generic
+debuffs with hundreds of distinct appliers each, so no single source applies.
+
 **Ruin line — catalog expansion.** Fourteen ruin debuffs added and two existing entries
 corrected. No existing entry's primary ID changed, so no profile whitelist is affected
 (`Default.json` untouched).
