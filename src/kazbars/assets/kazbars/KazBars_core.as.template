@@ -559,6 +559,7 @@
     }
 
     private function SlotTargetChanged(tid:Object):Void {
+        {{INS_SET_TARGET}}
         if (tid == null || tid.GetType() == _global.Enums.TypeID.e_Type_None) setTarget(null);
         else setTarget(com.GameInterface.Game.Character.GetCharacter(tid));
     }
@@ -650,6 +651,7 @@
             i++;
         }
         {{CAST_PREVIEW_ON}}
+        {{INS_PREVIEW_ON}}
         {{CONSOLE_PREVIEW_OPEN}}
     }
 
@@ -666,9 +668,11 @@
             {{CONSOLE_EXIT_PERSIST}}
             {{CAST_SAVE}}
             {{SW_SAVE}}
+            {{INS_SAVE}}
         }
         {{CONSOLE_EXIT_REMOVE}}
         {{CAST_PREVIEW_OFF}}
+        {{INS_PREVIEW_OFF}}
         var i:Number = 0;
         while (i < grids.length) { preview.removeOverlay(grids[i]); grids[i].dirty = true; updateGrid(grids[i]); i++; }
     }
@@ -680,6 +684,7 @@
         {{CONSOLE_CLEANUP}}
         {{CAST_CLEANUP}}
         {{SW_CLEANUP}}
+        {{INS_CLEANUP}}
         playerBuffs = new Array();
         targetBuffs = new Array();
         buffIndexCache = {player: {}, target: {}};
@@ -712,6 +717,7 @@
         createAllGrids();
         {{CAST_CREATE}}
         {{SW_CREATE}}
+        {{INS_CREATE}}
         try {
             com.GameInterface.Game.CharacterBase.SignalClientCharacterAlive.Connect(SlotAlive, this);
             m_Player = com.GameInterface.Game.Character.GetClientCharacter();
@@ -735,6 +741,7 @@
             {{CONSOLE_LOAD_PERSIST}}
             {{CAST_LOAD}}
             {{SW_LOAD}}
+            {{INS_LOAD}}
         }
     }
 
@@ -749,6 +756,7 @@
             {{CONSOLE_DEACTIVATE_PERSIST}}
             {{CAST_SAVE}}
             {{SW_SAVE}}
+            {{INS_SAVE}}
         }
         cleanup();
         try { com.GameInterface.Game.CharacterBase.SignalClientCharacterAlive.Disconnect(SlotAlive, this); } catch (e:Object) {}

@@ -120,9 +120,18 @@ def test_stopwatch_feature_compiles():
     assert ok, msg
 
 
+def test_inspect_feature_compiles():
+    # Doubles as the 32 KB-bytecode canary for the single-class stub: MTASC
+    # hard-fails a class over the limit, so exit-0 here proves headroom.
+    ins = {"enabled": True, "x": 40, "y": 240, "fontSize": 12, "startCollapsed": True}
+    ok, msg, _ = _compile([_grid()], inspect_config=ins)
+    assert ok, msg
+
+
 def test_all_features_together_compile():
     cast = {"enableP": True, "enableT": False, "playerX": 900, "playerY": 600}
     sw = {"enabled": True}
+    ins = {"enabled": True}
     ok, msg, _ = _compile([_grid()], include_console=True, cast_config=cast,
-                          stopwatch_config=sw)
+                          stopwatch_config=sw, inspect_config=ins)
     assert ok, msg

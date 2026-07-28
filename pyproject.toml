@@ -99,6 +99,7 @@ files = [
     "src/kazbars/foreground.py",
     "src/kazbars/grid_model.py",
     "src/kazbars/grids_generator.py",
+    "src/kazbars/inspect.py",
     "src/kazbars/live_tracker_settings.py",
     "src/kazbars/paths.py",
     "src/kazbars/prefs.py",

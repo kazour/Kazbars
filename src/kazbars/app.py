@@ -125,6 +125,7 @@ class KazBarsApp(ttkb.Window):
         self.deeps_panel = None
         self.damage_numbers_panel = None
         self.stopwatch_dialog = None
+        self.inspect_dialog = None
         self._profile_manager = None
 
         # One shared focus gate for every overlay: hides them whenever neither
@@ -388,6 +389,8 @@ class KazBarsApp(ttkb.Window):
              'command': self._open_damage_number_colors},
             {'type': 'command', 'label': 'In-game stopwatch…',
              'command': self._open_stopwatch_settings},
+            {'type': 'command', 'label': 'Target inspect panel…',
+             'command': self._open_inspect_settings},
             {'type': 'separator'},
             {'type': 'checkbutton', 'label': 'Include buff-discovery console in builds',
              'variable': self._build_console_var,
@@ -531,6 +534,11 @@ class KazBarsApp(ttkb.Window):
         """Open the In-Game Stopwatch settings dialog (modal)."""
         from .stopwatch_panel import open_stopwatch_dialog
         open_stopwatch_dialog(self)
+
+    def _open_inspect_settings(self):
+        """Open the Target Inspect Panel settings dialog (modal)."""
+        from .inspect_panel import open_inspect_dialog
+        open_inspect_dialog(self)
 
     def _open_backup_dialog(self):
         """Open the Backup & Restore settings dialog."""

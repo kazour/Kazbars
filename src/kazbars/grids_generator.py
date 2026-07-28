@@ -13,6 +13,7 @@ from .build_utils import compile_as2, resolve_assets_path
 from .cast_timer import is_enabled as cast_is_enabled
 from .cast_timer import validate_config as validate_cast_config
 from .grid_model import MAX_TOTAL_SLOTS
+from .inspect import validate_config as validate_inspect_config
 from .stopwatch import validate_config as validate_stopwatch_config
 
 logger = logging.getLogger(__name__)
@@ -83,6 +84,7 @@ class CodeGenerator:
         include_console=False,
         cast_config=None,
         stopwatch_config=None,
+        inspect_config=None,
     ):
         """Initialize the code generator with grid configs and the buff database."""
         # Filter out disabled grids
@@ -100,6 +102,9 @@ class CodeGenerator:
         # In-game stopwatch: same gate pattern — off means no stopwatch code compiles.
         self.stopwatch_config = validate_stopwatch_config(stopwatch_config)
         self.include_stopwatch = self.stopwatch_config["enabled"]
+        # Target inspect panel: same gate pattern again.
+        self.inspect_config = validate_inspect_config(inspect_config)
+        self.include_inspect = self.inspect_config["enabled"]
 
     def sanitize_id(self, grid_id):
         """Convert a grid ID to a safe AS2 identifier by replacing invalid characters."""
@@ -161,6 +166,9 @@ class CodeGenerator:
         sw_decl = (
             "\n    private var stopwatch:KazBarsStopwatch;" if self.include_stopwatch else ""
         )
+        ins_decl = (
+            "\n    private var inspect:KazBarsInspect;" if self.include_inspect else ""
+        )
         return f"""
     private var rootClip:MovieClip;
     private var m_Player:Object;
@@ -199,7 +207,7 @@ class CodeGenerator:
 
     // HELPER CLASSES: Preview, Slot, and (optional) Console (32KB bytecode limit workaround)
     private var preview:KazBarsPreview;{console_decl}
-    private var slot:KazBarsSlot;{console_pin_decl}{cast_decl}{sw_decl}
+    private var slot:KazBarsSlot;{console_pin_decl}{cast_decl}{sw_decl}{ins_decl}
 
     // Key listener reference for proper cleanup
     private var keyListener:Object;
@@ -220,6 +228,11 @@ class CodeGenerator:
         sw_init = (
             "\n        stopwatch = new KazBarsStopwatch(this, rootClip);"
             if self.include_stopwatch
+            else ""
+        )
+        ins_init = (
+            "\n        inspect = new KazBarsInspect(this, rootClip);"
+            if self.include_inspect
             else ""
         )
         return f"""
@@ -260,7 +273,7 @@ class CodeGenerator:
 
         // HELPER CLASSES: Initialize preview and slot managers (console added if enabled at build time)
         preview = new KazBarsPreview(this, rootClip);{console_init}
-        slot = new KazBarsSlot(this, rootClip);{cast_init}{sw_init}
+        slot = new KazBarsSlot(this, rootClip);{cast_init}{sw_init}{ins_init}
 
         initConfig();
     }}
@@ -315,6 +328,7 @@ class CodeGenerator:
     def _init_config_stub(self):
         cast_cfg = "\n        castTimer.configure(d.CAST);" if self.include_cast_timer else ""
         sw_cfg = "\n        stopwatch.configure(d.SW);" if self.include_stopwatch else ""
+        ins_cfg = "\n        inspect.configure(d.INS);" if self.include_inspect else ""
         return f"""
     private function initConfig():Void {{
         var d:Object = KazBarsData.init();
@@ -323,7 +337,7 @@ class CodeGenerator:
         ISDEB = d.ISDEB;
         BUFFTYPE = d.BUFFTYPE;
         STACK_LEVEL = d.STACK_LEVEL;
-        CUSTOMICON = d.CUSTOMICON;{cast_cfg}{sw_cfg}
+        CUSTOMICON = d.CUSTOMICON;{cast_cfg}{sw_cfg}{ins_cfg}
     }}"""
 
     def _cast_data_block(self):
@@ -350,6 +364,15 @@ class CodeGenerator:
         collapsed = "true" if c["startCollapsed"] else "false"
         return f"\n        d.SW = {{x: {int(c['x'])}, y: {int(c['y'])}, collapsed: {collapsed}}};"
 
+    def _inspect_data_block(self):
+        """AS2 `d.INS = {...}` literal for the target inspect panel."""
+        c = self.inspect_config
+        collapsed = "true" if c["startCollapsed"] else "false"
+        return (
+            f"\n        d.INS = {{x: {int(c['x'])}, y: {int(c['y'])}, "
+            f"fontSize: {int(c['fontSize'])}, collapsed: {collapsed}}};"
+        )
+
     def _data_class(self):
         lines = [
             """class KazBarsData {
@@ -371,6 +394,8 @@ class CodeGenerator:
             lines.append(self._cast_data_block())
         if self.include_stopwatch:
             lines.append(self._stopwatch_data_block())
+        if self.include_inspect:
+            lines.append(self._inspect_data_block())
 
         all_buff_ids = set()
         for idx, grid in enumerate(self.grids):
@@ -540,6 +565,28 @@ class CodeGenerator:
         else:
             sw_tokens = {name: "" for name in sw_token_names}
         tokens.update(sw_tokens)
+        ins_token_names = (
+            "{{INS_CREATE}}",
+            "{{INS_SET_TARGET}}",
+            "{{INS_PREVIEW_ON}}",
+            "{{INS_PREVIEW_OFF}}",
+            "{{INS_LOAD}}",
+            "{{INS_SAVE}}",
+            "{{INS_CLEANUP}}",
+        )
+        if self.include_inspect:
+            ins_tokens = {
+                "{{INS_CREATE}}": "inspect.createPanel();",
+                "{{INS_SET_TARGET}}": "inspect.setSubject(tid);",
+                "{{INS_PREVIEW_ON}}": "inspect.previewOn();",
+                "{{INS_PREVIEW_OFF}}": "inspect.previewOff();",
+                "{{INS_LOAD}}": "inspect.loadState(config);",
+                "{{INS_SAVE}}": "inspect.saveState(config);",
+                "{{INS_CLEANUP}}": "inspect.cleanup();",
+            }
+        else:
+            ins_tokens = {name: "" for name in ins_token_names}
+        tokens.update(ins_tokens)
 
         for token, replacement in tokens.items():
             template = template.replace(token, replacement)
@@ -561,6 +608,7 @@ def build_grids(
     include_console: bool = False,
     cast_config: dict | None = None,
     stopwatch_config: dict | None = None,
+    inspect_config: dict | None = None,
 ) -> tuple[bool, str]:
     """
     Complete build process for KazBars.swf.
@@ -598,6 +646,7 @@ def build_grids(
             include_console=include_console,
             cast_config=cast_config,
             stopwatch_config=stopwatch_config,
+            inspect_config=inspect_config,
         )
         main_code, data_code = generator.generate()
 
