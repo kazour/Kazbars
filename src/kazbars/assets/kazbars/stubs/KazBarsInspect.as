@@ -1,54 +1,25 @@
-// KazBarsInspect.as - Target inspect panel: a minimal combat sheet for the
-// current target, in the visual language of the game's default inspect window
-// (dark plate, orange headers with hairline rules, grey labels, green values,
-// every line "Rating (Effect%)"). Runtime-drawn chrome + dynamic text fields
-// (Arial resolves against the faces embedded in base.swf), no new symbols.
+// KazBarsInspect.as - Target inspect panel: a combat sheet for the current
+// target in the visual language of the game's default inspect window.
+// Runtime-drawn chrome + dynamic text fields (Arial resolves against the faces
+// embedded in base.swf), so it needs no new symbols.
 //
-// Reading rules are measured engine behavior, not style choices:
-//   - GetStat(id, 2), full watch-list pass every 250 ms via setInterval.
-//     Signals are unreliable here (gear/rating ids never signal; signal-time
-//     reads race the server), so the poll IS the data path and the
-//     assign-on-change string cache subsumes any dirty flag.
-//   - 3 clean passes (~750 ms) before the panel shows: login/zone/retarget
-//     repopulation settles inside the warm-up instead of flashing garbage.
-//   - id 1 AND id 54 collapsing to 0 together is the logout/zone teardown
-//     burst, not data: silent rebase + hide, no phantom values.
-//   - Subject resolve: Character.GetCharacter(tid), falling back to
-//     Dynel.GetDynel(tid) for destructibles (stats yes, buffs no).
-//   - Every engine call is try/catch-wrapped.
+// Reading rules are measured engine behaviour, not style: gear and rating ids
+// never fire SignalStatChanged and signal-time reads race the server, so the
+// 250 ms GetStat poll is the data path; 3 clean passes settle before the panel
+// shows; id 1 + id 54 collapsing together is the logout/zone teardown burst,
+// not data. Every synthesis constant below is a level-80 measurement, so an
+// off-80 target shows raw ratings with the %-decodes suppressed.
 //
-// Display laws (sheet-exact, measured at level 80):
-//   - effect% = classBase + rating / 36.6 (zero base for critigation/tenacity;
-//     crit weapon base 5 daggers-class / 2.5 else; CDI effect is FLAT round).
-//   - mitigation: v/a up to 50%, then 100 - 5000/(50 + v/a); a = 219.6 armor,
-//     73.7 protection; sheet column adds (perTypeInvul + id911) x (1 - mit).
-//   - armor total = floor(448 x (1 + 450%)) + 2xStr; protection = school comp
-//     + floor(451 x (1 + 334%)) + Int/2 (C/E/F) or Wis/2 (H/U).
-//   - the divisors are 80-measured: any non-80 target shows raw ratings with
-//     every %-decode suppressed (lvlOK gate).
-//   - Bonus Spell Damage is a synthesis like protection: untyped component
-//     861 + the per-school component (Cold 158 / Fire 876 / Elec 877 /
-//     Holy 878 / Unholy 879 — cold is the low-range outlier exactly as it is
-//     in the protection and combat-rating families) + 0.6 per point of the
-//     caster's main attribute + the flat Base Spell Damage id 1041. The panel
-//     shows the highest school, which is the one a caster actually stacks.
-//   - players are classified by ID32.IsPlayer() on the target id AND a decoded
-//     attribute spread; both must agree. Attribute *presence* is not a
-//     discriminator — attributes are x10+10 encoded, so an NPC template that
-//     carries them at base still reads raw 10 (decoded 0).
-//
-// Positioning mirrors the stopwatch: X/Y + fontSize are baked into config
-// (the only position that survives relaunch on /loadclip default clients; the
-// name strip shows live coordinates while dragging so users can copy them
-// into the app); aoc.exe clients persist drag position and collapsed state
-// via the module config archive (inx/iny/inc). The name strip carries a
-// collapse button that folds the panel to just that strip. ALL geometry
-// derives from fontSize, so the panel scales as one piece across rebuilds.
+// Positioning mirrors the stopwatch: X/Y, font size and collapsed state are
+// baked into config (the only position that survives relaunch on /loadclip
+// clients; the name strip shows live coordinates while dragging), and aoc.exe
+// clients persist drag + collapse via the archive (inx/iny/inc). All geometry
+// derives from fontSize.
 //
 // Driven from KazBars: createPanel() in onLoad, setSubject() from
-// SlotTargetChanged (first statement, so clears AND raw tids arrive here),
+// SlotTargetChanged (first statement, so clears and raw tids both arrive),
 // loadState()/saveState() from the module archive, previewOn()/previewOff()
-// from the shared Shift+Ctrl+Alt preview, cleanup() on deactivate.
+// from the shared preview, cleanup() on deactivate.
 class KazBarsInspect {
     private var rootClip:MovieClip;
 
@@ -58,8 +29,8 @@ class KazBarsInspect {
     private var START_COLLAPSED:Boolean;
     private var FS:Number;
 
-    // Geometry — every value = Math.round(FS x ratio), so the whole panel
-    // scales as one piece with the configured font size.
+    // Geometry — every value is Math.round(FS x ratio), so the panel scales
+    // as one piece.
     private var PAD:Number;       // 0.85  plate padding
     private var LABEL_W:Number;   // 8.6   label column
     private var COL_GAP:Number;   // 0.85  label -> value gap
@@ -73,7 +44,7 @@ class KazBarsInspect {
     private var BTN:Number;       // 1.1   collapse-button box
     private var W:Number;         // 2xPAD + LABEL_W + COL_GAP + VALUE_W
 
-    // UI (7 text fields + chrome + drag strip + collapse button)
+    // UI
     private var m_Panel:MovieClip;
     private var bg:MovieClip;
     private var body:MovieClip;
@@ -91,18 +62,14 @@ class KazBarsInspect {
     private var dragMC:MovieClip;
     private var coordTF:TextField;
     private var curH:Number;
-    // Rule offsets from the last layout pass, replayed on every collapse
-    // toggle (-1 = the PvP block is hidden, so there is no second rule).
-    private var m_ruleA:Number;
-    private var m_ruleB:Number;
+    private var m_ruleA:Number;   // rule offsets from the last layout pass,
+    private var m_ruleB:Number;   // replayed on collapse; -1 = not on screen
 
     // Subject / poll state
     private var m_Subject:Object;
     private var subjName:String;
     private var subjKey:String;
-    // Engine classification of the current subject: 1 player, 0 not,
-    // -1 unanswered (fall back to decoded attributes).
-    private var subjIsPlayer:Number;
+    private var subjIsPlayer:Number;  // 1 player, 0 not, -1 unanswered
     private var pollIv:Number;
     private var curV:Object;      // "i<id>" -> settled mode-2 value
     private var haveFull:Boolean;
@@ -110,16 +77,13 @@ class KazBarsInspect {
     private var previewMode:Boolean;
     private var pvpShown:Boolean;
 
-    // Render cache — assign-on-change strings (TextField.text writes are the
-    // expensive part; a full 250 ms pass with nothing changed writes nothing)
+    // Render cache — assign only on change; TextField.text writes are the
+    // expensive part and most 250 ms passes change nothing
     private var lastName:String;
     private var lastPve:String;
     private var lastPvp:String;
 
-    // Watch list: every id one render pass reads (registry-confirmed set)
     private var watchIds:Array;
-    // Bonus Spell Damage per-school components (untyped 861 rides the watch
-    // list): the sheet's per-school figure is 861 + this school's component.
     private var SPELL_IDS:Array;
     private var DASH:String;
 
@@ -142,8 +106,8 @@ class KazBarsInspect {
         titleH = 0;
         fullH = 0;
         subjIsPlayer = -1;
-        // Cold is the low-range outlier in every school family (157 prot,
-        // 162 CR, 158 magic damage); the other four cluster at 876-879.
+        // Magic damage per school: cold is the low-range outlier as in every
+        // school family (157 prot, 162 CR); the other four cluster at 876-879.
         SPELL_IDS = [158, 876, 877, 878, 879];
         watchIds = [
             1, 27, 525, 54, 67,
@@ -184,8 +148,8 @@ class KazBarsInspect {
     }
 
     public function createPanel():Void {
-        // Double-init protection (the host re-runs onLoad on the same
-        // instance): clear the old interval and clip or both leak.
+        // The host re-runs onLoad on this same instance; without this the old
+        // interval and clip both leak.
         if (pollIv != null) {
             clearInterval(pollIv);
             pollIv = null;
@@ -199,8 +163,7 @@ class KazBarsInspect {
         collapsed = START_COLLAPSED;
 
         bg = m_Panel.createEmptyMovieClip("chrome", m_Panel.getNextHighestDepth());
-        // Everything below the name strip lives in one clip, so collapsing is
-        // a single _visible toggle instead of six.
+        // Everything below the name strip, so collapsing is one _visible toggle.
         body = m_Panel.createEmptyMovieClip("body", m_Panel.getNextHighestDepth());
 
         nameTF = makeTF(m_Panel, "name", PAD, PAD, W - PAD * 2 - BTN, Math.round(NAME_FS * 1.4),
@@ -225,33 +188,27 @@ class KazBarsInspect {
         pvpLabTF.autoSize = "left";
         pvpValTF.autoSize = "left";
 
-        // Label text is constant (15 PvE lines, 8 PvP) — assigned exactly once;
-        // missing data renders as the dash so line counts never change and
-        // layout() only ever re-runs on the PvP-visibility flip.
+        // Assigned once: absent data renders as the dash rather than dropping
+        // a row, so layout() re-runs only on the PvP-visibility flip.
         pveLabTF.text = "Health\nArmor\nHoly Prot\nUnholy Prot\nCold Prot\nElec Prot\nFire Prot"
                       + "\nCritigation Chance\nCritigation Amount\nHeal Rating\nBonus Spell Dmg"
                       + "\nCDI\nCritical Chance\nCritical Damage\nTenacity";
         pvpLabTF.text = "Armor\nHoly Prot\nUnholy Prot\nCold Prot\nElec Prot\nFire Prot"
                       + "\nCDI\nKills / Deaths";
 
-        // Re-seed the changing fields from the render cache. The host re-runs
-        // onLoad on this same instance and setSubject's same-entity path keeps
-        // the cache warm, so assign-on-change would write nothing and leave
-        // these blank under a full label column.
+        // Re-seed from the cache: on a re-onLoad it is still warm, so
+        // assign-on-change would write nothing and leave these blank.
         nameTF.text = lastName;
         pveValTF.text = lastPve;
         pvpValTF.text = lastPvp;
 
-        // Live position readout — left of the centered name, visible only
-        // while dragging (the value a /loadclip user copies into the app to
-        // make a spot permanent).
+        // Shown only while dragging — the value a /loadclip user copies back
+        // into the app.
         coordTF = makeTF(m_Panel, "coords", PAD, PAD, LABEL_W, Math.round(FS * 1.3),
                          Math.max(9, Math.round(FS * 0.8)), false, 0x999999, "left");
         coordTF._visible = false;
 
-        // Drag handle = the name strip only (whole-plate drag would eat
-        // combat clicks over the stat rows), stopping short of the collapse
-        // button so the button still receives its own press.
+        // Name strip only: a whole-plate drag would eat combat clicks.
         dragMC = m_Panel.createEmptyMovieClip("drag", m_Panel.getNextHighestDepth());
         dragMC._self = this;
         dragMC.useHandCursor = true;
@@ -295,9 +252,7 @@ class KazBarsInspect {
     }
 
     // =========================================================================
-    // Layout — runs at createPanel and on the PvP-visibility flip only.
-    // Column text fields keep constant line counts, so their heights are
-    // stable; total height is read off the fields, never predicted.
+    // Layout / collapse
     // =========================================================================
 
     private function layout():Void {
@@ -331,8 +286,7 @@ class KazBarsInspect {
         m_ruleA = rule1;
         m_ruleB = rule2;
 
-        // Name-strip drag hitbox: full width minus the collapse button, so the
-        // button keeps its own press.
+        // Stops short of the collapse button so it keeps its own press.
         dragMC.clear();
         dragMC.beginFill(0, 0);
         rectPath(dragMC, 0, 0, W - PAD - BTN, titleH);
@@ -341,8 +295,6 @@ class KazBarsInspect {
         applyCollapsed();
     }
 
-    // Collapse folds the panel to its name strip; the stat body is one clip,
-    // so this is a visibility toggle plus a chrome redraw at the right height.
     public function toggleCollapsed():Void {
         collapsed = !collapsed;
         applyCollapsed();
@@ -358,7 +310,6 @@ class KazBarsInspect {
 
     private function drawChrome(h:Number, rule1:Number, rule2:Number):Void {
         bg.clear();
-        // Plate fill + the two 1px frames (outer black, inner bronze).
         bg.beginFill(0x0C0A07, 90);
         rectPath(bg, 0, 0, W, h);
         bg.endFill();
@@ -366,9 +317,8 @@ class KazBarsInspect {
         rectPath(bg, 0, 0, W, h);
         bg.lineStyle(1, 0x4A3B22, 100);
         rectPath(bg, 1, 1, W - 2, h - 2);
-        // Hairline rule under each section header, full content width.
-        // A negative offset means that section is not on screen (collapsed
-        // panel, or a target with no PvP block).
+        // Section-header rules; a negative offset means that section is off
+        // screen (collapsed, or a target with no PvP block).
         bg.lineStyle(1, 0x6B5324, 100);
         if (rule1 >= 0) {
             bg.moveTo(PAD, rule1);
@@ -389,11 +339,10 @@ class KazBarsInspect {
     }
 
     // =========================================================================
-    // Subject plumbing (Character first, Dynel wrapper fallback)
+    // Subject (Character first, Dynel wrapper fallback)
     // =========================================================================
 
-    // Receives the RAW tid from SlotTargetChanged (before the host's null
-    // branch), so target clears and non-Character dynels both arrive here.
+    // Takes the raw tid, so clears and non-Character dynels both arrive here.
     public function setSubject(tid:Object):Void {
         var isNull:Boolean = (tid == null);
         try {
@@ -416,8 +365,7 @@ class KazBarsInspect {
         }
         var k:String = keyOf(subj);
         if (m_Subject != null && k == subjKey) {
-            // Same entity re-targeted — keep the warm cache, no flicker.
-            m_Subject = subj;
+            m_Subject = subj;   // same entity re-targeted: keep the warm cache
             return;
         }
         m_Subject = subj;
@@ -428,9 +376,7 @@ class KazBarsInspect {
         updateVisibility();
     }
 
-    // ID32 carries the engine's own classifiers (IsPlayer / IsNpc / ...).
-    // Returns 1 player, 0 not, -1 unanswered — the caller then falls back to
-    // decoded attributes.
+    // ID32 carries the engine's own classifiers. -1 means it never answered.
     private function classify(tid:Object, subj:Object):Number {
         var id:Object = tid;
         if (id == null || id.IsPlayer == undefined) {
@@ -487,9 +433,8 @@ class KazBarsInspect {
     public function pollTick():Void {
         if (m_Subject == null) return;
 
-        // Teardown gate: logout/zone collapses every id to 0 in one burst.
-        // id1 AND id54 dropping from nonzero to 0 together is that burst,
-        // not stat change — rebase silently and hide, no phantom values.
+        // Logout/zone collapses every id to 0 in one burst; id 1 and id 54
+        // going together is that burst, not a stat change.
         if (haveFull && gv(1) != 0 && gv(54) != 0) {
             var t1 = null;
             var t54 = null;
@@ -497,9 +442,8 @@ class KazBarsInspect {
             var z1:Boolean = (t1 == null || t1 == undefined || t1 == 0);
             var z54:Boolean = (t54 == null || t54 == undefined || t54 == 0);
             if (z1 && z54) {
-                // Drop the dead handle too: a retarget arrives via setSubject
-                // anyway, and keeping it would let the warm-up count three
-                // null passes and re-show a phantom all-dash sheet.
+                // Drop the dead handle: keeping it lets the warm-up count
+                // three null passes and re-show a phantom all-dash sheet.
                 m_Subject = null;
                 subjKey = "";
                 subjName = "";
@@ -519,8 +463,7 @@ class KazBarsInspect {
             i++;
         }
         if (!haveFull) {
-            // 3 clean passes (~750 ms) before the first show — login/zone/
-            // retarget repopulation settles without flashing garbage.
+            // ~750 ms: login/zone/retarget repopulation settles inside it.
             warmup++;
             if (warmup < 3) return;
             haveFull = true;
@@ -530,7 +473,7 @@ class KazBarsInspect {
     }
 
     // =========================================================================
-    // Stat access + sheet syntheses (field-measured, sheet-exact-verified)
+    // Stat access + sheet syntheses (field-measured, sheet-exact at level 80)
     // =========================================================================
 
     private function gv(sid:Number):Number {
@@ -552,15 +495,10 @@ class KazBarsInspect {
         return Math.round((r - 10) / 10);
     }
 
-    // Gates the whole PvP block, and both available signals must agree.
-    //
-    // ID32.IsPlayer() is the engine's own classifier and is measured truthful
-    // on players, but it has never been sampled on a mob — so it is trusted to
-    // veto, not to confirm alone. The second signal is the DECODED attribute
-    // spread: raw values are useless here because the x10+10 encoding means an
-    // NPC template carrying the ids at base still reads raw 10 (a city guard
-    // does exactly that, which is what put a PvP block on guards). Decoded, a
-    // character carries hundreds of points and those templates sit at 0-1.
+    // Gates the PvP block; both signals must agree. IsPlayer() is measured
+    // truthful on players but never sampled on a mob, so it vetoes rather than
+    // confirms alone. Attributes must be DECODED — raw, an NPC template
+    // carrying them at base reads 10, which put a PvP block on city guards.
     private function isPlayer():Boolean {
         var hasAttrs:Boolean = attrSheet(804) > 4 || attrSheet(808) > 4
                             || attrSheet(810) > 4 || attrSheet(814) > 4;
@@ -568,45 +506,43 @@ class KazBarsInspect {
         return hasAttrs;
     }
 
-    // The 36.6 / 73.7 / 219.6 constants are level-80 measurements; any other
-    // level shows raw ratings with every %-decode suppressed.
     private function lvlOK():Boolean {
         return gv(54) == 80;
     }
 
-    // linear rating law: effect% = classBase + rating/36.6 at 80
+    // linear rating law: effect% = classBase + rating/36.6
     private function pctOf(r:Number):Number {
         return Math.round(r / 36.6 * 10) / 10;
     }
 
-    // mitigation curve: linear v/a up to 50%, then 100 - 5000/(50 + v/a);
-    // a = 219.6 armor, 73.7 protection; negative stat space floors at 0%
+    // linear v/a to 50%, then 100 - 5000/(50 + v/a); a = 219.6 armor,
+    // 73.7 protection. Negative stat space floors at 0%.
     private function mitCurve(v:Number, a:Number):Number {
         if (v <= 0) return 0;
         var q:Number = v / a;
         return (q <= 50) ? q : (100 - 5000 / (50 + q));
     }
 
-    // the sheet's displayed % = base mit + invul x (1 - mit), where the
-    // per-type invul column = per-type id + 911 (the all-type component)
+    // displayed % = base mit + invul x (1 - mit), where the per-type invul
+    // column = per-type id + 911 (the all-type component)
     private function sheetMit(baseMit:Number, invulId:Number):Number {
         var inv:Number = gv(invulId) + gv(911);
         return Math.round((baseMit + inv * (1 - baseMit / 100)) * 10) / 10;
     }
 
-    // sheet armor total = floor(comp x (1 + BonusArmor% 450)) + 2 x Str
+    // floor(comp x (1 + BonusArmor% 450)) + 2 x Str
     private function armorTotal():Number {
         return Math.floor(gv(448) * (1 + gv(450) / 100)) + 2 * attrSheet(804);
     }
 
-    // per-school protection total = school comp + floor(flat 451 x
-    // (1 + BonusProt% 334)) + attr/2 (Int for C/E/F, Wis for H/U)
+    // school comp + floor(flat 451 x (1 + BonusProt% 334)) + attr/2
+    // (Int for Cold/Elec/Fire, Wis for Holy/Unholy)
     private function protTotal(schoolId:Number, attrId:Number):Number {
         return gv(schoolId) + Math.floor(gv(451) * (1 + gv(334) / 100)) + Math.floor(attrSheet(attrId) / 2);
     }
 
-    // equipped-school gear CR (weapon type unreadable): largest school
-    // component — chars stack the CR of their own weapon school
+    // The equipped weapon type is unreadable; characters stack their own
+    // school's CR, so the largest component is it.
     private function gearSchoolCR():Number {
         var ids:Array = [866, 867, 868, 869, 870, 871, 872, 873];
         var best:Number = 0;
@@ -619,17 +555,15 @@ class KazBarsInspect {
         return best;
     }
 
-    // Combat Damage Increase rating: 3 x Str (Dex for the dagger class 34)
-    // + untyped 875 + equipped-school CR + all typed magic CRs; the PvP tab
-    // adds 225 on top. Effect = round(rating/36.6), flat.
+    // 3 x Str (Dex for the dagger class 34) + untyped 875 + equipped-school CR
+    // + every typed magic CR; the PvP tab adds 225 on top.
     private function cdiPvE():Number {
         var att:Number = (gv(67) == 34) ? attrSheet(814) : attrSheet(804);
         return 3 * att + gv(875) + gearSchoolCR() + gv(162) + gv(1007) + gv(1008) + gv(1009) + gv(1010);
     }
 
     // =========================================================================
-    // Line builders — every line renders like the character sheet:
-    // "Rating (Effect%)", dash when data is absent, effect dropped off-80
+    // Line builders — "Rating (Effect%)", dash when absent, effect off-80
     // =========================================================================
 
     private function fmt1(n:Number):String {
@@ -646,7 +580,6 @@ class KazBarsInspect {
         return s;
     }
 
-    // rating + folded mitigation % (a = 219.6 armor / 73.7 protection)
     private function mitLine(v:Number, invulId:Number, a:Number):String {
         if (v == 0) return DASH;
         if (!lvlOK()) return String(v);
@@ -660,10 +593,8 @@ class KazBarsInspect {
         return r + " (" + fmt1(pctOf(r)) + "%)";
     }
 
-    // Crit bonus damage: the rating share only. A per-character feat/AA base
-    // rides on top of it on the sheet, but it is not readable from stat space
-    // and is NOT class-keyed (measured feat bases exist outside class 34), so
-    // inventing one would silently inflate the number.
+    // Rating share only: the sheet's per-character feat/AA base is absent from
+    // stat space and not class-keyed, so inventing one would inflate this.
     private function critDmgLine():String {
         return pctLine(gv(711));
     }
@@ -676,9 +607,8 @@ class KazBarsInspect {
         return r + " (" + fmt1(r / 36.6 + wpnBase) + "%)";
     }
 
-    // Heal Rating + the Celestial Gaze heal range (the main HR beneficiary):
-    // low = 271 + HR x 0.2761, high = 292 + HR x 0.2761 (community table,
-    // all five points exact). Player-only — mobs/bosses never heal-rate.
+    // Rating + the Celestial Gaze range it buys (the main beneficiary):
+    // 271 + HR x 0.2761 to 292 + HR x 0.2761. Player-only.
     private function healLine():String {
         if (!isPlayer()) return DASH;
         var r:Number = gv(713);
@@ -687,29 +617,10 @@ class KazBarsInspect {
         return r + " (" + Math.round(271 + r * 0.2761) + "-" + Math.round(292 + r * 0.2761) + ")";
     }
 
-    // Bonus Spell Damage. The gear half is confirmed: untyped component 861
-    // plus the highest per-school component (Highspawn's 861 read 381, the
-    // registry's exact HoX baseline; Bazour's holy component read 57 against a
-    // measured 56). But the sheet adds a flat per-character term on top of
-    // that — 856/998/866/749/824 across five measured casters, ~115 on a
-    // melee priest — and the sheet absolute is proven absent from GetStat
-    // space, so that term is derived, not readable.
-    //
-    // Bonus Spell Damage, sheet-exact on two fully-probed casters:
-    //
-    //   861 + schoolComponent + round(0.6 x mainAttr) + BaseSpellDamage% 1041
-    //
-    // Demo Sadyra: 716 + 72 + round(0.6 x 1442 Int) + 1 = 1654, sheet 1654.
-    // ToS Khaenofset: 339 + 62 + round(0.6 x 1371 Wis) + 1 = 1224... 1225
-    // with the 1041 term, sheet 1225. Main attribute is max(Int, Wis) —
-    // priests lead on Wis, mages on Int — which avoids an unmeasured class
-    // table, the same shape as the equipped-school CR heuristic. The sheet
-    // absolute is proven absent from stat space, so this synthesis is the
-    // only route to it, exactly as with armor and protection.
-    //
-    // The 0.6 per point is level-80-measured like every other constant here,
-    // so an off-80 target shows the dash rather than a number built on an
-    // unverified coefficient.
+    // 861 + schoolComponent + round(0.6 x mainAttr) + BaseSpellDamage% 1041.
+    // Main attribute is max(Int, Wis) — priests lead on Wis, mages on Int —
+    // avoiding an unmeasured class table, like the school CR above. Only the
+    // highest school shows: a caster stacks exactly one.
     private function spellLine():String {
         var best:Number = 0;
         var i:Number = 0;
@@ -725,7 +636,7 @@ class KazBarsInspect {
         return String(total);
     }
 
-    // CDI rating + flat effect (the sheet's own Effect column = the DPS add)
+    // rating + flat effect (the sheet's Effect column = the DPS add)
     private function cdiLine(add:Number):String {
         var r:Number = cdiPvE();
         if (r == 0) return DASH;
@@ -765,13 +676,12 @@ class KazBarsInspect {
         g.push(mitLine(protTotal(927, 808) + gv(458), 906, 73.7));
         g.push(mitLine(protTotal(926, 808) + gv(458), 905, 73.7));
         g.push(cdiLine(gv(225)));
-        // K/D zeros are legitimate data, never the dash.
-        g.push(gv(656) + " / " + gv(658));
+        g.push(gv(656) + " / " + gv(658));   // 0 / 0 is real data, not absence
         return g.join("\n");
     }
 
     // =========================================================================
-    // Render — assign-on-change; layout() re-runs only on the PvP flip
+    // Render / preview
     // =========================================================================
 
     private function render():Void {
@@ -808,11 +718,7 @@ class KazBarsInspect {
         m_Panel._visible = previewMode || (m_Subject != null && haveFull);
     }
 
-    // =========================================================================
-    // Preview (shared Shift+Ctrl+Alt) — canned full-footprint sheet so the
-    // panel can be positioned without a target
-    // =========================================================================
-
+    // Canned full-footprint sheet, so the panel can be positioned untargeted.
     public function previewOn():Void {
         if (m_Panel == null) return;
         previewMode = true;
@@ -832,7 +738,7 @@ class KazBarsInspect {
     public function previewOff():Void {
         if (m_Panel == null) return;
         previewMode = false;
-        // Force a live reassign — the canned sheet overwrote the cache targets.
+        // Force a live reassign: the canned sheet bypassed the cache.
         lastName = "";
         lastPve = "";
         lastPvp = "";
@@ -848,14 +754,12 @@ class KazBarsInspect {
     }
 
     // =========================================================================
-    // Drag (name strip only) + live coordinate readout
+    // Drag + persistence (archive is aoc.exe only; /loadclip clients have none)
     // =========================================================================
 
     public function beginDrag(da:MovieClip):Void {
-        // Both bounds derive from fontSize, so a large enough panel overflows the
-        // stage and the rect inverts (bottom < top) — which yanks the panel
-        // off-screen on the first press. Floor them: a panel bigger than the
-        // stage pins to the top-left corner instead.
+        // Bounds derive from fontSize, so a big enough panel inverts the rect
+        // and gets yanked off-screen; floored, it pins to the top-left.
         m_Panel.startDrag(false, 0, 0, Math.max(0, Stage.width - W),
                           Math.max(0, Stage.height - curH));
         coordTF._visible = true;
@@ -873,10 +777,6 @@ class KazBarsInspect {
     public function updateCoords():Void {
         coordTF.text = Math.round(m_Panel._x) + ", " + Math.round(m_Panel._y);
     }
-
-    // =========================================================================
-    // Persistence (aoc.exe clients only — default /loadclip clients have no archive)
-    // =========================================================================
 
     public function loadState(config:Object):Void {
         if (config == null || m_Panel == null) return;
