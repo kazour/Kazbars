@@ -11,6 +11,13 @@ repos:
 
   - repo: local
     hooks:
+      - id: db-changelog
+        name: buff DB edits ship with their changelog entry
+        entry: python scripts/check_db_changelog.py
+        language: system
+        files: ^src/kazbars/assets/kazbars/Database\.json$
+        pass_filenames: false
+
       - id: pytest-smoke
         name: pytest smoke tests
         entry: pytest tests/ -q

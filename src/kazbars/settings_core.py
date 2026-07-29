@@ -3,7 +3,7 @@
 One engine behind every settings file. A `Schema` is an ordered set of typed
 `Field`s plus a migration ladder; the functional API loads/validates/fills/saves
 a settings dict against it, atomically. Each settings module (`deeps_settings`,
-`live_tracker_settings`, `damageinfo_settings`, and `prefs` in Phase 2) declares
+`live_tracker_settings`, `damageinfo_settings`, and `prefs`) declares
 a `Schema` and routes its load/save/validate through here, so validation,
 drop-unknown, fill-missing, atomic writes, and forward migrations all live in one
 place instead of being hand-rolled per file.
@@ -231,7 +231,7 @@ def save_patch(schema: Schema, folder: str | Path, patch: dict) -> bool:
 class Store:
     """A loaded settings file held in memory: `get`/`set` against `.data`, then
     `save()` atomically. The three typed settings modules use the functional API
-    above (folder varies per call); `prefs` (Phase 2) wraps a `Store`."""
+    above (folder varies per call); `prefs` wraps a `Store`."""
 
     def __init__(self, schema: Schema, folder: str | Path) -> None:
         self.schema = schema

@@ -95,3 +95,21 @@ def test_bundled_database_in_sync() -> None:
         f"(live={len(live)} bytes, bundled={len(default)} bytes). "
         "Re-copy Database.json over Database.json.default to resync."
     )
+
+
+def test_buff_ids_are_globally_unique() -> None:
+    """No spell ID may appear in two catalog entries.
+
+    `buff_database._rebuild_indexes` builds `by_id` with last-writer-wins, and
+    `grids_generator._expand_primary_ids` reads it to expand a grid's primary ID
+    into its rank set. A duplicated ID therefore silently binds a grid to the
+    *other* buff's ranks — a wrong-bar bug with no other signal.
+    """
+    owners: dict[int, list[str]] = defaultdict(list)
+    for buff in _load_db()["buffs"]:
+        for bid in buff.get("ids", []):
+            owners[bid].append(buff.get("name", "<unnamed>"))
+    collisions = {bid: names for bid, names in owners.items() if len(names) > 1}
+    assert not collisions, "spell IDs claimed by more than one buff: " + "; ".join(
+        f"{bid} -> {names}" for bid, names in sorted(collisions.items())
+    )

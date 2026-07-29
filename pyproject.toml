@@ -48,9 +48,10 @@ target-version = "py312"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B", "RUF"]
+select = ["E", "F", "W", "I", "UP", "B", "RUF", "N"]
 ignore = [
     "E501",   # line too long — let formatter handle
+    "N812",   # lowercase imported as non-lowercase — 4 deliberate module aliases
     "E402",   # module-import-not-at-top — codebase convention: logger = getLogger() after imports
     "E741",   # ambiguous variable names (l, I, O) — used as AS2 loop counters in generators
     "B008",   # function call in default argument (common in tk callbacks)
