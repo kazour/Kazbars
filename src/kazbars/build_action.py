@@ -140,6 +140,7 @@ def build(app):
         'include_console': bool(app.settings.get('build_console', False)),
         'cast_config': app.grids_panel.get_cast_timer_config(),
         'stopwatch_config': app.settings.get('stopwatch'),
+        'inspect_config': app.settings.get('inspect'),
         'game_path': app.game_path,
         'use_aoc': app.use_aoc_bypass,
         'di_enabled': di_enabled,
@@ -187,6 +188,7 @@ def _build_worker(app, loading, ctx):
             ctx['app_version'],
             include_console=ctx['include_console'], cast_config=ctx['cast_config'],
             stopwatch_config=ctx['stopwatch_config'],
+            inspect_config=ctx['inspect_config'],
         )
         if not compile_result[0]:
             _hold_phase(started)

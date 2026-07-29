@@ -107,8 +107,9 @@ SECTIONS: list[_Section] = [
             'tells you the one thing that matters: whether you ever need the '
             'app open again.',
             _sub('Set up once — then close the app', [
-                [('Grids, the Cast Timer, the Stopwatch, Damage Numbers, and the '
-                  'Default Buff Bars all install with one ', None),
+                [('Grids, the Cast Timer, the Stopwatch, the Inspect Panel, '
+                  'Damage Numbers, and the Default Buff Bars all install with '
+                  'one ', None),
                  ('Build & Install', _SUCCESS),
                  (". After that you type /reloadui in-game and you're done — they "
                   'keep working whether or not KazBars is running. Open it again '
@@ -534,6 +535,52 @@ SECTIONS: list[_Section] = [
                 'Drag the title bar to move it; live coordinates show as you '
                 'drag. Type them into the dialog to pin a spot. Aoc.exe clients '
                 'remember the position and collapsed state on their own.',
+            ]),
+        ],
+    },
+    {
+        'cat': 'Extras',
+        'id': 'inspect',
+        'title': 'Target Inspect Panel',
+        'body': [
+            'Extras → Target inspect panel… adds an in-game panel that shows '
+            "the combat sheet of whatever you target — the stats the game's "
+            "default inspect window can't reveal. Target a player, mob, or "
+            'boss and about three-quarters of a second later the panel '
+            'appears with their numbers; clear your target and it hides. Off '
+            'by default; when off, the build carries no inspect-panel code '
+            'at all.',
+            _sub('Turn it on', [
+                [('Open the dialog, tick ', None),
+                 ('Include the inspect panel in builds', _SUCCESS),
+                 (', then ', None),
+                 ('Build & Install', _SUCCESS),
+                 ('. It ships with your next build, same as grids.', None)],
+            ]),
+            _sub('What it shows', [
+                'Health (live current/max and %), Armor, the five protections '
+                '(Holy, Unholy, Cold, Elec, Fire), Critigation Chance, '
+                'Critigation Amount, Heal Rating, Bonus Spell Dmg, CDI, '
+                'Critical Chance, Critical Damage, and Tenacity — in the game '
+                "sheet's own Rating (Effect%) language.",
+                "A dash marks lines a target simply doesn't have — mobs and "
+                'bosses expose less than players.',
+                'Player targets get an extra PvP block: PvP armor, '
+                'protections, CDI, and kills/deaths. Mobs and bosses get the '
+                'PvE block only.',
+                "Targets that aren't level 80 show raw ratings without the "
+                'percent decodes — the conversions are level-80 measurements.',
+            ]),
+            _sub('Positioning and text size', [
+                'Drag the panel by its name strip; live coordinates show as '
+                'you drag. Type them into the dialog to pin a spot. The − '
+                'button folds it down to just that strip. Aoc.exe clients '
+                'remember the position and folded state on their own, and the '
+                'dialog can start it folded.',
+                'No target handy? Preview mode (Shift+Ctrl+Alt) shows a '
+                'placeholder panel to position against.',
+                'Font size (8–48) is baked in at build time — the whole panel '
+                'scales with it.',
             ]),
         ],
     },

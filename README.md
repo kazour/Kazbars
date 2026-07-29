@@ -4,7 +4,7 @@
 [![Latest release](https://img.shields.io/github/v/release/kazour/Kazbars?label=release)](https://github.com/kazour/Kazbars/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Buff/debuff overlay editor for **Age of Conan** — design icon grids and bars that show your active effects on top of the game, then compile and install them in one click. It also ships live combat HUDs and a handful of in-game extras: a cast timer, a stopwatch, leaner damage numbers, a real-time deeps meter, and the Ethram-Fal seed timer.
+Buff/debuff overlay editor for **Age of Conan** — design icon grids and bars that show your active effects on top of the game, then compile and install them in one click. It also ships live combat HUDs and a handful of in-game extras: a cast timer, a stopwatch, a target inspect panel, leaner damage numbers, a real-time deeps meter, and the Ethram-Fal seed timer.
 
 Most of what KazBars builds is set up once and runs on its own after you close the app. Only the two live combat overlays — the deeps meter and the Ethram-Fal seed timer — keep working while KazBars is open.
 
@@ -21,6 +21,8 @@ Most of what KazBars builds is set up once and runs on its own after you close t
 **Cast Timer** — an on-screen readout of your and your target's current cast time, ready to sit over the game's cast bars. Off by default
 
 **Stopwatch** — a draggable Start / Pause / Reset count-up timer that works in fullscreen and never steals focus from the game. Off by default
+
+**Target Inspect Panel** — an in-game combat sheet for whatever you have targeted: armor and protections with their mitigation percentages, crit, critigation, heal rating, bonus spell damage, and combat damage increase. Player targets add a PvP section; clear your target and the panel hides. Off by default
 
 **Damage Numbers** — a leaner, faster rewrite of the game's floating combat numbers, with new layout and behavior settings. Needs the Aoc.exe launcher bypass: it replaces a stock `.swf` the game's patcher restores otherwise, so rebuild after each patcher run if you don't have the bypass. Off by default
 
@@ -98,7 +100,7 @@ The PyInstaller build is reproducible from the checked-in [`kazbars.spec`](kazba
 
 ## Documentation
 
-See **[`docs/README.md`](docs/README.md)** for the full doc map — every doc with its audience and when to update it (changelog, architecture, flows, database changelog).
+See **[`docs/README.md`](docs/README.md)** for the full doc map — every doc with its audience and when to update it (changelog, architecture, flows, database changelog, inspect panel stat reference).
 
 The project follows a `src/` layout — entry point is `python -m kazbars`, which loads `KazBarsApp` from [`src/kazbars/app.py`](src/kazbars/app.py).
 

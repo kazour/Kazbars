@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Target inspect panel** (Extras ▸ Target inspect panel…) — an optional in-game overlay that shows a combat sheet for whatever you have targeted, styled after the game's own inspect window: armor and protection with their mitigation percentages, crit and critigation, heal rating with the Celestial Gaze range it buys, bonus spell damage, combat damage increase — and, on player targets only, the PvP section (mobs and bosses show the PvE sheet). Turn it on in the new dialog and it ships with your next Build & Install; the position and font size you pick are baked in, and the whole panel scales with the font size. Dragging its name strip shows live coordinates — type them into the dialog to make a spot permanent; the − button folds the panel down to that strip, and Aoc.exe clients remember both the drag and the folded state. Off by default; when off, the built overlay carries no inspect-panel code at all.
 - **Seal of Yog (Crit) and Seal of Yog (Mana)** — the Dark Templar stacking buffs join the catalog, every stack rank covered. (Already delivered to existing installs as a content update; see `database-changelog.md`.)
 
 ### Changed

@@ -254,3 +254,61 @@ def test_stopwatch_on_emits_hooks_and_data():
 
     # No leftover tokens
     assert "{{SW_" not in main_code
+
+
+# --------------------------------------------------------------------------
+# Target inspect panel toggle (include_inspect, derived from inspect_config)
+# --------------------------------------------------------------------------
+
+
+def test_inspect_off_emits_no_refs():
+    """No inspect_config (or enabled=False) must reference KazBarsInspect —
+    MTASC would otherwise fail to resolve the class — and leave no raw tokens."""
+    gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0", inspect_config=None)
+    main_code, data_code = gen.generate()
+    assert not gen.include_inspect
+    assert "KazBarsInspect" not in main_code
+    assert "inspect" not in main_code
+    assert "{{INS_" not in main_code
+    assert "d.INS" not in data_code
+
+
+def test_inspect_disabled_config_is_off():
+    gen = CodeGenerator(
+        [_minimal_grid()], _load_db(), "0.0.0",
+        inspect_config={"enabled": False, "x": 100, "y": 100},
+    )
+    main_code, _ = gen.generate()
+    assert not gen.include_inspect
+    assert "KazBarsInspect" not in main_code
+
+
+def test_inspect_on_emits_hooks_and_data():
+    gen = CodeGenerator(
+        [_minimal_grid()], _load_db(), "0.0.0",
+        inspect_config={"enabled": True, "x": 40, "y": 240, "fontSize": 14,
+                        "startCollapsed": True},
+    )
+    main_code, data_code = gen.generate()
+    assert gen.include_inspect
+
+    # Instantiation + configure
+    assert "private var inspect:KazBarsInspect;" in main_code
+    assert "inspect = new KazBarsInspect(this, rootClip);" in main_code
+    assert "inspect.configure(d.INS);" in main_code
+
+    # Lifecycle hooks
+    assert "inspect.createPanel();" in main_code
+    assert "inspect.setSubject(tid);" in main_code
+    assert "inspect.previewOn();" in main_code
+    assert "inspect.previewOff();" in main_code
+    assert "inspect.loadState(config);" in main_code
+    assert "inspect.cleanup();" in main_code
+    # Save fires from BOTH persist paths (exitPreview + OnModuleDeactivated)
+    assert main_code.count("inspect.saveState(config);") == 2
+
+    # Data block
+    assert "d.INS = {x: 40, y: 240, fontSize: 14, collapsed: true};" in data_code
+
+    # No leftover tokens
+    assert "{{INS_" not in main_code

@@ -10,6 +10,7 @@ This folder holds the docs that go deeper than the [README](../README.md). Skim 
 | [`architecture.md`](architecture.md) | Maintainers | With the code | A module moves, an import changes, a file is added or retired, a dependency cluster rearranges. The line counts and module list at the bottom are the load-bearing part — keep them honest. |
 | [`flows.md`](flows.md) | Maintainers | With the code | A documented function is renamed/moved, a flow's UI trigger changes (menu, button, shortcut), or a step is added/removed in a flow's call chain. Refs are function-anchored (a backticked `callable()` + its file path, never `file:line`) and machine-checked by `tests/test_docs_in_sync.py`; the function names, paths, and step ordering are load-bearing. |
 | [`database-changelog.md`](database-changelog.md) | Maintainers | On every DB edit | A buff is added, renamed, reclassified, or has its spell ID corrected in `Database.json`. One dated bullet per change (buff name + spell ID + action); applies however the edit was made. |
+| [`inspect-panel.md`](inspect-panel.md) | Maintainers | With the stub | The target inspect panel's watch list, sheet syntheses, level-80 constants, display gates and visual contract change. The AS2 carries bare stat ids and bare divisors; this is where they mean something. Also holds the known-unreadable list and the in-game verification checklist — the panel has no automated coverage. |
 
 ## What used to be here, and where it went
 
