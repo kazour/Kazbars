@@ -133,7 +133,7 @@ Trigger: User clicks the "Save Database" button in the Database view's toolbar (
 
 Steps:
 1. `DatabaseEditorTab.save()` — src/kazbars/database_editor.py — computes a delta of the in-memory effective DB against the stock←content floor via `buff_db_layers.compute_delta(self._floor_buffs, self.database.buffs)`: user adds + edits-of-a-built-in (overrides) land in `buffs`; built-ins the user hid (floor buffs now missing from the effective list) become tombstoned `ids[0]` in `deleted`.
-2. `DeltaStore.save(delta)` — src/kazbars/buff_db_layers.py — writes `{version: 2, buffs, deleted}` to `userdata/database_user.json` atomically via `safe_save_json`. The shipped `assets/kazbars/Database.json` is **never** written.
+2. `DeltaStore.save(delta)` — src/kazbars/buff_db_layers.py — writes `{version: 2, buffs, deleted}` to `userdata/database_user.json` atomically via `safe_save_json`. The shipped `src/kazbars/assets/kazbars/Database.json` is **never** written.
 
 End state: `userdata/database_user.json` holds the user's adds/overrides/tombstones; `DatabaseEditorTab.modified` → `False`; toast summarizes (`Saved: N custom buffs, M hidden built-ins`). On next launch `load_layers` re-merges the deltas over the shipped stock so they reappear.
 
@@ -168,7 +168,7 @@ End state: `KazBars.swf`, the Aoc xml.add module folder, the reload scripts, and
 
 ---
 
-## 10. open live tracker panel
+## 10. open live tracker panel (⏱ Ethram-Fal button)
 
 Trigger: User clicks the "⏱ Ethram-Fal" button in the bottom bar (right side, next to Build & Install)
 
@@ -251,7 +251,7 @@ End state: `game_path` and (when divergence triggered it) `use_aoc_bypass` persi
 
 ---
 
-## 15. open Buff Display editor and apply
+## 15. open Buff Display editor and apply (Extras > Default buff bars)
 
 Trigger: User selects Extras > Default buff bars… from the menu
 

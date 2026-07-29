@@ -1,7 +1,7 @@
 """Headless regression tests for HudOverlay's visibility gate.
 
 The real overlay paints through win32 UpdateLayeredWindow, so the visual path
-is manual-QA (`/smoke`) territory. But the *gate* — content updates never paint
+is manual-QA territory. But the *gate* — content updates never paint
 while the overlay is hidden — is pure control flow, and worth pinning: a
 `resize()` (font/cell/layout change) or a `set_locked()` made while the overlay
 is stopped must NOT float a ghost on screen. We stub the LayeredOverlay engine

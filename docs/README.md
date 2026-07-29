@@ -6,16 +6,14 @@ This folder holds the docs that go deeper than the [README](../README.md). Skim 
 
 | Doc | Audience | Update cadence | Update when… |
 |---|---|---|---|
-| [`CHANGELOG.md`](CHANGELOG.md) | Everyone | Per release | A version is cut. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Entries are prepended at release time; manual edits to the `[Unreleased]` section are fine in between. |
-| [`architecture.md`](architecture.md) | Maintainers | With the code | A module moves, an import changes, a file is added or retired, a dependency cluster rearranges. The line counts and module list at the bottom are the load-bearing part — keep them honest. |
+| [`CHANGELOG.md`](CHANGELOG.md) | Everyone | Per release | A version is cut. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Entries are prepended at release time; manual edits to the `[Unreleased]` section are fine in between. Pre-2.2.0 bodies live in `CHANGELOG-archive.md`; their stub headings here are load-bearing (a test asserts every release tag has a section). |
+| [`CHANGELOG-archive.md`](CHANGELOG-archive.md) | Everyone | Never | Closed record of the v2.1.0 / v2.0.0 / v1.1.0 bodies. Append only when a newer version is archived out of the live file. |
+| [`architecture.md`](architecture.md) | Maintainers | With the code | A module moves, an import changes, a dependency cluster rearranges, or a convention lands. Topology only — per-file rows live in `inventory.md`. |
+| [`inventory.md`](inventory.md) | Maintainers | With the code | Any `src/kazbars/*.py` or `tests/*.py` file is added, retired, or grows past the line-count tolerance. One row per file: path, line count, role. Machine-checked by `tests/test_docs_in_sync.py` for phantoms, omissions, and counts. |
 | [`flows.md`](flows.md) | Maintainers | With the code | A documented function is renamed/moved, a flow's UI trigger changes (menu, button, shortcut), or a step is added/removed in a flow's call chain. Refs are function-anchored (a backticked `callable()` + its file path, never `file:line`) and machine-checked by `tests/test_docs_in_sync.py`; the function names, paths, and step ordering are load-bearing. |
-| [`database-changelog.md`](database-changelog.md) | Maintainers | On every DB edit | A buff is added, renamed, reclassified, or has its spell ID corrected in `Database.json`. One dated bullet per change (buff name + spell ID + action); applies however the edit was made. |
+| [`database-changelog.md`](database-changelog.md) | Maintainers | On every DB edit | A buff is added, renamed, reclassified, or has its spell ID corrected in `Database.json`. One dated bullet per change (buff name + spell ID + action); applies however the edit was made. A pre-commit hook blocks a catalog edit that arrives without its entry. Past ~20 KB, split the oldest sections out per this file's own instructions. |
+| [`database-changelog-pre-kazbars.md`](database-changelog-pre-kazbars.md) | Maintainers | Never | Closed record of the same database under its predecessor repo (Kaz Flash Modz / Kaz Grids v3.x), pre-v1.0.0. |
 | [`inspect-panel.md`](inspect-panel.md) | Maintainers | With the stub | The target inspect panel's watch list, sheet syntheses, level-80 constants, display gates and visual contract change. The AS2 carries bare stat ids and bare divisors; this is where they mean something. Also holds the known-unreadable list and the in-game verification checklist — the panel has no automated coverage. |
-
-## What used to be here, and where it went
-
-- `requirements.txt` → **deleted.** Deps live in [`pyproject.toml`](../pyproject.toml). Run `pip install -e ".[dev]"` or `uv sync --extra dev`.
-- `architecture-notes.md` → **deleted.** It was a 2026-04-25 audit-cycle artifact whose three findings were all marked resolved (refactored in code, status notes added to flows.md). Historical clutter. The convention it surfaced — *"name dispatchers explicitly across boundaries"* — lives in [`flows.md`](flows.md)'s preamble.
 
 ## Documents elsewhere in the repo
 

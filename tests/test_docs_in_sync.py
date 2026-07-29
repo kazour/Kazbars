@@ -1,11 +1,11 @@
-"""Guard that docs/architecture.md's File inventory and docs/flows.md stay honest.
+"""Guard that docs/inventory.md and docs/flows.md stay honest.
 
 Mirrors the repo's other invariant tests (``test_cluster_isolation``, the
 ``Database.json``/``.default`` byte-parity check in ``test_data_integrity``):
 it turns silent doc drift into a CI failure instead of a thing someone notices
 six months later.
 
-architecture.md inventory — three checks, in increasing tolerance for churn:
+inventory.md — three checks, in increasing tolerance for churn:
 
   1. No phantoms  -- every ``src/kazbars/*.py`` / ``tests/*.py`` path named in
      the inventory still exists on disk.
@@ -49,13 +49,13 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-ARCH_DOC = REPO_ROOT / 'docs' / 'architecture.md'
+INVENTORY_DOC = REPO_ROOT / 'docs' / 'inventory.md'
 FLOWS_DOC = REPO_ROOT / 'docs' / 'flows.md'
 
-# Match only File-inventory *table rows* (`| `path` | N | role |`), not prose
-# mentions of the same path elsewhere in the doc — the smoke-test bullets name
-# these files too, with case counts / "1080p" etc. that would be misread as a
-# line count.
+# Match only inventory *table rows* (`| `path` | N | role |`), not prose mentions
+# of the same path elsewhere in the doc. This scans every line of the file, so
+# never add another row shaped `| src/kazbars/x.py | <number> | …` to it for any
+# other purpose — a case count or "1080p" in that position reads as a line count.
 _ROW_RE = re.compile(
     r'^\s*\|\s*`?(src/kazbars/[A-Za-z0-9_]+\.py|tests/[A-Za-z0-9_]+\.py)`?\s*\|\s*(\d+)\s*\|'
 )
@@ -64,7 +64,7 @@ _ROW_RE = re.compile(
 def _documented_rows():
     """Map each inventory .py path to its claimed line count."""
     rows = {}
-    for line in ARCH_DOC.read_text(encoding='utf-8').splitlines():
+    for line in INVENTORY_DOC.read_text(encoding='utf-8').splitlines():
         m = _ROW_RE.match(line)
         if m:
             rows.setdefault(m.group(1), int(m.group(2)))
@@ -92,7 +92,7 @@ _COUNTED = sorted(p for p, n in DOCUMENTED.items() if n is not None and p in ON_
 def test_no_phantom_files():
     phantoms = sorted(p for p in DOCUMENTED if p not in ON_DISK)
     assert not phantoms, (
-        'architecture.md inventory names files that no longer exist:\n  '
+        'docs/inventory.md names files that no longer exist:\n  '
         + '\n  '.join(phantoms)
         + '\nUpdate the inventory to match the tree.'
     )
@@ -101,7 +101,7 @@ def test_no_phantom_files():
 def test_inventory_is_complete():
     missing = sorted(p for p in ON_DISK if p not in DOCUMENTED)
     assert not missing, (
-        "These source/test files aren't in architecture.md's inventory:\n  "
+        "These source/test files aren't in docs/inventory.md:\n  "
         + '\n  '.join(missing)
         + '\nAdd a row (path, line count, role).'
     )
@@ -113,7 +113,7 @@ def test_line_count_within_tolerance(rel):
     actual = _actual_lines(rel)
     tol = max(40, math.ceil(0.25 * claimed))
     assert abs(actual - claimed) <= tol, (
-        f'{rel}: architecture.md says {claimed} lines, actual {actual} '
+        f'{rel}: docs/inventory.md says {claimed} lines, actual {actual} '
         f'(delta {actual - claimed:+d}, tolerance +/-{tol}). '
         'Refresh the inventory row to match the tree.'
     )
@@ -218,6 +218,23 @@ def test_flows_subject_callable_resolves(lineno, name, rel):
 # =============================================================================
 
 CHANGELOG_DOC = REPO_ROOT / 'docs' / 'CHANGELOG.md'
+DB_CHANGELOG_DOC = REPO_ROOT / 'docs' / 'database-changelog.md'
+CATALOG = REPO_ROOT / 'src' / 'kazbars' / 'assets' / 'kazbars' / 'Database.json'
+
+
+def test_db_changelog_buff_total_matches_the_catalog():
+    """The 'holds N buffs' footer is a hand-maintained number that silently rots
+    every time a buff lands. Pin it to the real entry count."""
+    import json
+
+    claimed = re.search(r'holds \*\*(\d+) buffs\*\*',
+                        DB_CHANGELOG_DOC.read_text(encoding='utf-8'))
+    assert claimed, "docs/database-changelog.md lost its 'holds **N buffs**' footer"
+    real = len(json.loads(CATALOG.read_text(encoding='utf-8'))['buffs'])
+    assert int(claimed.group(1)) == real, (
+        f'docs/database-changelog.md says the catalog holds {claimed.group(1)} buffs; '
+        f'Database.json holds {real}. Update the footer.'
+    )
 
 
 def _release_versions():

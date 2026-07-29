@@ -3,29 +3,14 @@
 Every change to the buff database (`src/kazbars/assets/kazbars/Database.json`) — buffs
 **added, renamed, reclassified, or with corrected spell IDs**. Newest first.
 
-**Why this exists:** the database grows continuously and raw `Database.json` diffs are
-noisy JSON. A human-readable record of *which buff changed, its spell ID, and why* is far
-easier to scan than `git log`, and gives every grid/profile that references a buff a paper
-trail when an ID or name moves.
-
 ## How to maintain it
 
-**Scope:** this log tracks the **shipped stock catalog** at `src/kazbars/assets/kazbars/Database.json`
-only. As of the three-layer split, the **in-app Database editor no longer writes assets** — user
-adds/edits/hidden-buffs are per-machine deltas in `userdata/database_user.json` (merged over stock at
-load; see `architecture.md` → "Buff database"). So entries here come from maintainer changes to the
-repo's stock file (a maintainer edit); per-user deltas are not logged.
+**Scope:** the **shipped stock catalog** at `src/kazbars/assets/kazbars/Database.json` only.
+Per-user deltas in `userdata/database_user.json` are per-machine and not logged
+(`architecture.md` → "Buff database"). A stock change also needs its OTA manifest
+regenerated in the same commit — `architecture.md` → "Reference content / OTA".
 
-**OTA channel:** a stock-file change requires regenerating `ota/manifest.json` **locally** in the same
-commit (`python scripts/gen_manifest.py "notes"`) — the pre-commit pytest gate won't let it land
-otherwise. That refreshes the sha256, the `main`-ref payload URLs, and the bumped `content_version`, and
-stamps the matching `CONTENT_BASELINE_VERSION`; once on `main`, existing installs pull the update on next
-launch (silent, reversible — see `architecture.md` → "Reference content / OTA"). The
-`.github/workflows/ota-manifest.yml` Action only **verifies** it (regenerate + fail on drift; never commits
-back). Don't hand-edit the manifest; regenerate and log the stock change here.
-
-Whenever the stock `Database.json` changes, add a bullet under a `## YYYY-MM-DD` heading at the top
-(reuse today's heading if it already exists):
+Add a bullet under a `## YYYY-MM-DD` heading at the top (reuse today's if it exists):
 
 - **Added:** `Buff Name` — `<spell id>`, #Category type.
 - **Renamed:** `Old Name` → `New Name` (`<spell id>`).
@@ -33,9 +18,11 @@ Whenever the stock `Database.json` changes, add a bullet under a `## YYYY-MM-DD`
 - **Fixed:** `Buff Name` spell ID `<old>` → `<new>` (and any profile whitelist that referenced the old ID).
 
 Always include the **spell ID** — it's the canonical identifier grids and profiles bind to.
-And keep `Database.json` **and** `Database.json.default` in sync (`test_data_integrity.py`
-enforces byte-parity); if you change an existing buff's **ID**, also update any profile that
-whitelists the old one (e.g. `assets/kazbars/Default.json`).
+
+**When this file passes ~20 KB,** move the oldest whole `## YYYY-MM-DD` sections into
+`docs/database-changelog-<YYYY>.md` until it's back under ~14 KB, and add a row for the
+new file in `docs/README.md`. Look an ID up across all of them with
+`grep -n "<id>" docs/database-changelog*.md`; new entries always go in this file.
 
 ---
 
@@ -184,30 +171,8 @@ unchanged, so no grid or profile whitelist is affected (`Default.json` untouched
 
 ---
 
-## Pre-KazBars era — Kaz Flash Modz / Kaz Grids v3.x
-
-*Earlier history of the same database, reconstructed from the predecessor repo
-(`KzBuilder-public` → `assets/kzgrids/Database.json`, author `kazour`). These edits predate
-this repo's v1.0.0; the catalog carried over into KazBars on the rebrand. The v3.x schema
-differed (name-based storage, `#BossTx` categories), so these are version-level summaries.*
-
-### 2026-03-22 — v3.6.x (buff dialog & sort fixes) · 328 buffs
-- **Category overhaul:** introduced `#Resistances`, `#Group Buffs`, `#Crowd Control`; dropped class-name categories (`Guardian`, `Herald of Xotli`, `-Tank General`, …). Reclassifications (debuff → buff/misc) + renames (`Incinerate 1-5` → `Incinerate T3 1-5`, `Fatality (Group)` → `Fatality`, `Forced Engage (res)` → `Forced Engage`). (+13)
-
-### 2026-03-16 — v3.6.0 (Timers v3 & UI Overhaul) · 315 buffs
-- Added `(Group)` suffixes (`Battle Cry`, `Call to Arms`, `Exploit`, `Holy Cleansing`, `Wave of Life`, …); `Vengeance (debuff)/(buff)` → `Vengeance 1-3` / `Vengeance 1-10`; `Guard V` → `Guard`; removed `Master at Arms`. (+22)
-
-### 2026-03-10 — v3.5.2 (Castbar Estimation & Database Improvements) · 293 buffs
-- Category cleanup: `#BossT3/T3.5/T4/T5` → `#T3/T3.5/T4/T5` (dropped the "Boss" prefix). **+74 buffs.**
-
-### 2026-03-06 — v3.5.0 (Grid Templates & Name-Based Buff Storage) · 219 buffs
-- Disambiguated duplicate names for name-based storage: `Forced Engage` / `Vengeance` / `Marked Target` → `(debuff)` / `(buff)`; `Stunned` → `(Bear Shaman)` / `(Guardian)` / `(HoX)`.
-
-### 2026-02-27 — Kaz Flash Modz v3.3.4 (first tracked database) · 219 buffs
-- Initial database in the predecessor repo.
-
 ---
 
 *Entries are reconstructed from `git log` on `Database.json` (this repo) and the predecessor
-`KzBuilder-public` repo; spell IDs reflect the current database, which holds **360 buffs**.
+`KzBuilder-public` repo; spell IDs reflect the current database, which holds **383 buffs**.
 Going forward, log changes here as they happen.*
