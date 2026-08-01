@@ -21,7 +21,7 @@ Nothing here is unit-testable — `tests/test_inspect.py` covers the config laye
 
 These are measured engine behaviour, not style choices. Changing any of them changes what the panel shows.
 
-- **Read with `GetStat(id, 2)`.** Mode 2 is the live effective value.
+- **Read with `GetStat(id, 2)`.** Mode 2 is the live effective value. One exception: the CDI attribute term additionally reads 804/814 at **mode 1** — the pre-%-multiplier attribute sum (a ×1.05 Dex feat moved mode 2 by an item's 97×1.05 while mode 1 moved by the flat 97), which is the basis the sheet's Rating-from-attribute uses. The spell-damage attribute term stays mode 2 — both verified against sheets.
 - **Poll; do not trust signals.** A full watch-list pass runs every 250 ms on a `setInterval`. `SignalStatChanged` is not usable as the data path here: gear and rating ids never fire it at all, signal-time reads race the server, and equips with no stat lines emit nothing. The poll *is* the settle re-read, and the assign-on-change string cache in `render()` subsumes any dirty flag — most passes change nothing, and `TextField.text` writes are the expensive part.
 - **Warm up 3 passes (~750 ms)** before the panel is allowed to show. Login, zone changes and retargets all repopulate stats over roughly that window; without the warm-up a retarget flashes the previous target's values.
 - **Teardown gate.** Logout and zoning collapse every id to 0 in one burst. Id 1 (max HP) and id 54 (level) reading 0 *together* is that burst, not data. On detecting it the stub drops the subject handle outright — keeping the dead handle lets the warm-up count three null passes and re-show a phantom all-dash sheet.
@@ -33,7 +33,7 @@ These are measured engine behaviour, not style choices. Changing any of them cha
 
 ## 2. The watch list
 
-57 ids, polled every pass, in the order they appear in `watchIds`. `curV["i" + id]` holds the last settled value; `gv(id)` returns 0 for absent, null or NaN.
+63 ids, polled every pass, in the order they appear in `watchIds`. `curV["i" + id]` holds the last settled value; `gv(id)` returns 0 for absent, null or NaN.
 
 ### Vitals & identity
 
@@ -42,8 +42,10 @@ These are measured engine behaviour, not style choices. Changing any of them cha
 | 1 | Max HP | half of the teardown gate |
 | 27 | Current HP | |
 | 525 | HP % | displayed verbatim — the game floors it |
-| 54 | Level | the level-80 gate for every percent decode; other half of the teardown gate |
-| 67 | Class id | 34 is the dagger class — selects Dex over Str for CDI and the 5.0 crit base |
+| 54 | Level | the level-80 gate for every percent decode; other half of the teardown gate; feeds the title |
+| 67 | Class id | 34 (dagger class) and 39 (Ranger) select Dex over Str for CDI — both named by the sheet's own tooltip; 34 alone gets the 5.0 crit base (Ranger sheet-verified on 2.5). Also feeds the title's class name via the measured table 18 Barbarian · 20 Guardian · 22 Conqueror · 24 Priest of Mitra · 28 Tempest of Set · 29 Bear Shaman · 31 Dark Templar · 34 Assassin · 39 Ranger · 41 Necromancer · 43 Herald of Xotli · 44 Demonologist — all twelve measured off live targets |
+| 70 | PvP level | raw; sheet-exact on five characters; feeds the title only |
+| 507 | Max Mana | gates the Bonus Spell Damage lines only — mana-less classes sheet the whole per-school block at 0 |
 
 ### Armor & protection
 
@@ -82,11 +84,13 @@ Invulnerabilities are unclamped in both directions: debuffs drive displayed miti
 | 312 | Critical Rating | |
 | 711 | Critical Damage Rating | |
 | 713 | Heal Rating | gear-sourced; NPCs never carry it |
-| 804 / 808 / 810 / 814 | Strength / Intelligence / Wisdom / Dexterity | ×10+10 encoded |
+| 804 / 808 / 810 / 814 | Strength / Intelligence / Wisdom / Dexterity | ×10+10 encoded; 804/814 additionally read at mode 1 for the CDI attr term (§1, §3) |
+| 1403 | Ferocity | ×10 encoded; `floor(1403/10)` **is** the sheet value — verified exact both loaded (2600 → sheet 260) and empty (0 → sheet 0, on a character whose old base-candidate id still read 33; that id, 864, is the engine's "Player Flags" state slot and feeds nothing) |
 | 875 | Untyped Combat Rating | CDI input |
 | 866–873 | Per-weapon-school Combat Rating | 1HE, 2HE, 1HB, 2HB, dagger, polearm, bow, crossbow |
 | 162 | Cold Combat Rating | CDI input |
 | 1007–1010 | Fire / Electrical / Holy / Unholy Combat Rating | CDI inputs |
+| 1095 / 1096 | Weapon Damage % (Melee / Ranged), ×100 | shown verbatim as a percent pair — no synthesis, no gates; stance and proc swings and multiplicative feats (Reave-type) are already inside the values. Dashed only when both are absent |
 | 861 | Untyped Magic Damage | applies to every school |
 | 158 / 876 / 877 / 878 / 879 | Cold / Fire / Electrical / Holy / Unholy Magic Damage | per-school component on top of 861 |
 | 1041 | Base Spell Damage % | added **flat**, not as a percent |
@@ -110,6 +114,7 @@ Tenacity comes from PvP gear only; bosses never carry it.
 | 454 | PvP armor gap | added to the PvE total; can be negative |
 | 458 | PvP protection gap | one value, applies to all five schools; can be negative |
 | 225 | PvP Combat Rating | added to the CDI rating on the PvP line; moves mid-combat on procs and can rest negative |
+| 226 | PvP spell-damage gap | sheet label "PvP Bonus Spell Damage"; one value, applies to all schools (the 458 shape); per-item accumulator, can rest negative; added to the spell-damage total on the PvP line |
 | 656 / 658 | Kills / Deaths | `0 / 0` is real data, printed rather than dashed |
 
 ---
@@ -162,15 +167,22 @@ Armor          = floor(448 × (1 + 450/100)) + 2 × Str
 Prot(school)   = schoolComp + floor(451 × (1 + 334/100)) + floor(attr / 2)
                  attr = Int for Cold/Fire/Elec · Wis for Holy/Unholy
 
-CDI rating     = 3 × (Dex if class 34 else Str)
+CDI rating     = 3 × (Dex for classes 34/39, Str otherwise)
                  + 875 + gearSchoolCR + 162 + 1007 + 1008 + 1009 + 1010
 CDI effect     = round(rating / 36.6)
 PvP CDI rating = CDI rating + 225
 
 PvP Armor      = Armor + 454        ·  PvP Prot(school) = Prot(school) + 458
+PvP Spell Dmg  = Bonus Spell Dmg total + 226
 ```
 
-`gearSchoolCR` is `max(866…873)`. The equipped weapon type is **not** readable — weapon-set swaps leave the equip bits invariant — but characters stack their own school's combat rating, so the largest component is it. This is a documented heuristic, not a measurement.
+`gearSchoolCR` is `max(866…873)`. The equipped weapon type is **not** readable — weapon-set swaps leave the equip bits invariant — but characters stack their own school's combat rating, so the largest component is it. This is a documented heuristic, not a measurement — though the game's own CDI tooltip named the max component as the weapon school on the one character cross-checked.
+
+**The composition is the sheet's own, verified digit-exact from the game's itemized CDI tooltip on two characters across multiple gear/buff states.** The attribute term is `3 × (mode-1 attr − 100 if Immeasurable Empowerment)`:
+
+- **Mode 1** is the pre-%-multiplier attribute sum — attribute-percent feats/AAs (a ×1.05 Dex feat measured; the Reave weapon-damage feat is the registry precedent) scale mode 2 but not the sheet's Rating-from-attribute, and mode 1 is exactly that basis.
+- The **+100-all-attributes AA passive** ("Immeasurable Empowerment", buff id 4279994) is bugged in-game: its attributes land in mode 1 yet never feed this rating, while its Wisdom *does* feed spell damage. The panel mirrors the bug by detecting the buff (confirmed visible on self-targets and other players) and subtracting the 100; an invisible list degrades to +300 high.
+- Flat attribute buffs other than the AA land in mode 1 and still inflate the term — the accepted residual. The +225 PvP delta is exact regardless.
 
 When a subject exposes no Strength (`attrSheet(804) == 0`, i.e. every mob), the armor line falls back to the raw gear component 448 rather than a total built on a missing term.
 
@@ -199,19 +211,30 @@ Heal Rating benefits specific heals only and has no percent form, so the panel s
 total = 861 + max(158, 876, 877, 878, 879) + round(0.6 × max(Int, Wis)) + 1041
 ```
 
-Only the highest school shows — a caster stacks exactly one. `max(Int, Wis)` avoids an unmeasured class table (priests lead on Wisdom, mages on Intelligence), the same shape as the school-CR heuristic above. The 1041 term is added flat despite its "Base Spell Damage %" label — read as a percent of the total it lands nowhere near the sheet. Player-only and level-80-only.
+Only the highest school shows — a caster stacks exactly one. `max(Int, Wis)` avoids an unmeasured class table (priests lead on Wisdom, mages on Intelligence), the same shape as the school-CR heuristic above. The 1041 term is added flat despite its "Base Spell Damage %" label — read as a percent of the total it lands nowhere near the sheet. Player-only, level-80-only, and **mana-gated**: a mana-less class (Ranger measured — max mana 0, sheet block all zeros despite 861/1041 residue in stat space; Barbarian predicted) dashes rather than synthesize a number the sheet contradicts.
+
+The PvP row adds the per-school gap 226 flat on top of the same total — the composition every other PvP row uses (+454, +458, +225), and it is **sheet-verified on two characters**: a Tempest of Set with 226 = −186 read exactly `total + 226` on the school-carrying line (985) with the school-less lines ±1 (the fractional attr term's rounding surface), and a Bear Shaman with 226 = −250 sheeted −71 against a composed −72 — the sheet's PvP per-school block is absolutes, not gaps, and renders negative faithfully.
+
+### Ferocity
+
+```
+total = floor(1403 / 10)      ·      effect% = 0.15 × total
+```
+
+Verified exact at both ends: a loaded character (1403 = 2600 → sheet 260) and an empty one (1403 = 0 → sheet Ferocity 0, even though the one-time base candidate id 864 still read 33 there — 864 is the engine's "Player Flags" state slot and feeds nothing). The 0.15 slope rests on a **single sheet pair** (260 → +39.0% on all five AOE surfaces — radius, max targets, cone angle, column distance, splash amount; the sheet shows one uniform percent). Player-only.
 
 ### Attribution
 
-The mitigation curve and the 36.6 / 73.7 / 219.6 divisors originate in community formula work (the 2016 Age of Conan formula thread) and were re-verified digit-for-digit against the in-game sheet before shipping. The heal decode is community-table-sourced as noted. Everything else — the totals, the fold, the CDI composition, the spell-damage composition — was derived here against the sheet.
+The mitigation curve and the 36.6 / 73.7 / 219.6 divisors originate in community formula work (the 2016 Age of Conan formula thread) and were re-verified digit-for-digit against the in-game sheet before shipping. The heal decode is community-table-sourced as noted. Everything else — the totals, the fold, the CDI composition, the spell-damage composition, the class-id table and the PvP gaps — was derived here against the sheet.
 
 ---
 
 ## 4. Display rules & gates
 
 - **Dash, never drop.** Absent data renders as an em dash (`String.fromCharCode(8212)`) inside the value field. Row counts never change, so `layout()` re-runs only on the PvP-visibility flip.
+- **Title line** is `Name Class (Level/PvP level)` — e.g. `Kazour Bear Shaman (80/10)`. The class name appends only when the PvP gate below agrees the subject is a player **and** id 67 maps (all twelve classes measured; an unmapped id would mean a patch moved the enum and simply omits the class); the level part drops absent components, so a mob reads `Name (83)` and a player with no PvP level `Name Class (80)`. Built per pass from polled stats and cached assign-on-change like the value columns; an overlong name + class combination clips at the name field's fixed width.
 - **Level gate.** Every percent decode is suppressed unless `GetStat(54, 2) == 80`. An off-80 target shows the raw rating with no parenthetical — the constants are level-80 measurements and applying them to a level-40 target would produce a confident wrong number.
-- **Line format** is `Rating (Effect%)`, matching the game's own combat-stats tab.
+- **Line format** is `Rating (Effect%)`, matching the game's own combat-stats tab. The CDI synthesis is labeled **Combat Rating** on both sections; this doc keeps CDI as the synthesis name.
 - **PvP block gating.** Shown only when the engine's `ID32.IsPlayer()` **and** a decoded attribute spread both agree:
 
   ```
@@ -220,7 +243,7 @@ The mitigation curve and the 36.6 / 73.7 / 219.6 divisors originate in community
   ```
 
   `IsPlayer()` is measured truthful on players but has never been sampled on a mob, so it **vetoes** rather than confirms alone; `subjIsPlayer == -1` means it never answered and the attribute spread carries the decision. The attribute half must be *decoded* — testing raw presence put a PvP block on city guards, because an NPC template at base attributes reads raw 10.
-- **Player-only lines** — Heal Rating and Bonus Spell Damage — dash on any non-player subject.
+- **Player-only lines** — Heal Rating, Bonus Spell Damage and Ferocity — dash on any non-player subject.
 - **Preview** (`previewOn()`) paints a canned full-footprint sheet including the PvP block, so the panel can be positioned without a target. `previewOff()` clears the render cache, since the canned values bypassed it.
 
 ---
@@ -268,6 +291,8 @@ Position and collapse mirror the stopwatch: baked X/Y and `startCollapsed` defau
 Do not spend another session chasing these through stat space:
 
 - **Weapon base DPS** and the **equipped weapon type** — hence the `gearSchoolCR` heuristic and the absence of a sheet-DPS line. An item-tooltip API route exists but is untested.
+- **The attributes' direct "+N DPS with weapons" grant** — reads live (mode-2) attributes and moves the sheet's DPS without touching CR, but its per-point rate was never measured and attribute tooltips are unreachable for targets. Together with the unreadable weapon base DPS this is why the panel has no DPS line — the Weapon Damage % pair is the readable part of that formula and is shown instead.
+- **Attribute modes beyond 1** — modes 0 and 3–7 return the raw template 10 on live players. Mode 1 is the pre-multiplier layer (§1) — it looked like a mirror of mode 2 until a %-multiplier subject split them. Flat buffs (including the bugged AA) land inside mode 1, so the AA correction still comes from the buff list, not stat space.
 - **The sheet's absolutes** — armor, protection, CDI and spell damage have no id; they are synthesized (§3).
 - **The critical-damage feat/AA base** (§3).
 - **Absorb-shield pool amounts** and **crowd-control resistance %** (buff presence only).
@@ -291,6 +316,7 @@ Researched and understood, but outside the current panel. Recorded so the ground
 - **Level proportionality** of 36.6 / 73.7 / 219.6 is assumed but unverified off-80. The level gate exists so the assumption is never displayed as fact.
 - **Floor vs round** on the `attr / 2` term in the protection total is indistinguishable at even attribute values; the stub floors.
 - **The 1041 term** as a flat add is an inference — a character with 0.0% Base Spell Damage would discriminate it. Either reading disagrees by at most ±1, inside the sheet's own rounding law.
+- **Ferocity rounding.** The 0.15 slope is a single sheet pair (260 → 39.0%); its rounding at odd totals is unmeasured.
 
 ---
 
@@ -299,8 +325,8 @@ Researched and understood, but outside the current panel. Recorded so the ground
 There is no automated coverage of the rendered panel — the AS2/SWF runtime is not unit-testable. Verify by build and manual QA in-game:
 
 1. **Untargeted** — the panel is invisible; preview from the dialog paints the full footprint including the PvP block, and drag/collapse work against it.
-2. **Player target** — the PvP section appears; armor and the five protections match the target's sheet digit for digit, PvP values differ from PvE by the 454/458 gaps.
-3. **Mob target** — no PvP section, no attributes, so Heal Rating and Bonus Spell Damage dash and the armor line falls back to the raw gear component.
+2. **Player target** — the PvP section appears; armor and the five protections match the target's sheet digit for digit, PvP values differ from PvE by the 454/458 gaps. The title reads `Name Class (80/N)` — every class maps — and drops `/N` on a PvP-level-0 character.
+3. **Mob target** — no PvP section, no attributes, so Heal Rating, Bonus Spell Damage and Ferocity dash and the armor line falls back to the raw gear component. The title carries no class and no PvP level — `Name (83)`.
 4. **City guard or other attribute-carrying NPC** — still no PvP section. This is the case the decoded-attribute gate exists for.
 5. **Boss target** — template stats and critigation read, tenacity dashes; a mitigation-phase change moves the protection percentages mid-fight via id 911.
 6. **Destructible target** — stats read through the `Dynel` fallback rather than dashing out entirely.
