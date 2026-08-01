@@ -558,16 +558,22 @@ SECTIONS: list[_Section] = [
                  ('. It ships with your next build, same as grids.', None)],
             ]),
             _sub('What it shows', [
+                'The name strip reads Name Class (Level/PvP level) — Kazour '
+                'Bear Shaman (80/10), for example. Class shows on player '
+                'targets; the parenthetical drops what a target '
+                "doesn't have, so a mob reads Name (83).",
                 'Health (live current/max and %), Armor, the five protections '
                 '(Holy, Unholy, Cold, Elec, Fire), Critigation Chance, '
-                'Critigation Amount, Heal Rating, Bonus Spell Dmg, CDI, '
-                'Critical Chance, Critical Damage, and Tenacity — in the game '
-                "sheet's own Rating (Effect%) language.",
+                'Critigation Amount, Heal Rating, Bonus Spell Dmg, '
+                'Combat Rating, Weapon Dmg M/R (a plain melee/ranged percent '
+                'pair), Critical Chance, Critical Damage, Tenacity, '
+                "and Ferocity — in the game sheet's own Rating (Effect%) "
+                'language.',
                 "A dash marks lines a target simply doesn't have — mobs and "
                 'bosses expose less than players.',
                 'Player targets get an extra PvP block: PvP armor, '
-                'protections, CDI, and kills/deaths. Mobs and bosses get the '
-                'PvE block only.',
+                'protections, bonus spell damage, combat rating, and '
+                'kills/deaths. Mobs and bosses get the PvE block only.',
                 "Targets that aren't level 80 show raw ratings without the "
                 'percent decodes — the conversions are level-80 measurements.',
             ]),

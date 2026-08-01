@@ -70,6 +70,7 @@ class KazBarsInspect {
     private var subjName:String;
     private var subjKey:String;
     private var subjIsPlayer:Number;  // 1 player, 0 not, -1 unanswered
+    private var aaOn:Boolean;         // +100-all-attrs AA visible on subject
     private var pollIv:Number;
     private var curV:Object;      // "i<id>" -> settled mode-2 value
     private var haveFull:Boolean;
@@ -85,6 +86,8 @@ class KazBarsInspect {
 
     private var watchIds:Array;
     private var SPELL_IDS:Array;
+    private var CLASS_NAMES:Object;
+    private var AA_BUFF_ID:Number;
     private var DASH:String;
 
     public function KazBarsInspect(kb:Object, root:MovieClip) {
@@ -101,6 +104,7 @@ class KazBarsInspect {
         lastPve = "";
         lastPvp = "";
         curH = 0;
+        aaOn = false;
         DASH = String.fromCharCode(8212);
         collapsed = false;
         titleH = 0;
@@ -109,16 +113,28 @@ class KazBarsInspect {
         // Magic damage per school: cold is the low-range outlier as in every
         // school family (157 prot, 162 CR); the other four cluster at 876-879.
         SPELL_IDS = [158, 876, 877, 878, 879];
+        // "Immeasurable Empowerment", the +100-all-attributes AA passive —
+        // the ubiquitous member of the attribute-buff layer the sheet's CDI
+        // excludes, and the one the panel can see and undo.
+        AA_BUFF_ID = 4279994;
+        // Class id 67 -> sheet name; all twelve classes measured off live
+        // targets. An unmapped id (a future patch?) still just omits the
+        // class rather than guess one.
+        CLASS_NAMES = {c18: "Barbarian", c20: "Guardian", c22: "Conqueror",
+                       c24: "Priest of Mitra", c28: "Tempest of Set",
+                       c29: "Bear Shaman", c31: "Dark Templar",
+                       c34: "Assassin", c39: "Ranger", c41: "Necromancer",
+                       c43: "Herald of Xotli", c44: "Demonologist"};
         watchIds = [
-            1, 27, 525, 54, 67,
+            1, 27, 525, 54, 67, 70, 507,
             448, 450, 451, 334, 157, 926, 927, 928, 929, 911,
             902, 167, 905, 906, 907, 908,
-            312, 711, 713, 804, 808, 810, 814,
+            312, 711, 713, 804, 808, 810, 814, 1403,
             875, 866, 867, 868, 869, 870, 871, 872, 873,
-            162, 1007, 1008, 1009, 1010,
+            162, 1007, 1008, 1009, 1010, 1095, 1096,
             861, 158, 876, 877, 878, 879, 1041,
             1000016, 1000017, 1000018,
-            454, 458, 225, 656, 658
+            454, 458, 225, 226, 656, 658
         ];
     }
 
@@ -192,9 +208,10 @@ class KazBarsInspect {
         // a row, so layout() re-runs only on the PvP-visibility flip.
         pveLabTF.text = "Health\nArmor\nHoly Prot\nUnholy Prot\nCold Prot\nElec Prot\nFire Prot"
                       + "\nCritigation Chance\nCritigation Amount\nHeal Rating\nBonus Spell Dmg"
-                      + "\nCDI\nCritical Chance\nCritical Damage\nTenacity";
+                      + "\nCombat Rating\nWeapon Dmg M/R\nCritical Chance\nCritical Damage"
+                      + "\nTenacity\nFerocity";
         pvpLabTF.text = "Armor\nHoly Prot\nUnholy Prot\nCold Prot\nElec Prot\nFire Prot"
-                      + "\nCDI\nKills / Deaths";
+                      + "\nBonus Spell Dmg\nCombat Rating\nKills / Deaths";
 
         // Re-seed from the cache: on a re-onLoad it is still warm, so
         // assign-on-change would write nothing and leave these blank.
@@ -421,6 +438,7 @@ class KazBarsInspect {
         haveFull = false;
         warmup = 0;
         curV = {};
+        aaOn = false;
         lastName = "";
         lastPve = "";
         lastPvp = "";
@@ -462,6 +480,31 @@ class KazBarsInspect {
             curV["i" + sid] = v;
             i++;
         }
+        // Mode-1 side-reads: the CDI attr term uses the PRE-multiplier
+        // attribute sum — mode 2 is post %-multiplier (a x1.05 Dex feat
+        // moved m2 by 97x1.05 while m1 moved by the item's flat 97).
+        var v1 = null;
+        try { v1 = m_Subject.GetStat(804, 1); } catch (e1a:Object) {}
+        curV["n804"] = v1;
+        v1 = null;
+        try { v1 = m_Subject.GetStat(814, 1); } catch (e1b:Object) {}
+        curV["n814"] = v1;
+        // The one buff-list read: the AA's presence corrects the CDI attr
+        // term. Dynels have no m_BuffList — the flag just stays false.
+        var aa:Boolean = false;
+        try {
+            var bl:Object = m_Subject.m_BuffList;
+            if (bl != null) {
+                for (var bk:String in bl) {
+                    var bb:Object = bl[bk];
+                    if (bb != null && bb.m_BuffId == AA_BUFF_ID) {
+                        aa = true;
+                        break;
+                    }
+                }
+            }
+        } catch (eBL:Object) {}
+        aaOn = aa;
         if (!haveFull) {
             // ~750 ms: login/zone/retarget repopulation settles inside it.
             warmup++;
@@ -495,10 +538,20 @@ class KazBarsInspect {
         return Math.round((r - 10) / 10);
     }
 
-    // Gates the PvP block; both signals must agree. IsPlayer() is measured
-    // truthful on players but never sampled on a mob, so it vetoes rather than
-    // confirms alone. Attributes must be DECODED — raw, an NPC template
-    // carrying them at base reads 10, which put a PvP block on city guards.
+    // mode-1 attribute: the pre-%-multiplier additive sum, same encoding
+    private function attrM1(sid:Number):Number {
+        var v = curV["n" + sid];
+        if (v == null || v == undefined) return 0;
+        var n:Number = Number(v);
+        if (isNaN(n) || n == 0) return 0;
+        return Math.round((n - 10) / 10);
+    }
+
+    // Gates the PvP block and the title's class name; both signals must
+    // agree. IsPlayer() is measured truthful on players but never sampled on
+    // a mob, so it vetoes rather than confirms alone. Attributes must be
+    // DECODED — raw, an NPC template carrying them at base reads 10, which
+    // put a PvP block on city guards.
     private function isPlayer():Boolean {
         var hasAttrs:Boolean = attrSheet(804) > 4 || attrSheet(808) > 4
                             || attrSheet(810) > 4 || attrSheet(814) > 4;
@@ -555,10 +608,19 @@ class KazBarsInspect {
         return best;
     }
 
-    // 3 x Str (Dex for the dagger class 34) + untyped 875 + equipped-school CR
-    // + every typed magic CR; the PvP tab adds 225 on top.
+    // 3 x Str (Dex for the dagger class 34 and Rangers 39 — both named by
+    // the sheet's own tooltip) + untyped 875 + equipped-school CR + every
+    // typed magic CR; the PvP tab adds 225 on top. The attr term uses the
+    // MODE-1 attribute (the pre-%-multiplier sum — the sheet's own basis,
+    // two chars digit-exact) minus the +100-all-attrs AA (Immeasurable
+    // Empowerment) when the subject's buff list shows it — the AA is
+    // bugged in-game and never feeds this rating. Flat attr buffs other
+    // than the AA still inflate the term.
     private function cdiPvE():Number {
-        var att:Number = (gv(67) == 34) ? attrSheet(814) : attrSheet(804);
+        var c:Number = gv(67);
+        var att:Number = (c == 34 || c == 39) ? attrM1(814) : attrM1(804);
+        if (aaOn) att -= 100;
+        if (att < 0) att = 0;
         return 3 * att + gv(875) + gearSchoolCR() + gv(162) + gv(1007) + gv(1008) + gv(1009) + gv(1010);
     }
 
@@ -620,8 +682,14 @@ class KazBarsInspect {
     // 861 + schoolComponent + round(0.6 x mainAttr) + BaseSpellDamage% 1041.
     // Main attribute is max(Int, Wis) — priests lead on Wis, mages on Int —
     // avoiding an unmeasured class table, like the school CR above. Only the
-    // highest school shows: a caster stacks exactly one.
-    private function spellLine():String {
+    // highest school shows: a caster stacks exactly one. The PvP row adds the
+    // per-school gap 226 on top — one value for all schools, the 458 shape.
+    private function spellLine(add:Number):String {
+        if (!isPlayer() || !lvlOK()) return DASH;
+        // Mana-less classes (Ranger measured; Barbarian predicted) sheet the
+        // whole per-school block at 0 even when 861/1041 carry residue —
+        // max mana 507 is the gate.
+        if (gv(507) == 0) return DASH;
         var best:Number = 0;
         var i:Number = 0;
         while (i < SPELL_IDS.length) {
@@ -629,11 +697,34 @@ class KazBarsInspect {
             if (v > best) best = v;
             i++;
         }
-        if (!isPlayer() || !lvlOK()) return DASH;
         var attr:Number = Math.max(attrSheet(808), attrSheet(810));
-        var total:Number = gv(861) + best + Math.round(attr * 0.6) + gv(1041);
+        var total:Number = gv(861) + best + Math.round(attr * 0.6) + gv(1041) + add;
         if (total == 0) return DASH;
         return String(total);
+    }
+
+    // Sheet Ferocity = floor(1403/10), the x10-encoded gear component and
+    // nothing else — a char with 1403=0 sheets Ferocity 0 even while the
+    // old base candidate 864 reads 33 (864 is the engine's "Player Flags"
+    // state id, not a rating). Effect is 0.15 x total on all five AOE
+    // surfaces (sheet pair 260 -> 39.0%). Player-only.
+    private function ferLine():String {
+        if (!isPlayer()) return DASH;
+        var t:Number = Math.floor(gv(1403) / 10);
+        if (t == 0) return DASH;
+        if (!lvlOK()) return String(t);
+        return t + " (" + fmt1(t * 0.15) + "%)";
+    }
+
+    // Weapon Damage % pair (1095 melee / 1096 ranged, x100) — the sheet's
+    // Melee/Ranged values verbatim. No synthesis, no gates: stance and
+    // proc swings and Reave-type feat multipliers are already inside the
+    // ids. Dashed only when both are absent.
+    private function wdLine():String {
+        var m:Number = gv(1095);
+        var r:Number = gv(1096);
+        if (m == 0 && r == 0) return DASH;
+        return fmt1(m / 100) + "% / " + fmt1(r / 100) + "%";
     }
 
     // rating + flat effect (the sheet's Effect column = the DPS add)
@@ -643,6 +734,23 @@ class KazBarsInspect {
         r += add;
         if (!lvlOK()) return String(r);
         return r + " (" + Math.round(r / 36.6) + ")";
+    }
+
+    // "Name Class (Level/PvPLevel)". Class only when the player gate agrees
+    // AND id 67 maps (all twelve measured); the level part drops what is
+    // absent, so a mob reads "Name (83)" and a PvP-level-0 player "Name (80)".
+    private function titleLine():String {
+        var s:String = subjName;
+        if (isPlayer()) {
+            var cn:String = CLASS_NAMES["c" + gv(67)];
+            if (cn != undefined) s += " " + cn;
+        }
+        var lvl:Number = gv(54);
+        if (lvl > 0) {
+            var pl:Number = gv(70);
+            s += " (" + lvl + ((pl > 0) ? ("/" + pl) : "") + ")";
+        }
+        return s;
     }
 
     private function pveValues():String {
@@ -658,11 +766,13 @@ class KazBarsInspect {
         g.push(pctLine(gv(1000016)));
         g.push(pctLine(gv(1000018)));
         g.push(healLine());
-        g.push(spellLine());
+        g.push(spellLine(0));
         g.push(cdiLine(0));
+        g.push(wdLine());
         g.push(critChanceLine());
         g.push(critDmgLine());
         g.push(pctLine(gv(1000017)));
+        g.push(ferLine());
         return g.join("\n");
     }
 
@@ -675,6 +785,7 @@ class KazBarsInspect {
         g.push(mitLine(protTotal(157, 808) + gv(458), 167, 73.7));
         g.push(mitLine(protTotal(927, 808) + gv(458), 906, 73.7));
         g.push(mitLine(protTotal(926, 808) + gv(458), 905, 73.7));
+        g.push(spellLine(gv(226)));
         g.push(cdiLine(gv(225)));
         g.push(gv(656) + " / " + gv(658));   // 0 / 0 is real data, not absence
         return g.join("\n");
@@ -694,9 +805,10 @@ class KazBarsInspect {
             pvpShown = pv;
             layout();
         }
-        if (subjName != lastName) {
-            lastName = subjName;
-            nameTF.text = subjName;
+        var t:String = titleLine();
+        if (t != lastName) {
+            lastName = t;
+            nameTF.text = t;
         }
         var s:String = pveValues();
         if (s != lastPve) {
@@ -726,12 +838,13 @@ class KazBarsInspect {
             pvpShown = true;
             layout();
         }
-        nameTF.text = "Preview";
+        nameTF.text = "Preview Bear Shaman (80/10)";
         pveValTF.text = "11527 / 23093 (49%)\n12492 (55.7%)\n3233 (23.4%)\n3228 (23.2%)"
                       + "\n3090 (22.6%)\n3090 (22.6%)\n3090 (22.6%)\n2196 (60.0%)\n2202 (60.2%)"
-                      + "\n2196 (877-898)\n1726\n3312 (90)\n467 (15.3%)\n431 (11.8%)\n2112 (57.7%)";
+                      + "\n2196 (877-898)\n1726\n3312 (90)\n20.5% / 2.0%\n467 (15.3%)\n431 (11.8%)"
+                      + "\n2112 (57.7%)\n260 (39.0%)";
         pvpValTF.text = "8230 (38.1%)\n3090 (42.5%)\n3090 (42.5%)\n3090 (42.5%)\n3090 (42.5%)"
-                      + "\n3090 (42.5%)\n5269 (144)\n18304 / 16264";
+                      + "\n3090 (42.5%)\n1844\n5269 (144)\n18304 / 16264";
         updateVisibility();
     }
 
