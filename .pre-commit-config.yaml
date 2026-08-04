@@ -8,6 +8,7 @@ repos:
     hooks:
       - id: ruff-check
         args: [--fix]
+        fail_fast: true
 
   - repo: local
     hooks:
@@ -20,7 +21,7 @@ repos:
 
       - id: pytest-smoke
         name: pytest smoke tests
-        entry: pytest tests/ -q
+        entry: uv run pytest -q --tb=no
         language: system
         pass_filenames: false
-        always_run: true
+        files: ^(src/|tests/|docs/|pyproject\.toml$)
