@@ -19,6 +19,13 @@ repos:
         files: ^src/kazbars/assets/kazbars/Database\.json$
         pass_filenames: false
 
+      - id: gen-inventory
+        name: regenerate inventory line counts
+        entry: python scripts/gen_inventory.py
+        language: system
+        files: ^(src/kazbars|tests)/[A-Za-z0-9_]+\.py$
+        pass_filenames: false
+
       - id: pytest-smoke
         name: pytest smoke tests
         entry: uv run pytest -q --tb=no

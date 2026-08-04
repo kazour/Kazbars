@@ -5,17 +5,16 @@ Mirrors the repo's other invariant tests (``test_cluster_isolation``, the
 it turns silent doc drift into a CI failure instead of a thing someone notices
 six months later.
 
-inventory.md — three checks, in increasing tolerance for churn:
+inventory.md — three checks:
 
   1. No phantoms  -- every ``src/kazbars/*.py`` / ``tests/*.py`` path named in
      the inventory still exists on disk.
   2. Completeness -- every ``src/kazbars/*.py`` and ``tests/*.py`` on disk is
      listed in the inventory.
-  3. Line counts  -- each documented count is within a *generous* tolerance of
-     reality (``max(40, 25%)``). Deliberately loose: a routine edit must never
-     trip CI, but a file that grew by a quarter (the kind of change that also
-     stales its role blurb) should. Exact refresh is a manual chore; this only
-     catches gross drift.
+  3. Line counts  -- each documented count matches reality exactly. The table
+     is generated (``scripts/gen_inventory.py``, wired into pre-commit), so
+     drift means the generator wasn't run, not that a human forgot to refresh
+     a number by hand.
 
 flows.md — refs are function-anchored (`` `callable()` — src/kazbars/file.py ``),
 never line numbers, so they survive edits. Three checks keep them live:
@@ -41,7 +40,6 @@ test just makes the drift impossible to merge silently.
 from __future__ import annotations
 
 import ast
-import math
 import re
 import subprocess
 from pathlib import Path
@@ -111,11 +109,9 @@ def test_inventory_is_complete():
 def test_line_count_within_tolerance(rel):
     claimed = DOCUMENTED[rel]
     actual = _actual_lines(rel)
-    tol = max(40, math.ceil(0.25 * claimed))
-    assert abs(actual - claimed) <= tol, (
+    assert actual == claimed, (
         f'{rel}: docs/inventory.md says {claimed} lines, actual {actual} '
-        f'(delta {actual - claimed:+d}, tolerance +/-{tol}). '
-        'Refresh the inventory row to match the tree.'
+        f'(delta {actual - claimed:+d}). Run `python scripts/gen_inventory.py`.'
     )
 
 
