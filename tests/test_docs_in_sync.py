@@ -5,43 +5,48 @@ Mirrors the repo's other invariant tests (``test_cluster_isolation``, the
 it turns silent doc drift into a CI failure instead of a thing someone notices
 six months later.
 
-inventory.md — three checks, in increasing tolerance for churn:
+inventory.md — three checks:
 
   1. No phantoms  -- every ``src/kazbars/*.py`` / ``tests/*.py`` path named in
      the inventory still exists on disk.
   2. Completeness -- every ``src/kazbars/*.py`` and ``tests/*.py`` on disk is
      listed in the inventory.
-  3. Line counts  -- each documented count is within a *generous* tolerance of
-     reality (``max(40, 25%)``). Deliberately loose: a routine edit must never
-     trip CI, but a file that grew by a quarter (the kind of change that also
-     stales its role blurb) should. Exact refresh is a manual chore; this only
-     catches gross drift.
+  3. Line counts  -- each documented count matches reality exactly. The table
+     is generated (``scripts/gen_inventory.py``, wired into pre-commit), so
+     drift means the generator wasn't run, not that a human forgot to refresh
+     a number by hand.
+
+inventory-roles.md — one check:
+
+  4. Every file is described -- the generated inventory carries no prose, so
+     this hand-written table is the only place a new module gets explained.
+     Without this check the generator would happily add a row for a file
+     nobody ever documented, and nothing would notice.
 
 flows.md — refs are function-anchored (`` `callable()` — src/kazbars/file.py ``),
 never line numbers, so they survive edits. Three checks keep them live:
 
-  4. No line numbers -- a ``.py:N`` ref is banned doc-wide (it rots on nearly
+  5. No line numbers -- a ``.py:N`` ref is banned doc-wide (it rots on nearly
      every edit above it; the function name is the stable anchor).
-  5. Files exist     -- every ``src/kazbars/*.py`` mentioned exists on disk.
-  6. Callables exist -- each step's subject callable(s) (the backticked
+  6. Files exist     -- every ``src/kazbars/*.py`` mentioned exists on disk.
+  7. Callables exist -- each step's subject callable(s) (the backticked
      ``name()`` tokens before the file ref) resolve to a def/class somewhere
      in that file's AST, so a rename fails CI instead of orphaning the doc.
 
 docs/CHANGELOG.md — releases can't outrun the changelog:
 
-  7. Every ``v*`` release tag has a ``## [X.Y.Z]`` section, so a release can't
+  8. Every ``v*`` release tag has a ``## [X.Y.Z]`` section, so a release can't
      ship while its entries still sit under ``[Unreleased]`` (v2.2.2 did
      exactly that). CI checks out full history (``fetch-depth: 0``) so this
      bites there too; it skips only where tags are genuinely unavailable.
 
-Refreshing these docs is a manual chore; this
-test just makes the drift impossible to merge silently.
+inventory.md is generated; the rest are a manual chore. This test just makes
+the drift impossible to merge silently.
 """
 
 from __future__ import annotations
 
 import ast
-import math
 import re
 import subprocess
 from pathlib import Path
@@ -50,6 +55,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 INVENTORY_DOC = REPO_ROOT / 'docs' / 'inventory.md'
+ROLES_DOC = REPO_ROOT / 'docs' / 'inventory-roles.md'
 FLOWS_DOC = REPO_ROOT / 'docs' / 'flows.md'
 
 # Match only inventory *table rows* (`| `path` | N | role |`), not prose mentions
@@ -71,6 +77,21 @@ def _documented_rows():
     return rows
 
 
+# Same row shape minus the count column: `| `path` | role prose |`. Anchored to
+# the leading pipe so prose mentions of a path elsewhere in the doc don't count.
+_ROLE_RE = re.compile(
+    r'^\s*\|\s*`?(src/kazbars/[A-Za-z0-9_]+\.py|tests/[A-Za-z0-9_]+\.py)`?\s*\|'
+)
+
+
+def _described_rows():
+    return {
+        m.group(1)
+        for line in ROLES_DOC.read_text(encoding='utf-8').splitlines()
+        if (m := _ROLE_RE.match(line))
+    }
+
+
 def _on_disk():
     found = set()
     for sub in ('src/kazbars', 'tests'):
@@ -85,6 +106,7 @@ def _actual_lines(rel):
 
 
 DOCUMENTED = _documented_rows()
+DESCRIBED = _described_rows()
 ON_DISK = _on_disk()
 _COUNTED = sorted(p for p, n in DOCUMENTED.items() if n is not None and p in ON_DISK)
 
@@ -103,7 +125,17 @@ def test_inventory_is_complete():
     assert not missing, (
         "These source/test files aren't in docs/inventory.md:\n  "
         + '\n  '.join(missing)
-        + '\nAdd a row (path, line count, role).'
+        + '\nRun `python scripts/gen_inventory.py`.'
+    )
+
+
+def test_every_file_has_a_role():
+    missing = sorted(p for p in ON_DISK if p not in DESCRIBED)
+    assert not missing, (
+        "These source/test files aren't in docs/inventory-roles.md:\n  "
+        + '\n  '.join(missing)
+        + '\nAdd a row (path, role). inventory.md is generated and carries no '
+        'prose, so this table is the only place a new file gets described.'
     )
 
 
@@ -111,11 +143,9 @@ def test_inventory_is_complete():
 def test_line_count_within_tolerance(rel):
     claimed = DOCUMENTED[rel]
     actual = _actual_lines(rel)
-    tol = max(40, math.ceil(0.25 * claimed))
-    assert abs(actual - claimed) <= tol, (
+    assert actual == claimed, (
         f'{rel}: docs/inventory.md says {claimed} lines, actual {actual} '
-        f'(delta {actual - claimed:+d}, tolerance +/-{tol}). '
-        'Refresh the inventory row to match the tree.'
+        f'(delta {actual - claimed:+d}). Run `python scripts/gen_inventory.py`.'
     )
 
 

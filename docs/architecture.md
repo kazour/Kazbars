@@ -1,7 +1,7 @@
 # Architectural Map
 
 **Current as of:** 2026-07-30 (the File inventory table split out to [`inventory.md`](inventory.md) — it was 52% of this file; two new guard tests added).
-**Purpose:** Module topology, dependencies, and coupling hotspots. Updated alongside code changes — if you edit this file, commit it with the code. Per-file line counts and role blurbs live in [`inventory.md`](inventory.md).
+**Purpose:** Module topology, dependencies, and coupling hotspots. Updated alongside code changes — if you edit this file, commit it with the code. Per-file line counts live in [`inventory.md`](inventory.md) (generated); role blurbs live in [`inventory-roles.md`](inventory-roles.md).
 
 ## Dependency clusters
 
@@ -218,7 +218,7 @@ These modules are consumed only by `src/kazbars/app.py` by design — they hold 
 
 ## Smoke tests
 
-Plain-Python pytest cases guard the failure modes we’ve actually hit. Per-test detail lives in [`inventory.md`](inventory.md) — one description per test file; don’t duplicate it here. Two conventions worth knowing up front: `tests/test_imports.py` auto-discovers every `src/kazbars/*.py` module (add nothing when a new module lands), and `tests/test_docs_in_sync.py` guards `docs/inventory.md`, `docs/flows.md`, `docs/database-changelog.md`'s buff total, and the CHANGELOG's release sections (inventory completeness, line-count tolerance, function-anchored refs, tag↔section parity).
+Plain-Python pytest cases guard the failure modes we’ve actually hit. Per-test detail lives in [`inventory-roles.md`](inventory-roles.md) — one description per test file; don’t duplicate it here. Two conventions worth knowing up front: `tests/test_imports.py` auto-discovers every `src/kazbars/*.py` module (add nothing when a new module lands), and `tests/test_docs_in_sync.py` guards `docs/inventory.md`, `docs/flows.md`, `docs/database-changelog.md`'s buff total, and the CHANGELOG's release sections (inventory completeness, exact line counts, function-anchored refs, tag↔section parity).
 
 Run before every commit touching code or data:
 ```bash
