@@ -55,7 +55,7 @@ def open_inspect_dialog(app):
     dialog.transient(app)
     dialog.grab_set()
 
-    restore_window_position(dialog, 'inspect_settings', _WIDTH, 380, app, resizable=False)
+    restore_window_position(dialog, 'inspect_settings', _WIDTH, 470, app, resizable=False)
 
     create_dialog_header(dialog, "Target Inspect Panel",
                          MODULE_COLORS['grids'], width=_WIDTH)
@@ -110,6 +110,26 @@ def open_inspect_dialog(app):
                 "The panel loads folded to just its name strip — click its "
                 "+ button in-game to expand.")
 
+    ttk.Label(content, text="Sections",
+              font=FONT_SECTION, foreground=THEME_COLORS['heading']
+              ).pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
+    pvp_var = tk.BooleanVar(value=cfg['showPvp'])
+    pvp_cb = ttk.Checkbutton(content, text="Show the PvP section",
+                             variable=pvp_var)
+    pvp_cb.pack(anchor='w', pady=(0, PAD_XS))
+    add_tooltip(pvp_cb,
+                "PvP armor, protections, spell damage, combat rating and "
+                "kills / deaths — shown on player targets only. Takes "
+                "effect on the next Build & Install.")
+    perks_var = tk.BooleanVar(value=cfg['showPerks'])
+    perks_cb = ttk.Checkbutton(content, text="Track slotted perks",
+                               variable=perks_var)
+    perks_cb.pack(anchor='w', pady=(0, PAD_SMALL))
+    add_tooltip(perks_cb,
+                "Adds a row of buff icons at the bottom of the panel showing "
+                "the AA perks detected on a player target — each player can "
+                "slot up to six. Takes effect on the next Build & Install.")
+
     btns = ttk.Frame(content)
     btns.pack(fill='x', side='bottom', pady=(PAD_SMALL, 0))
 
@@ -128,6 +148,8 @@ def open_inspect_dialog(app):
             'y': _read(y_var, cfg['y']),
             'fontSize': _read(size_var, cfg['fontSize']),
             'startCollapsed': collapsed_var.get(),
+            'showPvp': pvp_var.get(),
+            'showPerks': perks_var.get(),
         })
         app.settings.set('inspect', new_cfg)
         app.settings.save()

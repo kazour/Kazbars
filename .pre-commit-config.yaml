@@ -8,6 +8,7 @@ repos:
     hooks:
       - id: ruff-check
         args: [--fix]
+        fail_fast: true
 
   - repo: local
     hooks:
@@ -18,9 +19,16 @@ repos:
         files: ^src/kazbars/assets/kazbars/Database\.json$
         pass_filenames: false
 
+      - id: gen-inventory
+        name: regenerate inventory line counts
+        entry: python scripts/gen_inventory.py
+        language: system
+        files: ^(src/kazbars|tests)/[A-Za-z0-9_]+\.py$
+        pass_filenames: false
+
       - id: pytest-smoke
         name: pytest smoke tests
-        entry: pytest tests/ -q
+        entry: uv run pytest -q --tb=no
         language: system
         pass_filenames: false
-        always_run: true
+        files: ^(src/|tests/|docs/|pyproject\.toml$)

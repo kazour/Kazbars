@@ -368,9 +368,12 @@ class CodeGenerator:
         """AS2 `d.INS = {...}` literal for the target inspect panel."""
         c = self.inspect_config
         collapsed = "true" if c["startCollapsed"] else "false"
+        show_pvp = "true" if c["showPvp"] else "false"
+        show_perks = "true" if c["showPerks"] else "false"
         return (
             f"\n        d.INS = {{x: {int(c['x'])}, y: {int(c['y'])}, "
-            f"fontSize: {int(c['fontSize'])}, collapsed: {collapsed}}};"
+            f"fontSize: {int(c['fontSize'])}, collapsed: {collapsed}, "
+            f"showPvp: {show_pvp}, showPerks: {show_perks}}};"
         )
 
     def _data_class(self):
