@@ -577,6 +577,33 @@ SECTIONS: list[_Section] = [
                 "Targets that aren't level 80 show raw ratings without the "
                 'percent decodes — the conversions are level-80 measurements.',
             ]),
+            _sub('The Perks row', [
+                'On player targets, a Perks row at the bottom shows the AA '
+                "perks detected on the target, mirroring the game's own perk "
+                'bar: six boxes in three color-coded pairs — two blue for '
+                'General, two red for Archetype, two dark for Class. Each '
+                'perk sits in its own pair, so the color tells you what kind '
+                'of perk it is.',
+                "Three of every class's seven perks cost both Class slots. "
+                'The panel paints those across both dark boxes the way the '
+                'game does, so a double-slot perk reads as two identical '
+                'icons.',
+                "An empty box means the target hasn't slotted anything there, "
+                "or the slot holds an active perk that isn't running — the "
+                'row reads perk buffs, so an active perk shows only while its '
+                'effect is up. A few perks buff nearby allies, so an icon can '
+                'also mean the target received it from a groupmate.',
+            ]),
+            _sub('Sections', [
+                [('The PvP block and the Perks row are each behind a toggle '
+                  "in the dialog's Sections group — ", None),
+                 ('Show the PvP section', _SUCCESS),
+                 (' and ', None),
+                 ('Track slotted perks', _SUCCESS),
+                 (', both on by default. Untick one and the next ', None),
+                 ('Build & Install', _SUCCESS),
+                 (' leaves it out of the overlay.', None)],
+            ]),
             _sub('Positioning and text size', [
                 'Drag the panel by its name strip; live coordinates show as '
                 'you drag. Type them into the dialog to pin a spot. The − '

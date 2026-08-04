@@ -59,6 +59,15 @@ def test_validate_bad_values_fall_back():
     assert out["fontSize"] == INSPECT_DEFAULTS["fontSize"]
 
 
+def test_section_toggles_default_on_and_coerce():
+    cfg = get_default_config()
+    assert cfg["showPvp"] is True
+    assert cfg["showPerks"] is True
+    assert validate_config({"showPvp": 0})["showPvp"] is False
+    assert validate_config({"showPerks": 0})["showPerks"] is False
+    assert validate_config({"showPerks": "garbage"})["showPerks"] is True
+
+
 def test_validate_non_dict_returns_defaults():
     assert validate_config(None) == INSPECT_DEFAULTS
     assert validate_config("nope") == INSPECT_DEFAULTS

@@ -287,7 +287,8 @@ def test_inspect_on_emits_hooks_and_data():
     gen = CodeGenerator(
         [_minimal_grid()], _load_db(), "0.0.0",
         inspect_config={"enabled": True, "x": 40, "y": 240, "fontSize": 14,
-                        "startCollapsed": True},
+                        "startCollapsed": True, "showPvp": True,
+                        "showPerks": False},
     )
     main_code, data_code = gen.generate()
     assert gen.include_inspect
@@ -308,7 +309,8 @@ def test_inspect_on_emits_hooks_and_data():
     assert main_code.count("inspect.saveState(config);") == 2
 
     # Data block
-    assert "d.INS = {x: 40, y: 240, fontSize: 14, collapsed: true};" in data_code
+    assert ("d.INS = {x: 40, y: 240, fontSize: 14, collapsed: true, "
+            "showPvp: true, showPerks: false};" in data_code)
 
     # No leftover tokens
     assert "{{INS_" not in main_code
