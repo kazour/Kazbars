@@ -33,6 +33,8 @@ _SCHEMA = Schema('inspect', 1, {
     "y": Field(240, kind='int', min=0, max=SCREEN_MAX_Y),
     "fontSize": Field(12, kind='int', min=8, max=48),
     "startCollapsed": Field(False, kind='bool'),
+    "showPvp": Field(True, kind='bool'),
+    "showPerks": Field(True, kind='bool'),
 })
 
 INSPECT_DEFAULTS = get_defaults(_SCHEMA)
