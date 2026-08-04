@@ -100,7 +100,7 @@
 | `tests/test_deeps_settings.py` | 517 |
 | `tests/test_deeps_trackers.py` | 271 |
 | `tests/test_design_tokens.py` | 91 |
-| `tests/test_docs_in_sync.py` | 267 |
+| `tests/test_docs_in_sync.py` | 301 |
 | `tests/test_focus_watcher.py` | 96 |
 | `tests/test_foreground.py` | 95 |
 | `tests/test_grid_model.py` | 79 |
