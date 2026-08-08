@@ -21,6 +21,7 @@ from . import game_folder, profile_io
 from .app_popups import show_close_game_required_dialog
 from .build_loading import BuildLoadingScreen
 from .build_utils import find_compiler
+from .cast_timer import validate_config as validate_cast_config
 from .grids_generator import MAX_TOTAL_SLOTS
 from .ui_helpers import THEME_COLORS
 from .ui_widgets import app_toast, confirm, flash_status_bar
@@ -138,7 +139,7 @@ def build(app):
         'compiler': compiler,
         'app_version': app.app_version,
         'include_console': bool(app.settings.get('build_console', False)),
-        'cast_config': app.grids_panel.get_cast_timer_config(),
+        'cast_config': validate_cast_config(app.settings.get('cast_timer')),
         'stopwatch_config': app.settings.get('stopwatch'),
         'inspect_config': app.settings.get('inspect'),
         'game_path': app.game_path,

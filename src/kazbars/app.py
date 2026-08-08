@@ -126,6 +126,7 @@ class KazBarsApp(ttkb.Window):
         self.damage_numbers_panel = None
         self.stopwatch_dialog = None
         self.inspect_dialog = None
+        self.cast_timer_dialog = None
         self._profile_manager = None
 
         # One shared focus gate for every overlay: hides them whenever neither
@@ -396,6 +397,8 @@ class KazBarsApp(ttkb.Window):
              'command': self._open_stopwatch_settings},
             {'type': 'command', 'label': 'Inspect panel…',
              'command': self._open_inspect_settings},
+            {'type': 'command', 'label': 'Cast timer…',
+             'command': self._open_cast_timer_settings},
         ])
         self._menubar.add_cascade(label="Updates", menu_def=[
             {'type': 'checkbutton', 'label': 'Automatically update the buff database (recommended)',
@@ -540,6 +543,11 @@ class KazBarsApp(ttkb.Window):
         """Open the Inspect Panel settings dialog (modal)."""
         from .inspect_panel import open_inspect_dialog
         open_inspect_dialog(self)
+
+    def _open_cast_timer_settings(self):
+        """Open the Cast Timer settings dialog (modal)."""
+        from .cast_timer_panel import open_cast_timer_dialog
+        open_cast_timer_dialog(self)
 
     def _open_backup_dialog(self):
         """Open the Backup & Restore settings dialog."""

@@ -120,6 +120,7 @@ OPENERS = [
     ('_open_buff_display_editor', _find_buff_display_dialog),
     ('_open_stopwatch_settings', lambda a: a.stopwatch_dialog),
     ('_open_inspect_settings', lambda a: a.inspect_dialog),
+    ('_open_cast_timer_settings', lambda a: a.cast_timer_dialog),
     ('_show_about', lambda a: a._about_popup),
 ]
 

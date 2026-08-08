@@ -422,23 +422,49 @@ SECTIONS: list[_Section] = [
         'id': 'cast-timer',
         'title': 'Cast Timer',
         'body': [
-            "A timer-only overlay for your own and your target's cast time — "
-            "floating text over the game's cast bar, with no bar of its own. "
-            'Off by default.',
+            'Extras → Cast timer… adds a timer-only overlay for your own and '
+            "your target's cast time — floating text over the game's cast bar, "
+            'with no bar of its own. Off by default; when off, the build '
+            'carries no cast-timer code at all.',
             _sub('Turn it on', [
-                'Open the Cast Timer strip pinned above the grid list and flip '
-                'Enabled. One toggle runs both the Player and Target sides.',
+                [('Open the dialog, tick ', None),
+                 ('Include the cast timer in builds', _SUCCESS),
+                 (', then ', None),
+                 ('Apply', _SUCCESS),
+                 (' — it saves and closes the window. Cancel, Escape or the X '
+                  'discard everything you changed.', None)],
+                [('Nothing reaches the game until your next ', None),
+                 ('Build & Install', _SUCCESS),
+                 (', same as grids. One toggle runs both the Player and '
+                  'Target sides.', None)],
             ]),
-            _sub('Settings', [
-                'Player / Target X/Y — where each timer sits on screen.',
-                'Bold, Size, Color — shared by both sides.',
+            _sub('What you can set', [
+                'Player position and Target position — where each timer sits '
+                'on screen.',
+                'Text — Bold, Font size (8–48) and Color, shared by both '
+                'timers. The sample beside them shows what the overlay will '
+                'draw.',
                 'Show — Elapsed counts up, Total is the estimated cast length, '
                 'Both shows 1.2 / 2.5.',
             ]),
             _sub('Positioning', [
-                'Set X/Y in the strip, or press Shift+Ctrl+Alt in-game to drag '
-                'the timer. Rebuild and reload to apply.',
+                'Type X/Y into the dialog, or press Shift+Ctrl+Alt in-game to '
+                'toggle preview mode and drag each timer — coordinates show as '
+                'you drag, ready to copy back. Aoc.exe clients remember drags '
+                'on their own.',
             ]),
+            _sub('Saved on this PC, not in your profile', [
+                'Cast-timer settings live with your app preferences, the same '
+                'as the stopwatch and the inspect panel — the positions depend '
+                'on your screen, not on your buff layout. So switching '
+                'profiles leaves the timer alone, and a profile someone shares '
+                'with you no longer carries their positions.',
+            ]),
+            _note(
+                'If you had a cast timer set before this version, open the '
+                'dialog and set it once more. Your old profiles still hold the '
+                'values, but nothing reads them any more.',
+                _WARNING),
         ],
     },
     {

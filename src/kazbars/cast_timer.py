@@ -3,8 +3,10 @@ KazBars — Cast Timer config (pure data layer).
 
 Defaults + validation for the cast-timer overlay: a timer-only Flash overlay
 (no bar) showing cast time for the player and/or target. Configured via the
-frozen strip at the top of the Grids panel; persisted in the profile under
-`cast_timer` (like `boss_timer`). No Tk — importable by the codegen and tests.
+Extras-menu dialog (`cast_timer_panel.py`); persisted machine-local in
+prefs.json under `cast_timer` (like `stopwatch` and `inspect` — not per-profile,
+since screen position depends on the machine's resolution). No Tk — importable
+by the codegen, prefs schema, and tests.
 
 Positioning mirrors grids: `playerX/Y` and `targetX/Y` are baked into the
 generated SWF (the only positions that survive relaunch on `/loadclip` default
@@ -42,8 +44,10 @@ def validate_color(hex_str):
 
 
 # Master on/off for the whole overlay; per-side enableP/enableT pick which sides
-# show when the master is on. Off by default — nothing compiles until the user
-# turns it on.
+# show when the master is on. No UI splits them — the dialog writes all three from
+# its one master toggle — but the generator reads them per side, so they stay in the
+# schema as its contract and as the hook a per-side option would use. Off by
+# default — nothing compiles until the user turns it on.
 _SCHEMA = Schema('cast_timer', 1, {
     "enabled": Field(False, kind='bool'),
     "enableP": Field(False, kind='bool'),

@@ -122,9 +122,8 @@ def position_entry(
 
     Spinbox stepping doesn't fit thousands of pixels, so this is a plain Entry
     that key-validates to int (allowing transient '' / '-') and clamps to
-    [lo, hi] on focus-out. Shared by the grid cards and the cast-timer strip so
-    their X/Y columns are built identically. `on_change`, if given, fires after
-    the clamp. Returns the Entry so callers can grey it when disabled.
+    [lo, hi] on focus-out. `on_change`, if given, fires after the clamp. Returns
+    the Entry so callers can grey it when disabled.
     """
     lbl = ttk.Label(parent, text=label, font=label_font)
     if label_color:
