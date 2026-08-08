@@ -13,7 +13,8 @@
 // rebuilds the clip in place rather than reflowing every child.
 //
 // Drag is clamped to the Stage and the position and fold state persist in the
-// module config archive (cnx/cny/cnc) beside the pin and the two log toggles.
+// module config archive (cnx/cny/cnc) beside the master switch (cnv) and the
+// two log toggles.
 class KazBarsConsole {
     private var owner:Object;
     private var rootClip:MovieClip;
@@ -120,10 +121,15 @@ class KazBarsConsole {
         return (consoleClip != null);
     }
 
-    // Preview-mode control panel only: a hard hide of the whole plate, restored
-    // on the way out of preview. Logging carries on underneath.
-    public function setShown(shown:Boolean):Void {
-        if (consoleClip != null) consoleClip._visible = shown;
+    // Master switch: the console's active state IS the clip's existence.
+    // createConsole/removeConsole already carry logs, position and fold across
+    // the flip, so no second flag can drift from the truth.
+    public function setActive(shown:Boolean):Void {
+        if (shown) {
+            if (consoleClip == null) createConsole();
+        } else {
+            removeConsole();
+        }
     }
 
     public function createConsole():Void {
@@ -178,13 +184,6 @@ class KazBarsConsole {
         tcb.hit.onPress = function() {
             self.logTargetEnabled = !self.logTargetEnabled;
             self.rebuild();
-        };
-
-        var kcb:MovieClip = makeCheckbox("kcb", PAD * 2, CH - 24, "Keep Open",
-                                         owner.consolePinned, 104);
-        kcb.hit.onPress = function() {
-            self.owner.consolePinned = !self.owner.consolePinned;
-            this._parent.chk._visible = self.owner.consolePinned;
         };
 
         var clr:MovieClip = m_Body.createEmptyMovieClip("clr", m_Body.getNextHighestDepth());

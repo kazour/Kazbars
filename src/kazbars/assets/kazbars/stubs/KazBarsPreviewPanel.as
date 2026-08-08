@@ -10,10 +10,12 @@
 // not fold — it only exists while preview mode is on, and folding a panel whose
 // whole job is showing which things are hidden would hide the answer.
 //
-// Rows are rebuilt on every preview entry and every box starts checked: the
-// checks are a positioning aid, not a setting, so none of them persist. The drag
-// position does, in the module config archive (ppx/ppy) beside the other panels'
-// keys.
+// Rows are rebuilt on every preview entry, each one seeded from what the item
+// is actually doing right now, and a box IS that item's master switch: unchecked
+// survives the exit and the relog. The panel itself stays stateless — the owner
+// persists the grid flags (g<i>_v) and each stub persists its own (swv/inv/ctv/
+// cnv). Its own drag position rides in the module config archive as ppx/ppy,
+// beside the other panels' keys.
 class KazBarsPreviewPanel {
     private var owner:Object;
     private var rootClip:MovieClip;
@@ -22,7 +24,7 @@ class KazBarsPreviewPanel {
     private var dragMC:MovieClip;
     private var titleTF:TextField;
     private var coordTF:TextField;
-    // {mc, key, label, checked, cb} — mc set for grids, key for extras.
+    // {obj, key, label, checked, cb} — obj set for grids, key for extras.
     private var rows:Array;
     private var posX:Number;
     private var posY:Number;
@@ -68,17 +70,19 @@ class KazBarsPreviewPanel {
     // Row collection — begin() then one add per thing that can be hidden
     // =========================================================================
 
-    // Dropping the array IS the all-checked reset: every row is rebuilt checked.
+    // Rows are rebuilt from scratch every entry and each add seeds its check
+    // from live state, so the panel never carries a stale flag between entries.
     public function begin():Void {
         rows = new Array();
     }
 
     public function addGrid(obj:Object):Void {
-        rows.push({mc: obj.mc, key: null, label: String(obj.cfg.id), checked: true, cb: null});
+        rows.push({obj: obj, key: null, label: String(obj.cfg.id),
+                   checked: (obj.shown == true), cb: null});
     }
 
-    public function addExtra(label:String, key:String):Void {
-        rows.push({mc: null, key: key, label: label, checked: true, cb: null});
+    public function addExtra(label:String, key:String, checked:Boolean):Void {
+        rows.push({obj: null, key: key, label: label, checked: (checked == true), cb: null});
     }
 
     // =========================================================================
@@ -173,7 +177,7 @@ class KazBarsPreviewPanel {
     // The one dispatch point: a grid is its clip, an extra is a key the owner
     // knows how to route to whichever stub it belongs to.
     private function applyRow(r:Object):Void {
-        if (r.mc != null) r.mc._visible = r.checked;
+        if (r.obj != null) { r.obj.shown = r.checked; r.obj.mc._visible = r.checked; }
         else owner.previewToggle(r.key, r.checked);
     }
 
@@ -333,7 +337,7 @@ class KazBarsPreviewPanel {
     }
 
     // Preview is over: the clip goes, and the rows go with it so no stale grid
-    // clip reference outlives the grids it points at.
+    // object reference outlives the grids it points at.
     public function destroy():Void {
         capturePos();
         if (panelClip != null) { panelClip.removeMovieClip(); panelClip = null; }

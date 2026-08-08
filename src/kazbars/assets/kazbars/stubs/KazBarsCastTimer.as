@@ -5,7 +5,9 @@
 //
 // Positioning mirrors grids: PLAYER_X/Y + TARGET_X/Y are baked into config and
 // are the only positions that survive relaunch on /loadclip default clients;
-// preview drag persists via the config archive for aoc.exe clients.
+// preview drag persists via the config archive for aoc.exe clients, as does the
+// preview control panel's master switch (ctv) — inactive renders nothing, live
+// casts included.
 //
 // Driven from KazBars: createFields() in onLoad, connectPlayer()/setTarget()
 // from the existing player/target lifecycle, previewOn()/previewOff() from the
@@ -38,10 +40,12 @@ class KazBarsCastTimer {
     private var targetData:Object;
     private var driverClip:MovieClip;
     private var previewMode:Boolean;
+    private var active:Boolean;
 
     public function KazBarsCastTimer(kb:Object, root:MovieClip) {
         rootClip = root;
         previewMode = false;
+        active = true;
         playerData = newCastData();
         targetData = newCastData();
     }
@@ -189,7 +193,7 @@ class KazBarsCastTimer {
         if (ch != null) {
             try { data.initialProgress = clamp01(ch.GetCommandProgress()); } catch (e:Object) {}
         }
-        clip._visible = true;
+        clip._visible = active;
         setText(clip, "");
         startDriver();
         update();
@@ -300,14 +304,36 @@ class KazBarsCastTimer {
 
     public function previewOn():Void {
         previewMode = true;
+        if (!active) return;
         if (m_PlayerClip != null) showPreview(m_PlayerClip, 0x0066FF, "Player Cast");
         if (m_TargetClip != null) showPreview(m_TargetClip, 0xFF0066, "Target Cast");
     }
 
     public function previewOff():Void {
         previewMode = false;
-        hidePreview(m_PlayerClip, playerData.casting);
-        hidePreview(m_TargetClip, targetData.casting);
+        // An inactive timer must not survive preview exit on the strength of a
+        // live cast — the master switch outranks the cast state.
+        hidePreview(m_PlayerClip, playerData.casting && active);
+        hidePreview(m_TargetClip, targetData.casting && active);
+    }
+
+    // Master switch (preview control panel + archive). Hiding is a hard hide of
+    // both clips (the drag overlay is a child, so it follows); re-activating
+    // mid-preview rebuilds the placeholders, mid-cast re-shows the live timer.
+    public function isActive():Boolean {
+        return active;
+    }
+
+    public function setActive(shown:Boolean):Void {
+        active = shown;
+        if (shown) {
+            if (previewMode) { previewOn(); return; }
+            if (playerData.casting && m_PlayerClip != null) m_PlayerClip._visible = true;
+            if (targetData.casting && m_TargetClip != null) m_TargetClip._visible = true;
+        } else {
+            if (m_PlayerClip != null) m_PlayerClip._visible = false;
+            if (m_TargetClip != null) m_TargetClip._visible = false;
+        }
     }
 
     private function showPreview(clip:MovieClip, col:Number, title:String):Void {
@@ -363,6 +389,8 @@ class KazBarsCastTimer {
         if (config == null) return;
         applyPos(m_PlayerClip, config.FindEntry("ctpx"), config.FindEntry("ctpy"));
         applyPos(m_TargetClip, config.FindEntry("cttx"), config.FindEntry("ctty"));
+        var v:Object = config.FindEntry("ctv");
+        if (v !== undefined) setActive(v == 1);
     }
 
     private function applyPos(clip:MovieClip, x:Object, y:Object):Void {
@@ -374,6 +402,7 @@ class KazBarsCastTimer {
         if (config == null) return;
         if (m_PlayerClip != null) { config.ReplaceEntry("ctpx", m_PlayerClip._x); config.ReplaceEntry("ctpy", m_PlayerClip._y); }
         if (m_TargetClip != null) { config.ReplaceEntry("cttx", m_TargetClip._x); config.ReplaceEntry("ctty", m_TargetClip._y); }
+        config.ReplaceEntry("ctv", active ? 1 : 0);
     }
 
     public function cleanup():Void {
