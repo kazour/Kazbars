@@ -33,6 +33,7 @@ class KazBarsStopwatch {
     private var H:Number;         // 8.0   expanded plate
     private var H_COLLAPSED:Number; // 2.0  its collapsed bar
     private var TITLE_H:Number;   // 1.85  title band, above the rule
+    private var COLL_PAD:Number;  // 0.55  collapsed-bar inset (inspect/console)
     private var BTN:Number;       // 1.1   collapse glyph box
     private var NAME_FS:Number;   // 1.15  title font
     private var TIME_FS:Number;   // 2.0   time readout font
@@ -51,6 +52,7 @@ class KazBarsStopwatch {
     private var chrome:MovieClip;
     private var dragMC:MovieClip;
     private var titleTF:TextField;
+    private var collTF:TextField;
     private var coordTF:TextField;
     private var timeTF:TextField;
     private var btnStart:MovieClip;
@@ -97,6 +99,7 @@ class KazBarsStopwatch {
         H = Math.round(FS * 8);
         H_COLLAPSED = Math.round(FS * 2);
         TITLE_H = Math.round(FS * 1.85);
+        COLL_PAD = Math.round(FS * 0.55);
         BTN = Math.round(FS * 1.1);
         NAME_FS = Math.round(FS * 1.15);
         TIME_FS = Math.round(FS * 2);
@@ -123,6 +126,11 @@ class KazBarsStopwatch {
         titleTF = makeTF(m_Panel, "title", PAD, 0, W - PAD * 2 - BTN, NAME_H,
                          NAME_FS, true, 0xF7A22B, "left");
         titleTF.text = "Stopwatch";
+
+        // Separate collapsed label at the base font size, swapped on _visible —
+        // the inspect/console convention, so the three collapsed bars match.
+        collTF = makeTF(m_Panel, "coll", COLL_PAD, 0, W - COLL_PAD * 2 - BTN,
+                        LINE_H, FS, true, 0xF7A22B, "left");
 
         // Live position readout — visible only while dragging (the value a
         // /loadclip user copies into the app to make a spot permanent). Shares
@@ -307,7 +315,7 @@ class KazBarsStopwatch {
         if (txt == lastText) return;
         lastText = txt;
         timeTF.text = txt;
-        if (collapsed) titleTF.text = txt;
+        if (collapsed) collTF.text = txt;
     }
 
     private function formatTime(ms:Number):String {
@@ -338,19 +346,26 @@ class KazBarsStopwatch {
         applyCollapsed();
     }
 
-    // One plate at two heights — the stopwatch's identity is the live time in
-    // its own title band, so folding keeps the band and drops the body. What
-    // moves is everything sitting on that band: title, readout, button and the
-    // drag strip all re-centre on whichever height is on screen.
+    // One plate at two heights — folding keeps the title band and drops the
+    // body, and the title swaps to the collapsed label. Everything sitting on
+    // the band — label, readout, button and the drag strip — re-centres on
+    // whichever height is on screen, at the state's own inset.
     private function applyCollapsed():Void {
         var band:Number = collapsed ? H_COLLAPSED : TITLE_H;
+        var pad:Number = collapsed ? COLL_PAD : PAD;
         m_Body._visible = !collapsed;
-        titleTF._y = Math.floor((band - NAME_H) / 2);
+        titleTF._visible = !collapsed;
+        collTF._visible = collapsed;
+        titleTF._y = Math.floor((TITLE_H - NAME_H) / 2);
+        collTF._y = Math.floor((H_COLLAPSED - LINE_H) / 2);
+        coordTF._x = pad;
         coordTF._y = Math.floor((band - LINE_H) / 2);
+        coordTF._width = W - pad * 2 - BTN;
+        collapseBtn._x = W - pad - BTN;
         collapseBtn._y = Math.floor((band - BTN) / 2);
         dragMC.clear();
         dragMC.beginFill(0, 0);
-        rectPath(dragMC, 0, 0, W - PAD - BTN, band);
+        rectPath(dragMC, 0, 0, W - pad - BTN, band);
         dragMC.endFill();
         drawChrome(collapsed ? H_COLLAPSED : H);
         collapseBtn.label.text = collapsed ? "+" : "-";
@@ -358,7 +373,7 @@ class KazBarsStopwatch {
     }
 
     private function syncTitle():Void {
-        titleTF.text = (collapsed && (running || paused)) ? lastText : "Stopwatch";
+        collTF.text = (running || paused) ? lastText : "Stopwatch";
     }
 
     public function beginDrag(da:MovieClip):Void {

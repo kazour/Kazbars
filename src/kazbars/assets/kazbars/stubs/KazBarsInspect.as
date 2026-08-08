@@ -46,6 +46,8 @@ class KazBarsInspect {
     private var COL_GAP:Number;   // 0.85  label -> value gap
     private var VALUE_W:Number;   // 12.0  value column
     private var NAME_FS:Number;   // 1.15  name header font size
+    private var TITLE_H:Number;   // 1.85  title band — the stopwatch's, so the
+                                  //       family's expanded title bars match
     private var NAME_GAP:Number;  // 0.5   name -> first section header
     private var SECT_GAP:Number;  // 0.75  space above a section header
     private var RULE_GAP:Number;  // 0.2   header baseline -> 1px rule
@@ -321,6 +323,7 @@ class KazBarsInspect {
         COL_GAP = Math.round(FS * 0.85);
         VALUE_W = Math.round(FS * 12);
         NAME_FS = Math.round(FS * 1.15);
+        TITLE_H = Math.round(FS * 1.85);
         NAME_GAP = Math.round(FS * 0.5);
         SECT_GAP = Math.round(FS * 0.75);
         RULE_GAP = Math.round(FS * 0.2);
@@ -364,8 +367,10 @@ class KazBarsInspect {
         // Everything below the name strip, so collapsing is one _visible toggle.
         body = m_Panel.createEmptyMovieClip("body", m_Panel.getNextHighestDepth());
 
-        nameTF = makeTF(m_Panel, "name", PAD, PAD, W - PAD * 2 - BTN, Math.round(NAME_FS * 1.4),
-                        NAME_FS, true, 0xF7A22B, "center");
+        nameTF = makeTF(m_Panel, "name", PAD,
+                        Math.floor((TITLE_H - Math.round(NAME_FS * 1.4)) / 2),
+                        W - PAD * 2 - BTN, Math.round(NAME_FS * 1.4),
+                        NAME_FS, true, 0xF7A22B, "left");
         // Collapsed, the bar carries a static label and nothing else — no
         // target name, so no reason for a pass to read one. Its own field
         // rather than a re-formatted name strip: a TextFormat swap per fold
@@ -449,9 +454,10 @@ class KazBarsInspect {
         pvpValTF.text = lastPvp;
 
         // Shown only while dragging — the value a /loadclip user copies back
-        // into the app.
-        coordTF = makeTF(m_Panel, "coords", PAD, PAD, LABEL_W, Math.round(FS * 1.3),
-                         Math.max(9, Math.round(FS * 0.8)), false, 0x999999, "left");
+        // into the app. Right-aligned against the collapse glyph, the family
+        // convention (stopwatch, console), so it stays clear of the name.
+        coordTF = makeTF(m_Panel, "coords", PAD, PAD, W - PAD * 2 - BTN, Math.round(FS * 1.3),
+                         Math.max(9, Math.round(FS * 0.8)), false, 0x999999, "right");
         coordTF._visible = false;
 
         // Name strip only: a whole-plate drag would eat combat clicks.
@@ -463,7 +469,7 @@ class KazBarsInspect {
 
         collapseBtn = m_Panel.createEmptyMovieClip("btnCollapse", m_Panel.getNextHighestDepth());
         collapseBtn._x = W - PAD - BTN;
-        collapseBtn._y = PAD;
+        collapseBtn._y = Math.floor((TITLE_H - BTN) / 2);
         collapseBtn._self = this;
         collapseBtn.useHandCursor = true;
         var btf:TextField = makeTF(collapseBtn, "label", 0, 0, BTN, BTN + 2,
@@ -523,8 +529,8 @@ class KazBarsInspect {
 
     private function layout():Void {
         if (m_Panel == null) return;
-        titleH = PAD + nameTF._height + PAD;
-        var y:Number = PAD + nameTF._height + NAME_GAP;
+        titleH = TITLE_H;
+        var y:Number = TITLE_H + NAME_GAP;
 
         pveHdrTF._y = y;
         y += pveHdrTF._height + RULE_GAP;
@@ -596,9 +602,11 @@ class KazBarsInspect {
         curH = collapsed ? COLL_H : fullH;
         var pad:Number = collapsed ? COLL_PAD : PAD;
         collapseBtn._x = curW - pad - BTN;
-        collapseBtn._y = collapsed ? Math.floor((COLL_H - BTN) / 2) : PAD;
+        collapseBtn._y = Math.floor(((collapsed ? COLL_H : TITLE_H) - BTN) / 2);
         coordTF._x = pad;
-        coordTF._y = collapsed ? collTF._y : PAD;
+        coordTF._y = collapsed ? collTF._y
+                               : Math.floor((TITLE_H - Math.round(FS * 1.3)) / 2);
+        coordTF._width = curW - pad * 2 - BTN;
         // Stops short of the collapse button so it keeps its own press. The
         // strip is the title line only when expanded — a whole-plate drag
         // would eat combat clicks — but collapsed the bar IS the title line.
@@ -620,9 +628,14 @@ class KazBarsInspect {
         rectPath(bg, 0, 0, w, h);
         bg.lineStyle(1, 0x4A3B22, 100);
         rectPath(bg, 1, 1, w - 2, h - 2);
-        // Section-header rules; a negative offset means that section is off
-        // screen (collapsed, or a target with no PvP block).
+        // Title separator (expanded only — collapsed the bar IS the title
+        // line), then the section-header rules; a negative offset means that
+        // section is off screen (collapsed, or a target with no PvP block).
         bg.lineStyle(1, 0x6B5324, 100);
+        if (h > COLL_H) {
+            bg.moveTo(PAD, TITLE_H);
+            bg.lineTo(W - PAD, TITLE_H);
+        }
         if (rule1 >= 0) {
             bg.moveTo(PAD, rule1);
             bg.lineTo(W - PAD, rule1);

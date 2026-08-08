@@ -325,8 +325,9 @@ Every dimension is `Math.round(FS × ratio)`, so the whole panel scales as one p
 | `COL_GAP` | 0.85 | 10 | label column → value column |
 | `VALUE_W` | 12.0 | 144 | value column (fits a boss health line) |
 | `NAME_FS` | 1.15 | 14 | name header font size |
+| `TITLE_H` | 1.85 | 22 | title band — name left-aligned and vertically centred in it, hairline rule under it; the stopwatch's own band ratio, so the family's expanded title bars match |
 | `BTN` | 1.1 | 13 | collapse-button box; name field and drag hitbox both stop short of it |
-| `NAME_GAP` | 0.5 | 6 | name strip → first section header |
+| `NAME_GAP` | 0.5 | 6 | title-band rule → first section header |
 | `SECT_GAP` | 0.75 | 9 | space above a section header |
 | `RULE_GAP` | 0.2 | 2 | section header bottom → rule top |
 | `ROWS_GAP` | 0.4 | 5 | rule → first stat row |
@@ -339,7 +340,7 @@ Every dimension is `Math.round(FS × ratio)`, so the whole panel scales as one p
 | `COLL_PAD` | 0.55 | 7 | collapsed bar padding |
 | `W` | 2·`PAD` + `LABEL_W` + `COL_GAP` + `VALUE_W` | 277 | total footprint — derived, never fixed |
 
-`W` measures the outer black frame; both 1px frames sit inside it. Rules run from `x = PAD` to `W − PAD` — one per visible section header, so up to three (PvE / PvP / Perks), replayed on collapse from the last layout pass. Both columns are single left-aligned multiline `TextField`s sharing one `TextFormat`, so rows stay baseline-aligned; headers are their own bold fields. The perk boxes are 1px `COL_RULE` outlines drawn once at create.
+`W` measures the outer black frame; both 1px frames sit inside it. Rules run from `x = PAD` to `W − PAD` — one under the title band (expanded only; collapsed the bar *is* the title line) plus one per visible section header, so up to four (title / PvE / PvP / Perks), the section three replayed on collapse from the last layout pass. Both columns are single left-aligned multiline `TextField`s sharing one `TextFormat`, so rows stay baseline-aligned; headers are their own bold fields. The perk boxes are 1px `COL_RULE` outlines drawn once at create.
 
 Hovering a filled perk box names it: a chip in `COL_LABEL` on a `COL_BG` plate at **alpha 100** — the one opaque surface in the panel, since it lands on top of the icons and the Perks rule — with the usual 1px `COL_FRAME_IN` border, drawn at the top depth of `m_Panel`, centred over its icon and clamped inside `[PAD, W − PAD]` so the end slots don't hang off the frame. The name comes from `PERK_NAMES`, a rank-indexed baked table (the icon instance doesn't identify the perk, and no name field is confirmed on a buff-list entry), so `placePerks` returns `{inst, rank}` and the ranks join the `renderPerks` cache key — two perks can share an icon, and the chip must not name the one that left.
 

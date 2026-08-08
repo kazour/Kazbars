@@ -4,11 +4,13 @@
 // docs/inspect-panel.md section 5): warm near-black plate, 1px black-over-bronze
 // double frame, Conan-orange title, bronze hairline rules, square corners. The
 // two columns keep their player/target identity, retuned onto the panel's own
-// perk-pair blue and red so the console reads as part of the same HUD. The
-// expanded footprint stays a fixed 500x320 — it is a transient discovery tool
-// with no font-size config, so its dimensions are named constants at the values
-// the panel's ratios land on at FS 12, and it folds to the same 190x24 bar the
-// stopwatch and inspect panel do.
+// perk-pair blue and red so the console reads as part of the same HUD. It is a
+// transient discovery tool with no font-size config, so its dimensions are
+// named constants at the values the panel's ratios land on at FS 12, and it
+// folds to the same 190x24 bar the stopwatch and inspect panel do. The expanded
+// footprint follows the checked sides — 500x320 with both columns, a single
+// 280-wide column with one, a short toggle strip with none — and a side flip
+// rebuilds the clip in place rather than reflowing every child.
 //
 // Drag is clamped to the Stage and the position and fold state persist in the
 // module config archive (cnx/cny/cnc) beside the pin and the two log toggles.
@@ -42,9 +44,16 @@ class KazBarsConsole {
     public var logPlayerEnabled:Boolean;
     public var logTargetEnabled:Boolean;
 
-    // Layout — the FS-12 equivalents of the inspect panel's ratios.
+    // Layout — the FS-12 equivalents of the inspect panel's ratios. CW/CH are
+    // the current build's expanded footprint, picked per checked sides.
     private var CW:Number;
     private var CH:Number;
+    private var CW_FULL:Number;   // both columns
+    private var CW_ONE:Number;    // one column (or none)
+    private var CH_FULL:Number;
+    private var CH_NONE:Number;   // no columns: title, toggles, bottom bar
+    private var CB_OFF:Number;    // header text -> its checkbox
+    private var UNIT:Number;      // header + checkbox pair width
     private var PAD:Number;
     private var TITLE_H:Number;
     private var HDR_Y:Number;
@@ -81,15 +90,21 @@ class KazBarsConsole {
         dragY = 0;
         logPlayerEnabled = true;
         logTargetEnabled = true;
-        CW = 500;
-        CH = 320;
+        CW_FULL = 500;
+        CW_ONE = 280;
+        CH_FULL = 320;
+        CH_NONE = 100;
+        CB_OFF = 110;
+        CW = CW_FULL;
+        CH = CH_FULL;
         PAD = 10;
-        TITLE_H = 25;
+        TITLE_H = 22;
         HDR_Y = 33;
         BODY_Y = 56;
         COL_W = 230;
         LINE = 17;
         BOX = 12;
+        UNIT = CB_OFF + BOX;
         BTN = 13;
         BTN_W = 60;
         BTN_H = 22;
@@ -111,34 +126,52 @@ class KazBarsConsole {
 
         var self:KazBarsConsole = this;
 
+        // Footprint follows the checked sides: two columns, a lone column, or
+        // just the toggle strip when both are off.
+        var both:Boolean = logPlayerEnabled && logTargetEnabled;
+        CW = both ? CW_FULL : CW_ONE;
+        CH = (logPlayerEnabled || logTargetEnabled) ? CH_FULL : CH_NONE;
+
         // Chrome is its own child clip, not the console's own graphics, so it
         // can be cleared and redrawn without taking the contents with it.
         chrome = consoleClip.createEmptyMovieClip("chrome", consoleClip.getNextHighestDepth());
         // Everything below the title line, so folding is one _visible toggle.
         m_Body = consoleClip.createEmptyMovieClip("body", consoleClip.getNextHighestDepth());
 
-        var tp:TextField = makeTF(m_Body, "tp", PAD, HDR_Y, COL_W, LINE + 2,
+        // Header + checkbox pairs survive an unchecked side — drop the pair
+        // and there is no way to bring the column back. A checked side keeps
+        // the left (or only) column; an unchecked pair parks right-aligned on
+        // the header line with nothing below it.
+        var px:Number = (!logPlayerEnabled && logTargetEnabled) ? CW - PAD - UNIT : PAD;
+        var tx:Number = both ? CW / 2 + PAD
+                             : (logTargetEnabled ? PAD : CW - PAD - UNIT);
+        var logW:Number = both ? COL_W : CW - PAD * 2;
+
+        var tp:TextField = makeTF(m_Body, "tp", px, HDR_Y, CB_OFF, LINE + 2,
                                   12, true, 0x7FB0D6, "left");
         tp.text = "PLAYER BUFFS";
-        var tt:TextField = makeTF(m_Body, "tt", CW / 2 + PAD, HDR_Y, COL_W, LINE + 2,
+        var tt:TextField = makeTF(m_Body, "tt", tx, HDR_Y, CB_OFF, LINE + 2,
                                   12, true, 0xD68585, "left");
         tt.text = "TARGET BUFFS";
 
-        playerText = makeLog("pt", PAD, playerLog);
-        targetText = makeLog("tt2", CW / 2 + PAD, targetLog);
+        playerText = null;
+        targetText = null;
+        if (logPlayerEnabled) playerText = makeLog("pt", PAD, logW, playerLog);
+        if (logTargetEnabled) targetText = makeLog("tt2", both ? CW / 2 + PAD : PAD,
+                                                   logW, targetLog);
 
-        var pcb:MovieClip = makeCheckbox("pcb", PAD + 130, HDR_Y + 2, null,
+        var pcb:MovieClip = makeCheckbox("pcb", px + CB_OFF, HDR_Y + 2, null,
                                          logPlayerEnabled, 20);
         pcb.hit.onPress = function() {
             self.logPlayerEnabled = !self.logPlayerEnabled;
-            this._parent.chk._visible = self.logPlayerEnabled;
+            self.rebuild();
         };
 
-        var tcb:MovieClip = makeCheckbox("tcb", CW / 2 + PAD + 130, HDR_Y + 2, null,
+        var tcb:MovieClip = makeCheckbox("tcb", tx + CB_OFF, HDR_Y + 2, null,
                                          logTargetEnabled, 20);
         tcb.hit.onPress = function() {
             self.logTargetEnabled = !self.logTargetEnabled;
-            this._parent.chk._visible = self.logTargetEnabled;
+            self.rebuild();
         };
 
         var kcb:MovieClip = makeCheckbox("kcb", PAD * 2, CH - 24, "Keep Open",
@@ -166,9 +199,10 @@ class KazBarsConsole {
         // Both title fields exist at once and swap on _visible: re-formatting one
         // field per fold would mean re-applying the TextFormat to its text every
         // time. Same reason the inspect panel carries a separate collapsed label.
-        titleTF = makeTF(consoleClip, "title", PAD, 4, CW - PAD * 2 - BTN, LINE + 4,
-                         14, true, 0xF7A22B, "center");
-        titleTF.text = "BUFF CONSOLE";
+        titleTF = makeTF(consoleClip, "title", PAD, Math.floor((TITLE_H - (LINE + 4)) / 2),
+                         CW - PAD * 2 - BTN, LINE + 4,
+                         14, true, 0xF7A22B, "left");
+        titleTF.text = "Buff Console";
         collTF = makeTF(consoleClip, "coll", COLL_PAD, Math.floor((COLL_H - LINE) / 2),
                         COLL_W - COLL_PAD * 2 - BTN, LINE, 12, true, 0xF7A22B, "left");
         collTF.text = "Console";
@@ -214,6 +248,14 @@ class KazBarsConsole {
         applyCollapsed();
     }
 
+    // A side flip changes the whole footprint, so the console rebuilds in
+    // place — logs live in the class strings and the position is captured
+    // and re-clamped, so nothing is lost.
+    private function rebuild():Void {
+        capturePos();
+        createConsole();
+    }
+
     // Two plates, not one at two heights: the 500x320 sheet, and the labelled
     // bar the stopwatch and inspect panel fold to. Everything that sits on the
     // title line — title, readout, glyph, drag strip — moves onto whichever
@@ -249,19 +291,26 @@ class KazBarsConsole {
         rectPath(chrome, 0, 0, w, h);
         chrome.lineStyle(1, 0x4A3B22, 100);
         rectPath(chrome, 1, 1, w - 2, h - 2);
-        // Bronze hairlines: under the title, under each column header, and one
-        // down the middle — the panel's section rules doing column duty.
-        // Collapsed the bar is the title line, so there is nothing to divide.
+        // Bronze hairlines: under the title, under each column that is on
+        // screen, and one down the middle when both are — the panel's section
+        // rules doing column duty. An unchecked side's parked pair gets no
+        // rule (nothing below it), and collapsed the bar is the title line,
+        // so there is nothing to divide.
         if (h > COLL_H) {
+            var both:Boolean = logPlayerEnabled && logTargetEnabled;
             chrome.lineStyle(1, 0x6B5324, 100);
             chrome.moveTo(PAD, TITLE_H);
             chrome.lineTo(CW - PAD, TITLE_H);
-            chrome.moveTo(PAD, BODY_Y - 5);
-            chrome.lineTo(PAD + COL_W, BODY_Y - 5);
-            chrome.moveTo(CW / 2 + PAD, BODY_Y - 5);
-            chrome.lineTo(CW / 2 + PAD + COL_W, BODY_Y - 5);
-            chrome.moveTo(CW / 2, TITLE_H);
-            chrome.lineTo(CW / 2, CH - 35);
+            if (logPlayerEnabled || logTargetEnabled) {
+                chrome.moveTo(PAD, BODY_Y - 5);
+                chrome.lineTo(PAD + (both ? COL_W : CW - PAD * 2), BODY_Y - 5);
+            }
+            if (both) {
+                chrome.moveTo(CW / 2 + PAD, BODY_Y - 5);
+                chrome.lineTo(CW / 2 + PAD + COL_W, BODY_Y - 5);
+                chrome.moveTo(CW / 2, TITLE_H);
+                chrome.lineTo(CW / 2, CH - 35);
+            }
         }
     }
 
@@ -285,8 +334,8 @@ class KazBarsConsole {
     // out. HTML so each entry can put its name in label grey and its id in
     // value green without a field per line. Lives on the body clip so a fold
     // takes it with everything else.
-    private function makeLog(id:String, x:Number, html:String):TextField {
-        var tf:TextField = makeTF(m_Body, id, x, BODY_Y, COL_W, CH - BODY_Y - 40,
+    private function makeLog(id:String, x:Number, w:Number, html:String):TextField {
+        var tf:TextField = makeTF(m_Body, id, x, BODY_Y, w, CH - BODY_Y - 40,
                                   11, false, 0xC8C0B0, "left");
         tf.selectable = true;
         tf.multiline = true;
