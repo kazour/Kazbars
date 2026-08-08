@@ -21,9 +21,9 @@ from kazbars.buff_xml import (
     _read_bufflistview,
     _write_bufflistview,
     read_source_color,
-    set_directions,
-    set_resource_loss_to_column,
+    read_source_direction,
     set_source_color,
+    set_source_direction,
 )
 
 SAMPLE = '''\
@@ -149,11 +149,10 @@ def test_filter_canonical_form_written():
 
 
 # =========================================================================== #
-# TextColors.xml — resource-loss flytext direction                            #
+# TextColors.xml — per-source flytext direction                               #
 # =========================================================================== #
-# Mixed attribute orders, a spaced `direction = "1"`, and a multi-line element —
-# plus a non-loss type (self_attacked) and the gain types (already -1) that must
-# never be touched.
+# Mixed attribute orders, a spaced `direction = "1"`, a multi-line element, and
+# one element with no direction attribute at all (xp_gained — the injection path).
 TEXTCOLORS = '''\
 <?xml version="1.0" encoding="UTF-8"?>
 <TextColors>
@@ -163,6 +162,7 @@ TEXTCOLORS = '''\
     <text name="stamina_lost"           direction="1"    color="0x888800" />
     <text name="mana_lost"              color="0x000088" direction="1" />
     <text name="stamina_loss_critical"  direction = "1" />
+    <text name="xp_gained"              color="0x111111" />
     <text name="mana_loss_critical"
           color="0x440000"
           direction="1" />
@@ -177,57 +177,55 @@ def _direction_of(xml, name):
     return d.group(1) if d else None
 
 
-def test_resource_loss_to_column_flips_only_loss_types():
-    new, flips = set_resource_loss_to_column(TEXTCOLORS, True)
-    assert flips == 4
-    for name in RESOURCE_LOSS_TYPES:
-        assert _direction_of(new, name) == '-1', name
-    # Non-loss type and the gains are untouched.
-    assert _direction_of(new, 'self_attacked') == '1'
-    assert _direction_of(new, 'stamina_gained') == '-1'
-    assert _direction_of(new, 'mana_gained') == '-1'
+def test_read_source_direction():
+    assert read_source_direction(TEXTCOLORS, 'self_attacked') == '1'
+    assert read_source_direction(TEXTCOLORS, 'stamina_gained') == '-1'
+    assert read_source_direction(TEXTCOLORS, 'stamina_loss_critical') == '1'  # spaced form
+    assert read_source_direction(TEXTCOLORS, 'xp_gained') is None   # element has no direction
+    assert read_source_direction(TEXTCOLORS, 'nonexistent') is None
 
 
-def test_resource_loss_restore_flips_back():
-    on, _ = set_resource_loss_to_column(TEXTCOLORS, True)
-    restored, flips = set_resource_loss_to_column(on, False)
-    assert flips == 4
-    assert restored == TEXTCOLORS          # byte-identical round trip
-    assert _direction_of(restored, 'self_attacked') == '1'
-
-
-def test_resource_loss_idempotent():
-    on, _ = set_resource_loss_to_column(TEXTCOLORS, True)
-    again, flips = set_resource_loss_to_column(on, True)
-    assert flips == 0          # nothing left to change
-    assert again == on
-
-
-def test_resource_loss_missing_types_is_noop():
-    text = '<TextColors><text name="self_attacked" direction="1" /></TextColors>'
-    new, flips = set_resource_loss_to_column(text, True)
-    assert flips == 0
-    assert new == text
-
-
-def test_resource_loss_preserves_surrounding_bytes():
-    new, _ = set_resource_loss_to_column(TEXTCOLORS, True)
-    assert '<?xml version="1.0" encoding="UTF-8"?>' in new
-    assert 'color="0x888800"' in new       # stamina_lost's other attrs intact
-    assert 'color="0x440000"' in new       # multi-line element's body intact
-
-
-def test_set_directions_flips_named_only():
-    new, flips = set_directions(TEXTCOLORS, ['self_attacked'], True)
-    assert flips == 1
+def test_set_source_direction_replaces_named_only():
+    new, changed = set_source_direction(TEXTCOLORS, 'self_attacked', -1)
+    assert changed is True
     assert _direction_of(new, 'self_attacked') == '-1'
-    assert _direction_of(new, 'stamina_lost') == '1'   # not named → untouched
-    new2, flips2 = set_directions(new, ['self_attacked'], False)  # restore
-    assert flips2 == 1
-    assert _direction_of(new2, 'self_attacked') == '1'
+    assert _direction_of(new, 'stamina_lost') == '1'      # not named → untouched
+    back, changed_back = set_source_direction(new, 'self_attacked', 1)
+    assert changed_back is True
+    assert back == TEXTCOLORS                             # byte-identical round trip
 
 
-def test_incoming_damage_types_are_self_prefixed():
+def test_set_source_direction_accepts_all_three_values():
+    for value in (1, -1, 0):
+        new, _ = set_source_direction(TEXTCOLORS, 'mana_lost', value)
+        assert _direction_of(new, 'mana_lost') == str(value)
+
+
+def test_set_source_direction_injects_when_missing():
+    new, changed = set_source_direction(TEXTCOLORS, 'xp_gained', -1)
+    assert changed is True
+    assert '<text name="xp_gained"              color="0x111111" direction="-1" />' in new
+    assert read_source_color(new, 'xp_gained') == '111111'   # color preserved
+
+
+def test_set_source_direction_idempotent_and_missing_element():
+    same, changed = set_source_direction(TEXTCOLORS, 'self_attacked', 1)  # already 1
+    assert changed is False and same == TEXTCOLORS
+    miss, c2 = set_source_direction(TEXTCOLORS, 'nope', -1)
+    assert c2 is False and miss == TEXTCOLORS
+
+
+def test_set_source_direction_preserves_surrounding_bytes():
+    new, _ = set_source_direction(TEXTCOLORS, 'mana_loss_critical', -1)
+    assert '<?xml version="1.0" encoding="UTF-8"?>' in new
+    assert 'color="0x440000"' in new       # multi-line element's body intact
+    assert 'color="0x888800"' in new       # sibling untouched
+
+
+def test_direction_group_lists():
+    # The colors panel's two macro checkboxes flip exactly these sets.
+    assert RESOURCE_LOSS_TYPES
+    assert all('lost' in n or 'loss' in n for n in RESOURCE_LOSS_TYPES)
     assert INCOMING_DAMAGE_TYPES
     assert all(n.startswith('self_') for n in INCOMING_DAMAGE_TYPES)
 

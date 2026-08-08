@@ -18,6 +18,7 @@ def test_defaults_disabled():
     cfg = get_default_config()
     assert cfg["enabled"] is False
     assert cfg["startCollapsed"] is False
+    assert cfg["fontSize"] == 12  # the FS the panel's ratios were tuned at
     # A fresh copy, not the shared module dict.
     cfg["enabled"] = True
     assert STOPWATCH_DEFAULTS["enabled"] is False
@@ -39,10 +40,17 @@ def test_validate_clamps_position():
     assert out["y"] == 0
 
 
+def test_validate_clamps_font_size():
+    assert validate_config({"fontSize": 4})["fontSize"] == 8
+    assert validate_config({"fontSize": 99})["fontSize"] == 48
+
+
 def test_validate_bad_values_fall_back():
-    out = validate_config({"x": "garbage", "y": None, "enabled": 1, "startCollapsed": ""})
+    out = validate_config({"x": "garbage", "y": None, "enabled": 1, "startCollapsed": "",
+                           "fontSize": "big"})
     assert out["x"] == STOPWATCH_DEFAULTS["x"]
     assert out["y"] == STOPWATCH_DEFAULTS["y"]
+    assert out["fontSize"] == STOPWATCH_DEFAULTS["fontSize"]
     assert out["enabled"] is True
     assert out["startCollapsed"] is False
 

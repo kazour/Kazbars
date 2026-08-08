@@ -338,14 +338,15 @@ def create_status_block(parent, title="Status", wraplength=0):
     return body
 
 
-def create_slider_row(parent, label_text, from_, to, initial, suffix, on_drag, on_commit,
+def create_slider_row(parent, label_text, from_, to, initial, suffix, on_drag, on_commit=None,
                       value_width=5, notch=False, label_width=None, label_sink=None):
     """One row: descriptor label · ttk.Scale · live value label.
 
     `on_drag(value)` fires continuously while dragging (refresh the label + push
     live, but do NOT persist); `on_commit()` fires on button/key release so a
-    drag is a single write. Returns `(scale, value_label)` — keep the scale to
-    move it programmatically (e.g. on profile load).
+    drag is a single write. Pass None on a staged form whose Apply is the only
+    write. Returns `(scale, value_label)` — keep the scale to move it
+    programmatically (e.g. on profile load).
 
     `value_width` is the readout label width in chars — default 5 fits short
     units like `48pt` / `100%`; widen it for longer readouts (e.g. `4000/s`).
@@ -396,8 +397,9 @@ def create_slider_row(parent, label_text, from_, to, initial, suffix, on_drag, o
             row, from_=from_, to=to, value=initial, orient="horizontal", command=on_drag,
         )
         scale.pack(side="left", fill="x", expand=True, padx=PAD_SMALL)
-    scale.bind("<ButtonRelease-1>", lambda _e: on_commit())
-    scale.bind("<KeyRelease>", lambda _e: on_commit())
+    if on_commit is not None:
+        scale.bind("<ButtonRelease-1>", lambda _e: on_commit())
+        scale.bind("<KeyRelease>", lambda _e: on_commit())
     if label_sink is not None:
         label_sink.extend((desc_label, value_label))
     return scale, value_label

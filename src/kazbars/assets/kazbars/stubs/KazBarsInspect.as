@@ -1506,16 +1506,19 @@ class KazBarsInspect {
 
     public function loadState(config:Object):Void {
         if (config == null || m_Panel == null) return;
-        var x:Object = config.FindEntry("inx");
-        var y:Object = config.FindEntry("iny");
-        if (x !== undefined && y !== undefined) {
-            m_Panel._x = clampPos(Number(x), Stage.width - W);
-            m_Panel._y = clampPos(Number(y), Stage.height - COLL_H);
-        }
+        // Fold state first: the clamp has to measure the plate actually on
+        // screen. Clamping a sheet against the collapsed bar's height let a
+        // saved spot near the bottom edge hang off it.
         var c:Object = config.FindEntry("inc");
         if (c !== undefined) {
             collapsed = (c == 1);
             applyCollapsed();
+        }
+        var x:Object = config.FindEntry("inx");
+        var y:Object = config.FindEntry("iny");
+        if (x !== undefined && y !== undefined) {
+            m_Panel._x = clampPos(Number(x), Stage.width - curW);
+            m_Panel._y = clampPos(Number(y), Stage.height - curH);
         }
     }
 

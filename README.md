@@ -34,7 +34,7 @@ Most of what KazBars builds is set up once and runs on its own after you close t
 
 **Default Buff Bars editor** — tune the game's own buff-bar HUD from one place: on/off, icon size, spacing, columns, friendly/hostile filter — no XML editing.
 
-**Damage number colors** — recolor every damage source from one place.
+**Damage number colors** — recolor every damage source and pick where each one lands: above the head, in a fixed column, or in the zig-zag stack.
 
 **Backup & restore** — save your full Age of Conan config plus your KazBars profiles and settings to one portable zip, and restore it after a reformat or on a new PC.
 

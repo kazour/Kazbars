@@ -1,8 +1,9 @@
 """
 KazBars — In-game stopwatch dialog.
 
-Game-menu settings for the in-game stopwatch panel (KazBarsStopwatch stub):
-the build gate, the baked default position, and the start-collapsed flag.
+Extras-menu settings for the in-game stopwatch panel (KazBarsStopwatch stub):
+the build gate, the baked default position, the baked font size, and the
+start-collapsed flag.
 Persists machine-local in prefs.json under `stopwatch` (data layer:
 `stopwatch.py`); the build bakes the values into the generated SWF.
 Functions take the KazBarsApp instance as first arg.
@@ -26,10 +27,12 @@ from .ui_helpers import (
     PAD_XS,
     THEME_COLORS,
 )
+from .ui_tk_style import apply_dark_titlebar
 from .ui_widgets import add_tooltip, app_toast
-from .window_position import restore_window_position
+from .window_position import bind_window_position_save, restore_window_position
 
 _WIDTH = 400
+_HEIGHT = 390
 
 
 def open_stopwatch_dialog(app):
@@ -39,6 +42,7 @@ def open_stopwatch_dialog(app):
     if existing is not None:
         try:
             if existing.winfo_exists():
+                existing.deiconify()
                 existing.lift()
                 existing.focus_force()
                 return existing
@@ -49,12 +53,11 @@ def open_stopwatch_dialog(app):
 
     dialog = tk.Toplevel(app)
     app.stopwatch_dialog = dialog
+    dialog.withdraw()
     dialog.title("In-Game Stopwatch")
     dialog.resizable(False, False)
     dialog.transient(app)
     dialog.grab_set()
-
-    restore_window_position(dialog, 'stopwatch_settings', _WIDTH, 330, app, resizable=False)
 
     create_dialog_header(dialog, "In-Game Stopwatch",
                          MODULE_COLORS['grids'], width=_WIDTH)
@@ -88,6 +91,19 @@ def open_stopwatch_dialog(app):
                     width=6, padx=(0, PAD_SMALL * 2))
     labeled_spinbox(pos_row, "Y ", y_var, from_=0, to=SCREEN_MAX_Y, width=6)
 
+    ttk.Label(content, text="Text size",
+              font=FONT_SECTION, foreground=THEME_COLORS['heading']
+              ).pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
+    size_var = tk.IntVar(value=cfg['fontSize'])
+    size_row = ttk.Frame(content)
+    size_row.pack(anchor='w', pady=(0, PAD_SMALL))
+    size_spin = labeled_spinbox(size_row, "Font size ", size_var, from_=8, to=48, width=6)
+    add_tooltip(size_spin,
+                "Baked at build time — the whole panel scales with it, collapsed "
+                "bar included, so set it to the same size as the inspect panel "
+                "and the two collapsed bars match. Takes effect on the next "
+                "Build & Install.")
+
     collapsed_var = tk.BooleanVar(value=cfg['startCollapsed'])
     collapsed_cb = ttk.Checkbutton(content, text="Start collapsed (title bar only)",
                                    variable=collapsed_var)
@@ -112,6 +128,7 @@ def open_stopwatch_dialog(app):
             'enabled': enabled_var.get(),
             'x': _read(x_var, cfg['x']),
             'y': _read(y_var, cfg['y']),
+            'fontSize': _read(size_var, cfg['fontSize']),
             'startCollapsed': collapsed_var.get(),
         })
         app.settings.set('stopwatch', new_cfg)
@@ -128,5 +145,20 @@ def open_stopwatch_dialog(app):
                command=dialog.destroy, width=BTN_SMALL
                ).pack(side='right', padx=(0, PAD_XS))
 
+    # withdraw → build → restore → deiconify, then keep the drag: the dialog
+    # reopens where the user left it (clamped to a live monitor), like the
+    # panels it configures.
+    restore_window_position(dialog, 'stopwatch_settings', _WIDTH, _HEIGHT, app,
+                            resizable=False)
+    bind_window_position_save(dialog, 'stopwatch_settings', save_size=False)
+    dialog.deiconify()
+
+    dialog.bind("<Escape>", lambda e: dialog.destroy())
     dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
+    # The global one-shot dark-titlebar patch can miss a Toplevel built this
+    # late, so re-assert it on the dialog's own map (as damageinfo_colors_panel).
+    dialog.bind("<Map>",
+                lambda e: apply_dark_titlebar(dialog) if e.widget is dialog else None,
+                add="+")
+    dialog.after(0, enable_cb.focus_set)
     return dialog

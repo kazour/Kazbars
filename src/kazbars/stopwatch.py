@@ -8,11 +8,14 @@ prefs.json under `stopwatch` (like `build_console` — not per-profile, since
 screen position depends on the machine's resolution). No Tk — importable by
 the codegen, prefs schema, and tests.
 
-Positioning mirrors the cast timer: `x`/`y` are baked into the generated SWF
-(the only position that survives relaunch on `/loadclip` default clients —
-the panel shows live coordinates while its title bar is dragged so users can
-copy them here); aoc.exe clients persist drag position and collapsed state
-via the module config archive.
+`fontSize` is baked at build time (cast-timer precedent) and drives the whole
+panel: every dimension in the stub derives from it, so the panel scales as one
+piece — and its collapsed bar keeps pairing with the inspect panel's, which is
+built from the same ratios. Positioning mirrors the cast timer: `x`/`y` are
+baked into the generated SWF (the only position that survives relaunch on
+`/loadclip` default clients — the panel shows live coordinates while its title
+bar is dragged so users can copy them here); aoc.exe clients persist drag
+position and collapsed state via the module config archive.
 """
 
 import logging
@@ -29,6 +32,7 @@ _SCHEMA = Schema('stopwatch', 1, {
     "enabled": Field(False, kind='bool'),
     "x": Field(850, kind='int', min=0, max=SCREEN_MAX_X),
     "y": Field(300, kind='int', min=0, max=SCREEN_MAX_Y),
+    "fontSize": Field(12, kind='int', min=8, max=48),
     "startCollapsed": Field(False, kind='bool'),
 })
 

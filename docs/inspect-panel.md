@@ -2,7 +2,7 @@
 
 What the `KazBarsInspect` stub reads, and why every constant in it is the number it is. Update when the watch list, a synthesis formula, or a display gate changes — the stub carries the rules as comments, this doc carries the reasoning and the id table behind them.
 
-The panel is an optional in-game overlay (Extras ▸ Target inspect panel…) that renders a combat sheet for the current target in the visual language of the game's own inspect window. It is off by default; when off the build emits zero references and MTASC skips the stub entirely.
+The panel is an optional in-game overlay (Extras ▸ Inspect panel…) that renders a combat sheet for the current target in the visual language of the game's own inspect window. It is off by default; when off the build emits zero references and MTASC skips the stub entirely.
 
 | Piece | Where |
 |---|---|
@@ -334,8 +334,8 @@ Every dimension is `Math.round(FS × ratio)`, so the whole panel scales as one p
 | `ICO_GAP` | 0.35 | 4 | gap between perk boxes |
 | `TIP_PAD` | 0.3 | 4 | perk-name chip: padding on all four sides, and its gap above the icon row |
 | `LEAD` | 0.15 | 2 | `TextFormat.leading`, applied to every field |
-| `COLL_W` | 15.8 | 190 | collapsed bar width — the stopwatch's own `W` at FS 12 |
-| `COLL_H` | 2.0 | 24 | collapsed bar height — its `H_COLLAPSED` |
+| `COLL_W` | 15.8 | 190 | collapsed bar width — the stopwatch derives its own `W` from the same ratio |
+| `COLL_H` | 2.0 | 24 | collapsed bar height — likewise its `H_COLLAPSED` |
 | `COLL_PAD` | 0.55 | 7 | collapsed bar padding |
 | `W` | 2·`PAD` + `LABEL_W` + `COL_GAP` + `VALUE_W` | 277 | total footprint — derived, never fixed |
 
@@ -347,9 +347,9 @@ Hovering a filled perk box names it: a chip in `COL_LABEL` on a `COL_BG` plate a
 
 This is the one thing in the panel that runs at mouse-move frequency — continuously while the camera is dragged in combat — so it is ordered to cost as little as possible when there is nothing to name: baked `showPerks` off never installs the listener at all; the rejection path tests cached AS state (`perksShown`, `collapsed`, `previewMode`, and `panelVis`, which mirrors `m_Panel._visible`) before any native mouse or clip read; the row top comes from `perkRowY`, stamped by `layout()`, rather than off the slot clip; and `hideTip()` returns on `tipSlot < 0` instead of rewriting `_visible` on every move.
 
-**Collapsed is a different plate, not the sheet at a shorter height.** The panel folds to a bar reading just `Inspect` — `COLL_W` × `COLL_H`, which is the stopwatch's own collapsed bar (190 × 24) at the default FS 12, so the two sit together in a HUD without disagreeing; both dimensions are FS ratios like everything else, so they stay in proportion at any baked font size. Folding hides the name strip and shows `collTF` in its place, and the collapse button, the drag hitbox and the drag coordinate readout all move onto whichever plate is on screen (`applyCollapsed`). Nothing on the bar tracks the target, which is what lets a collapsed pass read two ids (§1).
+**Collapsed is a different plate, not the sheet at a shorter height.** The panel folds to a bar reading just `Inspect` — `COLL_W` × `COLL_H` (190 × 24 at FS 12). The stopwatch builds its own plate from the same two ratios rather than from copied constants, so the two collapsed bars are identical at *every* baked font size, not only at the default 12 — set both dialogs to the same size and they sit together in a HUD without disagreeing. Folding hides the name strip and shows `collTF` in its place, and the collapse button, the drag hitbox and the drag coordinate readout all move onto whichever plate is on screen (`applyCollapsed`). Nothing on the bar tracks the target, which is what lets a collapsed pass read two ids (§1).
 
-Position and collapse mirror the stopwatch: baked X/Y and `startCollapsed` defaults are the only position that survives relaunch on `/loadclip` clients; dragging shows live coordinates to copy back into the dialog; aoc.exe clients persist drag position and folded state in the module config archive under `inx` / `iny` / `inc`. Expanded, the drag hitbox is the name strip only — a whole-plate drag would eat combat clicks. Collapsed, the bar *is* the title line, so the hitbox is the whole bar, and a press that does not move it (under 2px) opens the sheet on release: the bar is small and labelled and reads as a button. That click-to-open is collapsed-only — expanded, a stray click beside the target's name must not fold the sheet away, so the − / + button is the only way back.
+Position and collapse mirror the stopwatch: baked X/Y and `startCollapsed` defaults are the only position that survives relaunch on `/loadclip` clients; dragging shows live coordinates to copy back into the dialog; aoc.exe clients persist drag position and folded state in the module config archive under `inx` / `iny` / `inc`. `loadState` reads `inc` **first** and only then clamps `inx`/`iny` against `curW`/`curH`: clamping a sheet against the collapsed bar's height let a saved spot near the bottom edge hang off screen. Expanded, the drag hitbox is the name strip only — a whole-plate drag would eat combat clicks. Collapsed, the bar *is* the title line, so the hitbox is the whole bar, and a press that does not move it (under 2px) opens the sheet on release: the bar is small and labelled and reads as a button. That click-to-open is collapsed-only — expanded, a stray click beside the target's name must not fold the sheet away, so the − / + button is the only way back.
 
 ---
 

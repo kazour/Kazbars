@@ -13,6 +13,7 @@ from .ui_helpers import (
     FONT_BODY,
     FONT_SMALL,
     PAD_LF,
+    PAD_MICRO,
     PAD_ROW,
     PAD_SMALL,
     THEME_COLORS,
@@ -31,8 +32,8 @@ class CustomMenuBar(tk.Canvas):
 
     Uses a Canvas for the bar (immune to ttkbootstrap theme overrides) and a
     place()-based Frame overlay for dropdowns (no Toplevel = no Windows flash).
-    Supports accelerator text, separators, disabled items, and keyboard nav
-    (F10 opens the menu; arrows / Return / Escape navigate).
+    Supports accelerator text, separators, group headers, disabled items, and
+    keyboard nav (F10 opens the menu; arrows / Return / Escape navigate).
     """
 
     _MENU_BG = TK_COLORS['status_bg']
@@ -218,6 +219,15 @@ class CustomMenuBar(tk.Canvas):
                 spacer(PAD_ROW)
                 spacer(1, color=self._SEP_COLOR, padx=PAD_LF)
                 spacer(PAD_ROW)
+                continue
+
+            if entry['type'] == 'header':
+                # A caption naming the group below it. Not appended to _rows, so
+                # it takes no hover and keyboard nav steps straight over it.
+                tk.Label(
+                    content, text=entry['label'], bg=self._MENU_BG,
+                    fg=THEME_COLORS['muted'], font=FONT_SMALL, anchor='w',
+                ).pack(fill='x', padx=(PAD_LF + PAD_SMALL, PAD_LF), pady=(0, PAD_MICRO))
                 continue
 
             row = tk.Frame(content, bg=self._MENU_BG)

@@ -216,17 +216,13 @@ def _format_point(x, y):
 
 
 # ============================================================================
-# TEXTCOLORS.xml — flytext direction (Damage Numbers toggles)
+# TEXTCOLORS.xml — per-source flytext direction (Damage Number Colors panel)
 # ============================================================================
 # AoC's TextColors.xml gives each flying-text type a `direction`: 1 = float above the
-# head, -1 = drop into the fixed column. Two independent toggles flip groups to -1:
-#  • "Group my resource numbers" → RESOURCE_LOSS_TYPES (your own mana/stamina losses join
-#    your gains, already -1, in one column). The DamageInfo SWF separately keeps drains you
-#    deal to ENEMIES floating overhead (OTHER_RESOURCE_LOSS_TO_TARGET).
-#  • "Separate resources into Column B" → INCOMING_DAMAGE_TYPES (everything that lands on you
-#    drops into the columns; plain damage to column A, signed numbers (heals, mana, stamina)
-#    to column B).
-# Surgical + reversible — restore flips back to 1.
+# head, -1 = drop into the fixed column, 0 = join the zig-zag stack. The colors panel
+# edits it per source alongside the color; these two group lists back its macro
+# checkboxes ("Group my resource numbers" / "Send incoming numbers to the fixed column"),
+# which flip a whole group at once.
 RESOURCE_LOSS_TYPES = (
     'stamina_lost', 'mana_lost', 'stamina_loss_critical', 'mana_loss_critical',
 )
@@ -249,30 +245,40 @@ def _elem_re(name):
     return re.compile(rf'<[^>]*\bname\s*=\s*["\']{re.escape(name)}["\'][^>]*>')
 
 
-def set_directions(xml_text, names, to_column):
-    """Set `direction` for each named flytext element: ``-1`` (fixed column) when
-    ``to_column`` else ``1`` (above the head). Only the element carrying each
-    ``name="<type>"`` is touched (any attribute order, single- or multi-line); all other
-    bytes are preserved. Returns ``(new_text, flips)`` — ``flips`` counts the direction
-    attributes actually changed (0 ⇒ already in the wanted state or types absent).
+def read_source_direction(xml_text, name):
+    """Return the ``direction`` of the ``name="<name>"`` flytext element as a bare string
+    (``'1'`` / ``'-1'`` / ``'0'``), or None if the element or its direction attr is absent.
+    Element-scoped like :func:`read_source_color` (any attribute order, single- or
+    multi-line)."""
+    m = _elem_re(name).search(xml_text)
+    if not m:
+        return None
+    d = _DIRECTION_ATTR_RE.search(m.group(0))
+    return d.group(2) if d else None
+
+
+def set_source_direction(xml_text, name, value):
+    """Rewrite the ``direction`` attr of the ``name="<name>"`` flytext element to ``value``
+    (1 = above the head, -1 = fixed column, 0 = zig-zag stack), preserving all other bytes.
+
+    Unlike :func:`set_source_color`, a missing attribute is *injected* before the element's
+    closing bracket: every flytext type has a direction whether or not the source spelled it
+    out, and the game reads the absent case as its own default — so a user picking a
+    direction for such a source must be able to write one. Returns ``(new_text, changed)``;
+    ``changed`` is False when the element is missing or already carries that direction.
     """
-    target = '-1' if to_column else '1'
-    flips = 0
-    for name in names:
-        m = _elem_re(name).search(xml_text)
-        if not m:
-            continue
-        new_elem, n = _DIRECTION_ATTR_RE.subn(rf'\g<1>{target}\g<3>', m.group(0))
-        if n and new_elem != m.group(0):
-            xml_text = xml_text[:m.start()] + new_elem + xml_text[m.end():]
-            flips += n
-    return xml_text, flips
-
-
-def set_resource_loss_to_column(xml_text, to_column):
-    """Flip the four resource-loss flytext directions (see RESOURCE_LOSS_TYPES); thin
-    wrapper over :func:`set_directions`."""
-    return set_directions(xml_text, RESOURCE_LOSS_TYPES, to_column)
+    m = _elem_re(name).search(xml_text)
+    if not m:
+        return xml_text, False
+    elem = m.group(0)
+    new_elem, n = _DIRECTION_ATTR_RE.subn(rf'\g<1>{int(value)}\g<3>', elem)
+    if not n:
+        close = re.search(r'\s*/?>$', elem)
+        assert close is not None, "_elem_re matches only up to a closing bracket"
+        new_elem = elem[:close.start()] + f' direction="{int(value)}"' + close.group(0)
+    if new_elem == elem:
+        return xml_text, False
+    return xml_text[:m.start()] + new_elem + xml_text[m.end():], True
 
 
 # ============================================================================
