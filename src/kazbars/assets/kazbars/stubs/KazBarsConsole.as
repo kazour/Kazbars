@@ -120,6 +120,12 @@ class KazBarsConsole {
         return (consoleClip != null);
     }
 
+    // Preview-mode control panel only: a hard hide of the whole plate, restored
+    // on the way out of preview. Logging carries on underneath.
+    public function setShown(shown:Boolean):Void {
+        if (consoleClip != null) consoleClip._visible = shown;
+    }
+
     public function createConsole():Void {
         if (consoleClip != null) consoleClip.removeMovieClip();
         consoleClip = rootClip.createEmptyMovieClip("buffConsole", rootClip.getNextHighestDepth());

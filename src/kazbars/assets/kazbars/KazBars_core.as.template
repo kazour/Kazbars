@@ -641,6 +641,7 @@
     private function enterPreview():Void {
         if (previewMode) return;
         previewMode = true;
+        ppanel.begin();
         var i:Number = 0;
         while (i < grids.length) {
             var obj:Object = grids[i];
@@ -648,11 +649,18 @@
             var j:Number = 0;
             while (j < obj.slots.length) { obj.slots[j]._visible = true; j++; }
             preview.createOverlay(obj);
+            ppanel.addGrid(obj);
             i++;
         }
         {{CAST_PREVIEW_ON}}
         {{INS_PREVIEW_ON}}
         {{CONSOLE_PREVIEW_OPEN}}
+        {{PP_ROW_SW}}
+        {{PP_ROW_INS}}
+        {{PP_ROW_CAST}}
+        {{PP_ROW_CONSOLE}}
+        // Last, so the control panel sits on top of everything it controls.
+        ppanel.show();
     }
 
     private function exitPreview():Void {
@@ -665,22 +673,37 @@
                 config.ReplaceEntry("g" + j + "_y", grids[j].mc._y);
                 j++;
             }
+            ppanel.saveState(config);
             {{CONSOLE_EXIT_PERSIST}}
             {{CAST_SAVE}}
             {{SW_SAVE}}
             {{INS_SAVE}}
         }
+        // Panel first — its position is already captured, and every restore
+        // below is owner-side. Grid visibility self-heals in the final loop.
+        ppanel.destroy();
         {{CONSOLE_EXIT_REMOVE}}
         {{CAST_PREVIEW_OFF}}
         {{INS_PREVIEW_OFF}}
+        {{SW_PREVIEW_RESTORE}}
         var i:Number = 0;
         while (i < grids.length) { preview.removeOverlay(grids[i]); grids[i].dirty = true; updateGrid(grids[i]); i++; }
+    }
+
+    // Named dispatcher for the control panel's extra rows — the checkbox knows
+    // a key, each stub has its own idea of what hiding means.
+    public function previewToggle(key:String, shown:Boolean):Void {
+        {{PP_APPLY_SW}}
+        {{PP_APPLY_INS}}
+        {{PP_APPLY_CAST}}
+        {{PP_APPLY_CONSOLE}}
     }
 
     private function cleanup():Void {
         stopTimer();
         previewMode = false;
         if (keyListener != null) { Key.removeListener(keyListener); keyListener = null; }
+        ppanel.destroy();
         {{CONSOLE_CLEANUP}}
         {{CAST_CLEANUP}}
         {{SW_CLEANUP}}
@@ -738,6 +761,7 @@
                 }
                 i++;
             }
+            ppanel.loadState(config);
             {{CONSOLE_LOAD_PERSIST}}
             {{CAST_LOAD}}
             {{SW_LOAD}}
@@ -753,6 +777,7 @@
                 config.ReplaceEntry("g" + i + "_y", grids[i].mc._y);
                 i++;
             }
+            ppanel.saveState(config);
             {{CONSOLE_DEACTIVATE_PERSIST}}
             {{CAST_SAVE}}
             {{SW_SAVE}}
