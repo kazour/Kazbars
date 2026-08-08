@@ -115,10 +115,14 @@ def test_console_on_emits_console_hooks():
     assert "console.createConsole();" in main_code
     assert "console.removeConsole();" in main_code
 
-    # Persistence keys
+    # Persistence keys — pin + the two log toggles here, position inside the stub
     assert 'config.ReplaceEntry("console_pin"' in main_code
     assert 'config.ReplaceEntry("log_p"' in main_code
     assert 'config.ReplaceEntry("log_t"' in main_code
+    assert "console.saveState(config);" in main_code
+    # Loaded before the pinned console is re-created, so it opens where it was left.
+    assert main_code.index("console.loadState(config);") < main_code.index(
+        "if (consolePinned) console.createConsole();")
 
     # No leftover tokens
     assert "{{CONSOLE_" not in main_code
@@ -233,7 +237,8 @@ def test_stopwatch_disabled_config_is_off():
 def test_stopwatch_on_emits_hooks_and_data():
     gen = CodeGenerator(
         [_minimal_grid()], _load_db(), "0.0.0",
-        stopwatch_config={"enabled": True, "x": 750, "y": 410, "startCollapsed": True},
+        stopwatch_config={"enabled": True, "x": 750, "y": 410, "fontSize": 16,
+                          "startCollapsed": True},
     )
     main_code, data_code = gen.generate()
     assert gen.include_stopwatch
@@ -250,7 +255,7 @@ def test_stopwatch_on_emits_hooks_and_data():
     assert "stopwatch.cleanup();" in main_code
 
     # Data block
-    assert "d.SW = {x: 750, y: 410, collapsed: true};" in data_code
+    assert "d.SW = {x: 750, y: 410, fontSize: 16, collapsed: true};" in data_code
 
     # No leftover tokens
     assert "{{SW_" not in main_code

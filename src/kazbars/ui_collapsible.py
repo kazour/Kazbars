@@ -3,7 +3,7 @@ KazBars — CollapsibleSection widget.
 
 A section with a clickable header (arrow + accent + title + badge + summary)
 whose content area toggles via pack/pack_forget. Used by the grid editor cards,
-the cast-timer strip, the buff-display editor, and the instructions panel.
+the buff-display editor, and the instructions panel.
 """
 
 import tkinter as tk

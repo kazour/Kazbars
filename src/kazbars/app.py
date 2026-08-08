@@ -126,6 +126,7 @@ class KazBarsApp(ttkb.Window):
         self.damage_numbers_panel = None
         self.stopwatch_dialog = None
         self.inspect_dialog = None
+        self.cast_timer_dialog = None
         self._profile_manager = None
 
         # One shared focus gate for every overlay: hides them whenever neither
@@ -255,6 +256,7 @@ class KazBarsApp(ttkb.Window):
             self.content_frame,
             database=self.database,
             on_modified=self._mark_modified,
+            app=self,
         )
 
         # Database view — edits write user deltas to userdata/database_user.json
@@ -348,7 +350,6 @@ class KazBarsApp(ttkb.Window):
         self._menubar = CustomMenuBar(self)
         self._menubar.pack(fill='x', before=self._header_canvas)
 
-        self._build_console_var = tk.BooleanVar(value=bool(self.settings.get('build_console', False)))
         self._auto_update_var = tk.BooleanVar(value=bool(self.settings.get('auto_update_content', True)))
 
         self._menubar.add_cascade(label="File", menu_def=[
@@ -380,21 +381,25 @@ class KazBarsApp(ttkb.Window):
             {'type': 'command', 'label': 'Uninstall from game client…',
              'command': self._uninstall_game},
         ])
+        # Two captioned groups, because the two halves behave differently: the
+        # XML editors write the game's own files on Apply (/reloadui to see),
+        # while the SWF forms stage settings the next Build & Install bakes in.
         self._menubar.add_cascade(label="Extras", menu_def=[
+            {'type': 'header', 'label': '/reloadui to apply'},
             {'type': 'command', 'label': 'Default buff bars…',
              'command': self._open_buff_display_editor},
-            {'type': 'command', 'label': 'Damage number mod…',
-             'command': self._open_damage_numbers},
             {'type': 'command', 'label': 'Damage number colors…',
              'command': self._open_damage_number_colors},
-            {'type': 'command', 'label': 'In-game stopwatch…',
-             'command': self._open_stopwatch_settings},
-            {'type': 'command', 'label': 'Target inspect panel…',
-             'command': self._open_inspect_settings},
             {'type': 'separator'},
-            {'type': 'checkbutton', 'label': 'Include buff-discovery console in builds',
-             'variable': self._build_console_var,
-             'command': self._on_toggle_build_console},
+            {'type': 'header', 'label': 'Build & Install to apply'},
+            {'type': 'command', 'label': 'Damage number mod…',
+             'command': self._open_damage_numbers},
+            {'type': 'command', 'label': 'Stopwatch…',
+             'command': self._open_stopwatch_settings},
+            {'type': 'command', 'label': 'Inspect panel…',
+             'command': self._open_inspect_settings},
+            {'type': 'command', 'label': 'Cast timer…',
+             'command': self._open_cast_timer_settings},
         ])
         self._menubar.add_cascade(label="Updates", menu_def=[
             {'type': 'checkbutton', 'label': 'Automatically update the buff database (recommended)',
@@ -531,14 +536,19 @@ class KazBarsApp(ttkb.Window):
         open_damage_number_colors_panel(self)
 
     def _open_stopwatch_settings(self):
-        """Open the In-Game Stopwatch settings dialog (modal)."""
+        """Open the Stopwatch settings dialog (modal)."""
         from .stopwatch_panel import open_stopwatch_dialog
         open_stopwatch_dialog(self)
 
     def _open_inspect_settings(self):
-        """Open the Target Inspect Panel settings dialog (modal)."""
+        """Open the Inspect Panel settings dialog (modal)."""
         from .inspect_panel import open_inspect_dialog
         open_inspect_dialog(self)
+
+    def _open_cast_timer_settings(self):
+        """Open the Cast Timer settings dialog (modal)."""
+        from .cast_timer_panel import open_cast_timer_dialog
+        open_cast_timer_dialog(self)
 
     def _open_backup_dialog(self):
         """Open the Backup & Restore settings dialog."""
@@ -568,14 +578,6 @@ class KazBarsApp(ttkb.Window):
 
     def _open_buff_display_editor(self):
         return buff_display_editor.open_buff_display_editor(self)
-
-    def _on_toggle_build_console(self):
-        enabled = self._build_console_var.get()
-        self.settings.set('build_console', enabled)
-        self.settings.save()
-        msg = ("Buff-discovery console will be included in next build"
-               if enabled else "Buff-discovery console excluded from next build")
-        self.toast.show(msg, style='info', duration=4)
 
     def _on_toggle_auto_update(self):
         enabled = self._auto_update_var.get()

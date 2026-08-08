@@ -107,13 +107,18 @@ SECTIONS: list[_Section] = [
             'tells you the one thing that matters: whether you ever need the '
             'app open again.',
             _sub('Set up once — then close the app', [
-                [('Grids, the Cast Timer, the Stopwatch, the Inspect Panel, '
-                  'Damage Numbers, and the Default Buff Bars all install with '
-                  'one ', None),
+                [('Grids, the Cast Timer, the Stopwatch, the Inspect panel and '
+                  'Damage Numbers all install with one ', None),
                  ('Build & Install', _SUCCESS),
                  (". After that you type /reloadui in-game and you're done — they "
                   'keep working whether or not KazBars is running. Open it again '
                   'only when you want to change something.', None)],
+                'Those four extras also have toggle cards above the grid list — '
+                'click one to flip the feature in or out of your next build. '
+                'Configuring them stays in the Extras menu.',
+                'Default Buff Bars and Damage Number Colors skip the build '
+                "entirely — they edit the game's own files the moment you hit "
+                'Apply, so /reloadui is all they need.',
             ]),
             _sub('Runs while you play — keep KazBars open', [
                 [('The ', None),
@@ -288,11 +293,17 @@ SECTIONS: list[_Section] = [
                  (' again.', None)],
             ]),
             _sub('Buff-discovery console', [
-                "Don't know an effect's buff ID? Turn on Extras → Include "
-                'buff-discovery console in builds, then Build & Install. In '
-                'preview mode (Shift+Ctrl+Alt), the console logs every effect\'s '
-                'name and buff ID as it lands on you or your target — copy the '
-                'ID into the Database.',
+                "Don't know an effect's buff ID? Open Extras → Inspect panel… "
+                'and tick Include the buff-discovery console in builds, then '
+                'Build & Install. In preview mode (Shift+Ctrl+Alt), the console '
+                "logs every effect's name and buff ID as it lands on you or "
+                'your target — copy the ID into the Database.',
+                'Drag it by its title bar; it stays on screen and comes back '
+                'where you left it. The − button collapses it to a small bar '
+                'reading Console; click that bar to open the console again.',
+                'Aoc.exe clients remember that spot and whether you left it '
+                'collapsed across a relog — other clients start it open in the '
+                'middle of the screen.',
                 "It's off by default and only included when you enable it, so "
                 "finished builds don't carry it. Turn it off and rebuild to "
                 'remove it.',
@@ -414,23 +425,51 @@ SECTIONS: list[_Section] = [
         'id': 'cast-timer',
         'title': 'Cast Timer',
         'body': [
-            "A timer-only overlay for your own and your target's cast time — "
-            "floating text over the game's cast bar, with no bar of its own. "
-            'Off by default.',
+            'Extras → Cast timer… adds a timer-only overlay for your own and '
+            "your target's cast time — floating text over the game's cast bar, "
+            'with no bar of its own. Off by default; when off, the build '
+            'carries no cast-timer code at all.',
             _sub('Turn it on', [
-                'Open the Cast Timer strip pinned above the grid list and flip '
-                'Enabled. One toggle runs both the Player and Target sides.',
+                [('Open the dialog, tick ', None),
+                 ('Include the cast timer in builds', _SUCCESS),
+                 (', then ', None),
+                 ('Apply', _SUCCESS),
+                 (' — it saves and closes the window. Cancel, Escape or the X '
+                  'discard everything you changed.', None)],
+                [('Nothing reaches the game until your next ', None),
+                 ('Build & Install', _SUCCESS),
+                 (', same as grids. One toggle runs both the Player and '
+                  'Target sides.', None)],
+                'The Cast Timer card above the grid list flips this same '
+                'switch — the dialog stays the place to configure it.',
             ]),
-            _sub('Settings', [
-                'Player / Target X/Y — where each timer sits on screen.',
-                'Bold, Size, Color — shared by both sides.',
+            _sub('What you can set', [
+                'Player position and Target position — where each timer sits '
+                'on screen.',
+                'Text — Bold, Font size (8–48) and Color, shared by both '
+                'timers. The sample beside them shows what the overlay will '
+                'draw.',
                 'Show — Elapsed counts up, Total is the estimated cast length, '
                 'Both shows 1.2 / 2.5.',
             ]),
             _sub('Positioning', [
-                'Set X/Y in the strip, or press Shift+Ctrl+Alt in-game to drag '
-                'the timer. Rebuild and reload to apply.',
+                'Type X/Y into the dialog, or press Shift+Ctrl+Alt in-game to '
+                'toggle preview mode and drag each timer — coordinates show as '
+                'you drag, ready to copy back. Aoc.exe clients remember drags '
+                'on their own.',
             ]),
+            _sub('Saved on this PC, not in your profile', [
+                'Cast-timer settings live with your app preferences, the same '
+                'as the stopwatch and the inspect panel — the positions depend '
+                'on your screen, not on your buff layout. So switching '
+                'profiles leaves the timer alone, and a profile someone shares '
+                'with you no longer carries their positions.',
+            ]),
+            _note(
+                'If you had a cast timer set before this version, open the '
+                'dialog and set it once more. Your old profiles still hold the '
+                'values, but nothing reads them any more.',
+                _WARNING),
         ],
     },
     {
@@ -462,13 +501,19 @@ SECTIONS: list[_Section] = [
             "Conan's floating combat numbers, in place of the stock ones. The "
             'headline fix: ranged hits stop shrinking to nothing at distance.',
             _sub('Turn it on', [
-                [('Off by default. Flip ', None),
-                 ('Enable', _SUCCESS),
+                [('Off by default. Tick ', None),
+                 ('Enable the Damage Numbers mod', _SUCCESS),
                  (', set your options, then ', None),
+                 ('Apply', _SUCCESS),
+                 (' — it saves and closes the window. Cancel, Escape or the X '
+                  'discard everything you changed.', None)],
+                [('Nothing reaches the game until your next ', None),
                  ('Build & Install', _SUCCESS),
-                 (' — it applies on your next build, same as grids.', None)],
+                 (', same as grids.', None)],
                 'Your stock file is backed up the first time, so turning it off '
                 'and rebuilding restores the original.',
+                'The Damage Numbers card above the grid list flips this same '
+                'switch — the dialog stays the place to configure it.',
             ]),
             _sub('What you can tune', [
                 'Keep ranged numbers big — holds the size of ranged hits past '
@@ -476,14 +521,15 @@ SECTIONS: list[_Section] = [
                 'never touched.',
                 'Shadow, pop-in, and fade speed — with Default and Performance '
                 'presets.',
-                'Where numbers land — above the target, in fixed columns, or a '
-                'zig-zag stack.',
-                'Group my resource numbers — routes your own mana / stamina '
-                'losses into the same column as your resource gains. Drains '
-                'from enemies still float over them.',
-                'Separate resources into Column B — drops everything that lands '
-                'on you into fixed columns: incoming damage in one, heals / '
-                'mana / stamina in the next.',
+                'Where rising, dropping and zig-zag numbers land on screen. '
+                'Which of the three a number uses is set per source in Damage '
+                'Number Colors.',
+                'Split signed numbers into Column B — of the numbers already '
+                'dropping into the fixed column, plain damage stays in Column A '
+                'and the signed ones (heals, stamina, mana) move to Column B.',
+                'Keep enemy drains overhead — mana and stamina you drain from '
+                'enemies keep floating over them even when your own resource '
+                'numbers are set to Dropping.',
             ]),
         ],
     },
@@ -492,58 +538,78 @@ SECTIONS: list[_Section] = [
         'id': 'damage-number-colors',
         'title': 'Damage Number Colors',
         'body': [
-            'Extras → Damage number colors… recolors every combat-number '
-            'source on its own — incoming vs outgoing hits, crits, spells, '
-            'combos, heals, mana, and stamina — laid out self on the left, '
-            'your target on the right.',
+            'Extras → Damage number colors… sets the color and the direction '
+            'of every combat-number source on its own — incoming vs outgoing '
+            'hits, crits, spells, combos, heals, mana, and stamina — laid out '
+            'self on the left, your target on the right.',
             [('Works like the ', None),
              ('Default Buff Bars', _ACCENT),
-             (' editor: pick colors, hit ', None),
+             (' editor: make your changes, hit ', None),
              ('Apply', _SUCCESS),
              (', then type /reloadui in-game to see them. No ', None),
              ('Build & Install', _SUCCESS),
              (' and no master toggle — it edits the game files directly.', None)],
+            _sub('Direction', [
+                'Every row also picks where that number goes: Rising floats it '
+                'above the head, Dropping lands it in the fixed column, Zig-zag '
+                "adds it to the stacked swing. Those are the game's own three "
+                'behaviours — the Damage Numbers mod only moves where each one '
+                'sits on screen.',
+                'Two checkboxes at the top move a whole group at once. Group my '
+                'resource numbers sends your own mana and stamina losses down '
+                'to the fixed column with your gains; Send incoming numbers to '
+                'the fixed column does the same for everything that lands on '
+                'you. Both just set the dropdowns, so you can still tune any '
+                'row afterwards — the box unticks once its group is mixed.',
+            ]),
             _sub('It stands alone', [
-                "These are Age of Conan's own colors — you don't need the "
-                'Damage Numbers mod turned on to change them.',
-                'Reset to game default pulls the original color straight from '
-                'the game files.',
-                'Colors you set stick even if you turn the mod off or uninstall '
-                'it — use Reset if you want stock back.',
+                "These are Age of Conan's own colors and directions — you "
+                "don't need the Damage Numbers mod turned on to change them.",
+                'Reset to game default pulls the original color and direction '
+                'straight from the game files, one row at a time or the whole '
+                'panel at once.',
+                'What you set here stays set: turning the mod off, rebuilding, '
+                'or uninstalling never puts it back. Reset is how you get stock '
+                'back.',
             ]),
         ],
     },
     {
         'cat': 'Extras',
         'id': 'stopwatch',
-        'title': 'In-Game Stopwatch',
+        'title': 'Stopwatch',
         'body': [
-            'Extras → In-game stopwatch… adds a count-up Start / Pause / Reset '
+            'Extras → Stopwatch… adds a count-up Start / Pause / Reset '
             'timer that lives inside the overlay. It works in fullscreen and '
             'never steals focus from AoC. Off by default; when off, the build '
             'carries no stopwatch code at all.',
             _sub('Turn it on', [
-                [('Open the dialog, flip ', None),
-                 ('Enabled', _SUCCESS),
+                [('Open the dialog, tick ', None),
+                 ('Include the stopwatch in builds', _SUCCESS),
                  (', then ', None),
                  ('Build & Install', _SUCCESS),
                  ('. It ships with your next build, same as grids.', None)],
+                'The Stopwatch card above the grid list flips this same '
+                'switch — the dialog stays the place to configure it.',
             ]),
             _sub('Using it in-game', [
                 'A compact draggable panel shows h:mm:ss. The − button collapses '
-                'it to just the title bar, which then shows the running time.',
+                'it to just the title bar, which then shows the running time; '
+                'click that bar to open the panel again.',
                 'Drag the title bar to move it; live coordinates show as you '
                 'drag. Type them into the dialog to pin a spot. Aoc.exe clients '
                 'remember the position and collapsed state on their own.',
+                'Font size (8–48) is baked in at build time — the whole panel '
+                'scales with it.',
             ]),
         ],
     },
     {
         'cat': 'Extras',
         'id': 'inspect',
-        'title': 'Target Inspect Panel',
+        'title': 'Inspect panel',
         'body': [
-            'Extras → Target inspect panel… adds an in-game panel that shows '
+            'Extras → Inspect panel… adds an in-game panel that shows '
             "the combat sheet of whatever you target — the stats the game's "
             "default inspect window can't reveal. Target a player, mob, or "
             'boss and about three-quarters of a second later the panel '
@@ -556,6 +622,8 @@ SECTIONS: list[_Section] = [
                  (', then ', None),
                  ('Build & Install', _SUCCESS),
                  ('. It ships with your next build, same as grids.', None)],
+                'The Inspect panel card above the grid list flips this same '
+                'switch — the dialog stays the place to configure it.',
             ]),
             _sub('What it shows', [
                 'The name strip reads Name Class (Level/PvP level) — Kazour '
@@ -607,13 +675,21 @@ SECTIONS: list[_Section] = [
             _sub('Positioning and text size', [
                 'Drag the panel by its name strip; live coordinates show as '
                 'you drag. Type them into the dialog to pin a spot. The − '
-                'button folds it down to just that strip. Aoc.exe clients '
-                'remember the position and folded state on their own, and the '
-                'dialog can start it folded.',
+                'button collapses it to just that strip. Aoc.exe clients '
+                'remember the position and collapsed state on their own, and '
+                'the dialog can start it collapsed.',
                 'No target handy? Preview mode (Shift+Ctrl+Alt) shows a '
                 'placeholder panel to position against.',
                 'Font size (8–48) is baked in at build time — the whole panel '
                 'scales with it.',
+            ]),
+            _sub('Buff-discovery console', [
+                'The same dialog carries Include the buff-discovery console in '
+                "builds. It's the other in-game inspection tool — a window "
+                "that logs every effect's name and buff ID as it lands — so "
+                'both switch on from one place. It collapses to a small bar of '
+                'its own the same way this panel does; Building and Installing '
+                'covers the rest.',
             ]),
         ],
     },

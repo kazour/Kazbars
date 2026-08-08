@@ -3,6 +3,13 @@
 // embedded in base.swf), so it needs no new symbols. Clicks are ordinary
 // Scaleform GUI input: fullscreen-safe, never steals game focus.
 //
+// Chrome, palette and geometry are the inspect panel's (KazBarsInspect.as, and
+// docs/inspect-panel.md section 5): warm near-black plate, 1px black-over-bronze
+// double frame, Conan-orange title, square corners, and every dimension a
+// Math.round(FS * ratio) off the baked fontSize. The collapsed bar is FS*15.8 x
+// FS*2 — the same bar the inspect panel folds to — so the two pair at any font
+// size, not just at the default 12 the numbers used to be hard-coded for.
+//
 // Positioning mirrors the cast timer: X/Y are baked into config (the only
 // position that survives relaunch on /loadclip default clients; the title bar
 // shows live coordinates while dragging so users can copy them into the app);
@@ -18,24 +25,42 @@ class KazBarsStopwatch {
     private var START_X:Number;
     private var START_Y:Number;
     private var START_COLLAPSED:Boolean;
+    private var FS:Number;
 
-    // Layout (AS2 has no const)
-    private var W:Number;
-    private var H:Number;
-    private var H_COLLAPSED:Number;
-    private var TITLE_H:Number;
+    // Layout — all derived from FS in configure() (AS2 has no const)
+    private var PAD:Number;       // 0.85  plate padding
+    private var W:Number;         // 15.8  the inspect panel's collapsed width
+    private var H:Number;         // 8.0   expanded plate
+    private var H_COLLAPSED:Number; // 2.0  its collapsed bar
+    private var TITLE_H:Number;   // 1.85  title band, above the rule
+    private var COLL_PAD:Number;  // 0.55  collapsed-bar inset (inspect/console)
+    private var BTN:Number;       // 1.1   collapse glyph box
+    private var NAME_FS:Number;   // 1.15  title font
+    private var TIME_FS:Number;   // 2.0   time readout font
+    private var LINE_H:Number;    // 1.4x FS, the height one line of text needs
+    private var NAME_H:Number;    // 1.4x NAME_FS
+    private var TIME_H:Number;    // 2.7   time readout field
+    private var LEAD:Number;      // 0.15  TextFormat.leading
+    private var BTN_W:Number;     // derived: three buttons across the plate
+    private var BTN_H:Number;     // 1.85
+    private var BTN_GAP:Number;   // 0.42
+    private var BTN_PAD:Number;   // 0.5   button row inset (tighter than PAD)
 
     // UI
     private var m_Panel:MovieClip;
     private var m_Body:MovieClip;
     private var chrome:MovieClip;
+    private var dragMC:MovieClip;
     private var titleTF:TextField;
+    private var collTF:TextField;
     private var coordTF:TextField;
     private var timeTF:TextField;
     private var btnStart:MovieClip;
     private var btnPause:MovieClip;
     private var collapseBtn:MovieClip;
     private var collapsed:Boolean;
+    private var dragX:Number;
+    private var dragY:Number;
 
     // Stopwatch state
     private var running:Boolean;
@@ -47,16 +72,14 @@ class KazBarsStopwatch {
 
     public function KazBarsStopwatch(kb:Object, root:MovieClip) {
         rootClip = root;
-        W = 190;
-        H = 96;
-        H_COLLAPSED = 24;
-        TITLE_H = 22;
         running = false;
         paused = false;
         startTime = 0;
         pausedAt = 0;
         pausedTotal = 0;
         collapsed = false;
+        dragX = 0;
+        dragY = 0;
         lastText = "0:00:00";
     }
 
@@ -69,6 +92,27 @@ class KazBarsStopwatch {
         START_X = Number(cfg.x);
         START_Y = Number(cfg.y);
         START_COLLAPSED = (cfg.collapsed == true);
+        FS = Number(cfg.fontSize);
+        if (isNaN(FS) || FS < 8) FS = 12;
+        PAD = Math.round(FS * 0.85);
+        W = Math.round(FS * 15.8);
+        H = Math.round(FS * 8);
+        H_COLLAPSED = Math.round(FS * 2);
+        TITLE_H = Math.round(FS * 1.85);
+        COLL_PAD = Math.round(FS * 0.55);
+        BTN = Math.round(FS * 1.1);
+        NAME_FS = Math.round(FS * 1.15);
+        TIME_FS = Math.round(FS * 2);
+        LINE_H = Math.round(FS * 1.4);
+        NAME_H = Math.round(NAME_FS * 1.4);
+        TIME_H = Math.round(FS * 2.7);
+        LEAD = Math.round(FS * 0.15);
+        BTN_H = Math.round(FS * 1.85);
+        BTN_GAP = Math.round(FS * 0.42);
+        BTN_PAD = Math.round(FS * 0.5);
+        // Derived, never fixed: three equal buttons plus their gaps must land
+        // inside the plate at every FS, so the width falls out of the others.
+        BTN_W = Math.floor((W - BTN_PAD * 2 - BTN_GAP * 2) / 3);
     }
 
     public function createPanel():Void {
@@ -79,39 +123,52 @@ class KazBarsStopwatch {
 
         chrome = m_Panel.createEmptyMovieClip("chrome", m_Panel.getNextHighestDepth());
 
-        titleTF = makeTF(m_Panel, "title", 8, 4, 100, 16, 12, "left");
+        titleTF = makeTF(m_Panel, "title", PAD, 0, W - PAD * 2 - BTN, NAME_H,
+                         NAME_FS, true, 0xF7A22B, "left");
         titleTF.text = "Stopwatch";
 
+        // Separate collapsed label at the base font size, swapped on _visible —
+        // the inspect/console convention, so the three collapsed bars match.
+        collTF = makeTF(m_Panel, "coll", COLL_PAD, 0, W - COLL_PAD * 2 - BTN,
+                        LINE_H, FS, true, 0xF7A22B, "left");
+
         // Live position readout — visible only while dragging (the value a
-        // /loadclip user copies into the app to make a spot permanent).
-        coordTF = makeTF(m_Panel, "coords", W - 112, 6, 86, 14, 10, "right");
-        coordTF.textColor = 0x999999;
+        // /loadclip user copies into the app to make a spot permanent). Shares
+        // the title band, right-aligned, so the two never sit on each other.
+        coordTF = makeTF(m_Panel, "coords", PAD, 0, W - PAD * 2 - BTN, LINE_H,
+                         Math.max(9, Math.round(FS * 0.8)), false, 0x999999, "right");
         coordTF._visible = false;
 
-        // Invisible drag handle over the title bar (stops short of the collapse button).
-        var da:MovieClip = m_Panel.createEmptyMovieClip("drag", m_Panel.getNextHighestDepth());
-        da.beginFill(0, 0);
-        rectPath(da, 2, 2, W - 26, TITLE_H - 2);
-        da.endFill();
-        da._self = this;
-        da.useHandCursor = true;
-        da.onPress = function() { this._self.beginDrag(this); };
-        da.onRelease = da.onReleaseOutside = function() { this._self.endDrag(this); };
+        // Invisible drag handle over the title band (stops short of the
+        // collapse button so it keeps its own press). Redrawn per fold state.
+        dragMC = m_Panel.createEmptyMovieClip("drag", m_Panel.getNextHighestDepth());
+        dragMC._self = this;
+        dragMC.useHandCursor = true;
+        dragMC.onPress = function() { this._self.beginDrag(this); };
+        dragMC.onRelease = dragMC.onReleaseOutside = function() { this._self.endDrag(this); };
 
-        collapseBtn = makeButton(m_Panel, "btnCollapse", "-", W - 21, 3, 16, 16, 4);
+        // Bare glyph, no box — the inspect panel's collapse control.
+        collapseBtn = m_Panel.createEmptyMovieClip("btnCollapse", m_Panel.getNextHighestDepth());
+        collapseBtn._x = W - PAD - BTN;
+        collapseBtn._self = this;
+        collapseBtn.useHandCursor = true;
+        makeTF(collapseBtn, "label", 0, 0, BTN, BTN + 2,
+               Math.max(9, Math.round(FS * 0.9)), true, 0xC8C0B0, "center");
         collapseBtn.onRelease = function() { this._self.toggleCollapsed(); };
+        collapseBtn.onRollOver = function() { this.label.textColor = 0xF7A22B; };
+        collapseBtn.onRollOut = function() { this.label.textColor = 0xC8C0B0; };
 
         m_Body = m_Panel.createEmptyMovieClip("body", m_Panel.getNextHighestDepth());
 
-        timeTF = makeTF(m_Body, "time", 8, TITLE_H + 6, W - 16, 32, 24, "center");
+        timeTF = makeTF(m_Body, "time", PAD, TITLE_H + Math.round(FS * 0.5),
+                        W - PAD * 2, TIME_H, TIME_FS, true, 0xC8C0B0, "center");
         timeTF.text = lastText;
 
-        var bw:Number = 56;
-        var bh:Number = 22;
-        var by:Number = 64;
-        btnStart = makeButton(m_Body, "btnStart", "Start", 6, by, bw, bh, 6);
-        btnPause = makeButton(m_Body, "btnPause", "Pause", 6 + bw + 5, by, bw, bh, 6);
-        var btnReset:MovieClip = makeButton(m_Body, "btnReset", "Reset", 6 + (bw + 5) * 2, by, bw, bh, 6);
+        var by:Number = H - PAD - BTN_H;
+        btnStart = makeButton(m_Body, "btnStart", "Start", BTN_PAD, by);
+        btnPause = makeButton(m_Body, "btnPause", "Pause", BTN_PAD + BTN_W + BTN_GAP, by);
+        var btnReset:MovieClip = makeButton(m_Body, "btnReset", "Reset",
+                                            BTN_PAD + (BTN_W + BTN_GAP) * 2, by);
         btnStart.onRelease = function() { this._self.startWatch(); };
         btnPause.onRelease = function() { this._self.pauseWatch(); };
         btnReset.onRelease = function() { this._self.resetWatch(); };
@@ -121,48 +178,44 @@ class KazBarsStopwatch {
         updateButtons();
     }
 
-    private function makeTF(parent:MovieClip, id:String, x:Number, y:Number, w:Number, h:Number, size:Number, align:String):TextField {
+    private function makeTF(parent:MovieClip, id:String, x:Number, y:Number, w:Number,
+                            h:Number, size:Number, bold:Boolean, col:Number,
+                            align:String):TextField {
         var tf:TextField = parent.createTextField(id, parent.getNextHighestDepth(), x, y, w, h);
         tf.selectable = false;
         tf.embedFonts = false;
         var fmt:TextFormat = new TextFormat();
         fmt.font = "Arial";
         fmt.size = size;
-        fmt.bold = true;
+        fmt.bold = bold;
         fmt.align = align;
-        fmt.color = 0xCCCCCC;
+        fmt.color = col;
+        fmt.leading = LEAD;
         tf.setNewTextFormat(fmt);
         return tf;
     }
 
-    private function makeButton(parent:MovieClip, name:String, label:String, x:Number, y:Number, w:Number, h:Number, r:Number):MovieClip {
+    // Flat square button: plate fill, 1px bronze border, orange label on hover
+    // — the panel's own chrome at button scale. Drawn once; only the label
+    // colour and the disabled alpha ever change.
+    private function makeButton(parent:MovieClip, name:String, label:String,
+                                x:Number, y:Number):MovieClip {
         var c:MovieClip = parent.createEmptyMovieClip(name, parent.getNextHighestDepth());
         c._x = x;
         c._y = y;
-        c._w = w;
-        c._h = h;
-        c._r = r;
         c._self = this;
-        var bd:MovieClip = c.createEmptyMovieClip("bd", c.getNextHighestDepth());
-        bd.lineStyle(1, 0x4A4A40, 100);
-        roundRectPath(bd, 0, 0, w, h, r);
-        c.createEmptyMovieClip("bg", c.getNextHighestDepth());
-        var tf:TextField = makeTF(c, "label", 0, 0, w, h, 11, "center");
+        c.beginFill(0x0C0A07, 90);
+        rectPath(c, 0, 0, BTN_W, BTN_H);
+        c.endFill();
+        c.lineStyle(1, 0x4A3B22, 100);
+        rectPath(c, 0, 0, BTN_W, BTN_H);
+        var tf:TextField = makeTF(c, "label", 0, Math.floor((BTN_H - LINE_H) / 2),
+                                  BTN_W, LINE_H, Math.round(FS * 0.9), true, 0xC8C0B0, "center");
         tf.text = label;
-        tf._y = (h - tf.textHeight) / 2 - 2;
         c.useHandCursor = true;
-        paintButton(c, false);
-        c.onRollOver = function() { this._self.paintButton(this, true); };
-        c.onRollOut = function() { this._self.paintButton(this, false); };
+        c.onRollOver = function() { this.label.textColor = 0xF7A22B; };
+        c.onRollOut = function() { this.label.textColor = 0xC8C0B0; };
         return c;
-    }
-
-    public function paintButton(c:MovieClip, hover:Boolean):Void {
-        c.bg.clear();
-        c.bg.beginFill(hover ? 0x2A2A24 : 0x1A1A18, 90);
-        roundRectPath(c.bg, 1, 1, c._w - 2, c._h - 2, c._r - 1);
-        c.bg.endFill();
-        c.label.textColor = hover ? 0xFFFFFF : 0xCCCCCC;
     }
 
     // =========================================================================
@@ -171,19 +224,20 @@ class KazBarsStopwatch {
 
     private function drawChrome(h:Number):Void {
         chrome.clear();
-        chrome.beginFill(0x0D0D0D, 85);
+        chrome.beginFill(0x0C0A07, 90);
         rectPath(chrome, 0, 0, W, h);
         chrome.endFill();
-        chrome.beginFill(0x1A1A18, 85);
-        rectPath(chrome, 2, 2, W - 4, TITLE_H - 2);
-        chrome.endFill();
+        chrome.lineStyle(1, 0x000000, 100);
+        rectPath(chrome, 0, 0, W, h);
+        chrome.lineStyle(1, 0x4A3B22, 100);
+        rectPath(chrome, 1, 1, W - 2, h - 2);
+        // Title separator — the same hairline the inspect panel rules its
+        // section headers with. Collapsed there is no body to divide.
         if (h > H_COLLAPSED) {
-            chrome.lineStyle(1, 0x444440, 60);
-            chrome.moveTo(2, TITLE_H);
-            chrome.lineTo(W - 2, TITLE_H);
+            chrome.lineStyle(1, 0x6B5324, 100);
+            chrome.moveTo(PAD, TITLE_H);
+            chrome.lineTo(W - PAD, TITLE_H);
         }
-        chrome.lineStyle(2, 0x3A3A30, 100);
-        rectPath(chrome, 0, 0, W, h);
     }
 
     private function rectPath(mc:MovieClip, x:Number, y:Number, w:Number, h:Number):Void {
@@ -192,18 +246,6 @@ class KazBarsStopwatch {
         mc.lineTo(x + w, y + h);
         mc.lineTo(x, y + h);
         mc.lineTo(x, y);
-    }
-
-    private function roundRectPath(mc:MovieClip, x:Number, y:Number, w:Number, h:Number, r:Number):Void {
-        mc.moveTo(x + r, y);
-        mc.lineTo(x + w - r, y);
-        mc.curveTo(x + w, y, x + w, y + r);
-        mc.lineTo(x + w, y + h - r);
-        mc.curveTo(x + w, y + h, x + w - r, y + h);
-        mc.lineTo(x + r, y + h);
-        mc.curveTo(x, y + h, x, y + h - r);
-        mc.lineTo(x, y + r);
-        mc.curveTo(x, y, x + r, y);
     }
 
     // =========================================================================
@@ -273,7 +315,7 @@ class KazBarsStopwatch {
         if (txt == lastText) return;
         lastText = txt;
         timeTF.text = txt;
-        if (collapsed) titleTF.text = txt;
+        if (collapsed) collTF.text = txt;
     }
 
     private function formatTime(ms:Number):String {
@@ -284,8 +326,10 @@ class KazBarsStopwatch {
         return hh + ":" + ((mm < 10) ? "0" + mm : String(mm)) + ":" + ((ss < 10) ? "0" + ss : String(ss));
     }
 
+    // Running / paused / stopped mapped onto the panel's value, header and
+    // label colours, so the state reads without adding a fourth hue.
     private function setTimeColor():Void {
-        timeTF.textColor = running ? 0xFFFFFF : (paused ? 0xFFCC66 : 0xCCCCCC);
+        timeTF.textColor = running ? 0x7AC142 : (paused ? 0xF7A22B : 0xC8C0B0);
     }
 
     private function updateButtons():Void {
@@ -302,20 +346,42 @@ class KazBarsStopwatch {
         applyCollapsed();
     }
 
+    // One plate at two heights — folding keeps the title band and drops the
+    // body, and the title swaps to the collapsed label. Everything sitting on
+    // the band — label, readout, button and the drag strip — re-centres on
+    // whichever height is on screen, at the state's own inset.
     private function applyCollapsed():Void {
+        var band:Number = collapsed ? H_COLLAPSED : TITLE_H;
+        var pad:Number = collapsed ? COLL_PAD : PAD;
         m_Body._visible = !collapsed;
+        titleTF._visible = !collapsed;
+        collTF._visible = collapsed;
+        titleTF._y = Math.floor((TITLE_H - NAME_H) / 2);
+        collTF._y = Math.floor((H_COLLAPSED - LINE_H) / 2);
+        coordTF._x = pad;
+        coordTF._y = Math.floor((band - LINE_H) / 2);
+        coordTF._width = W - pad * 2 - BTN;
+        collapseBtn._x = W - pad - BTN;
+        collapseBtn._y = Math.floor((band - BTN) / 2);
+        dragMC.clear();
+        dragMC.beginFill(0, 0);
+        rectPath(dragMC, 0, 0, W - pad - BTN, band);
+        dragMC.endFill();
         drawChrome(collapsed ? H_COLLAPSED : H);
         collapseBtn.label.text = collapsed ? "+" : "-";
         syncTitle();
     }
 
     private function syncTitle():Void {
-        titleTF.text = (collapsed && (running || paused)) ? lastText : "Stopwatch";
+        collTF.text = (running || paused) ? lastText : "Stopwatch";
     }
 
     public function beginDrag(da:MovieClip):Void {
         var hh:Number = collapsed ? H_COLLAPSED : H;
-        m_Panel.startDrag(false, 0, 0, Stage.width - W, Stage.height - hh);
+        m_Panel.startDrag(false, 0, 0, Math.max(0, Stage.width - W),
+                          Math.max(0, Stage.height - hh));
+        dragX = m_Panel._x;
+        dragY = m_Panel._y;
         coordTF._visible = true;
         updateCoords();
         var self:KazBarsStopwatch = this;
@@ -326,6 +392,13 @@ class KazBarsStopwatch {
         m_Panel.stopDrag();
         delete da.onMouseMove;
         coordTF._visible = false;
+        // Collapsed, the bar is small and labelled and reads as a button, so a
+        // press that never moved it opens the panel; a real drag still just
+        // moves it. Expanded, a stray click on the title must not fold it away.
+        if (collapsed && Math.abs(m_Panel._x - dragX) < 2
+                      && Math.abs(m_Panel._y - dragY) < 2) {
+            toggleCollapsed();
+        }
     }
 
     public function updateCoords():Void {
@@ -338,16 +411,18 @@ class KazBarsStopwatch {
 
     public function loadState(config:Object):Void {
         if (config == null || m_Panel == null) return;
-        var x:Object = config.FindEntry("swx");
-        var y:Object = config.FindEntry("swy");
-        if (x !== undefined && y !== undefined) {
-            m_Panel._x = clampPos(Number(x), Stage.width - W);
-            m_Panel._y = clampPos(Number(y), Stage.height - H_COLLAPSED);
-        }
+        // Fold state first: the position clamp needs the height actually on
+        // screen, or a saved spot near the bottom snaps up on every relog.
         var c:Object = config.FindEntry("swc");
         if (c !== undefined) {
             collapsed = (c == 1);
             applyCollapsed();
+        }
+        var x:Object = config.FindEntry("swx");
+        var y:Object = config.FindEntry("swy");
+        if (x !== undefined && y !== undefined) {
+            m_Panel._x = clampPos(Number(x), Stage.width - W);
+            m_Panel._y = clampPos(Number(y), Stage.height - (collapsed ? H_COLLAPSED : H));
         }
     }
 

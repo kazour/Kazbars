@@ -362,7 +362,10 @@ class CodeGenerator:
         """AS2 `d.SW = {...}` literal for the in-game stopwatch panel."""
         c = self.stopwatch_config
         collapsed = "true" if c["startCollapsed"] else "false"
-        return f"\n        d.SW = {{x: {int(c['x'])}, y: {int(c['y'])}, collapsed: {collapsed}}};"
+        return (
+            f"\n        d.SW = {{x: {int(c['x'])}, y: {int(c['y'])}, "
+            f"fontSize: {int(c['fontSize'])}, collapsed: {collapsed}}};"
+        )
 
     def _inspect_data_block(self):
         """AS2 `d.INS = {...}` literal for the target inspect panel."""
@@ -501,19 +504,24 @@ class CodeGenerator:
                 "{{CONSOLE_PREVIEW_OPEN}}": "if (!console.isActive()) console.createConsole();",
                 "{{CONSOLE_EXIT_PERSIST}}": 'config.ReplaceEntry("console_pin", consolePinned ? 1 : 0);\n'
                 '            config.ReplaceEntry("log_p", console.logPlayerEnabled ? 1 : 0);\n'
-                '            config.ReplaceEntry("log_t", console.logTargetEnabled ? 1 : 0);',
+                '            config.ReplaceEntry("log_t", console.logTargetEnabled ? 1 : 0);\n'
+                "            console.saveState(config);",
                 "{{CONSOLE_EXIT_REMOVE}}": "if (!consolePinned) console.removeConsole();",
                 "{{CONSOLE_CLEANUP}}": "console.removeConsole();",
+                # loadState before createConsole: a pinned console re-opens on the spot
+                # the user left it, not back in the middle of the screen.
                 "{{CONSOLE_LOAD_PERSIST}}": 'var cp:Object = config.FindEntry("console_pin");\n'
                 "            if (cp !== undefined) consolePinned = (cp == 1);\n"
                 '            var clp:Object = config.FindEntry("log_p");\n'
                 "            if (clp !== undefined) console.logPlayerEnabled = (clp == 1);\n"
                 '            var clt:Object = config.FindEntry("log_t");\n'
                 "            if (clt !== undefined) console.logTargetEnabled = (clt == 1);\n"
+                "            console.loadState(config);\n"
                 "            if (consolePinned) console.createConsole();",
                 "{{CONSOLE_DEACTIVATE_PERSIST}}": 'config.ReplaceEntry("console_pin", consolePinned ? 1 : 0);\n'
                 '            config.ReplaceEntry("log_p", console.logPlayerEnabled ? 1 : 0);\n'
-                '            config.ReplaceEntry("log_t", console.logTargetEnabled ? 1 : 0);',
+                '            config.ReplaceEntry("log_t", console.logTargetEnabled ? 1 : 0);\n'
+                "            console.saveState(config);",
             }
         else:
             tokens = {

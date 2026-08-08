@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 from ttkbootstrap.dialogs import Messagebox
 
-from .cast_timer_strip import CastTimerStrip
+from .extras_shortcuts import ExtrasShortcutsRow
 from .grid_dialogs import AddGridWizard
 from .grid_editor_panel import (
     GridEditorPanel,
@@ -67,10 +67,11 @@ from .ui_widgets import (
 class GridsPanel(ttk.Frame):
     """Grid editor panel: switches between empty state and toolbar+cards normal view."""
 
-    def __init__(self, parent, database, on_modified=None):
+    def __init__(self, parent, database, on_modified=None, app=None):
         super().__init__(parent)
         self.database = database
         self.on_modified = on_modified
+        self.app = app
 
         self.grids = []
         self.grid_panels = []
@@ -94,11 +95,16 @@ class GridsPanel(ttk.Frame):
                                           font=FONT_BODY, foreground=THEME_COLORS['muted'])
         self._slot_count_lbl.pack(side='right')
 
-        # Frozen cast-timer strip — pinned above the grid list, collapsed + off by default.
-        self.cast_strip = CastTimerStrip(self._normal_view, on_modified=self._mark_modified)
-        self.cast_strip.pack(fill='x', padx=PAD_TAB, pady=(0, PAD_SMALL))
-
         self._build_tip_bar()
+
+        # Extras shortcuts — a child of self (not _normal_view) packed once
+        # right here, so the row stays on screen in the zero-grids empty state
+        # too. The state widgets pack after it and land below; the tip bar
+        # anchors `before` it.
+        self.extras_row = None
+        if self.app is not None:
+            self.extras_row = ExtrasShortcutsRow(self, self.app)
+            self.extras_row.pack(fill='x', padx=PAD_TAB, pady=(PAD_XS, 0))
 
         content = ttk.Frame(self._normal_view)
         content.pack(fill='both', expand=True, padx=PAD_SMALL, pady=PAD_SMALL)
@@ -349,6 +355,11 @@ class GridsPanel(ttk.Frame):
         """Called when the active game folder changes."""
         self._update_tip()
 
+    def refresh_extras_shortcuts(self):
+        """Resync the extras shortcut cards after an Extras dialog Apply."""
+        if self.extras_row is not None:
+            self.extras_row.refresh()
+
     def _update_tip(self):
         """Update step guide state and show/hide the tip panel."""
         if self._tip_dismissed:
@@ -376,16 +387,20 @@ class GridsPanel(ttk.Frame):
         border = THEME_COLORS['success'] if ready else TK_COLORS['border']
         self._tip_frame.configure(highlightbackground=border, highlightcolor=border)
 
-        state_widget = self._normal_view if has_grids else self._empty_state
+        # Anchor `before` the always-packed extras row when there is one — a
+        # stable target. The state-widget fallback (app=None) can be mid-swap
+        # when _mark_modified() fires before refresh_panels() repacks the view
+        # (e.g. deleting the last grid un-ticks Build while _normal_view is
+        # still packed); anchoring `before` an unpacked widget raises TclError,
+        # so skip the repack and let the follow-up _update_tip() place it once
+        # the view has swapped.
+        anchor = self.extras_row
+        if anchor is None:
+            anchor = self._normal_view if has_grids else self._empty_state
         self._tip_frame.pack_forget()
-        # state_widget can be mid-swap when _mark_modified() fires before
-        # refresh_panels() repacks the view (e.g. deleting the last grid
-        # un-ticks Build while _normal_view is still packed). Anchoring
-        # `before` an unpacked widget raises TclError, so skip the repack and
-        # let the follow-up _update_tip() place it once the view has swapped.
-        if state_widget.winfo_manager() == 'pack':
+        if anchor.winfo_manager() == 'pack':
             self._tip_frame.pack(fill='x', padx=PAD_TAB, pady=(PAD_XS, PAD_XS),
-                                 before=state_widget)
+                                 before=anchor)
 
     def _create_from_empty_state(self, rows, cols, mode):
         """Create a grid from the empty state preset shortcuts."""
@@ -406,14 +421,6 @@ class GridsPanel(ttk.Frame):
         """Return current grid configurations (save all panel values first)."""
         self.save_settings()
         return self.grids
-
-    def get_cast_timer_config(self):
-        """Return the current cast-timer overlay config (validated dict)."""
-        return self.cast_strip.get_config()
-
-    def load_cast_timer_config(self, config):
-        """Load a cast-timer overlay config into the strip (defaults if empty)."""
-        self.cast_strip.load_config(config or {})
 
     def _migrate_whitelist(self, whitelist, missing):
         """Normalize whitelist entries to primary spell IDs.

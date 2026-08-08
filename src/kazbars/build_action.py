@@ -21,6 +21,7 @@ from . import game_folder, profile_io
 from .app_popups import show_close_game_required_dialog
 from .build_loading import BuildLoadingScreen
 from .build_utils import find_compiler
+from .cast_timer import validate_config as validate_cast_config
 from .grids_generator import MAX_TOTAL_SLOTS
 from .ui_helpers import THEME_COLORS
 from .ui_widgets import app_toast, confirm, flash_status_bar
@@ -138,18 +139,13 @@ def build(app):
         'compiler': compiler,
         'app_version': app.app_version,
         'include_console': bool(app.settings.get('build_console', False)),
-        'cast_config': app.grids_panel.get_cast_timer_config(),
+        'cast_config': validate_cast_config(app.settings.get('cast_timer')),
         'stopwatch_config': app.settings.get('stopwatch'),
         'inspect_config': app.settings.get('inspect'),
         'game_path': app.game_path,
         'use_aoc': app.use_aoc_bypass,
         'di_enabled': di_enabled,
         'di_settings': di_settings,
-        # TextColors.xml direction toggles, gated by the master enable so disabling
-        # reverts them: "Group my resource numbers", "Separate resources into Column B".
-        # (Per-source colors are not build state — the colors panel edits the file directly.)
-        'group_resources': di_enabled and bool(di_settings.get('other_resource_loss_to_target')),
-        'split_incoming': di_enabled and bool(di_settings.get('fixed_col_split')),
         'profile_name': profile_name,
     }
 
@@ -223,7 +219,6 @@ def _build_worker(app, loading, ctx):
             staging_dir / "KazBars.swf", ctx['game_path'], ctx['use_aoc'],
             damageinfo_swf=damageinfo_swf,
             damageinfo_pristine=Path(ctx['assets_path']) / "damageinfo" / "DamageInfo.swf",
-            group_resources=ctx['group_resources'], split_incoming=ctx['split_incoming'],
         )
         aoc_running = ctx['use_aoc'] and is_aoc_running()
         _hold_phase(started)

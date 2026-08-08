@@ -6,8 +6,9 @@ meter: every value here is an *offset* baked into a modded ``DamageInfo.swf`` at
 next Build & Install (see :mod:`damageinfo_settings` / :mod:`damageinfo_generator`).
 
 A master **Enable** toggle gates everything — when off, the controls grey out and the
-build leaves the stock file in place (reverting any prior mod). Settings persist to
-``damageinfo_settings.json`` on every change. Single-instance, opened via
+build leaves the stock file in place (reverting any prior mod). Edits are **staged**:
+they live in ``self.settings`` until Apply writes ``damageinfo_settings.json`` and
+closes the window; Cancel / X / Escape discard them. Single-instance, opened via
 ``open_damage_numbers_panel`` (mirrors ``open_deeps_panel``).
 
 Sliders run in offset space but their readout shows the resulting game value
@@ -24,10 +25,12 @@ from .ui_components import create_scrollable_frame
 from .ui_forms import create_card, create_slider_row
 from .ui_headers import create_dialog_header, create_tip_bar
 from .ui_helpers import (
+    BTN_DIALOG,
     BTN_MEDIUM,
     FONT_BODY,
     MODULE_COLORS,
     PAD_ROW,
+    PAD_SMALL,
     PAD_TAB,
     PAD_XS,
     THEME_COLORS,
@@ -67,12 +70,15 @@ class DamageNumbersPanel(tk.Toplevel):
 
     def __init__(self, parent: tk.Misc, settings_path: str | Path) -> None:
         super().__init__(parent)
-        self.title("Damage Numbers - KazBars")
+        self.title("Damage Numbers")
         self.resizable(False, False)
         self.transient(parent)  # type: ignore[call-overload]  # tk stubs reject Misc master
         # withdraw → build → restore → deiconify: build off-screen so the panel
         # appears fully laid out instead of packing its cards a row at a time.
+        # The grab goes after the withdraw, as in every other dialog here — Tk
+        # can drop a grab whose window becomes unviewable.
         self.withdraw()
+        self.grab_set()
 
         self.settings_folder = str(settings_path)
         self.settings = dis.load_settings(self.settings_folder)
@@ -102,6 +108,7 @@ class DamageNumbersPanel(tk.Toplevel):
         restore_window_position(self, "damage_numbers", _W, _H, parent, resizable=False)
         bind_window_position_save(self, "damage_numbers", save_size=False)
         self.deiconify()
+        self.bind("<Escape>", lambda e: self.destroy())
         self.protocol("WM_DELETE_WINDOW", self.destroy)
         # The global one-shot dark-titlebar patch can miss a deep/scrollable Toplevel
         # like this one (it fires before the caption HWND is ready, then never retries),
@@ -122,9 +129,17 @@ class DamageNumbersPanel(tk.Toplevel):
         create_dialog_header(self, "Damage Numbers", MODULE_COLORS['damage_numbers'], width=_W)
         create_tip_bar(
             self,
-            "Tune AoC's floating combat numbers. Changes apply on your next Build & Install.",
+            "Tune AoC's floating combat numbers. Apply, then Build & Install to see them.",
         )
         self._build_master(self)
+
+        # Footer first so it reserves height before the scrollable body claims the rest.
+        footer = ttk.Frame(self, padding=(PAD_TAB, PAD_XS))
+        footer.pack(fill="x", side="bottom")
+        ttk.Button(footer, text="Apply", width=BTN_DIALOG, bootstyle="success",
+                   command=self._on_apply).pack(side="right")
+        ttk.Button(footer, text="Cancel", width=BTN_DIALOG, bootstyle="secondary",
+                   command=self.destroy).pack(side="right", padx=(0, PAD_SMALL))
 
         outer, inner, _canvas = create_scrollable_frame(self)
         outer.pack(fill="both", expand=True)
@@ -187,7 +202,6 @@ class DamageNumbersPanel(tk.Toplevel):
         scale, label = create_slider_row(
             card, meta['description'] + ":", lo, hi, offset, meta['unit'],
             on_drag=lambda v, k=key: self._on_slider(k, v),
-            on_commit=self._save,
             value_width=6,
             notch=dis.is_offset_key(key),
             label_width=_LABEL_W,
@@ -284,9 +298,6 @@ class DamageNumbersPanel(tk.Toplevel):
         step = dis.GLOBAL_SETTINGS[key]['step']
         return dis.validate_setting(key, round(round(raw / step) * step, 10))
 
-    def _save(self) -> None:
-        dis.save_settings(self.settings_folder, self.settings)
-
     def _register_dim(self, *labels: ttk.Label) -> None:
         """Track a static (non-interactive) text label so the master gate can grey it
         in step with its controls — stores its current colour to restore on re-enable."""
@@ -305,13 +316,11 @@ class DamageNumbersPanel(tk.Toplevel):
     def _on_enum(self, key: str) -> None:
         var, options = self._enum_vars[key]
         self.settings[key] = options.index(var.get())
-        self._save()
         if key == 'shadow_mode':
             self._sync_shadow_state()
 
     def _on_bool(self, key: str) -> None:
         self.settings[key] = int(self._bool_vars[key].get())
-        self._save()
         if key == 'fixed_col_split':
             self._sync_split_state()
 
@@ -323,18 +332,34 @@ class DamageNumbersPanel(tk.Toplevel):
             if opt_name == name:
                 self.settings.update(values)  # writes both fixed_x_offset + fixed_y_spacing
                 break
-        self._save()
 
     def _on_enabled(self) -> None:
         self.settings['enabled'] = bool(self._enabled_var.get())
-        self._save()
         self._sync_enabled_state()
 
     def _apply_preset(self, name: str) -> None:
         self.settings = dis.apply_preset(self.settings, name)
-        self._save()
         self._refresh_all()
-        app_toast(self, f"Applied the {name} preset", "info", 3)
+        app_toast(self, f"{name} preset loaded — Apply to keep it", "info", 3)
+
+    def _on_apply(self) -> None:
+        """The one write: persist the staged settings, then close (Model B).
+
+        The toast branches on the master gate the way the stopwatch and inspect
+        dialogs do — with the mod off, the next build *removes* it, and saying
+        "Build & Install to apply" would read as the opposite.
+        """
+        dis.save_settings(self.settings_folder, self.settings)
+        # The parent is the app root; guard so a bare-parent construction
+        # (tests) doesn't require the full app surface.
+        grids_panel = getattr(self.master, 'grids_panel', None)
+        if grids_panel is not None:
+            grids_panel.refresh_extras_shortcuts()
+        if self.settings['enabled']:
+            app_toast(self, "Damage Numbers saved — Build & Install to apply", "success", 6)
+        else:
+            app_toast(self, "Damage Numbers off — next build restores stock", "info", 6)
+        self.destroy()
 
     # ------------------------------------------------------------------ #
     # State sync                                                         #

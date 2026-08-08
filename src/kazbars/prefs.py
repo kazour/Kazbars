@@ -19,6 +19,7 @@ import logging
 from typing import Any
 
 from . import CONTENT_BASELINE_VERSION
+from .cast_timer import validate_config as _validate_cast_timer
 from .inspect import validate_config as _validate_inspect
 from .settings_core import Field, Schema
 from .stopwatch import validate_config as _validate_stopwatch
@@ -88,6 +89,9 @@ PREFS_SCHEMA = Schema(
         "stopwatch": Field({}, validate=_validate_stopwatch),
         # Target inspect panel — ONE structured dict (defaults/clamps in inspect.py).
         "inspect": Field({}, validate=_validate_inspect),
+        # Cast timer — ONE structured dict (defaults/clamps in cast_timer.py). Machine-local
+        # like the other two baked overlays: its X/Y depend on the screen, not the profile.
+        "cast_timer": Field({}, validate=_validate_cast_timer),
         # OTA reference content (Phase 4). content_version is the authoritative
         # comparison key (vs the server manifest); it defaults to the shipped
         # baseline so a fresh install knows it's current and fires no first-run OTA.

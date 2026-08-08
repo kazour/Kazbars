@@ -95,16 +95,16 @@ GLOBAL_SETTINGS: dict[str, dict[str, Any]] = {
         'file': 'numbersTypes/MovingDamageText.as',
         'pattern': r'(static var FIXED_COL_Y\s*=\s*)(-?\d+)',
     },
-    # "Separate resources into Column B" also drops your incoming damage/heals into the fixed
-    # columns: at install it flips the self Attacks/Spells/Combos/Heals directions to -1 in
-    # TextColors.xml (build_executor, independent of "Group my resource numbers"), so plain
-    # damage stacks in Column A and the signed numbers (heals, mana, stamina) in Column B.
+    # SWF-only: splits whatever already drops into the fixed column by prefix sign. Which
+    # sources drop there is a TextColors.xml direction, owned by the Damage Number Colors
+    # panel — this setting never touches that file.
     'fixed_col_split': {
         'default': 0, 'min': 0, 'max': 1, 'step': 1, 'type': 'bool', 'unit': '',
-        'description': 'Separate resources into Column B',
-        'tooltip': 'Sends everything that lands on you into the fixed columns and splits it: '
-                   'incoming damage in Column A; heals, stamina and mana in Column B. '
-                   'Off = everything in one column.',
+        'description': 'Split signed numbers into Column B',
+        'tooltip': 'Of the numbers already dropping into the fixed column, plain damage '
+                   'stays in Column A and signed ones — heals, stamina, mana — move to '
+                   'Column B. Off = one column. Pick which sources drop there in '
+                   'Extras ▸ Damage number colors.',
         'file': 'numbersTypes/MovingDamageText.as',
         'pattern': r'(static var FIXED_COL_SPLIT\s*=\s*)(\d+)',
     },
@@ -182,16 +182,15 @@ GLOBAL_SETTINGS: dict[str, dict[str, Any]] = {
         'file': 'DamageNumberManager.as',
         'pattern': r'(static var ESSENTIAL_LABELS_ONLY\s*=\s*)(\d+)',
     },
-    # "Group my resource numbers": baked into OTHER_RESOURCE_LOSS_TO_TARGET (the SWF keeps
-    # enemy drains over the enemy) AND patches TextColors.xml at install time so your own
-    # resource losses drop into the fixed column with your gains. See build_executor._prepare_textcolors.
+    # SWF-only: forces enemy resource drains to direction 1 whatever TextColors.xml says,
+    # so sending your own resource losses to the fixed column doesn't drag the enemy's
+    # down with them. The direction itself is the colors panel's to set.
     'other_resource_loss_to_target': {
         'default': 0, 'min': 0, 'max': 1, 'step': 1, 'type': 'bool', 'unit': '',
-        'description': 'Group my resource numbers',
-        'tooltip': 'Sends your own mana/stamina losses to the same fixed column as your '
-                   'resource gains, so you watch all your resource changes in one place. '
-                   'Mana/stamina you drain from enemies still floats above them. '
-                   '(Patches TextColors.xml on Build & Install.)',
+        'description': 'Keep enemy drains overhead',
+        'tooltip': 'Mana and stamina you drain from enemies keep floating over them even '
+                   'when resource numbers are set to Dropping — so "Group my resource '
+                   'numbers" in Extras ▸ Damage number colors moves only your own.',
         'file': 'DamageNumberManager.as',
         'pattern': r'(static var OTHER_RESOURCE_LOSS_TO_TARGET\s*=\s*)(\d+)',
     },
@@ -275,9 +274,9 @@ _FLOAT_KEYS = frozenset(
 # Catalog of AoC's flytext sources for the color editor, grouped for the 2-column
 # (self | other) panel. Names MUST match the htmlFontParser("...") calls in
 # assets/damageinfo/src/__Packages/helpers/NumbersFontsCollection.as — guarded by
-# test_damageinfo_settings. Colors live in TextColors.xml and are written straight to
-# the skin by the Damage Number Colors panel (damageinfo_colors_panel) — they are NOT
-# stored in these settings and NOT baked into the SWF.
+# test_damageinfo_settings. Colors and directions both live in TextColors.xml and are
+# written straight to the skin by the Damage Number Colors panel (damageinfo_colors_panel)
+# — they are NOT stored in these settings and NOT baked into the SWF.
 
 # (group title, self [(name, label)], other [(name, label)]) — paired source groups.
 PAIRED_GROUPS: tuple[tuple[str, tuple[tuple[str, str], ...], tuple[tuple[str, str], ...]], ...] = (

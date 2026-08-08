@@ -3,7 +3,9 @@ KazBars — Target inspect panel dialog.
 
 Extras-menu settings for the in-game target inspect panel (KazBarsInspect
 stub): the build gate, the baked default position, the baked font size, and
-the start-collapsed flag.
+the start-collapsed flag. It also hosts the buff-discovery console's build
+gate (flat prefs key `build_console`) — the console is the other SWF-side
+inspection tool, so both are switched on from one place.
 Persists machine-local in prefs.json under `inspect` (data layer:
 `inspect.py`); the build bakes the values into the generated SWF.
 Functions take the KazBarsApp instance as first arg.
@@ -27,10 +29,12 @@ from .ui_helpers import (
     PAD_XS,
     THEME_COLORS,
 )
+from .ui_tk_style import apply_dark_titlebar
 from .ui_widgets import add_tooltip, app_toast
-from .window_position import restore_window_position
+from .window_position import bind_window_position_save, restore_window_position
 
 _WIDTH = 400
+_HEIGHT = 560
 
 
 def open_inspect_dialog(app):
@@ -40,6 +44,7 @@ def open_inspect_dialog(app):
     if existing is not None:
         try:
             if existing.winfo_exists():
+                existing.deiconify()
                 existing.lift()
                 existing.focus_force()
                 return existing
@@ -50,14 +55,13 @@ def open_inspect_dialog(app):
 
     dialog = tk.Toplevel(app)
     app.inspect_dialog = dialog
-    dialog.title("Target Inspect Panel")
+    dialog.withdraw()
+    dialog.title("Inspect Panel")
     dialog.resizable(False, False)
     dialog.transient(app)
     dialog.grab_set()
 
-    restore_window_position(dialog, 'inspect_settings', _WIDTH, 470, app, resizable=False)
-
-    create_dialog_header(dialog, "Target Inspect Panel",
+    create_dialog_header(dialog, "Inspect Panel",
                          MODULE_COLORS['grids'], width=_WIDTH)
 
     content = ttk.Frame(dialog)
@@ -130,6 +134,19 @@ def open_inspect_dialog(app):
                 "the AA perks detected on a player target — each player can "
                 "slot up to six. Takes effect on the next Build & Install.")
 
+    ttk.Label(content, text="Console",
+              font=FONT_SECTION, foreground=THEME_COLORS['heading']
+              ).pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
+    console_var = tk.BooleanVar(value=bool(app.settings.get('build_console', False)))
+    console_cb = ttk.Checkbutton(content, text="Include the buff-discovery console in builds",
+                                 variable=console_var)
+    console_cb.pack(anchor='w', pady=(0, PAD_SMALL))
+    add_tooltip(console_cb,
+                "Adds an in-game window that logs every buff and debuff on you "
+                "and your target with its buff ID — the ID you need to track "
+                "something the database doesn't carry. Opens in preview mode "
+                "(Shift+Ctrl+Alt). Takes effect on the next Build & Install.")
+
     btns = ttk.Frame(content)
     btns.pack(fill='x', side='bottom', pady=(PAD_SMALL, 0))
 
@@ -151,9 +168,16 @@ def open_inspect_dialog(app):
             'showPvp': pvp_var.get(),
             'showPerks': perks_var.get(),
         })
+        # The console rides along on the same Apply — one save() covers both keys.
+        app.settings.set('build_console', console_var.get())
         app.settings.set('inspect', new_cfg)
         app.settings.save()
-        if new_cfg['enabled']:
+        app.grids_panel.refresh_extras_shortcuts()
+        if new_cfg == cfg:
+            # Nothing about the panel moved, so the only reason to be here was
+            # the console — say so rather than report an inspect save that isn't.
+            app_toast(app, "Console saved — Build & Install to apply", 'success')
+        elif new_cfg['enabled']:
             app_toast(app, "Inspect panel saved — Build & Install to apply", 'success')
         else:
             app_toast(app, "Inspect panel off — next build removes it", 'info')
@@ -165,5 +189,21 @@ def open_inspect_dialog(app):
                command=dialog.destroy, width=BTN_SMALL
                ).pack(side='right', padx=(0, PAD_XS))
 
+    # withdraw → build → restore → deiconify, then keep the drag: the dialog
+    # reopens where the user left it (clamped to a live monitor), like the
+    # panels it configures. Staggered off the stopwatch dialog's first-launch
+    # centre so opening both doesn't stack them exactly.
+    restore_window_position(dialog, 'inspect_settings', _WIDTH, _HEIGHT, app,
+                            resizable=False, offset=(30, 30))
+    bind_window_position_save(dialog, 'inspect_settings', save_size=False)
+    dialog.deiconify()
+
+    dialog.bind("<Escape>", lambda e: dialog.destroy())
     dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
+    # The global one-shot dark-titlebar patch can miss a Toplevel built this
+    # late, so re-assert it on the dialog's own map (as damageinfo_colors_panel).
+    dialog.bind("<Map>",
+                lambda e: apply_dark_titlebar(dialog) if e.widget is dialog else None,
+                add="+")
+    dialog.after(0, enable_cb.focus_set)
     return dialog

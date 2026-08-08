@@ -62,3 +62,32 @@ def test_resolve_default_ignores_missing_user_default(tmp_path, monkeypatch):
     # default_profile points at a file that no longer exists → fall through to stock.
     app = _App(_Settings(default_profile=str(tmp_path / "gone.json")), tmp_path / "assets")
     assert profile_io.resolve_default_profile_path(app) == tmp_path / "assets" / "kazbars" / "Default.json"
+
+
+# --------------------------------------------------------------------------- #
+# build_profile_payload — what a profile is, and is not, allowed to carry
+# --------------------------------------------------------------------------- #
+class _GridsPanel:
+    @staticmethod
+    def get_profile_data():
+        return [{"id": "g1"}]
+
+
+class _PayloadApp:
+    app_version = "9.9.9"
+    reference_resolution = None
+    grids_panel = _GridsPanel()
+
+    @staticmethod
+    def _boss_timer_if_alive():
+        return None
+
+
+def test_payload_carries_no_cast_timer():
+    # The cast timer is machine-local (prefs `cast_timer`), like the stopwatch and
+    # inspect panel: its X/Y depend on the screen, not the profile. A profile that
+    # carried it would re-apply one machine's coordinates on another — and a shared
+    # KZBARS1 profile would drag them across users.
+    data = profile_io.build_profile_payload(_PayloadApp())
+    assert "cast_timer" not in data
+    assert data["grids"] == [{"id": "g1"}]
