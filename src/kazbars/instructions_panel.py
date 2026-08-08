@@ -107,7 +107,7 @@ SECTIONS: list[_Section] = [
             'tells you the one thing that matters: whether you ever need the '
             'app open again.',
             _sub('Set up once — then close the app', [
-                [('Grids, the Cast Timer, the Stopwatch, the Inspect Panel and '
+                [('Grids, the Cast Timer, the Stopwatch, the Inspect panel and '
                   'Damage Numbers all install with one ', None),
                  ('Build & Install', _SUCCESS),
                  (". After that you type /reloadui in-game and you're done — they "
@@ -295,9 +295,12 @@ SECTIONS: list[_Section] = [
                 'Build & Install. In preview mode (Shift+Ctrl+Alt), the console '
                 "logs every effect's name and buff ID as it lands on you or "
                 'your target — copy the ID into the Database.',
-                'Drag it by its title bar; it stays on screen and reopens where '
-                'you left it. Aoc.exe clients remember that spot across a relog '
-                '— other clients put it back in the middle of the screen.',
+                'Drag it by its title bar; it stays on screen and comes back '
+                'where you left it. The − button collapses it to a small bar '
+                'reading Console; click that bar to open the console again.',
+                'Aoc.exe clients remember that spot and whether you left it '
+                'collapsed across a relog — other clients start it open in the '
+                'middle of the screen.',
                 "It's off by default and only included when you enable it, so "
                 "finished builds don't carry it. Turn it off and rebuild to "
                 'remove it.',
@@ -541,7 +544,7 @@ SECTIONS: list[_Section] = [
     {
         'cat': 'Extras',
         'id': 'stopwatch',
-        'title': 'In-Game Stopwatch',
+        'title': 'Stopwatch',
         'body': [
             'Extras → Stopwatch… adds a count-up Start / Pause / Reset '
             'timer that lives inside the overlay. It works in fullscreen and '
@@ -569,7 +572,7 @@ SECTIONS: list[_Section] = [
     {
         'cat': 'Extras',
         'id': 'inspect',
-        'title': 'Target Inspect Panel',
+        'title': 'Inspect panel',
         'body': [
             'Extras → Inspect panel… adds an in-game panel that shows '
             "the combat sheet of whatever you target — the stats the game's "
@@ -635,9 +638,9 @@ SECTIONS: list[_Section] = [
             _sub('Positioning and text size', [
                 'Drag the panel by its name strip; live coordinates show as '
                 'you drag. Type them into the dialog to pin a spot. The − '
-                'button folds it down to just that strip. Aoc.exe clients '
-                'remember the position and folded state on their own, and the '
-                'dialog can start it folded.',
+                'button collapses it to just that strip. Aoc.exe clients '
+                'remember the position and collapsed state on their own, and '
+                'the dialog can start it collapsed.',
                 'No target handy? Preview mode (Shift+Ctrl+Alt) shows a '
                 'placeholder panel to position against.',
                 'Font size (8–48) is baked in at build time — the whole panel '
@@ -647,8 +650,9 @@ SECTIONS: list[_Section] = [
                 'The same dialog carries Include the buff-discovery console in '
                 "builds. It's the other in-game inspection tool — a window "
                 "that logs every effect's name and buff ID as it lands — so "
-                'both switch on from one place. Building and Installing covers '
-                'what it does.',
+                'both switch on from one place. It collapses to a small bar of '
+                'its own the same way this panel does; Building and Installing '
+                'covers the rest.',
             ]),
         ],
     },

@@ -29,9 +29,9 @@
 | `src/kazbars/combat_monitor.py` | 301 |
 | `src/kazbars/content_update.py` | 400 |
 | `src/kazbars/custom_menu_bar.py` | 446 |
-| `src/kazbars/damageinfo_colors_panel.py` | 415 |
+| `src/kazbars/damageinfo_colors_panel.py` | 416 |
 | `src/kazbars/damageinfo_generator.py` | 134 |
-| `src/kazbars/damageinfo_panel.py` | 420 |
+| `src/kazbars/damageinfo_panel.py` | 430 |
 | `src/kazbars/damageinfo_settings.py` | 482 |
 | `src/kazbars/database_editor.py` | 850 |
 | `src/kazbars/deeps_meter.py` | 485 |
@@ -52,8 +52,8 @@
 | `src/kazbars/grids_generator.py` | 704 |
 | `src/kazbars/grids_panel.py` | 683 |
 | `src/kazbars/inspect.py` | 52 |
-| `src/kazbars/inspect_panel.py` | 204 |
-| `src/kazbars/instructions_panel.py` | 948 |
+| `src/kazbars/inspect_panel.py` | 208 |
+| `src/kazbars/instructions_panel.py` | 952 |
 | `src/kazbars/live_tracker_panel.py` | 511 |
 | `src/kazbars/live_tracker_settings.py` | 183 |
 | `src/kazbars/overlay_engine.py` | 800 |

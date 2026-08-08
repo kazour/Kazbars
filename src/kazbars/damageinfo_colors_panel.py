@@ -286,23 +286,24 @@ class DamageNumberColorsPanel(tk.Toplevel):
             self._build_source_row(card, name, label)
 
     def _build_source_row(self, card, name, label) -> None:
-        """One source: label · direction · reset · swatch (packed right-to-left)."""
+        """One source, reading label · direction · swatch · ↺ — so the reset sits
+        past both things it resets. Packed right-to-left, first is rightmost."""
         row = ttk.Frame(card)
         row.pack(fill="x", pady=PAD_XS)
         ttk.Label(row, text=label, font=FONT_BODY,
                   foreground=THEME_COLORS['body']).pack(side="left")
 
+        reset = ttk.Button(row, text="↺", width=3, bootstyle="link",
+                           command=lambda n=name: self._reset_one(n))
+        reset.pack(side="right")
+        add_tooltip(reset, "Reset this source's color and direction to the game default")
+
         current = self._current.get(name) or _FALLBACK_COLOR
         self._picks[name] = current
         swatch = ColorSwatch(row, initial_color=f"#{current}",
                              on_change=lambda hex_, n=name: self._on_color(n, hex_))
-        swatch.pack(side="right")
+        swatch.pack(side="right", padx=(0, PAD_XS))
         self._swatches[name] = swatch
-
-        reset = ttk.Button(row, text="↺", width=3, bootstyle="link",
-                           command=lambda n=name: self._reset_one(n))
-        reset.pack(side="right", padx=(0, PAD_XS))
-        add_tooltip(reset, "Reset this source's color and direction to the game default")
 
         # Seed from the live file, then the stock file, then AoC's own default.
         direction = self._current_dirs.get(

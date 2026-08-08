@@ -73,10 +73,12 @@ class DamageNumbersPanel(tk.Toplevel):
         self.title("Damage Numbers")
         self.resizable(False, False)
         self.transient(parent)  # type: ignore[call-overload]  # tk stubs reject Misc master
-        self.grab_set()
         # withdraw → build → restore → deiconify: build off-screen so the panel
         # appears fully laid out instead of packing its cards a row at a time.
+        # The grab goes after the withdraw, as in every other dialog here — Tk
+        # can drop a grab whose window becomes unviewable.
         self.withdraw()
+        self.grab_set()
 
         self.settings_folder = str(settings_path)
         self.settings = dis.load_settings(self.settings_folder)
@@ -341,9 +343,17 @@ class DamageNumbersPanel(tk.Toplevel):
         app_toast(self, f"{name} preset loaded — Apply to keep it", "info", 3)
 
     def _on_apply(self) -> None:
-        """The one write: persist the staged settings, then close (Model B)."""
+        """The one write: persist the staged settings, then close (Model B).
+
+        The toast branches on the master gate the way the stopwatch and inspect
+        dialogs do — with the mod off, the next build *removes* it, and saying
+        "Build & Install to apply" would read as the opposite.
+        """
         dis.save_settings(self.settings_folder, self.settings)
-        app_toast(self, "Damage Numbers saved — Build & Install to apply", "success", 6)
+        if self.settings['enabled']:
+            app_toast(self, "Damage Numbers saved — Build & Install to apply", "success", 6)
+        else:
+            app_toast(self, "Damage Numbers off — next build restores stock", "info", 6)
         self.destroy()
 
     # ------------------------------------------------------------------ #

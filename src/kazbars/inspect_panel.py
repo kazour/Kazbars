@@ -56,12 +56,12 @@ def open_inspect_dialog(app):
     dialog = tk.Toplevel(app)
     app.inspect_dialog = dialog
     dialog.withdraw()
-    dialog.title("Target Inspect Panel")
+    dialog.title("Inspect Panel")
     dialog.resizable(False, False)
     dialog.transient(app)
     dialog.grab_set()
 
-    create_dialog_header(dialog, "Target Inspect Panel",
+    create_dialog_header(dialog, "Inspect Panel",
                          MODULE_COLORS['grids'], width=_WIDTH)
 
     content = ttk.Frame(dialog)
@@ -172,7 +172,11 @@ def open_inspect_dialog(app):
         app.settings.set('build_console', console_var.get())
         app.settings.set('inspect', new_cfg)
         app.settings.save()
-        if new_cfg['enabled']:
+        if new_cfg == cfg:
+            # Nothing about the panel moved, so the only reason to be here was
+            # the console — say so rather than report an inspect save that isn't.
+            app_toast(app, "Console saved — Build & Install to apply", 'success')
+        elif new_cfg['enabled']:
             app_toast(app, "Inspect panel saved — Build & Install to apply", 'success')
         else:
             app_toast(app, "Inspect panel off — next build removes it", 'info')

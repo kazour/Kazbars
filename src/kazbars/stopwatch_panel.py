@@ -54,12 +54,12 @@ def open_stopwatch_dialog(app):
     dialog = tk.Toplevel(app)
     app.stopwatch_dialog = dialog
     dialog.withdraw()
-    dialog.title("In-Game Stopwatch")
+    dialog.title("Stopwatch")
     dialog.resizable(False, False)
     dialog.transient(app)
     dialog.grab_set()
 
-    create_dialog_header(dialog, "In-Game Stopwatch",
+    create_dialog_header(dialog, "Stopwatch",
                          MODULE_COLORS['grids'], width=_WIDTH)
 
     content = ttk.Frame(dialog)

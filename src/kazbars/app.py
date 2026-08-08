@@ -532,12 +532,12 @@ class KazBarsApp(ttkb.Window):
         open_damage_number_colors_panel(self)
 
     def _open_stopwatch_settings(self):
-        """Open the In-Game Stopwatch settings dialog (modal)."""
+        """Open the Stopwatch settings dialog (modal)."""
         from .stopwatch_panel import open_stopwatch_dialog
         open_stopwatch_dialog(self)
 
     def _open_inspect_settings(self):
-        """Open the Target Inspect Panel settings dialog (modal)."""
+        """Open the Inspect Panel settings dialog (modal)."""
         from .inspect_panel import open_inspect_dialog
         open_inspect_dialog(self)
 
