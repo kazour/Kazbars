@@ -14,7 +14,7 @@
 // position that survives relaunch on /loadclip default clients; the title bar
 // shows live coordinates while dragging so users can copy them into the app);
 // aoc.exe clients persist drag position + collapsed state via the module
-// config archive (swx/swy/swc).
+// config archive (swx/swy/swc, and the control-panel master switch swv).
 //
 // Driven from KazBars: createPanel() in onLoad, loadState()/saveState() from
 // the module archive, cleanup() on deactivate.
@@ -69,9 +69,11 @@ class KazBarsStopwatch {
     private var pausedAt:Number;
     private var pausedTotal:Number;
     private var lastText:String;
+    private var active:Boolean;
 
     public function KazBarsStopwatch(kb:Object, root:MovieClip) {
         rootClip = root;
+        active = true;
         running = false;
         paused = false;
         startTime = 0;
@@ -176,6 +178,9 @@ class KazBarsStopwatch {
         applyCollapsed();
         setTimeColor();
         updateButtons();
+        // A re-run of onLoad rebuilds the plate in whatever state the master
+        // switch is in, not blindly visible.
+        m_Panel._visible = active;
     }
 
     private function makeTF(parent:MovieClip, id:String, x:Number, y:Number, w:Number,
@@ -405,9 +410,14 @@ class KazBarsStopwatch {
         coordTF.text = Math.round(m_Panel._x) + ", " + Math.round(m_Panel._y);
     }
 
-    // Preview-mode control panel only: a hard hide of the whole plate, restored
-    // on the way out of preview. The timer keeps running underneath.
-    public function setShown(shown:Boolean):Void {
+    // Master switch (preview control panel + archive): hidden is inactive, but
+    // the timer keeps running underneath — re-activating shows the live count.
+    public function isActive():Boolean {
+        return active;
+    }
+
+    public function setActive(shown:Boolean):Void {
+        active = shown;
         if (m_Panel != null) m_Panel._visible = shown;
     }
 
@@ -424,6 +434,8 @@ class KazBarsStopwatch {
             collapsed = (c == 1);
             applyCollapsed();
         }
+        var v:Object = config.FindEntry("swv");
+        if (v !== undefined) setActive(v == 1);
         var x:Object = config.FindEntry("swx");
         var y:Object = config.FindEntry("swy");
         if (x !== undefined && y !== undefined) {
@@ -437,6 +449,7 @@ class KazBarsStopwatch {
         config.ReplaceEntry("swx", m_Panel._x);
         config.ReplaceEntry("swy", m_Panel._y);
         config.ReplaceEntry("swc", collapsed ? 1 : 0);
+        config.ReplaceEntry("swv", active ? 1 : 0);
     }
 
     private function clampPos(v:Number, max:Number):Number {

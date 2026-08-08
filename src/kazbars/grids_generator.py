@@ -155,11 +155,6 @@ class CodeGenerator:
 
     def _member_variables(self):
         console_decl = "\n    private var console:KazBarsConsole;" if self.include_console else ""
-        console_pin_decl = (
-            "\n\n    // Console pin state (persisted via config archive)\n    private var consolePinned:Boolean;"
-            if self.include_console
-            else ""
-        )
         cast_decl = (
             "\n    private var castTimer:KazBarsCastTimer;" if self.include_cast_timer else ""
         )
@@ -208,14 +203,13 @@ class CodeGenerator:
     // HELPER CLASSES: Preview, Slot, PreviewPanel, and (optional) Console (32KB bytecode limit workaround)
     private var preview:KazBarsPreview;{console_decl}
     private var slot:KazBarsSlot;
-    private var ppanel:KazBarsPreviewPanel;{console_pin_decl}{cast_decl}{sw_decl}{ins_decl}
+    private var ppanel:KazBarsPreviewPanel;{cast_decl}{sw_decl}{ins_decl}
 
     // Key listener reference for proper cleanup
     private var keyListener:Object;
 """
 
     def _constructor(self):
-        console_pin_init = "\n        consolePinned = false;" if self.include_console else ""
         console_init = (
             "\n        console = new KazBarsConsole(this, rootClip);"
             if self.include_console
@@ -249,7 +243,7 @@ class CodeGenerator:
         previewArmed = true;
         lastShiftDown = 0;
         lastCtrlDown = 0;
-        lastAltDown = 0;{console_pin_init}
+        lastAltDown = 0;
         C_BUFF = 0x666666;
         C_DEBUFF = 0x8B0000;
         C_BG = 0x000000;
@@ -503,40 +497,37 @@ class CodeGenerator:
             tokens = {
                 "{{CONSOLE_LOG_PLAYER}}": "if (console.isActive() && buff.m_Name != null) console.logPlayer(buff.m_Name, bid);",
                 "{{CONSOLE_LOG_TARGET}}": "if (console.isActive() && buff.m_Name != null) console.logTarget(buff.m_Name, bid);",
-                "{{CONSOLE_PREVIEW_OPEN}}": "if (!console.isActive()) console.createConsole();",
-                "{{CONSOLE_EXIT_PERSIST}}": 'config.ReplaceEntry("console_pin", consolePinned ? 1 : 0);\n'
+                # Open at login is the default, and the only default a /loadclip
+                # client ever gets — no archive reaches it to say otherwise.
+                "{{CONSOLE_CREATE}}": "console.createConsole();",
+                "{{CONSOLE_EXIT_PERSIST}}": 'config.ReplaceEntry("cnv", console.isActive() ? 1 : 0);\n'
                 '            config.ReplaceEntry("log_p", console.logPlayerEnabled ? 1 : 0);\n'
                 '            config.ReplaceEntry("log_t", console.logTargetEnabled ? 1 : 0);\n'
                 "            console.saveState(config);",
-                # setShown first: a pinned console survives the exit, and the
-                # control panel may have left it hidden.
-                "{{CONSOLE_EXIT_REMOVE}}": "console.setShown(true);\n"
-                "        if (!consolePinned) console.removeConsole();",
                 "{{CONSOLE_CLEANUP}}": "console.removeConsole();",
-                # loadState before createConsole: a pinned console re-opens on the spot
-                # the user left it, not back in the middle of the screen.
-                "{{CONSOLE_LOAD_PERSIST}}": 'var cp:Object = config.FindEntry("console_pin");\n'
-                "            if (cp !== undefined) consolePinned = (cp == 1);\n"
+                # loadState before the re-create so the console rebuilds on the
+                # archived spot and fold, not back in the middle of the screen.
+                "{{CONSOLE_LOAD_PERSIST}}": 'var cnv:Object = config.FindEntry("cnv");\n'
                 '            var clp:Object = config.FindEntry("log_p");\n'
                 "            if (clp !== undefined) console.logPlayerEnabled = (clp == 1);\n"
                 '            var clt:Object = config.FindEntry("log_t");\n'
                 "            if (clt !== undefined) console.logTargetEnabled = (clt == 1);\n"
                 "            console.loadState(config);\n"
-                "            if (consolePinned) console.createConsole();",
-                "{{CONSOLE_DEACTIVATE_PERSIST}}": 'config.ReplaceEntry("console_pin", consolePinned ? 1 : 0);\n'
+                "            if (cnv !== undefined && cnv == 0) console.removeConsole();\n"
+                "            else console.createConsole();",
+                "{{CONSOLE_DEACTIVATE_PERSIST}}": 'config.ReplaceEntry("cnv", console.isActive() ? 1 : 0);\n'
                 '            config.ReplaceEntry("log_p", console.logPlayerEnabled ? 1 : 0);\n'
                 '            config.ReplaceEntry("log_t", console.logTargetEnabled ? 1 : 0);\n'
                 "            console.saveState(config);",
-                "{{PP_ROW_CONSOLE}}": 'ppanel.addExtra("Console", "console");',
-                "{{PP_APPLY_CONSOLE}}": 'if (key == "console") console.setShown(shown);',
+                "{{PP_ROW_CONSOLE}}": 'ppanel.addExtra("Console", "console", console.isActive());',
+                "{{PP_APPLY_CONSOLE}}": 'if (key == "console") console.setActive(shown);',
             }
         else:
             tokens = {
                 "{{CONSOLE_LOG_PLAYER}}": "",
                 "{{CONSOLE_LOG_TARGET}}": "",
-                "{{CONSOLE_PREVIEW_OPEN}}": "",
+                "{{CONSOLE_CREATE}}": "",
                 "{{CONSOLE_EXIT_PERSIST}}": "",
-                "{{CONSOLE_EXIT_REMOVE}}": "",
                 "{{CONSOLE_CLEANUP}}": "",
                 "{{CONSOLE_LOAD_PERSIST}}": "",
                 "{{CONSOLE_DEACTIVATE_PERSIST}}": "",
@@ -567,9 +558,8 @@ class CodeGenerator:
                 "{{CAST_LOAD}}": "castTimer.loadPositions(config);",
                 "{{CAST_SAVE}}": "castTimer.savePositions(config);",
                 "{{CAST_CLEANUP}}": "castTimer.cleanup();",
-                "{{PP_ROW_CAST}}": 'ppanel.addExtra("Cast timer", "cast");',
-                "{{PP_APPLY_CAST}}": 'if (key == "cast") { if (shown) castTimer.previewOn(); '
-                "else castTimer.previewOff(); }",
+                "{{PP_ROW_CAST}}": 'ppanel.addExtra("Cast timer", "cast", castTimer.isActive());',
+                "{{PP_APPLY_CAST}}": 'if (key == "cast") castTimer.setActive(shown);',
             }
         else:
             cast_tokens = {name: "" for name in cast_token_names}
@@ -579,7 +569,6 @@ class CodeGenerator:
             "{{SW_LOAD}}",
             "{{SW_SAVE}}",
             "{{SW_CLEANUP}}",
-            "{{SW_PREVIEW_RESTORE}}",
             "{{PP_ROW_SW}}",
             "{{PP_APPLY_SW}}",
         )
@@ -589,9 +578,8 @@ class CodeGenerator:
                 "{{SW_LOAD}}": "stopwatch.loadState(config);",
                 "{{SW_SAVE}}": "stopwatch.saveState(config);",
                 "{{SW_CLEANUP}}": "stopwatch.cleanup();",
-                "{{SW_PREVIEW_RESTORE}}": "stopwatch.setShown(true);",
-                "{{PP_ROW_SW}}": 'ppanel.addExtra("Stopwatch", "sw");',
-                "{{PP_APPLY_SW}}": 'if (key == "sw") stopwatch.setShown(shown);',
+                "{{PP_ROW_SW}}": 'ppanel.addExtra("Stopwatch", "sw", stopwatch.isActive());',
+                "{{PP_APPLY_SW}}": 'if (key == "sw") stopwatch.setActive(shown);',
             }
         else:
             sw_tokens = {name: "" for name in sw_token_names}
@@ -616,9 +604,8 @@ class CodeGenerator:
                 "{{INS_LOAD}}": "inspect.loadState(config);",
                 "{{INS_SAVE}}": "inspect.saveState(config);",
                 "{{INS_CLEANUP}}": "inspect.cleanup();",
-                "{{PP_ROW_INS}}": 'ppanel.addExtra("Inspect panel", "ins");',
-                "{{PP_APPLY_INS}}": 'if (key == "ins") { if (shown) inspect.previewOn(); '
-                "else inspect.previewOff(); }",
+                "{{PP_ROW_INS}}": 'ppanel.addExtra("Inspect panel", "ins", inspect.isActive());',
+                "{{PP_APPLY_INS}}": 'if (key == "ins") inspect.setActive(shown);',
             }
         else:
             ins_tokens = {name: "" for name in ins_token_names}

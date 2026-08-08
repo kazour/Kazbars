@@ -21,7 +21,8 @@
 // Positioning mirrors the stopwatch: X/Y, font size and collapsed state are
 // baked into config (the only position that survives relaunch on /loadclip
 // clients; the name strip shows live coordinates while dragging), and aoc.exe
-// clients persist drag + collapse via the archive (inx/iny/inc). All geometry
+// clients persist drag + collapse via the archive (inx/iny/inc, master switch
+// inv). All geometry
 // derives from fontSize.
 //
 // Driven from KazBars: createPanel() in onLoad, setSubject() from
@@ -121,6 +122,7 @@ class KazBarsInspect {
     private var haveFull:Boolean;
     private var warmup:Number;
     private var previewMode:Boolean;
+    private var active:Boolean;
     private var pvpShown:Boolean;
 
     // Render cache — assign only on change; TextField.text writes are the
@@ -159,6 +161,7 @@ class KazBarsInspect {
         haveFull = false;
         warmup = 0;
         previewMode = false;
+        active = true;
         pvpShown = false;
         lastName = "";
         lastPve = "";
@@ -761,6 +764,7 @@ class KazBarsInspect {
     // =========================================================================
 
     public function pollTick():Void {
+        if (!active) return;
         if (m_Subject == null) return;
 
         // Logout/zone collapses every id to 0 in one burst; id 1 and id 54
@@ -1430,9 +1434,20 @@ class KazBarsInspect {
         tipMC._visible = false;
     }
 
+    // Master switch (preview control panel + archive): folds into the one
+    // visibility gate, so live sheets and the canned preview sheet both obey it.
+    public function isActive():Boolean {
+        return active;
+    }
+
+    public function setActive(shown:Boolean):Void {
+        active = shown;
+        updateVisibility();
+    }
+
     private function updateVisibility():Void {
         if (m_Panel == null) return;
-        var vis:Boolean = previewMode || (m_Subject != null && haveFull);
+        var vis:Boolean = active && (previewMode || (m_Subject != null && haveFull));
         if (vis != panelVis) {
             panelVis = vis;
             m_Panel._visible = vis;
@@ -1519,6 +1534,8 @@ class KazBarsInspect {
 
     public function loadState(config:Object):Void {
         if (config == null || m_Panel == null) return;
+        var v:Object = config.FindEntry("inv");
+        if (v !== undefined) setActive(v == 1);
         // Fold state first: the clamp has to measure the plate actually on
         // screen. Clamping a sheet against the collapsed bar's height let a
         // saved spot near the bottom edge hang off it.
@@ -1540,6 +1557,7 @@ class KazBarsInspect {
         config.ReplaceEntry("inx", m_Panel._x);
         config.ReplaceEntry("iny", m_Panel._y);
         config.ReplaceEntry("inc", collapsed ? 1 : 0);
+        config.ReplaceEntry("inv", active ? 1 : 0);
     }
 
     private function clampPos(v:Number, max:Number):Number {
