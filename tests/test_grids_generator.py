@@ -319,3 +319,94 @@ def test_inspect_on_emits_hooks_and_data():
 
     # No leftover tokens
     assert "{{INS_" not in main_code
+
+
+# --------------------------------------------------------------------------
+# Preview-mode control panel (KazBarsPreviewPanel — unconditional; the extra
+# rows and their dispatch arms are gated per extra)
+# --------------------------------------------------------------------------
+
+
+def _all_extras_gen():
+    return CodeGenerator(
+        [_minimal_grid()], _load_db(), "0.0.0",
+        include_console=True,
+        cast_config=_cast_cfg(),
+        stopwatch_config={"enabled": True, "x": 750, "y": 410},
+        inspect_config={"enabled": True, "x": 40, "y": 240},
+    )
+
+
+def test_preview_panel_always_emitted():
+    """The panel compiles into every build, extras or not."""
+    gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0")
+    main_code, _ = gen.generate()
+
+    assert "private var ppanel:KazBarsPreviewPanel;" in main_code
+    assert "ppanel = new KazBarsPreviewPanel(this, rootClip);" in main_code
+
+    # Rows are collected on every preview entry, panel shown last (topmost).
+    assert "ppanel.begin();" in main_code
+    assert "ppanel.addGrid(obj);" in main_code
+    assert "ppanel.show();" in main_code
+    assert "public function previewToggle(key:String, shown:Boolean):Void {" in main_code
+
+    # Teardown from both paths (exitPreview + cleanup), save from both
+    # persist paths (exitPreview + OnModuleDeactivated).
+    assert main_code.count("ppanel.destroy();") == 2
+    assert main_code.count("ppanel.saveState(config);") == 2
+    assert "ppanel.loadState(config);" in main_code
+
+    assert "{{PP_" not in main_code
+
+
+def test_preview_panel_no_extras_has_no_extra_rows():
+    """With nothing compiled in, the panel lists grids only and the dispatcher
+    body is empty — an addExtra or setShown here would name a missing class."""
+    main_code, _ = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0").generate()
+    assert "ppanel.addExtra(" not in main_code
+    assert "setShown" not in main_code
+
+
+def test_preview_panel_rows_and_dispatch_all_extras():
+    main_code, _ = _all_extras_gen().generate()
+
+    assert 'ppanel.addExtra("Stopwatch", "sw");' in main_code
+    assert 'ppanel.addExtra("Inspect panel", "ins");' in main_code
+    assert 'ppanel.addExtra("Cast timer", "cast");' in main_code
+    assert 'ppanel.addExtra("Console", "console");' in main_code
+
+    # Rows are added before the panel is built, in menu order.
+    assert (main_code.index('ppanel.addExtra("Stopwatch"')
+            < main_code.index('ppanel.addExtra("Inspect panel"')
+            < main_code.index('ppanel.addExtra("Cast timer"')
+            < main_code.index('ppanel.addExtra("Console"')
+            < main_code.index("ppanel.show();"))
+
+    # One dispatch arm per extra.
+    assert 'if (key == "sw") stopwatch.setShown(shown);' in main_code
+    assert 'if (key == "ins") { if (shown) inspect.previewOn(); else inspect.previewOff(); }' in main_code
+    assert 'if (key == "cast") { if (shown) castTimer.previewOn(); else castTimer.previewOff(); }' in main_code
+    assert 'if (key == "console") console.setShown(shown);' in main_code
+
+    # Nothing the panel hid may outlive preview: the stopwatch is restored
+    # outright, and a pinned console is made visible before it is kept.
+    assert "stopwatch.setShown(true);" in main_code
+    assert main_code.index("console.setShown(true);") < main_code.index(
+        "if (!consolePinned) console.removeConsole();")
+
+    assert "{{PP_" not in main_code
+    assert "{{SW_" not in main_code
+
+
+def test_preview_panel_row_gated_per_extra():
+    """A row only appears for an extra that is actually compiled in."""
+    gen = CodeGenerator(
+        [_minimal_grid()], _load_db(), "0.0.0",
+        stopwatch_config={"enabled": True, "x": 750, "y": 410},
+    )
+    main_code, _ = gen.generate()
+    assert 'ppanel.addExtra("Stopwatch", "sw");' in main_code
+    assert 'ppanel.addExtra("Inspect panel", "ins");' not in main_code
+    assert 'ppanel.addExtra("Cast timer", "cast");' not in main_code
+    assert 'ppanel.addExtra("Console", "console");' not in main_code

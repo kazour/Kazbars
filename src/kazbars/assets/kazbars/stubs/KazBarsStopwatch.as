@@ -405,6 +405,12 @@ class KazBarsStopwatch {
         coordTF.text = Math.round(m_Panel._x) + ", " + Math.round(m_Panel._y);
     }
 
+    // Preview-mode control panel only: a hard hide of the whole plate, restored
+    // on the way out of preview. The timer keeps running underneath.
+    public function setShown(shown:Boolean):Void {
+        if (m_Panel != null) m_Panel._visible = shown;
+    }
+
     // =========================================================================
     // Persistence (aoc.exe clients only — default /loadclip clients have no archive)
     // =========================================================================
