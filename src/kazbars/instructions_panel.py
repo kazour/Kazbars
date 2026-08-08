@@ -113,6 +113,9 @@ SECTIONS: list[_Section] = [
                  (". After that you type /reloadui in-game and you're done — they "
                   'keep working whether or not KazBars is running. Open it again '
                   'only when you want to change something.', None)],
+                'Those four extras also have toggle cards above the grid list — '
+                'click one to flip the feature in or out of your next build. '
+                'Configuring them stays in the Extras menu.',
                 'Default Buff Bars and Damage Number Colors skip the build '
                 "entirely — they edit the game's own files the moment you hit "
                 'Apply, so /reloadui is all they need.',
@@ -437,6 +440,8 @@ SECTIONS: list[_Section] = [
                  ('Build & Install', _SUCCESS),
                  (', same as grids. One toggle runs both the Player and '
                   'Target sides.', None)],
+                'The Cast Timer card above the grid list flips this same '
+                'switch — the dialog stays the place to configure it.',
             ]),
             _sub('What you can set', [
                 'Player position and Target position — where each timer sits '
@@ -507,6 +512,8 @@ SECTIONS: list[_Section] = [
                  (', same as grids.', None)],
                 'Your stock file is backed up the first time, so turning it off '
                 'and rebuilding restores the original.',
+                'The Damage Numbers card above the grid list flips this same '
+                'switch — the dialog stays the place to configure it.',
             ]),
             _sub('What you can tune', [
                 'Keep ranged numbers big — holds the size of ranged hits past '
@@ -582,6 +589,8 @@ SECTIONS: list[_Section] = [
                  (', then ', None),
                  ('Build & Install', _SUCCESS),
                  ('. It ships with your next build, same as grids.', None)],
+                'The Stopwatch card above the grid list flips this same '
+                'switch — the dialog stays the place to configure it.',
             ]),
             _sub('Using it in-game', [
                 'A compact draggable panel shows h:mm:ss. The − button collapses '
@@ -613,6 +622,8 @@ SECTIONS: list[_Section] = [
                  (', then ', None),
                  ('Build & Install', _SUCCESS),
                  ('. It ships with your next build, same as grids.', None)],
+                'The Inspect panel card above the grid list flips this same '
+                'switch — the dialog stays the place to configure it.',
             ]),
             _sub('What it shows', [
                 'The name strip reads Name Class (Level/PvP level) — Kazour '

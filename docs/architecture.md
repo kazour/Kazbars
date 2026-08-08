@@ -1,6 +1,6 @@
 # Architectural Map
 
-**Current as of:** 2026-08-08 (Extras homogenization: the cast timer left the Grids panel for its own Extras dialog, `cast_timer_strip.py` deleted and its config moved from the profile to the machine-local `cast_timer` prefs dict).
+**Current as of:** 2026-08-08 (Extras homogenization: the cast timer left the Grids panel for its own Extras dialog with its config in the machine-local `cast_timer` prefs dict, and the main screen gained `extras_shortcuts.py` — four toggle cards above the grid list that flip the four SWF-extra build gates in place).
 **Purpose:** Module topology, dependencies, and coupling hotspots. Updated alongside code changes — if you edit this file, commit it with the code. Per-file line counts live in [`inventory.md`](inventory.md) (generated); role blurbs live in [`inventory-roles.md`](inventory-roles.md).
 
 ## Dependency clusters
@@ -202,7 +202,7 @@ These modules are consumed only by `src/kazbars/app.py` by design — they hold 
 |  4 | `ui_tk_style`, `ui_components`, `overlay_engine`, `app_popups`, `cast_timer` | Narrow surface — ripple is contained. `overlay_engine` feeds both overlays + both settings adapters; `app_popups` feeds `app.py`, `build_action`, `first_launch`, `build_loading` (popup chrome + the three popups). `cast_timer` is the pure config layer ← `prefs`, `grids_generator`, `cast_timer_panel`, and `build_action` (which validates the prefs dict before handing it to the build as `cast_config`). |
 |  3 | `build_utils`, `build_executor`, `live_tracker_settings`, `paths`, `stopwatch`, `inspect` | Cluster leaves. `paths` is imported directly by `app.py`, `build_utils`, `deeps_parsers` (everyone else gets paths via the `app` object). `stopwatch` and `inspect` are the pure config layers ← `grids_generator`, `prefs`, and their own Extras dialog (`stopwatch_panel` / `inspect_panel`). |
 |  2 | `grids_generator`, `update_check` | `update_check`: `app.py` (launch check) + `app_popups` (About ▸ Check for updates via `fetch_latest`). |
-|  1 | `grids_panel`, `custom_menu_bar`, `profile_io`, `game_folder`, `game_resolution`, `build_action`, `build_loading`, `database_editor`, `instructions_panel`, `first_launch`, `live_tracker_panel`, `grid_dialogs`, `boss_timer`, `timer_overlay`, `combat_monitor`, `settings_backup`, `stopwatch_panel`, `inspect_panel`, `cast_timer_panel`, `foreground`, `focus_watcher` | Each consumed by exactly one parent — low blast radius by design. (`foreground` ← `focus_watcher`; `focus_watcher` ← `app.py`; `build_loading` ← `build_action`.) |
+|  1 | `grids_panel`, `custom_menu_bar`, `profile_io`, `game_folder`, `game_resolution`, `build_action`, `build_loading`, `database_editor`, `instructions_panel`, `first_launch`, `live_tracker_panel`, `grid_dialogs`, `boss_timer`, `timer_overlay`, `combat_monitor`, `settings_backup`, `stopwatch_panel`, `inspect_panel`, `cast_timer_panel`, `extras_shortcuts`, `foreground`, `focus_watcher` | Each consumed by exactly one parent — low blast radius by design. (`foreground` ← `focus_watcher`; `focus_watcher` ← `app.py`; `build_loading` ← `build_action`; `extras_shortcuts` ← `grids_panel` — flips the four SWF-extra gates via `cast_timer`/`stopwatch`/`inspect` validators + `damageinfo_settings`, and the four Extras dialogs push `refresh_extras_shortcuts()` back after Apply.) |
 
 ## Conventions
 

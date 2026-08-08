@@ -206,6 +206,7 @@ def open_cast_timer_dialog(app):
         })
         app.settings.set('cast_timer', new_cfg)
         app.settings.save()
+        app.grids_panel.refresh_extras_shortcuts()
         if new_cfg['enabled']:
             app_toast(app, "Cast timer saved — Build & Install to apply", 'success')
         else:

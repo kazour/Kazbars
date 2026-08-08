@@ -13,7 +13,7 @@
 |---|---:|
 | `src/kazbars/__init__.py` | 11 |
 | `src/kazbars/__main__.py` | 43 |
-| `src/kazbars/app.py` | 717 |
+| `src/kazbars/app.py` | 718 |
 | `src/kazbars/app_popups.py` | 489 |
 | `src/kazbars/boss_timer.py` | 399 |
 | `src/kazbars/buff_database.py` | 176 |
@@ -25,13 +25,13 @@
 | `src/kazbars/build_loading.py` | 491 |
 | `src/kazbars/build_utils.py` | 106 |
 | `src/kazbars/cast_timer.py` | 93 |
-| `src/kazbars/cast_timer_panel.py` | 237 |
+| `src/kazbars/cast_timer_panel.py` | 238 |
 | `src/kazbars/combat_monitor.py` | 301 |
 | `src/kazbars/content_update.py` | 400 |
 | `src/kazbars/custom_menu_bar.py` | 446 |
 | `src/kazbars/damageinfo_colors_panel.py` | 416 |
 | `src/kazbars/damageinfo_generator.py` | 134 |
-| `src/kazbars/damageinfo_panel.py` | 430 |
+| `src/kazbars/damageinfo_panel.py` | 435 |
 | `src/kazbars/damageinfo_settings.py` | 482 |
 | `src/kazbars/database_editor.py` | 850 |
 | `src/kazbars/deeps_meter.py` | 485 |
@@ -41,6 +41,7 @@
 | `src/kazbars/deeps_rolling_window.py` | 81 |
 | `src/kazbars/deeps_settings.py` | 354 |
 | `src/kazbars/deeps_trackers.py` | 182 |
+| `src/kazbars/extras_shortcuts.py` | 177 |
 | `src/kazbars/first_launch.py` | 384 |
 | `src/kazbars/focus_watcher.py` | 85 |
 | `src/kazbars/foreground.py` | 111 |
@@ -50,10 +51,10 @@
 | `src/kazbars/grid_editor_panel.py` | 635 |
 | `src/kazbars/grid_model.py` | 192 |
 | `src/kazbars/grids_generator.py` | 704 |
-| `src/kazbars/grids_panel.py` | 670 |
+| `src/kazbars/grids_panel.py` | 690 |
 | `src/kazbars/inspect.py` | 52 |
-| `src/kazbars/inspect_panel.py` | 208 |
-| `src/kazbars/instructions_panel.py` | 978 |
+| `src/kazbars/inspect_panel.py` | 209 |
+| `src/kazbars/instructions_panel.py` | 989 |
 | `src/kazbars/live_tracker_panel.py` | 511 |
 | `src/kazbars/live_tracker_settings.py` | 183 |
 | `src/kazbars/overlay_engine.py` | 800 |
@@ -66,7 +67,7 @@
 | `src/kazbars/settings_core.py` | 255 |
 | `src/kazbars/settings_manager.py` | 56 |
 | `src/kazbars/stopwatch.py` | 51 |
-| `src/kazbars/stopwatch_panel.py` | 164 |
+| `src/kazbars/stopwatch_panel.py` | 165 |
 | `src/kazbars/timer_overlay.py` | 372 |
 | `src/kazbars/ui_collapsible.py` | 232 |
 | `src/kazbars/ui_components.py` | 624 |

@@ -256,6 +256,7 @@ class KazBarsApp(ttkb.Window):
             self.content_frame,
             database=self.database,
             on_modified=self._mark_modified,
+            app=self,
         )
 
         # Database view — edits write user deltas to userdata/database_user.json

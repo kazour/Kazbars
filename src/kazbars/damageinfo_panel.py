@@ -350,6 +350,11 @@ class DamageNumbersPanel(tk.Toplevel):
         "Build & Install to apply" would read as the opposite.
         """
         dis.save_settings(self.settings_folder, self.settings)
+        # The parent is the app root; guard so a bare-parent construction
+        # (tests) doesn't require the full app surface.
+        grids_panel = getattr(self.master, 'grids_panel', None)
+        if grids_panel is not None:
+            grids_panel.refresh_extras_shortcuts()
         if self.settings['enabled']:
             app_toast(self, "Damage Numbers saved — Build & Install to apply", "success", 6)
         else:

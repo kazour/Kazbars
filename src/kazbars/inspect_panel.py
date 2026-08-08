@@ -172,6 +172,7 @@ def open_inspect_dialog(app):
         app.settings.set('build_console', console_var.get())
         app.settings.set('inspect', new_cfg)
         app.settings.save()
+        app.grids_panel.refresh_extras_shortcuts()
         if new_cfg == cfg:
             # Nothing about the panel moved, so the only reason to be here was
             # the console — say so rather than report an inspect save that isn't.

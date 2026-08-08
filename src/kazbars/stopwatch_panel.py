@@ -133,6 +133,7 @@ def open_stopwatch_dialog(app):
         })
         app.settings.set('stopwatch', new_cfg)
         app.settings.save()
+        app.grids_panel.refresh_extras_shortcuts()
         if new_cfg['enabled']:
             app_toast(app, "Stopwatch saved — Build & Install to apply", 'success')
         else:
