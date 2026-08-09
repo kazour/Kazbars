@@ -20,7 +20,7 @@
 | `src/kazbars/buff_db_layers.py` | 267 |
 | `src/kazbars/buff_display_editor.py` | 592 |
 | `src/kazbars/buff_xml.py` | 319 |
-| `src/kazbars/build_action.py` | 298 |
+| `src/kazbars/build_action.py` | 312 |
 | `src/kazbars/build_executor.py` | 374 |
 | `src/kazbars/build_loading.py` | 507 |
 | `src/kazbars/build_utils.py` | 86 |
