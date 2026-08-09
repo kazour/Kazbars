@@ -90,7 +90,7 @@ The manifest (committed at repo root `ota/manifest.json`, payload URLs on the `m
 ### Build pipeline
 ```
 build_utils  ← grids_generator
-             ← build_executor  ← first_launch, build_action
+             ← build_executor  ← first_launch, build_action, game_folder
 app_popups   ← app.py, build_action, first_launch, build_loading
 build_loading  ← build_action
 ```
@@ -200,7 +200,7 @@ These modules are consumed only by `src/kazbars/app.py` by design — they hold 
 |  6 | `ui_forms` | Form fields + shared settings-panel builders (card/status-block/slider-row/toggle). The Deeps + Live Tracker config panels are its heaviest consumers. |
 |  5 | `ui_collapsible`, `window_position` | Small stable APIs. `ui_collapsible` is just `CollapsibleSection`. |
 |  4 | `ui_tk_style`, `ui_components`, `overlay_engine`, `app_popups`, `cast_timer` | Narrow surface — ripple is contained. `overlay_engine` feeds both overlays + both settings adapters; `app_popups` feeds `app.py`, `build_action`, `first_launch`, `build_loading` (popup chrome + the three popups). `cast_timer` is the pure config layer ← `prefs`, `grids_generator`, `cast_timer_panel`, and `build_action` (which validates the prefs dict before handing it to the build as `cast_config`). |
-|  3 | `build_utils`, `build_executor`, `live_tracker_settings`, `paths`, `stopwatch`, `inspect` | Cluster leaves. `paths` is imported directly by `app.py`, `build_utils`, `deeps_parsers` (everyone else gets paths via the `app` object). `stopwatch` and `inspect` are the pure config layers ← `grids_generator`, `prefs`, and their own Extras dialog (`stopwatch_panel` / `inspect_panel`). |
+|  3 | `build_utils`, `build_executor`, `live_tracker_settings`, `paths`, `stopwatch`, `inspect` | Cluster leaves. `build_executor` also owns `ifeo_hook_present` — the registry probe that tells the build (and both first-launch flows) whether Aoc.exe is active on this PC. `paths` is imported directly by `app.py`, `build_utils`, `deeps_parsers` (everyone else gets paths via the `app` object). `stopwatch` and `inspect` are the pure config layers ← `grids_generator`, `prefs`, and their own Extras dialog (`stopwatch_panel` / `inspect_panel`). |
 |  2 | `grids_generator`, `update_check` | `update_check`: `app.py` (launch check) + `app_popups` (About ▸ Check for updates via `fetch_latest`). |
 |  1 | `grids_panel`, `custom_menu_bar`, `profile_io`, `game_folder`, `game_resolution`, `build_action`, `build_loading`, `database_editor`, `instructions_panel`, `first_launch`, `live_tracker_panel`, `grid_dialogs`, `boss_timer`, `timer_overlay`, `combat_monitor`, `settings_backup`, `stopwatch_panel`, `inspect_panel`, `cast_timer_panel`, `extras_shortcuts`, `foreground`, `focus_watcher` | Each consumed by exactly one parent — low blast radius by design. (`foreground` ← `focus_watcher`; `focus_watcher` ← `app.py`; `build_loading` ← `build_action`; `extras_shortcuts` ← `grids_panel` — flips the four SWF-extra gates via `cast_timer`/`stopwatch`/`inspect` validators + `damageinfo_settings`, and the four Extras dialogs push `refresh_extras_shortcuts()` back after Apply.) |
 

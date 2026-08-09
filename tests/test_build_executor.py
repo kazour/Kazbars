@@ -3,14 +3,18 @@
 Covers the filesystem side of the build pipeline (the riskiest untested path
 per the audit), with no MTASC and no Tk: SWF + script deployment in both
 standard and Aoc.exe modes, legacy-artifact cleanup, the Aoc xml.add module
-files, launcher detection, uninstall, and the running-game-process argv. The
-actual MTASC compile is covered separately (test_build_compile.py); the Build &
-Install Tk flow is exercised manually.
+files, the IFEO probe that decides which of those two modes applies, uninstall,
+and the running-game-process argv. The actual MTASC compile is covered
+separately (test_build_compile.py); the Build & Install Tk flow is exercised
+manually.
 
 Run: `pytest tests/test_build_executor.py` (from repo root).
 """
 
+import sys
 import types
+
+import pytest
 
 from kazbars import build_executor
 from kazbars.build_executor import (
@@ -22,8 +26,8 @@ from kazbars.build_executor import (
     LEGACY_FLASH_FILES,
     cleanup_legacy_files,
     create_scripts,
-    detect_aoc_launcher,
     get_running_game_process,
+    ifeo_hook_present,
     install_to_client,
     is_aoc_running,
     uninstall_from_client,
@@ -193,24 +197,74 @@ def test_write_xml_add_files(tmp_path):
 
 
 # =========================================================================== #
-# detect_aoc_launcher                                                         #
+# ifeo_hook_present                                                           #
 # =========================================================================== #
 
-class TestDetectAocLauncher:
-    def test_true_on_aoc_exe(self, tmp_path):
-        aoc = tmp_path / "Data" / "Gui" / "Aoc"
-        aoc.mkdir(parents=True)
-        (aoc / "aoc.exe").write_text("x", encoding="utf-8")
-        assert detect_aoc_launcher(str(tmp_path)) is True
+def _fake_winreg(values):
+    """A winreg stand-in. `values` maps (image name, view flag) → Debugger value."""
+    mod = types.SimpleNamespace(
+        HKEY_LOCAL_MACHINE=object(),
+        KEY_READ=0x1,
+        KEY_WOW64_32KEY=0x200,
+        KEY_WOW64_64KEY=0x100,
+    )
 
-    def test_true_on_aoc_log(self, tmp_path):
-        aoc = tmp_path / "Data" / "Gui" / "Aoc"
-        aoc.mkdir(parents=True)
-        (aoc / "Aoc.log").write_text("x", encoding="utf-8")
-        assert detect_aoc_launcher(str(tmp_path)) is True
+    class _Key:
+        def __init__(self, name, view):
+            self.name, self.view = name, view
 
-    def test_false_when_absent(self, tmp_path):
-        assert detect_aoc_launcher(str(tmp_path)) is False
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    def open_key(root, sub_key, reserved, access):
+        view = access & (mod.KEY_WOW64_32KEY | mod.KEY_WOW64_64KEY)
+        name = sub_key.rsplit("\\", 1)[-1]
+        if (name, view) not in values:
+            raise FileNotFoundError(sub_key)
+        return _Key(name, view)
+
+    def query_value_ex(key, value_name):
+        if value_name != "Debugger":
+            raise FileNotFoundError(value_name)
+        return values[(key.name, key.view)], 1
+
+    mod.OpenKey = open_key
+    mod.QueryValueEx = query_value_ex
+    return mod
+
+
+def _install_winreg(monkeypatch, values):
+    monkeypatch.setitem(sys.modules, "winreg", _fake_winreg(values))
+
+
+class TestIfeoHookPresent:
+    def test_false_when_no_key(self, monkeypatch):
+        _install_winreg(monkeypatch, {})
+        assert ifeo_hook_present() is False
+
+    @pytest.mark.parametrize("name", GAME_PROCESSES)
+    @pytest.mark.parametrize("view", [0x200, 0x100])
+    def test_true_for_either_exe_in_either_view(self, monkeypatch, name, view):
+        _install_winreg(monkeypatch, {(name, view): r"C:\Funcom\Data\Gui\Aoc\aoc.exe"})
+        assert ifeo_hook_present() is True
+
+    def test_case_insensitive(self, monkeypatch):
+        _install_winreg(monkeypatch,
+                        {("AgeOfConan.exe", 0x100): r'"D:\Games\AOC\Data\Gui\Aoc\AOC.EXE"'})
+        assert ifeo_hook_present() is True
+
+    def test_foreign_debugger_is_not_the_launcher_bypass(self, monkeypatch):
+        _install_winreg(monkeypatch,
+                        {("AgeOfConan.exe", 0x100): r"C:\Windows\System32\vsjitdebugger.exe"})
+        assert ifeo_hook_present() is False
+
+    def test_key_without_a_debugger_value(self, monkeypatch):
+        # The IFEO key exists for unrelated reasons too (GlobalFlag, MitigationOptions).
+        _install_winreg(monkeypatch, {("AgeOfConan.exe", 0x100): None})
+        assert ifeo_hook_present() is False
 
 
 # =========================================================================== #

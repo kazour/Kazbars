@@ -2,8 +2,8 @@
 KazBars — Game folder configuration.
 
 UI + persistence for the configured Age of Conan install folder. Includes the
-Aoc.exe launcher-bypass prompt, the "uninstall KazBars from the game" action,
-and build-button state sync. Functions take the KazBarsApp instance as first arg.
+Aoc.exe reconcile, the "uninstall KazBars from the game" action, and
+build-button state sync. Functions take the KazBarsApp instance as first arg.
 """
 
 from pathlib import Path
@@ -11,6 +11,7 @@ from tkinter import filedialog
 
 from ttkbootstrap.dialogs import Messagebox
 
+from .build_executor import ifeo_hook_present
 from .ui_helpers import PAD_XS, THEME_COLORS
 from .ui_widgets import add_tooltip, app_toast, confirm
 
@@ -68,18 +69,32 @@ def change_game_folder(app):
     app.game_path = resolved
     save_game_path(app)
 
-    from .build_executor import detect_aoc_launcher
     if resolved != previous:
-        has_aoc = detect_aoc_launcher(resolved)
-        if has_aoc and not app.use_aoc_bypass:
-            prompt_aoc_bypass(app)
-        elif not has_aoc and app.use_aoc_bypass:
-            save_aoc_bypass(app, False)
-            app_toast(app,
-                      "Aoc.exe not found in this folder — bypass mode disabled.",
-                      'info', 8)
+        reconcile_aoc_state(app)
 
     refresh_game_path_label(app)
+
+
+def reconcile_aoc_state(app):
+    """Sync the stored Aoc.exe flag with what's actually active on this PC.
+
+    Detected, never asked: Aoc.exe activates itself with a machine-global IFEO
+    hook (`build_executor.ifeo_hook_present`), and the user can turn it on or
+    off without touching KazBars — so the flag is re-derived rather than
+    trusted. It decides whether the build ships xml.add fragments or an
+    auto_login entry, so a toast fires in both directions.
+    """
+    has_aoc = ifeo_hook_present()
+    if has_aoc == app.use_aoc_bypass:
+        return
+    save_aoc_bypass(app, has_aoc)
+    if has_aoc:
+        app_toast(app, "Aoc.exe is active on this PC — it loads your mods when "
+                       "you start the game. Build & Install again to use it.",
+                  'info', 8)
+    else:
+        app_toast(app, "Aoc.exe is no longer active on this PC. Build & Install "
+                       "again so your mods load without it.", 'info', 8)
 
 
 def clear_game_path(app):
@@ -119,17 +134,6 @@ def save_aoc_bypass(app, value):
     app.use_aoc_bypass = bool(value)
     app.settings.set('use_aoc_bypass', app.use_aoc_bypass)
     app.settings.save()
-
-
-def prompt_aoc_bypass(app):
-    """Ask the user whether they use Aoc.exe (launcher bypass)."""
-    # A genuine yes/no question, not a confirm — Yes/No are the right labels here.
-    result = Messagebox.yesno(
-        "Aoc.exe (third-party launcher bypass) was detected in this game folder.\n\n"
-        "Is Aoc.exe enabled on your PC?",
-        title="Aoc.exe Detected",
-    )
-    save_aoc_bypass(app, result == "Yes")
 
 
 def uninstall_game(app):

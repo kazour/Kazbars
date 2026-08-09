@@ -271,8 +271,8 @@ class BuildLoadingScreen(tk.Toplevel):
             client_results: [(name, success, error_msg), ...] per-client install results
             compile_result: (success, message) from compilation step
             profile_name: name of saved profile (or None)
-            aoc_installed: whether Aoc.exe file exists in any game folder
-            aoc_running: whether Aoc.exe process is running
+            aoc_installed: whether Aoc.exe is active on this PC
+            aoc_running: whether an AoC game process is running
         """
         self._phase = 'summary'
 

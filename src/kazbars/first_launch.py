@@ -11,7 +11,7 @@ from ttkbootstrap.dialogs import Messagebox
 
 from . import content_update, game_folder, profile_io
 from .app_popups import show_welcome_popup
-from .build_executor import detect_aoc_launcher
+from .build_executor import ifeo_hook_present
 from .grid_model import parse_resolution
 from .ui_headers import create_dialog_header
 from .ui_helpers import (
@@ -41,7 +41,7 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
       on_game_set(path)           — user picked a game folder
       on_load_default(res_str)    — user chose "Load Defaults" (after on_game_set)
       on_resolution_set(res_str)  — user picked a resolution (Start Empty path)
-      on_aoc_bypass_set(bool)     — user answered the Aoc.exe Yes/No prompt
+      on_aoc_bypass_set(bool)     — whether Aoc.exe is active on this PC
       on_dialog_closed()          — dialog destroyed
     """
     dialog = tk.Toplevel(parent)
@@ -125,38 +125,6 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
                 foreground=THEME_COLORS['body']))
             bind_label_press_effect(lbl)
 
-    # --- Aoc.exe section (revealed only when fingerprint detected) ---
-    aoc_frame = ttk.Frame(content)
-    aoc_use_var = tk.StringVar(value='no')
-
-    ttk.Label(aoc_frame, text="Aoc.exe detected",
-              font=FONT_SECTION, foreground=THEME_COLORS['heading']
-              ).pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
-    ttk.Label(
-        aoc_frame,
-        text="Aoc.exe is a third-party launcher bypass. Is it enabled on your PC?",
-        font=FONT_SMALL, foreground=THEME_COLORS['muted'],
-        wraplength=440, justify='left',
-    ).pack(anchor='w', pady=(0, PAD_TINY))
-
-    radio_row = ttk.Frame(aoc_frame)
-    radio_row.pack(anchor='w', pady=(0, PAD_TINY))
-    ttk.Radiobutton(radio_row, text="Yes — I use Aoc.exe",
-                    variable=aoc_use_var, value='yes'
-                    ).pack(side='left', padx=(0, PAD_SMALL))
-    ttk.Radiobutton(radio_row, text="No — standard launcher",
-                    variable=aoc_use_var, value='no'
-                    ).pack(side='left')
-
-    def _refresh_aoc_section(*_):
-        p = path_var.get().strip()
-        if p and detect_aoc_launcher(p):
-            if not aoc_frame.winfo_ismapped():
-                aoc_frame.pack(fill='x', before=sep, pady=(PAD_TINY, 0))
-        else:
-            if aoc_frame.winfo_ismapped():
-                aoc_frame.pack_forget()
-
     # Separator
     sep = ttk.Separator(content, orient='horizontal')
     sep.pack(fill='x', pady=(PAD_TAB, PAD_SMALL))
@@ -183,7 +151,7 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
         if p:
             on_game_set(str(Path(p).resolve()))
             if on_aoc_bypass_set:
-                on_aoc_bypass_set(aoc_use_var.get() == 'yes')
+                on_aoc_bypass_set(ifeo_hook_present())
         if on_resolution_set:
             on_resolution_set(res_var.get())
 
@@ -282,7 +250,7 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
                            state='disabled')
     btn_empty.pack(anchor='w')
 
-    # Enable/disable action buttons based on game path; also reveal aoc section
+    # Enable/disable action buttons based on game path
     def _on_path_changed(*_):
         has_path = bool(path_var.get().strip())
         state = 'normal' if has_path else 'disabled'
@@ -290,7 +258,6 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
             btn_defaults.configure(state=state)
         btn_empty.configure(state=state)
         _validate_path_hint()
-        _refresh_aoc_section()
 
     path_var.trace_add('write', _on_path_changed)
 

@@ -115,8 +115,8 @@ Trigger: `KazBarsApp.__init__` has just created `userdata/` fresh via `ensure_la
 Steps:
 1. `_show_first_launch_dialog()` — src/kazbars/app.py — one-line delegator to `run_first_launch(self, APP_NAME)`
 2. `run_first_launch()` — src/kazbars/first_launch.py — defines the `on_game_set`, `on_aoc_bypass_set`, `on_load_default`, `on_resolution_set`, `on_dialog_closed` closures; calls `show_first_launch_dialog()`
-3. `show_first_launch_dialog()` — src/kazbars/first_launch.py — builds modal dialog with game folder entry, common-paths shortcuts, an Aoc.exe Yes/No section (revealed on demand), resolution picker, and two option cards ("Use Defaults" / "Start Empty")
-4. `detect_aoc_launcher()` — src/kazbars/build_executor.py — called whenever the path entry changes; checks for `aoc.exe` or `Aoc.log` under `Data/Gui/Aoc/`; reveals the Aoc.exe radio group if found
+3. `show_first_launch_dialog()` — src/kazbars/first_launch.py — builds modal dialog with game folder entry, common-paths shortcuts, resolution picker, and two option cards ("Use Defaults" / "Start Empty"). Nothing here asks about Aoc.exe — the answer is detected, not a preference to state
+4. `ifeo_hook_present()` — src/kazbars/build_executor.py — called from `_set_game_if_provided()` once a path is committed; its result is persisted as `use_aoc_bypass` via the `on_aoc_bypass_set` closure
 5. `on_load_default()` — src/kazbars/first_launch.py — closure: persists game path, Aoc.exe preference, and resolution **before** loading the profile so the auto-scale inside `apply_profile_data()` reads the just-saved `game_resolution`; composes `read_profile_file()` + `apply_profile_data()` against `Default.json`; saves a personal copy as `profiles/MyGrids.json` (auto-incremented on collision); stashes data for the welcome popup
 6. `profile_io.read_profile_file()` + `apply_profile_data()` — src/kazbars/profile_io.py — reads `Default.json` (pure I/O), then dispatches grids to `grids_panel.load_profile_data()`, populates `app.reference_resolution` from the JSON, **auto-scales via `grids_panel.scale_to_resolution()` if the profile's reference differs from `game_resolution`**, anchors `current_profile` to None for the bundled default
 7. `GridsPanel.scale_to_resolution()` — src/kazbars/grids_panel.py — anchor-based scaling (X center-anchored, Y bottom-anchored) via `grid_model.scale_grid_position()`; clamps to `SCREEN_MAX_X`/`SCREEN_MAX_Y` (8K sanity caps) and floors at 0; calls `refresh_panels()`
@@ -221,11 +221,11 @@ End state: overlay displays the active seed/fixation/syphon phase with elapsed t
 
 Trigger: User completes the first-launch dialog by clicking "Start Empty" instead of "Use Defaults"
 
-Steps 1–4 are identical to Flow 6 (delegator → `run_first_launch()` → `show_first_launch_dialog()` → `detect_aoc_launcher()`).
+Steps 1–4 are identical to Flow 6 (delegator → `run_first_launch()` → `show_first_launch_dialog()` → `ifeo_hook_present()`).
 
 Steps:
 5. `start_empty()` — src/kazbars/first_launch.py — closure: calls `_set_game_if_provided()`, then `_close()`. No `on_load_default` invocation, so no profile load and no scale.
-6. `_set_game_if_provided()` — src/kazbars/first_launch.py — same dispatcher used by Flow 6's `load_default()`; persists game path via `on_game_set`, Aoc.exe preference via `on_aoc_bypass_set`, resolution via `on_resolution_set`
+6. `_set_game_if_provided()` — src/kazbars/first_launch.py — same dispatcher used by Flow 6's `load_default()`; persists game path via `on_game_set`, the detected Aoc.exe state via `on_aoc_bypass_set`, resolution via `on_resolution_set`
 7. `on_dialog_closed()` — src/kazbars/first_launch.py — runs as in Flow 6 but `welcome_data` was never populated, so the welcome popup is suppressed
 
 End state: `game_path`, `use_aoc_bypass`, and `game_resolution` persisted; no profile loaded; no welcome popup; user lands on the empty `GridsPanel` empty-state
@@ -242,12 +242,11 @@ Steps:
 3. User picks "Change game folder..." → `KazBarsApp._change_game_folder()` — src/kazbars/app.py — one-line delegator to `game_folder.change_game_folder(self)`. (When triggered via Game menu the cascade invokes the same delegator directly, skipping steps 1-2.)
 4. `change_game_folder()` — src/kazbars/game_folder.py — opens `filedialog.askdirectory`; validates AoC folder structure (warns if `Data/Gui/Default` is missing); warns if the resulting `KazBars.swf` path exceeds 240 characters
 5. `save_game_path()` — src/kazbars/game_folder.py — persists `game_path` to settings; calls `grids_panel.notify_game_path_changed()` so the panel can refresh
-6. **Reconcile (only when `resolved != previous`)**: `detect_aoc_launcher()` — src/kazbars/build_executor.py — checks for `aoc.exe` or `Aoc.log` under `Data/Gui/Aoc/`. Two state-divergence branches fire:
-   - **Aoc.exe newly present** (`has_aoc=True, use_aoc_bypass=False`) → `prompt_aoc_bypass()` — src/kazbars/game_folder.py — modal yes/no; answer is persisted via `save_aoc_bypass()`
-   - **Aoc.exe newly absent** (`has_aoc=False, use_aoc_bypass=True`) → `save_aoc_bypass(app, False)` (src/kazbars/game_folder.py) and `app_toast(app, "Aoc.exe not found in this folder — bypass mode disabled.", 'info', 8)`
-7. `refresh_game_path_label()` — src/kazbars/game_folder.py — updates the path label text/tooltip and calls `update_build_state()` to re-enable or disable the Build button based on the new path's existence
+6. **Reconcile (only when `resolved != previous`)**: `reconcile_aoc_state()` — src/kazbars/game_folder.py — re-derives the Aoc.exe flag instead of asking. There is no dialog: Aoc.exe activation is machine state, so the answer is a fact rather than a preference
+7. `ifeo_hook_present()` — src/kazbars/build_executor.py — reads the IFEO `Debugger` value on both game exes in both registry views (no admin needed); a value naming `aoc.exe` means Aoc.exe intercepts every game launch on this PC. On divergence from `app.use_aoc_bypass`, `save_aoc_bypass()` (src/kazbars/game_folder.py) persists the new truth and an `app_toast` says which way it went and that a rebuild is needed — the flag decides whether the next build ships xml.add fragments or an `auto_login` entry
+8. `refresh_game_path_label()` — src/kazbars/game_folder.py — updates the path label text/tooltip and calls `update_build_state()` to re-enable or disable the Build button based on the new path's existence
 
-End state: `game_path` and (when divergence triggered it) `use_aoc_bypass` persisted; path label updated; Build button state synced
+End state: `game_path` persisted; `use_aoc_bypass` re-derived from the live IFEO hook; path label updated; Build button state synced
 
 ---
 
