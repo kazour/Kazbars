@@ -14,7 +14,7 @@ Trigger: User clicks "Build & Install" button in the bottom bar or presses Ctrl+
 
 Steps:
 1. `KazBarsApp._build()` — src/kazbars/app.py — one-line delegator to `build_action.build(self)`
-2. `build_action.build()` — src/kazbars/build_action.py — checks `_building` re-entry guard; validates game folder, compiler path, grids list, total slot count; flags grids that would render empty (no whitelist or no static slot assignments); blocks build if Aoc.exe mode and an AoC game process is running
+2. `build_action.build()` — src/kazbars/build_action.py — checks `_building` re-entry guard; validates game folder, compiler path, that there is anything to build (a grid or an enabled extra), total slot count; flags grids that would render empty (no whitelist or no static slot assignments); blocks build if Aoc.exe mode and an AoC game process is running
 3. `get_profile_data()` — src/kazbars/grids_panel.py — calls `save_settings()` then returns `self.grids`
 4. `save_settings()` — src/kazbars/grids_panel.py — iterates all `GridEditorPanel` instances, calling `save_to_config()` on each
 5. `save_to_config()` — src/kazbars/grid_editor_panel.py — reads every spinbox/combobox/toggle value and writes it into the grid config dict

@@ -21,6 +21,7 @@ from . import game_folder, profile_io
 from .app_popups import show_close_game_required_dialog
 from .build_loading import BuildLoadingScreen
 from .build_utils import find_compiler
+from .cast_timer import is_enabled as cast_is_enabled
 from .cast_timer import validate_config as validate_cast_config
 from .grids_generator import MAX_TOTAL_SLOTS
 from .ui_helpers import THEME_COLORS
@@ -57,6 +58,19 @@ def build(app):
         and (Path(app.assets_path) / "damageinfo" / "src" / "__Packages").exists()
     )
 
+    # Extras stand on their own: nothing downstream needs a grid, so an
+    # extras-only build is legitimate. Mirrors the generator's include gates —
+    # cast through is_enabled on the validated config (legacy configs derive the
+    # master enable from the sides), stopwatch/inspect off their own flag.
+    cast_config = validate_cast_config(app.settings.get('cast_timer'))
+    any_extra = (
+        bool(app.settings.get('build_console', False))
+        or cast_is_enabled(cast_config)
+        or bool((app.settings.get('stopwatch') or {}).get('enabled'))
+        or bool((app.settings.get('inspect') or {}).get('enabled'))
+        or di_enabled
+    )
+
     validations = [
         (not valid,
          "No valid game folder configured.\n\n"
@@ -64,8 +78,8 @@ def build(app):
         (compiler is None,
          "A required build file is missing.\n\n"
          "Re-download KazBars to restore it."),
-        (not grids,
-         "No grids to build.\n\nAdd at least one grid first."),
+        (not grids and not any_extra,
+         "Nothing to build.\n\nAdd a grid or enable an extra first."),
         (total_slots > MAX_TOTAL_SLOTS,
          f"Total slots ({total_slots}) exceeds maximum ({MAX_TOTAL_SLOTS}).\n\n"
          "Remove some grids or reduce grid sizes."),
@@ -139,7 +153,7 @@ def build(app):
         'compiler': compiler,
         'app_version': app.app_version,
         'include_console': bool(app.settings.get('build_console', False)),
-        'cast_config': validate_cast_config(app.settings.get('cast_timer')),
+        'cast_config': cast_config,
         'stopwatch_config': app.settings.get('stopwatch'),
         'inspect_config': app.settings.get('inspect'),
         'game_path': app.game_path,
