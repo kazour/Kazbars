@@ -13,15 +13,15 @@
 |---|---:|
 | `src/kazbars/__init__.py` | 11 |
 | `src/kazbars/__main__.py` | 43 |
-| `src/kazbars/app.py` | 718 |
+| `src/kazbars/app.py` | 719 |
 | `src/kazbars/app_popups.py` | 489 |
 | `src/kazbars/boss_timer.py` | 399 |
 | `src/kazbars/buff_database.py` | 176 |
 | `src/kazbars/buff_db_layers.py` | 267 |
 | `src/kazbars/buff_display_editor.py` | 592 |
 | `src/kazbars/buff_xml.py` | 319 |
-| `src/kazbars/build_action.py` | 289 |
-| `src/kazbars/build_executor.py` | 375 |
+| `src/kazbars/build_action.py` | 303 |
+| `src/kazbars/build_executor.py` | 402 |
 | `src/kazbars/build_loading.py` | 491 |
 | `src/kazbars/build_utils.py` | 106 |
 | `src/kazbars/cast_timer.py` | 93 |
@@ -42,15 +42,15 @@
 | `src/kazbars/deeps_settings.py` | 354 |
 | `src/kazbars/deeps_trackers.py` | 182 |
 | `src/kazbars/extras_shortcuts.py` | 177 |
-| `src/kazbars/first_launch.py` | 384 |
+| `src/kazbars/first_launch.py` | 351 |
 | `src/kazbars/focus_watcher.py` | 85 |
 | `src/kazbars/foreground.py` | 111 |
-| `src/kazbars/game_folder.py` | 180 |
+| `src/kazbars/game_folder.py` | 184 |
 | `src/kazbars/game_resolution.py` | 105 |
 | `src/kazbars/grid_dialogs.py` | 865 |
 | `src/kazbars/grid_editor_panel.py` | 635 |
 | `src/kazbars/grid_model.py` | 192 |
-| `src/kazbars/grids_generator.py` | 704 |
+| `src/kazbars/grids_generator.py` | 716 |
 | `src/kazbars/grids_panel.py` | 690 |
 | `src/kazbars/inspect.py` | 52 |
 | `src/kazbars/inspect_panel.py` | 209 |
@@ -85,7 +85,7 @@
 | `tests/test_buff_db_layers.py` | 266 |
 | `tests/test_buff_xml.py` | 272 |
 | `tests/test_build_compile.py` | 137 |
-| `tests/test_build_executor.py` | 460 |
+| `tests/test_build_executor.py` | 514 |
 | `tests/test_cast_timer.py` | 97 |
 | `tests/test_cluster_isolation.py` | 184 |
 | `tests/test_combat_monitor.py` | 150 |
@@ -105,7 +105,7 @@
 | `tests/test_focus_watcher.py` | 96 |
 | `tests/test_foreground.py` | 95 |
 | `tests/test_grid_model.py` | 79 |
-| `tests/test_grids_generator.py` | 321 |
+| `tests/test_grids_generator.py` | 458 |
 | `tests/test_hud_overlay.py` | 141 |
 | `tests/test_imports.py` | 33 |
 | `tests/test_inspect.py` | 73 |

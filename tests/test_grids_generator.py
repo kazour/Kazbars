@@ -107,7 +107,8 @@ def test_console_on_emits_console_hooks():
     # Instantiation
     assert "private var console:KazBarsConsole;" in main_code
     assert "console = new KazBarsConsole(this, rootClip);" in main_code
-    assert "consolePinned = false;" in main_code
+    # The pin is gone — the control panel is the master switch now.
+    assert "consolePinned" not in main_code
 
     # The five inline call sites
     assert "console.logPlayer(buff.m_Name, bid)" in main_code
@@ -115,14 +116,16 @@ def test_console_on_emits_console_hooks():
     assert "console.createConsole();" in main_code
     assert "console.removeConsole();" in main_code
 
-    # Persistence keys — pin + the two log toggles here, position inside the stub
-    assert 'config.ReplaceEntry("console_pin"' in main_code
+    # Persistence keys — master switch + the two log toggles here, position
+    # inside the stub. cnv saves from both persist paths.
+    assert 'config.ReplaceEntry("console_pin"' not in main_code
+    assert main_code.count('config.ReplaceEntry("cnv"') == 2
     assert 'config.ReplaceEntry("log_p"' in main_code
     assert 'config.ReplaceEntry("log_t"' in main_code
     assert "console.saveState(config);" in main_code
-    # Loaded before the pinned console is re-created, so it opens where it was left.
+    # Loaded before the re-create, so the console rebuilds where it was left.
     assert main_code.index("console.loadState(config);") < main_code.index(
-        "if (consolePinned) console.createConsole();")
+        "else console.createConsole();")
 
     # No leftover tokens
     assert "{{CONSOLE_" not in main_code
@@ -319,3 +322,137 @@ def test_inspect_on_emits_hooks_and_data():
 
     # No leftover tokens
     assert "{{INS_" not in main_code
+
+
+# --------------------------------------------------------------------------
+# Preview-mode control panel (KazBarsPreviewPanel — unconditional; the extra
+# rows and their dispatch arms are gated per extra)
+# --------------------------------------------------------------------------
+
+
+def _all_extras_gen():
+    return CodeGenerator(
+        [_minimal_grid()], _load_db(), "0.0.0",
+        include_console=True,
+        cast_config=_cast_cfg(),
+        stopwatch_config={"enabled": True, "x": 750, "y": 410},
+        inspect_config={"enabled": True, "x": 40, "y": 240},
+    )
+
+
+def test_preview_panel_always_emitted():
+    """The panel compiles into every build, extras or not."""
+    gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0")
+    main_code, _ = gen.generate()
+
+    assert "private var ppanel:KazBarsPreviewPanel;" in main_code
+    assert "ppanel = new KazBarsPreviewPanel(this, rootClip);" in main_code
+
+    # Rows are collected on every preview entry, panel shown last (topmost).
+    assert "ppanel.begin();" in main_code
+    assert "ppanel.addGrid(obj);" in main_code
+    assert "ppanel.show();" in main_code
+    assert "public function previewToggle(key:String, shown:Boolean):Void {" in main_code
+
+    # Teardown from both paths (exitPreview + cleanup), save from both
+    # persist paths (exitPreview + OnModuleDeactivated).
+    assert main_code.count("ppanel.destroy();") == 2
+    assert main_code.count("ppanel.saveState(config);") == 2
+    assert "ppanel.loadState(config);" in main_code
+
+    assert "{{PP_" not in main_code
+
+
+def test_preview_panel_no_extras_has_no_extra_rows():
+    """With nothing compiled in, the panel lists grids only and the dispatcher
+    body is empty — an addExtra or setActive here would name a missing class."""
+    main_code, _ = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0").generate()
+    assert "ppanel.addExtra(" not in main_code
+    assert "setActive" not in main_code
+
+
+def test_preview_panel_rows_and_dispatch_all_extras():
+    main_code, _ = _all_extras_gen().generate()
+
+    # Each row seeds its check from the item's live state — the panel never
+    # caches a flag of its own.
+    assert 'ppanel.addExtra("Stopwatch", "sw", stopwatch.isActive());' in main_code
+    assert 'ppanel.addExtra("Inspect panel", "ins", inspect.isActive());' in main_code
+    assert 'ppanel.addExtra("Cast timer", "cast", castTimer.isActive());' in main_code
+    assert 'ppanel.addExtra("Console", "console", console.isActive());' in main_code
+
+    # Rows are added before the panel is built, in menu order.
+    assert (main_code.index('ppanel.addExtra("Stopwatch"')
+            < main_code.index('ppanel.addExtra("Inspect panel"')
+            < main_code.index('ppanel.addExtra("Cast timer"')
+            < main_code.index('ppanel.addExtra("Console"')
+            < main_code.index("ppanel.show();"))
+
+    # One dispatch arm per extra.
+    assert 'if (key == "sw") stopwatch.setActive(shown);' in main_code
+    assert 'if (key == "ins") inspect.setActive(shown);' in main_code
+    assert 'if (key == "cast") castTimer.setActive(shown);' in main_code
+    assert 'if (key == "console") console.setActive(shown);' in main_code
+
+    # Nothing is restored on the way out of preview any more — a check is the
+    # setting, and the pin it replaced is gone.
+    assert "setShown" not in main_code
+    assert "consolePinned" not in main_code
+
+    assert "{{PP_" not in main_code
+    assert "{{SW_" not in main_code
+
+
+def test_preview_panel_row_gated_per_extra():
+    """A row only appears for an extra that is actually compiled in."""
+    gen = CodeGenerator(
+        [_minimal_grid()], _load_db(), "0.0.0",
+        stopwatch_config={"enabled": True, "x": 750, "y": 410},
+    )
+    main_code, _ = gen.generate()
+    assert 'ppanel.addExtra("Stopwatch", "sw", stopwatch.isActive());' in main_code
+    assert 'ppanel.addExtra("Inspect panel", "ins", inspect.isActive());' not in main_code
+    assert 'ppanel.addExtra("Cast timer", "cast", castTimer.isActive());' not in main_code
+    assert 'ppanel.addExtra("Console", "console", console.isActive());' not in main_code
+
+
+def test_grid_shown_is_master_switch():
+    """A grid row flips a persisted `shown` flag the normal-mode writers honor,
+    and preview shows what normal mode would (no blanket force-show)."""
+    main_code, _ = _all_extras_gen().generate()
+
+    assert "dirty: true, shown: true" in main_code
+    assert 'config.FindEntry("g" + i + "_v")' in main_code
+    # Saved from both persist paths, keyed like the positions beside them.
+    assert 'config.ReplaceEntry("g" + j + "_v", grids[j].shown ? 1 : 0);' in main_code
+    assert 'config.ReplaceEntry("g" + i + "_v", grids[i].shown ? 1 : 0);' in main_code
+
+    assert "obj.mc._visible = obj.shown;" in main_code
+    assert "obj.mc._visible = obj.shown && disp.length > 0;" in main_code
+    assert "obj.mc._visible = obj.shown && hasAny;" in main_code
+
+
+def test_console_master_switch_defaults_active():
+    """Fresh archive (and every /loadclip client) opens the console at login;
+    an archived cnv == 0 closes it again on activation."""
+    main_code, _ = _all_extras_gen().generate()
+
+    assert main_code.index("console.createConsole();") < main_code.index(
+        "SignalClientCharacterAlive")
+    assert 'if (cnv !== undefined && cnv == 0) console.removeConsole();' in main_code
+    assert "console_pin" not in main_code
+
+
+def test_stub_archive_keys_present():
+    """The per-stub master switches live inside the stubs, where generator
+    output can't show them."""
+    stubs = KAZBARS_ASSETS / "stubs"
+    pairs = (
+        ("KazBarsStopwatch.as", "swv"),
+        ("KazBarsInspect.as", "inv"),
+        ("KazBarsCastTimer.as", "ctv"),
+    )
+    for name, key in pairs:
+        src = (stubs / name).read_text(encoding="utf-8")
+        assert f'FindEntry("{key}")' in src, f"{name} never reads {key}"
+        assert f'ReplaceEntry("{key}"' in src, f"{name} never writes {key}"

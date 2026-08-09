@@ -28,7 +28,7 @@
         mc._visible = false;
         var obj:Object = {
             mc: mc, cfg: cfg, slots: slots, loaders: loaders,
-            loading: loading, display: new Array(), dirty: true
+            loading: loading, display: new Array(), dirty: true, shown: true
         };
         createCallbacks(obj, idx);
         return obj;
@@ -297,7 +297,7 @@
             i++;
         }
         obj.display = disp;
-        if (!previewMode) obj.mc._visible = disp.length > 0;
+        if (!previewMode) obj.mc._visible = obj.shown && disp.length > 0;
     }
 
     private function updateStatic(obj:Object):Void {
@@ -352,7 +352,7 @@
             i++;
         }
         obj.display = disp;
-        if (!previewMode) obj.mc._visible = hasAny;
+        if (!previewMode) obj.mc._visible = obj.shown && hasAny;
     }
 
     private function sortArr(arr:Array, order:String, now:Number):Void {
@@ -641,18 +641,25 @@
     private function enterPreview():Void {
         if (previewMode) return;
         previewMode = true;
+        ppanel.begin();
         var i:Number = 0;
         while (i < grids.length) {
             var obj:Object = grids[i];
-            obj.mc._visible = true;
+            obj.mc._visible = obj.shown;
             var j:Number = 0;
             while (j < obj.slots.length) { obj.slots[j]._visible = true; j++; }
             preview.createOverlay(obj);
+            ppanel.addGrid(obj);
             i++;
         }
         {{CAST_PREVIEW_ON}}
         {{INS_PREVIEW_ON}}
-        {{CONSOLE_PREVIEW_OPEN}}
+        {{PP_ROW_SW}}
+        {{PP_ROW_INS}}
+        {{PP_ROW_CAST}}
+        {{PP_ROW_CONSOLE}}
+        // Last, so the control panel sits on top of everything it controls.
+        ppanel.show();
     }
 
     private function exitPreview():Void {
@@ -663,24 +670,39 @@
             while (j < grids.length) {
                 config.ReplaceEntry("g" + j + "_x", grids[j].mc._x);
                 config.ReplaceEntry("g" + j + "_y", grids[j].mc._y);
+                config.ReplaceEntry("g" + j + "_v", grids[j].shown ? 1 : 0);
                 j++;
             }
+            ppanel.saveState(config);
             {{CONSOLE_EXIT_PERSIST}}
             {{CAST_SAVE}}
             {{SW_SAVE}}
             {{INS_SAVE}}
         }
-        {{CONSOLE_EXIT_REMOVE}}
+        // Panel first — its position is already captured. Nothing is restored on
+        // the way out: the checks are the settings now, and the final loop
+        // re-applies each grid's shown flag.
+        ppanel.destroy();
         {{CAST_PREVIEW_OFF}}
         {{INS_PREVIEW_OFF}}
         var i:Number = 0;
         while (i < grids.length) { preview.removeOverlay(grids[i]); grids[i].dirty = true; updateGrid(grids[i]); i++; }
     }
 
+    // Named dispatcher for the control panel's extra rows — the checkbox knows
+    // a key, each stub has its own idea of what hiding means.
+    public function previewToggle(key:String, shown:Boolean):Void {
+        {{PP_APPLY_SW}}
+        {{PP_APPLY_INS}}
+        {{PP_APPLY_CAST}}
+        {{PP_APPLY_CONSOLE}}
+    }
+
     private function cleanup():Void {
         stopTimer();
         previewMode = false;
         if (keyListener != null) { Key.removeListener(keyListener); keyListener = null; }
+        ppanel.destroy();
         {{CONSOLE_CLEANUP}}
         {{CAST_CLEANUP}}
         {{SW_CLEANUP}}
@@ -718,6 +740,7 @@
         {{CAST_CREATE}}
         {{SW_CREATE}}
         {{INS_CREATE}}
+        {{CONSOLE_CREATE}}
         try {
             com.GameInterface.Game.CharacterBase.SignalClientCharacterAlive.Connect(SlotAlive, this);
             m_Player = com.GameInterface.Game.Character.GetClientCharacter();
@@ -736,8 +759,17 @@
                     grids[i].mc._x = Number(gx);
                     grids[i].mc._y = Number(gy);
                 }
+                // Hiding directly covers the window where SlotAlive already
+                // painted a grid before the archive arrived; the show side needs
+                // nothing, since updateGrid honors shown from here on.
+                var gs:Object = config.FindEntry("g" + i + "_v");
+                if (gs !== undefined) {
+                    grids[i].shown = (gs == 1);
+                    if (!grids[i].shown) grids[i].mc._visible = false;
+                }
                 i++;
             }
+            ppanel.loadState(config);
             {{CONSOLE_LOAD_PERSIST}}
             {{CAST_LOAD}}
             {{SW_LOAD}}
@@ -751,8 +783,10 @@
             while (i < grids.length) {
                 config.ReplaceEntry("g" + i + "_x", grids[i].mc._x);
                 config.ReplaceEntry("g" + i + "_y", grids[i].mc._y);
+                config.ReplaceEntry("g" + i + "_v", grids[i].shown ? 1 : 0);
                 i++;
             }
+            ppanel.saveState(config);
             {{CONSOLE_DEACTIVATE_PERSIST}}
             {{CAST_SAVE}}
             {{SW_SAVE}}

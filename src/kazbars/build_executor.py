@@ -282,14 +282,41 @@ def uninstall_from_client(game_path, damageinfo_pristine=None):
     return True, "Removed: " + ", ".join(removed)
 
 
-def detect_aoc_launcher(game_path):
-    """Return True if this folder shows the launcher-bypass fingerprint
-    (aoc.exe or Aoc.log under Data/Gui/Aoc)."""
-    aoc_dir = Path(game_path) / "Data" / "Gui" / "Aoc"
-    return (aoc_dir / "aoc.exe").exists() or (aoc_dir / "Aoc.log").exists()
-
-
 GAME_PROCESSES = ('AgeOfConan.exe', 'AgeOfConanDX10.exe')
+
+# Aoc.exe activates itself by writing an IFEO "Debugger" value on the game exes,
+# so every game launch on the machine is routed through it. That value is the
+# only reliable "is it actually on?" signal — the old file fingerprint (an
+# aoc.exe/Aoc.log sitting in Data/Gui/Aoc) proved only that it was *installed*,
+# which is why the app used to have to ask the user.
+IFEO_KEY = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options"
+AOC_LAUNCHER_EXE = "aoc.exe"
+
+
+def ifeo_hook_present():
+    """Return True if Aoc.exe currently intercepts game launches on this PC.
+
+    The hook is keyed on the bare image name and is machine-global, not
+    per-install — hence no ``game_path`` argument. Both registry views are
+    probed because the value can be written to either. Reading HKLM needs no
+    admin rights. Only a ``Debugger`` naming ``aoc.exe`` counts: a foreign
+    debugger on the game exe (a JIT debugger, an anti-cheat shim) is somebody
+    else's tooling, not the launcher bypass.
+    """
+    import winreg
+
+    for name in GAME_PROCESSES:
+        for view in (winreg.KEY_WOW64_32KEY, winreg.KEY_WOW64_64KEY):
+            try:
+                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                                    f"{IFEO_KEY}\\{name}", 0,
+                                    winreg.KEY_READ | view) as key:
+                    value = winreg.QueryValueEx(key, "Debugger")[0]
+            except OSError:
+                continue
+            if isinstance(value, str) and AOC_LAUNCHER_EXE in value.lower():
+                return True
+    return False
 
 
 def get_running_game_process():
