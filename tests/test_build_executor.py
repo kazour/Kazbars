@@ -23,7 +23,6 @@ from kazbars.build_executor import (
     LEGACY_FLASH_FILES,
     LEGACY_SCRIPTS,
     cleanup_legacy_files,
-    detect_aoc_launcher,
     get_running_game_process,
     install_to_client,
     is_aoc_running,
@@ -202,27 +201,6 @@ class TestCleanupLegacy:
 
         assert not (flash / "KzGrids.swf").exists()
         assert (flash / "KazBars.swf").exists()
-
-
-# =========================================================================== #
-# detect_aoc_launcher                                                         #
-# =========================================================================== #
-
-class TestDetectAocLauncher:
-    def test_true_on_aoc_exe(self, tmp_path):
-        aoc = tmp_path / "Data" / "Gui" / "Aoc"
-        aoc.mkdir(parents=True)
-        (aoc / "aoc.exe").write_text("x", encoding="utf-8")
-        assert detect_aoc_launcher(str(tmp_path)) is True
-
-    def test_true_on_aoc_log(self, tmp_path):
-        aoc = tmp_path / "Data" / "Gui" / "Aoc"
-        aoc.mkdir(parents=True)
-        (aoc / "Aoc.log").write_text("x", encoding="utf-8")
-        assert detect_aoc_launcher(str(tmp_path)) is True
-
-    def test_false_when_absent(self, tmp_path):
-        assert detect_aoc_launcher(str(tmp_path)) is False
 
 
 # =========================================================================== #

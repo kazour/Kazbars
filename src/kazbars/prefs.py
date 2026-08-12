@@ -78,7 +78,6 @@ PREFS_SCHEMA = Schema(
         # Scalars are passthrough — their consumers already guard the value
         # (e.g. grid_model.get_game_resolution_or_default validates the list).
         "game_path": Field(None),
-        "use_aoc_bypass": Field(False, kind="bool"),
         "game_resolution": Field(None),
         "last_profile": Field(None),
         "default_profile": Field(None),

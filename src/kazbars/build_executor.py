@@ -329,13 +329,6 @@ def uninstall_from_client(game_path, damageinfo_pristine=None):
     return True, "Removed: " + ", ".join(removed)
 
 
-def detect_aoc_launcher(game_path):
-    """Return True if this folder shows the launcher-bypass fingerprint
-    (aoc.exe or Aoc.log under Data/Gui/Aoc)."""
-    aoc_dir = Path(game_path) / "Data" / "Gui" / "Aoc"
-    return (aoc_dir / "aoc.exe").exists() or (aoc_dir / "Aoc.log").exists()
-
-
 def get_running_game_process():
     """Return the name of a running AoC game process, or None.
 

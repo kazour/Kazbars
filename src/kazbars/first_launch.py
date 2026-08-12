@@ -11,7 +11,6 @@ from ttkbootstrap.dialogs import Messagebox
 
 from . import content_update, game_folder, profile_io
 from .app_popups import show_welcome_popup
-from .build_executor import detect_aoc_launcher
 from .grid_model import parse_resolution
 from .ui_headers import create_dialog_header
 from .ui_helpers import (
@@ -34,14 +33,13 @@ from .window_position import restore_window_position
 
 def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
                              on_resolution_set=None, default_profile_exists=True,
-                             on_dialog_closed=None, on_aoc_bypass_set=None):
+                             on_dialog_closed=None):
     """Modal first-launch setup. Returns when dialog closes.
 
     Callbacks:
       on_game_set(path)           — user picked a game folder
       on_load_default(res_str)    — user chose "Load Defaults" (after on_game_set)
       on_resolution_set(res_str)  — user picked a resolution (Start Empty path)
-      on_aoc_bypass_set(bool)     — user answered the Aoc.exe Yes/No prompt
       on_dialog_closed()          — dialog destroyed
     """
     dialog = tk.Toplevel(parent)
@@ -125,38 +123,6 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
                 foreground=THEME_COLORS['body']))
             bind_label_press_effect(lbl)
 
-    # --- Aoc.exe section (revealed only when fingerprint detected) ---
-    aoc_frame = ttk.Frame(content)
-    aoc_use_var = tk.StringVar(value='no')
-
-    ttk.Label(aoc_frame, text="Aoc.exe detected",
-              font=FONT_SECTION, foreground=THEME_COLORS['heading']
-              ).pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
-    ttk.Label(
-        aoc_frame,
-        text="Aoc.exe is a third-party launcher bypass. Is it enabled on your PC?",
-        font=FONT_SMALL, foreground=THEME_COLORS['muted'],
-        wraplength=440, justify='left',
-    ).pack(anchor='w', pady=(0, PAD_TINY))
-
-    radio_row = ttk.Frame(aoc_frame)
-    radio_row.pack(anchor='w', pady=(0, PAD_TINY))
-    ttk.Radiobutton(radio_row, text="Yes — I use Aoc.exe",
-                    variable=aoc_use_var, value='yes'
-                    ).pack(side='left', padx=(0, PAD_SMALL))
-    ttk.Radiobutton(radio_row, text="No — standard launcher",
-                    variable=aoc_use_var, value='no'
-                    ).pack(side='left')
-
-    def _refresh_aoc_section(*_):
-        p = path_var.get().strip()
-        if p and detect_aoc_launcher(p):
-            if not aoc_frame.winfo_ismapped():
-                aoc_frame.pack(fill='x', before=sep, pady=(PAD_TINY, 0))
-        else:
-            if aoc_frame.winfo_ismapped():
-                aoc_frame.pack_forget()
-
     # Separator
     sep = ttk.Separator(content, orient='horizontal')
     sep.pack(fill='x', pady=(PAD_TAB, PAD_SMALL))
@@ -182,8 +148,6 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
         p = path_var.get().strip()
         if p:
             on_game_set(str(Path(p).resolve()))
-            if on_aoc_bypass_set:
-                on_aoc_bypass_set(aoc_use_var.get() == 'yes')
         if on_resolution_set:
             on_resolution_set(res_var.get())
 
@@ -282,7 +246,7 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
                            state='disabled')
     btn_empty.pack(anchor='w')
 
-    # Enable/disable action buttons based on game path; also reveal aoc section
+    # Enable/disable action buttons based on game path
     def _on_path_changed(*_):
         has_path = bool(path_var.get().strip())
         state = 'normal' if has_path else 'disabled'
@@ -290,7 +254,6 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
             btn_defaults.configure(state=state)
         btn_empty.configure(state=state)
         _validate_path_hint()
-        _refresh_aoc_section()
 
     path_var.trace_add('write', _on_path_changed)
 
@@ -331,9 +294,6 @@ def run_first_launch(app, app_name):
         app.game_path = path
         game_folder.save_game_path(app)
         game_folder.refresh_game_path_label(app)
-
-    def on_aoc_bypass_set(value):
-        game_folder.save_aoc_bypass(app, value)
 
     def on_load_default(resolution_str):
         if not default_profile.exists():
@@ -380,5 +340,4 @@ def run_first_launch(app, app_name):
     show_first_launch_dialog(
         app, app_name, on_game_set, on_load_default, on_resolution_set,
         default_profile.exists(), on_dialog_closed,
-        on_aoc_bypass_set=on_aoc_bypass_set,
     )

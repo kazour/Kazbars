@@ -135,9 +135,8 @@ class KazBarsApp(ttkb.Window):
         self.focus_watcher = ForegroundWatcher(self)
         self.focus_watcher.start()
 
-        # Single game folder + Aoc.exe preference (set via first-launch prompt)
+        # Single game folder (set via the first-launch dialog or the bottom bar)
         self.game_path = self.settings.get('game_path') or None
-        self.use_aoc_bypass = bool(self.settings.get('use_aoc_bypass', False))
 
         # Setup
         setup_custom_styles(self)

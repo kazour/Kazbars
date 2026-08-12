@@ -2,8 +2,8 @@
 KazBars — Game folder configuration.
 
 UI + persistence for the configured Age of Conan install folder. Includes the
-Aoc.exe launcher-bypass prompt, the "uninstall KazBars from the game" action,
-and build-button state sync. Functions take the KazBarsApp instance as first arg.
+"uninstall KazBars from the game" action and build-button state sync. Functions
+take the KazBarsApp instance as first arg.
 """
 
 from pathlib import Path
@@ -63,22 +63,8 @@ def change_game_folder(app):
             title="Long Path"
         )
 
-    resolved = str(Path(path).resolve())
-    previous = app.game_path
-    app.game_path = resolved
+    app.game_path = str(Path(path).resolve())
     save_game_path(app)
-
-    from .build_executor import detect_aoc_launcher
-    if resolved != previous:
-        has_aoc = detect_aoc_launcher(resolved)
-        if has_aoc and not app.use_aoc_bypass:
-            prompt_aoc_bypass(app)
-        elif not has_aoc and app.use_aoc_bypass:
-            save_aoc_bypass(app, False)
-            app_toast(app,
-                      "Aoc.exe not found in this folder — bypass mode disabled.",
-                      'info', 8)
-
     refresh_game_path_label(app)
 
 
@@ -112,24 +98,6 @@ def save_game_path(app):
         app.settings.data.pop('game_path', None)
     app.settings.save()
     app.grids_panel.notify_game_path_changed()
-
-
-def save_aoc_bypass(app, value):
-    """Persist the Aoc.exe bypass preference."""
-    app.use_aoc_bypass = bool(value)
-    app.settings.set('use_aoc_bypass', app.use_aoc_bypass)
-    app.settings.save()
-
-
-def prompt_aoc_bypass(app):
-    """Ask the user whether they use Aoc.exe (launcher bypass)."""
-    # A genuine yes/no question, not a confirm — Yes/No are the right labels here.
-    result = Messagebox.yesno(
-        "Aoc.exe (third-party launcher bypass) was detected in this game folder.\n\n"
-        "Is Aoc.exe enabled on your PC?",
-        title="Aoc.exe Detected",
-    )
-    save_aoc_bypass(app, result == "Yes")
 
 
 def uninstall_game(app):
