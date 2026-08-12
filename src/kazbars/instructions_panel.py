@@ -588,42 +588,35 @@ SECTIONS: list[_Section] = [
             "target — stats the game's own inspect window can't reveal. It "
             'appears moments after you target; clears when you do.',
             _sub('What it shows', [
-                'The name strip reads Name Class (Level/PvP level) — Kazour '
-                'Bear Shaman (80/10). A mob just reads Name (83).',
-                'Health, Armor, the five protections, Critigation Chance and '
-                'Amount, Heal Rating, Bonus Spell Dmg, Combat Rating, Weapon '
-                'Dmg M/R, Critical Chance and Damage, Tenacity, Ferocity — in '
-                "the game sheet's own Rating (Effect%) language. A dash means "
-                'the target lacks that line; below level 80 raw ratings show '
-                'without percent decodes.',
-                [('Player targets add a PvP block — armor, protections, '
-                  'spell damage, combat rating, kills/deaths. Untick ', None),
+                'The name strip reads Name Class (Level/PvP level). A mob '
+                'just reads Name (83).',
+                'Health, armor, protections, crit and critigation, heal '
+                'rating, spell damage, combat and weapon damage, tenacity, '
+                "ferocity — in the game sheet's own Rating (Effect%) "
+                'language. A dash: the target lacks it. Below level 80: raw '
+                'ratings only.',
+                [('Player targets add a PvP block. Untick ', None),
                  ('Show the PvP section', _SUCCESS),
                  (' to drop it from the build.', None)],
             ]),
             _sub('The Perks row', [
-                "Six boxes mirror the game's perk bar in three color pairs — "
-                'blue General, red Archetype, dark Class. The color tells you '
-                "the perk's kind.",
-                'Some Class perks take both slots — those paint two identical '
-                'icons, as in the game.',
-                [('The row reads perk buffs, not slots: active perks show '
-                  "only while running; a groupmate's perk can appear too. "
-                  'Untick ', None),
+                "Six boxes mirror the game's perk bar — blue General, red "
+                'Archetype, dark Class. Double-slot Class perks paint two '
+                'identical icons.',
+                [('The row reads perk buffs: active perks show only while '
+                  "running; a groupmate's perk can appear too. Untick ", None),
                  ('Track slotted perks', _SUCCESS),
-                 (' to drop the row from the build.', None)],
+                 (' to drop the row.', None)],
             ]),
             _sub('Positioning and text size', [
-                'Drag by the name strip; − collapses to just that strip. The '
-                "game remembers position and fold — the dialog's X/Y and "
-                'start-collapsed only seed the first session.',
-                'No target handy? Preview mode (Shift+Ctrl+Alt) shows a '
-                'placeholder to position against. Font size (8–48) scales '
-                'the whole panel.',
+                'Drag by the name strip; − collapses to just the strip. The '
+                'game remembers position and fold.',
+                'No target? Preview mode (Shift+Ctrl+Alt) shows a '
+                'placeholder. Font size (8–48) scales the whole panel.',
             ]),
             [('Tick ', None),
              ('Include the inspect panel in builds', _SUCCESS),
-             (' to ship it. The same dialog carries the buff-discovery console.',
+             (' to ship it. The same dialog holds the buff-discovery console.',
               None)],
             _link('How Extras Ship', 'extras-shipping'),
             _link('Finding Buff IDs', 'finding-buff-ids'),
