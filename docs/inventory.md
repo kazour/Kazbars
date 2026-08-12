@@ -20,9 +20,9 @@
 | `src/kazbars/buff_db_layers.py` | 267 |
 | `src/kazbars/buff_display_editor.py` | 592 |
 | `src/kazbars/buff_xml.py` | 319 |
-| `src/kazbars/build_action.py` | 289 |
-| `src/kazbars/build_executor.py` | 370 |
-| `src/kazbars/build_loading.py` | 491 |
+| `src/kazbars/build_action.py` | 290 |
+| `src/kazbars/build_executor.py` | 363 |
+| `src/kazbars/build_loading.py` | 497 |
 | `src/kazbars/build_utils.py` | 106 |
 | `src/kazbars/cast_timer.py` | 93 |
 | `src/kazbars/cast_timer_panel.py` | 238 |
@@ -86,7 +86,7 @@
 | `tests/test_buff_db_layers.py` | 266 |
 | `tests/test_buff_xml.py` | 272 |
 | `tests/test_build_compile.py` | 137 |
-| `tests/test_build_executor.py` | 460 |
+| `tests/test_build_executor.py` | 484 |
 | `tests/test_cast_timer.py` | 97 |
 | `tests/test_cluster_isolation.py` | 184 |
 | `tests/test_combat_monitor.py` | 150 |

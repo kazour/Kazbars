@@ -1,11 +1,12 @@
 """Smoke tests for kazbars.build_executor — the install/uninstall orchestration.
 
 Covers the filesystem side of the build pipeline (the riskiest untested path
-per the audit), with no MTASC and no Tk: SWF + script deployment in both
-standard and Aoc.exe modes, legacy-artifact cleanup, the Aoc xml.add module
-files, launcher detection, uninstall, and the running-game-process argv. The
-actual MTASC compile is covered separately (test_build_compile.py); the Build &
-Install Tk flow is exercised manually.
+per the audit), with no MTASC and no Tk: SWF deployment, the permanent module
+declarations + patcher-bypass flag that make positions persist, clearing both
+predecessor eras' load paths, launcher detection, byte-exact uninstall, and the
+running-game-process argv. The surgery itself is unit-tested in
+test_game_persistence.py; the actual MTASC compile is covered separately
+(test_build_compile.py); the Build & Install Tk flow is exercised manually.
 
 Run: `pytest tests/test_build_executor.py` (from repo root).
 """
@@ -20,20 +21,24 @@ from kazbars.build_executor import (
     GAME_EXES,
     LEGACY_AOC_DIRS,
     LEGACY_FLASH_FILES,
+    LEGACY_SCRIPTS,
     cleanup_legacy_files,
-    create_scripts,
     detect_aoc_launcher,
     get_running_game_process,
     install_to_client,
     is_aoc_running,
     uninstall_from_client,
-    write_xml_add_files,
 )
+from kazbars.game_persistence import BACKUP_SUFFIX, FLAG_NAME, MARKER_BEGIN
+
+# Minimal stand-ins for the game's XMLs — the splice only needs a </Root> to
+# anchor to. Written as bytes so the LF endings survive on Windows.
+STOCK_XML = b'<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>\n<Root>\n</Root>\n'
 
 
 def _staging_swf(tmp_path):
     swf = tmp_path / "staging" / "KazBars.swf"
-    swf.parent.mkdir(parents=True)
+    swf.parent.mkdir(parents=True, exist_ok=True)
     swf.write_bytes(b"FWS\x06fake-swf-bytes")
     return swf
 
@@ -46,48 +51,103 @@ def _scripts(game):
     return game / "Scripts"
 
 
+def _default(game):
+    return game / "Data" / "Gui" / "Default"
+
+
+def _make_game(tmp_path, name="game"):
+    """A game folder with the two XMLs install now splices into."""
+    game = tmp_path / name
+    _default(game).mkdir(parents=True, exist_ok=True)
+    (_default(game) / "MainPrefs.xml").write_bytes(STOCK_XML)
+    (_default(game) / "Modules.xml").write_bytes(STOCK_XML)
+    return game
+
+
 # =========================================================================== #
 # install_to_client                                                           #
 # =========================================================================== #
 
-class TestInstallStandard:
-    def test_copies_swf_and_writes_scripts(self, tmp_path):
-        game = tmp_path / "game"
-        ok, err = install_to_client(_staging_swf(tmp_path), str(game), use_aoc=False)
+class TestInstall:
+    def test_copies_swf_and_declares_the_module(self, tmp_path):
+        game = _make_game(tmp_path)
+        ok, err = install_to_client(_staging_swf(tmp_path), str(game))
 
         assert (ok, err) == (True, "")
         assert (_flash(game) / "KazBars.swf").read_bytes().startswith(b"FWS")
-        assert (_scripts(game) / "reloadgrids").exists()
-        assert (_scripts(game) / "unloadgrids").exists()
+        for xml in ("MainPrefs.xml", "Modules.xml"):
+            assert MARKER_BEGIN in (_default(game) / xml).read_text(encoding="utf-8")
+            assert (_default(game) / (xml + BACKUP_SUFFIX)).read_bytes() == STOCK_XML
+        assert (game / FLAG_NAME).is_file()
 
-    def test_writes_auto_load_marker(self, tmp_path):
-        game = tmp_path / "game"
-        install_to_client(_staging_swf(tmp_path), str(game), use_aoc=False)
+    def test_writes_no_aoc_module_dir(self, tmp_path):
+        game = _make_game(tmp_path)
+        install_to_client(_staging_swf(tmp_path), str(game))
 
-        auto_login = (_scripts(game) / "auto_login").read_text(encoding="utf-8")
-        assert AUTO_LOAD_MARKER in auto_login
-        assert "/loadclip KazBars.swf" in auto_login
-
-    def test_no_aoc_module_in_standard_mode(self, tmp_path):
-        game = tmp_path / "game"
-        install_to_client(_staging_swf(tmp_path), str(game), use_aoc=False)
-
+        # Our own fragments would make a live Aoc.exe declare KazBars twice.
         assert not (game / "Data" / "Gui" / "Aoc" / "KazBars").exists()
 
+    def test_clears_the_previous_era_load_path(self, tmp_path):
+        game = _make_game(tmp_path)
+        _scripts(game).mkdir(parents=True)
+        for script in LEGACY_SCRIPTS:
+            (_scripts(game) / script).write_text("x", encoding="utf-8")
+        (_scripts(game) / "auto_login").write_text(
+            f"/say hi\n\n{AUTO_LOAD_MARKER}\n/loadclip KazBars.swf\n", encoding="utf-8")
 
-class TestInstallAoc:
-    def test_writes_xml_add_and_no_auto_login_marker(self, tmp_path):
-        game = tmp_path / "game"
-        ok, err = install_to_client(_staging_swf(tmp_path), str(game), use_aoc=True)
+        install_to_client(_staging_swf(tmp_path), str(game))
 
-        assert (ok, err) == (True, "")
-        aoc_dir = game / "Data" / "Gui" / "Aoc" / "KazBars"
-        assert (aoc_dir / "MainPrefs.xml.add").exists()
-        assert (aoc_dir / "Modules.xml.add").exists()
-        # Aoc.exe loads via xml.add — the auto_login marker must not be written.
-        auto_login = _scripts(game) / "auto_login"
-        if auto_login.exists():
-            assert AUTO_LOAD_MARKER not in auto_login.read_text(encoding="utf-8")
+        for script in LEGACY_SCRIPTS:
+            assert not (_scripts(game) / script).exists()
+        auto_login = (_scripts(game) / "auto_login").read_text(encoding="utf-8")
+        assert "/say hi" in auto_login
+        assert AUTO_LOAD_MARKER not in auto_login
+
+    def test_adopts_sibling_declarations_into_mainprefs_only(self, tmp_path):
+        game = _make_game(tmp_path)
+        mod = game / "Data" / "Gui" / "Aoc" / "RF position controller"
+        mod.mkdir(parents=True)
+        (mod / "MainPrefs.xml.add").write_text(
+            '  <Archive name="Position" />', encoding="utf-8")
+        (mod / "Modules.xml.add").write_text(
+            '\t<Module name="RF" movie="RF.swf" />\n', encoding="utf-8")
+
+        install_to_client(_staging_swf(tmp_path), str(game))
+
+        # Their archive is declared, so a bare session can't strip it...
+        assert '<Archive name="Position" />' in (
+            _default(game) / "MainPrefs.xml").read_text(encoding="utf-8")
+        # ...but their module is not ours to load.
+        assert "RF" not in (_default(game) / "Modules.xml").read_text(encoding="utf-8")
+
+    def test_second_install_is_idempotent(self, tmp_path):
+        game = _make_game(tmp_path)
+        install_to_client(_staging_swf(tmp_path), str(game))
+        once = (_default(game) / "MainPrefs.xml").read_bytes()
+        install_to_client(_staging_swf(tmp_path), str(game))
+
+        assert (_default(game) / "MainPrefs.xml").read_bytes() == once
+
+    def test_missing_xml_reports_a_repairable_failure(self, tmp_path):
+        game = _make_game(tmp_path)
+        (_default(game) / "MainPrefs.xml").unlink()
+
+        ok, err = install_to_client(_staging_swf(tmp_path), str(game))
+
+        assert ok is False
+        assert "Repair game install" in err
+
+    def test_damaged_markers_report_a_repairable_failure(self, tmp_path):
+        game = _make_game(tmp_path)
+        install_to_client(_staging_swf(tmp_path), str(game))
+        prefs = _default(game) / "MainPrefs.xml"
+        prefs.write_bytes(prefs.read_text(encoding="utf-8")
+                          .replace(MARKER_BEGIN, "").encode("utf-8"))
+
+        ok, err = install_to_client(_staging_swf(tmp_path), str(game))
+
+        assert ok is False
+        assert "Repair game install" in err
 
 
 # =========================================================================== #
@@ -109,12 +169,12 @@ class TestCleanupLegacy:
             assert not (flash / name).exists()
         assert (flash / "KazBars.swf").exists()
 
-    def test_removes_legacy_aoc_dirs(self, tmp_path):
+    def test_removes_legacy_and_own_aoc_dirs(self, tmp_path):
         game = tmp_path / "game"
         aoc = game / "Data" / "Gui" / "Aoc"
         for name in LEGACY_AOC_DIRS:
             d = aoc / name
-            d.mkdir(parents=True)
+            d.mkdir(parents=True, exist_ok=True)
             (d / "Modules.xml.add").write_text("x", encoding="utf-8")
 
         cleanup_legacy_files(str(game))
@@ -122,74 +182,26 @@ class TestCleanupLegacy:
         for name in LEGACY_AOC_DIRS:
             assert not (aoc / name).exists()
 
-    def test_install_cleans_legacy_before_copy(self, tmp_path):
+    def test_leaves_other_mods_alone(self, tmp_path):
         game = tmp_path / "game"
+        other = game / "Data" / "Gui" / "Aoc" / "No Itemshop popup"
+        other.mkdir(parents=True)
+        (other / "Modules.xml.add").write_text("x", encoding="utf-8")
+
+        cleanup_legacy_files(str(game))
+
+        assert (other / "Modules.xml.add").exists()
+
+    def test_install_cleans_legacy_before_copy(self, tmp_path):
+        game = _make_game(tmp_path)
         flash = _flash(game)
         flash.mkdir(parents=True)
         (flash / "KzGrids.swf").write_text("stale", encoding="utf-8")
 
-        install_to_client(_staging_swf(tmp_path), str(game), use_aoc=False)
+        install_to_client(_staging_swf(tmp_path), str(game))
 
         assert not (flash / "KzGrids.swf").exists()
         assert (flash / "KazBars.swf").exists()
-
-
-# =========================================================================== #
-# create_scripts                                                              #
-# =========================================================================== #
-
-class TestCreateScripts:
-    def test_reload_unload_content(self, tmp_path):
-        scripts = tmp_path / "Scripts"
-        scripts.mkdir()
-        create_scripts(scripts, use_aoc=False)
-
-        assert (scripts / "reloadgrids").read_text(encoding="utf-8") == (
-            "/unloadclip KazBars.swf\n/delay 100\n/loadclip KazBars.swf"
-        )
-        assert (scripts / "unloadgrids").read_text(encoding="utf-8") == (
-            "/unloadclip KazBars.swf"
-        )
-
-    def test_standard_appends_marker_preserving_existing(self, tmp_path):
-        scripts = tmp_path / "Scripts"
-        scripts.mkdir()
-        (scripts / "auto_login").write_text("/say hello\n", encoding="utf-8")
-
-        create_scripts(scripts, use_aoc=False)
-
-        content = (scripts / "auto_login").read_text(encoding="utf-8")
-        assert "/say hello" in content
-        assert AUTO_LOAD_MARKER in content
-
-    def test_aoc_strips_marker_but_keeps_other_lines(self, tmp_path):
-        scripts = tmp_path / "Scripts"
-        scripts.mkdir()
-        (scripts / "auto_login").write_text(
-            f"/say hi\n\n{AUTO_LOAD_MARKER}\n/loadclip KazBars.swf\n",
-            encoding="utf-8",
-        )
-
-        create_scripts(scripts, use_aoc=True)
-
-        content = (scripts / "auto_login").read_text(encoding="utf-8")
-        assert "/say hi" in content
-        assert AUTO_LOAD_MARKER not in content
-
-
-# =========================================================================== #
-# write_xml_add_files                                                         #
-# =========================================================================== #
-
-def test_write_xml_add_files(tmp_path):
-    aoc_dir = tmp_path / "Aoc" / "KazBars"
-    write_xml_add_files(aoc_dir)
-
-    prefs = (aoc_dir / "MainPrefs.xml.add").read_text(encoding="utf-8")
-    modules = (aoc_dir / "Modules.xml.add").read_text(encoding="utf-8")
-    assert 'name="KazBars"' in prefs
-    assert 'movie             = "KazBars.swf"' in modules
-    assert 'variable          = "KazBars"' in modules
 
 
 # =========================================================================== #
@@ -219,21 +231,33 @@ class TestDetectAocLauncher:
 
 class TestUninstall:
     def test_removes_everything_and_lists_it(self, tmp_path):
-        game = tmp_path / "game"
-        install_to_client(_staging_swf(tmp_path), str(game), use_aoc=True)
+        game = _make_game(tmp_path)
+        install_to_client(_staging_swf(tmp_path), str(game))
 
         ok, msg = uninstall_from_client(str(game))
 
         assert ok is True
         assert "Removed:" in msg
         assert not (_flash(game) / "KazBars.swf").exists()
-        assert not (game / "Data" / "Gui" / "Aoc" / "KazBars").exists()
-        assert not (_scripts(game) / "reloadgrids").exists()
+        assert "Default/MainPrefs.xml" in msg
+        assert FLAG_NAME in msg
+
+    def test_restores_the_game_xmls_byte_exactly(self, tmp_path):
+        game = _make_game(tmp_path)
+        install_to_client(_staging_swf(tmp_path), str(game))
+
+        uninstall_from_client(str(game))
+
+        for xml in ("MainPrefs.xml", "Modules.xml"):
+            assert (_default(game) / xml).read_bytes() == STOCK_XML
+            assert not (_default(game) / (xml + BACKUP_SUFFIX)).exists()
+        assert not (game / FLAG_NAME).exists()
 
     def test_strips_marker_keeping_other_auto_login_lines(self, tmp_path):
-        game = tmp_path / "game"
-        install_to_client(_staging_swf(tmp_path), str(game), use_aoc=False)
+        game = _make_game(tmp_path)
+        install_to_client(_staging_swf(tmp_path), str(game))
         auto_login = _scripts(game) / "auto_login"
+        auto_login.parent.mkdir(parents=True, exist_ok=True)
         auto_login.write_text(
             f"/say hi\n\n{AUTO_LOAD_MARKER}\n/loadclip KazBars.swf\n",
             encoding="utf-8",
@@ -277,14 +301,14 @@ class TestDamageInfo:
         p.write_bytes(content)
         return p
 
-    def _install(self, tmp_path, game, *, di, pristine, use_aoc=False):
-        return install_to_client(self._kazbars(tmp_path), str(game), use_aoc=use_aoc,
+    def _install(self, tmp_path, game, *, di, pristine):
+        return install_to_client(self._kazbars(tmp_path), str(game),
                                  damageinfo_swf=di, damageinfo_pristine=pristine)
 
     # --- install + backup-once ------------------------------------------- #
 
     def test_first_install_backs_up_stock_and_writes_mod(self, tmp_path):
-        game = tmp_path / "game"
+        game = _make_game(tmp_path)
         flash = _flash(game)
         flash.mkdir(parents=True)
         (flash / DAMAGEINFO_FILE).write_bytes(b"STOCK")
@@ -297,7 +321,7 @@ class TestDamageInfo:
         assert (flash / DAMAGEINFO_BACKUP).read_bytes() == b"STOCK"
 
     def test_second_install_does_not_overwrite_backup(self, tmp_path):
-        game = tmp_path / "game"
+        game = _make_game(tmp_path)
         flash = _flash(game)
         flash.mkdir(parents=True)
         (flash / DAMAGEINFO_FILE).write_bytes(b"STOCK")
@@ -309,7 +333,7 @@ class TestDamageInfo:
         assert (flash / DAMAGEINFO_BACKUP).read_bytes() == b"STOCK"  # still genuine stock
 
     def test_install_with_no_existing_target_seeds_pristine_backup(self, tmp_path):
-        game = tmp_path / "game"
+        game = _make_game(tmp_path)
         flash = _flash(game)
         flash.mkdir(parents=True)
         # no DamageInfo.swf present at all
@@ -323,7 +347,7 @@ class TestDamageInfo:
         # The core regression: .bak deleted out-of-band while a mod remains. The next
         # build must seed the backup from bundled pristine stock, never from the mod —
         # otherwise "restore stock" would resurrect the mod forever.
-        game = tmp_path / "game"
+        game = _make_game(tmp_path)
         flash = _flash(game)
         flash.mkdir(parents=True)
         pristine = self._pristine(tmp_path, b"STOCK")
@@ -340,7 +364,7 @@ class TestDamageInfo:
     # --- disable (damageinfo_swf=None) ----------------------------------- #
 
     def test_disable_restores_stock_and_keeps_backup(self, tmp_path):
-        game = tmp_path / "game"
+        game = _make_game(tmp_path)
         flash = _flash(game)
         flash.mkdir(parents=True)
         (flash / DAMAGEINFO_FILE).write_bytes(b"STOCK")
@@ -354,7 +378,7 @@ class TestDamageInfo:
         assert (flash / DAMAGEINFO_BACKUP).read_bytes() == b"STOCK"
 
     def test_disable_with_no_backup_is_noop(self, tmp_path):
-        game = tmp_path / "game"
+        game = _make_game(tmp_path)
         flash = _flash(game)
         flash.mkdir(parents=True)
         (flash / DAMAGEINFO_FILE).write_bytes(b"STOCK")
@@ -367,7 +391,7 @@ class TestDamageInfo:
     # --- uninstall ------------------------------------------------------- #
 
     def test_uninstall_restores_stock_and_removes_backup(self, tmp_path):
-        game = tmp_path / "game"
+        game = _make_game(tmp_path)
         flash = _flash(game)
         flash.mkdir(parents=True)
         (flash / DAMAGEINFO_FILE).write_bytes(b"STOCK")
@@ -383,7 +407,7 @@ class TestDamageInfo:
 
     def test_uninstall_orphaned_mod_restored_from_pristine(self, tmp_path):
         # backup lost but a modded core file remains — uninstall must not leave it modded
-        game = tmp_path / "game"
+        game = _make_game(tmp_path)
         flash = _flash(game)
         flash.mkdir(parents=True)
         (flash / "KazBars.swf").write_bytes(b"x")
@@ -398,7 +422,7 @@ class TestDamageInfo:
 
     def test_uninstall_leaves_genuine_stock_untouched(self, tmp_path):
         # no backup, target already byte-identical to pristine → nothing to restore
-        game = tmp_path / "game"
+        game = _make_game(tmp_path)
         flash = _flash(game)
         flash.mkdir(parents=True)
         (flash / "KazBars.swf").write_bytes(b"x")

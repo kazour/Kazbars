@@ -43,7 +43,7 @@ GAME_EXES = ('AgeOfConan.exe', 'AgeOfConanDX10.exe')
 # predecessor (Kaz Flash Mods → Kaz Grids → KazBars). The persistence era owns
 # the declarations directly, so all of these are removed on install and skipped
 # when adopting other mods' fragments. Windows matches them case-insensitively.
-LEGACY_AOC_DIRS = ("KzGrids", "KazGrids", "Kazbars")
+LEGACY_AOC_DIRS = ("KzGrids", "KazGrids", "Kazbars", "KazBars")
 
 # Empty file in the game root. Engine-native: a bare-launched client respawns
 # ConanPatcher.exe and exits unless this exists. The patcher never deletes it

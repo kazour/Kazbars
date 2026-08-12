@@ -264,15 +264,15 @@ class BuildLoadingScreen(tk.Toplevel):
         self.update()
 
     def show_summary(self, client_results, compile_result, profile_name=None,
-                     aoc_installed=False, aoc_running=False):
+                     game_running=False, flag_supported=True):
         """Transition from progress view to summary results view.
 
         Args:
             client_results: [(name, success, error_msg), ...] per-client install results
             compile_result: (success, message) from compilation step
             profile_name: name of saved profile (or None)
-            aoc_installed: whether Aoc.exe file exists in any game folder
-            aoc_running: whether Aoc.exe process is running
+            game_running: whether an AoC game process is running right now
+            flag_supported: whether the client recognizes IgnorePatcher.enable
         """
         self._phase = 'summary'
 
@@ -285,13 +285,13 @@ class BuildLoadingScreen(tk.Toplevel):
         self._canvas.destroy()
 
         self._build_summary_ui(client_results, compile_result, profile_name,
-                               aoc_installed, aoc_running)
+                               game_running, flag_supported)
 
         self.lift()
         self.focus_set()
 
     def _build_summary_ui(self, client_results, compile_result, profile_name,
-                          aoc_installed, aoc_running):
+                          game_running, flag_supported):
         """Build the results summary view."""
         compile_ok, compile_msg = compile_result
         any_installed = compile_ok and any(s for _, s, _ in client_results)
@@ -429,17 +429,15 @@ class BuildLoadingScreen(tk.Toplevel):
                                 font=FONT_SECTION, fill=THEME_COLORS['heading'])
             y += 20
 
-            if aoc_running:
+            # One install mode: the module is declared in the game's own XMLs, so a
+            # running client just needs /reloadui and a stopped one is launched
+            # directly — going through the patcher would undo the declarations.
+            if game_running:
                 instructions = [("In-game:", "/reloadui", THEME_COLORS['accent'])]
-            elif aoc_installed:
+            else:
                 instructions = [
                     ("Start game from:", "AgeOfConan.exe", THEME_COLORS['accent']),
                     ("Or:", "AgeOfConanDX10.exe", THEME_COLORS['accent']),
-                ]
-            else:
-                instructions = [
-                    ("In game chat:", "/reloadui", THEME_COLORS['accent']),
-                    ("Then:", "/reloadgrids", THEME_COLORS['accent']),
                 ]
 
             label_x = 140
@@ -451,14 +449,22 @@ class BuildLoadingScreen(tk.Toplevel):
                                     font=FONT_SECTION, fill=cmd_color)
                 y += 20
 
-            if aoc_installed and not aoc_running:
+            if not flag_supported:
                 y += 2
                 canvas.create_text(
                     42, y,
-                    text="\u26A0 Don't launch via Funcom patcher \u2014 it resets mods",
+                    text="\u26A0 This client can't skip the patcher \u2014 positions may reset",
                     anchor='w', font=FONT_SMALL, fill=THEME_COLORS['warning'],
                 )
                 y += 16
+
+            y += 2
+            canvas.create_text(
+                42, y,
+                text="After a game patch, run Game \u25B8 Repair game install",
+                anchor='w', font=FONT_SMALL, fill=THEME_COLORS['muted'],
+            )
+            y += 16
 
             canvas.create_text(42, y, text="Tip: Ctrl+Shift+Alt for Preview Mode",
                                 anchor='w', font=FONT_SMALL, fill=THEME_COLORS['muted'])
