@@ -269,6 +269,23 @@ class TestSplice:
         _write(_customized_modules(game), STOCK_MODULES)
         assert not is_merged(game)
 
+    def test_retarget_strips_the_stranded_default_block(self, tmp_path):
+        game = _make_game(tmp_path)
+        splice_declarations(game)
+        default_backup = _default_modules(game).with_name("Modules.xml" + BACKUP_SUFFIX)
+        assert default_backup.is_file()
+
+        # A UI mod adds Customized/Modules.xml, moving the live target; the next
+        # splice must sweep the stranded Default block (and its now-pointless
+        # backup) or a merging engine would load the module twice.
+        _write(_customized_modules(game), STOCK_MODULES)
+        splice_declarations(game)
+
+        assert MARKER_BEGIN in _read(_customized_modules(game))
+        assert _read(_default_modules(game)) == STOCK_MODULES
+        assert not default_backup.is_file()
+        assert is_merged(game)
+
 
 # =========================================================================== #
 # strip_declarations                                                          #

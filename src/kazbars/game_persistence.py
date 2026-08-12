@@ -257,10 +257,19 @@ def splice_declarations(game_path, extra_declarations=()):
     converge instead of stacking. `extra_declarations` are other mods' adopted
     MainPrefs lines (see `discover_aoc_archive_declarations`). Raises ValueError if
     a marker pair is damaged or an XML is missing/shapeless.
+
+    A mod installed after us can move the Modules target (a Customized/Modules.xml
+    appearing shadows Default), stranding our old block where the engine may still
+    read it — so the location we no longer write to is swept clean here, not just
+    on uninstall.
     """
     _splice_file(main_prefs_path(game_path),
                  (*MAINPREFS_DECLARATIONS, *extra_declarations))
-    _splice_file(modules_target(game_path), MODULES_DECLARATION)
+    target = modules_target(game_path)
+    _splice_file(target, MODULES_DECLARATION)
+    for stale in _modules_locations(game_path):
+        if stale != target and _has_marker(stale):
+            _strip_file(stale)
 
 
 def _has_marker(path):
