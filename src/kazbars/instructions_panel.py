@@ -93,7 +93,8 @@ SECTIONS: list[_Section] = [
                  ('Build & Install', _SUCCESS),
                  (' at the bottom. This compiles your grids and writes them to '
                   'your game folder.', None)],
-                "How you apply changes later depends on your setup — see "
+                'Close the game and the patcher for your first build; after '
+                'that, rebuild anytime and type /reloadui in-game — see '
                 "'Building and Installing'.",
             ]),
         ],
@@ -278,19 +279,29 @@ SECTIONS: list[_Section] = [
             [('Build & Install', _SUCCESS),
              (' compiles your grid layout and writes it to your game folder. '
               'The compiler is bundled — nothing else to install.', None)],
-            [('Aoc.exe is a third-party launcher bypass. KazBars asks once at '
-              'first launch and reuses that answer for every build. ', None),
-             ('Aoc.exe users must close the game before the first build.', _DANGER),
-             (' After that, rebuild while playing.', None)],
-            _note(
-                'If you install or remove Aoc.exe later, clear and re-set the '
-                'game folder. KazBars re-detects and adjusts.',
-                _WARNING),
-            _sub('After game patches', [
-                [('A patch may overwrite your overlay files. If grids disappear '
-                  'in-game, just click ', None),
+            [("The first build also registers KazBars with the game — two "
+              "small, clearly marked blocks in the game's own config files, "
+              'with untouched .bak backups beside them. ', None),
+             ('Close the game and the patcher before your first build.', _DANGER),
+             (' After that, rebuild anytime and apply with /reloadui.', None)],
+            _sub('Launching the game', [
+                'Start the game from AgeOfConan.exe or AgeOfConanDX10.exe '
+                "directly — KazBars drops IgnorePatcher.enable, the engine's "
+                'own flag, so a direct launch skips the patcher. After your '
+                'first successful build, KazBars offers to create a desktop '
+                'shortcut (DX10 or DX9); Game → Create game desktop '
+                'shortcut… makes one anytime.',
+            ]),
+            _sub('After a game patch', [
+                "A patch restores the game's stock files, which takes the "
+                'KazBars registration with them. Run the official patcher '
+                'once, then Game → Repair game install — it re-registers '
+                'KazBars and restores your saved positions from a safety '
+                'snapshot.',
+                [('Using the Damage Numbers mod? A patch also puts the stock '
+                  'numbers back — click ', None),
                  ('Build & Install', _SUCCESS),
-                 (' again.', None)],
+                 (' once to restore the mod.', None)],
             ]),
             _sub('Buff-discovery console', [
                 "Don't know an effect's buff ID? Open Extras → Inspect panel… "
@@ -301,16 +312,16 @@ SECTIONS: list[_Section] = [
                 'Drag it by its title bar; it stays on screen and comes back '
                 'where you left it. The − button collapses it to a small bar '
                 'reading Console; click that bar to open the console again.',
-                'Aoc.exe clients remember that spot and whether you left it '
-                'collapsed across a relog — other clients start it open in the '
-                'middle of the screen.',
+                'The game remembers its spot, its fold, and whether you left '
+                'it open — across relogs and full restarts.',
                 "It's off by default and only included when you enable it, so "
                 "finished builds don't carry it. Turn it off and rebuild to "
                 'remove it.',
             ]),
             _sub('Removing KazBars from your game folder', [
                 'Game → Uninstall from game client… removes KazBars.swf '
-                'and related files from your Age of Conan install.',
+                'and related files, and restores every game file KazBars '
+                'changed byte-for-byte.',
             ]),
         ],
     },
@@ -319,22 +330,25 @@ SECTIONS: list[_Section] = [
         'id': 'positioning',
         'title': 'Applying and Positioning In-Game',
         'body': [
-            'How you reload the overlay and place grids on screen depends on '
-            'whether you use Aoc.exe.',
+            'Apply a rebuild with /reloadui in chat. Positioning happens '
+            'in-game, in preview mode, and the game remembers your layout.',
             _sub('Preview mode', [
                 'Press Shift+Ctrl+Alt in-game to toggle. Each grid appears as '
                 'a colored rectangle with its name and live X/Y coordinates. '
-                'Preview mode is only for positioning; all other settings are '
-                'configured in the app.',
+                'Drag grids and panels where you want them — positions and '
+                'collapse states persist across relogs and full restarts, '
+                'like any other game window.',
             ]),
-            _sub('With Aoc.exe (launcher bypass)', [
-                'Apply with /reloadui. Drag grids to position; they save '
-                'automatically and persist between sessions.',
+            _sub('The control panel', [
+                'Preview mode also shows a Control Panel with one checkbox '
+                'per grid and extra. Untick a box to hide that item while '
+                'you position. Each box is a master switch that persists: '
+                'unchecked stays off after a relog until you check it again.',
             ]),
-            _sub('Without Aoc.exe (standard launcher)', [
-                'Apply with /reloadui, then /reloadgrids. The launcher resets '
-                "positions each session, so dragging doesn't stick. Read X/Y "
-                'from preview mode, enter them in the Grids tab, and rebuild.',
+            _sub('X/Y in the app', [
+                'The X/Y fields in the Grids tab are only the defaults a '
+                'first-ever session starts from. Once you drag something '
+                'in-game, the dragged spot is the one the game keeps.',
             ]),
         ],
     },
@@ -453,10 +467,10 @@ SECTIONS: list[_Section] = [
                 'Both shows 1.2 / 2.5.',
             ]),
             _sub('Positioning', [
-                'Type X/Y into the dialog, or press Shift+Ctrl+Alt in-game to '
-                'toggle preview mode and drag each timer — coordinates show as '
-                'you drag, ready to copy back. Aoc.exe clients remember drags '
-                'on their own.',
+                'Press Shift+Ctrl+Alt in-game to toggle preview mode and '
+                'drag each timer — the game remembers drags across relogs. '
+                "The dialog's X/Y are just the defaults a first-ever "
+                'session starts from.',
             ]),
             _sub('Saved on this PC, not in your profile', [
                 'Cast-timer settings live with your app preferences, the same '
@@ -597,8 +611,9 @@ SECTIONS: list[_Section] = [
                 'it to just the title bar, which then shows the running time; '
                 'click that bar to open the panel again.',
                 'Drag the title bar to move it; live coordinates show as you '
-                'drag. Type them into the dialog to pin a spot. Aoc.exe clients '
-                'remember the position and collapsed state on their own.',
+                'drag. The game remembers the position and collapsed state '
+                "across relogs — the dialog's X/Y just set where a "
+                'first-ever session starts.',
                 'Font size (8–48) is baked in at build time — the whole panel '
                 'scales with it.',
             ]),
@@ -674,10 +689,10 @@ SECTIONS: list[_Section] = [
             ]),
             _sub('Positioning and text size', [
                 'Drag the panel by its name strip; live coordinates show as '
-                'you drag. Type them into the dialog to pin a spot. The − '
-                'button collapses it to just that strip. Aoc.exe clients '
-                'remember the position and collapsed state on their own, and '
-                'the dialog can start it collapsed.',
+                'you drag. The − button collapses it to just that strip. '
+                'The game remembers the position and collapsed state across '
+                "relogs — the dialog's X/Y set where a first-ever session "
+                'starts, and it can start the panel collapsed.',
                 'No target handy? Preview mode (Shift+Ctrl+Alt) shows a '
                 'placeholder panel to position against.',
                 'Font size (8–48) is baked in at build time — the whole panel '
