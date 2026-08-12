@@ -14,7 +14,7 @@ rollbacks) is regenerable and machine-bound, so it never enters a backup.
 path), so restore leaves it out by default — a checkbox opts in for a same-PC
 restore.
 
-Split into a pure layer (``funcom_prefs_path`` / ``locate_funcom_prefs`` /
+Split into a pure layer (``locate_funcom_prefs`` over ``userdata.funcom_prefs_path`` /
 ``write_backup_zip`` / ``read_manifest`` / ``restore_zip`` — no Tk,
 unit-tested) and a Tk dialog/flow layer (``open_backup_dialog`` +
 ``backup_settings`` / ``restore_settings``), mirroring profile_io's read/
@@ -23,7 +23,6 @@ dispatch split. The Tk-layer functions take the KazBarsApp instance first.
 
 import json
 import logging
-import os
 import tkinter as tk
 import zipfile
 from datetime import datetime
@@ -50,6 +49,7 @@ from .userdata import (
     DATABASE_USER_FILENAME,
     PREFS_FILENAME,
     database_user_path,
+    funcom_prefs_path,
     prefs_path,
     userdata_root,
 )
@@ -67,13 +67,6 @@ MANIFEST_NAME = "manifest.json"
 # ============================================================================
 # PURE LAYER — no Tk, unit-tested
 # ============================================================================
-def funcom_prefs_path():
-    """The AoC prefs dir (``%LOCALAPPDATA%\\Funcom\\Conan\\Prefs``) whether or
-    not it exists yet. None only if LOCALAPPDATA is unset (never on Windows)."""
-    local = os.environ.get("LOCALAPPDATA")
-    return Path(local) / "Funcom" / "Conan" / "Prefs" if local else None
-
-
 def locate_funcom_prefs():
     """Return the AoC prefs dir if it currently exists on disk, else None."""
     prefs = funcom_prefs_path()

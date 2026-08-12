@@ -11,7 +11,6 @@ from ttkbootstrap.dialogs import Messagebox
 
 from . import content_update, game_folder, profile_io
 from .app_popups import show_welcome_popup
-from .build_executor import ifeo_hook_present
 from .grid_model import parse_resolution
 from .ui_headers import create_dialog_header
 from .ui_helpers import (
@@ -34,14 +33,13 @@ from .window_position import restore_window_position
 
 def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
                              on_resolution_set=None, default_profile_exists=True,
-                             on_dialog_closed=None, on_aoc_bypass_set=None):
+                             on_dialog_closed=None):
     """Modal first-launch setup. Returns when dialog closes.
 
     Callbacks:
       on_game_set(path)           — user picked a game folder
       on_load_default(res_str)    — user chose "Load Defaults" (after on_game_set)
       on_resolution_set(res_str)  — user picked a resolution (Start Empty path)
-      on_aoc_bypass_set(bool)     — whether Aoc.exe is active on this PC
       on_dialog_closed()          — dialog destroyed
     """
     dialog = tk.Toplevel(parent)
@@ -150,8 +148,6 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
         p = path_var.get().strip()
         if p:
             on_game_set(str(Path(p).resolve()))
-            if on_aoc_bypass_set:
-                on_aoc_bypass_set(ifeo_hook_present())
         if on_resolution_set:
             on_resolution_set(res_var.get())
 
@@ -299,9 +295,6 @@ def run_first_launch(app, app_name):
         game_folder.save_game_path(app)
         game_folder.refresh_game_path_label(app)
 
-    def on_aoc_bypass_set(value):
-        game_folder.save_aoc_bypass(app, value)
-
     def on_load_default(resolution_str):
         if not default_profile.exists():
             Messagebox.show_warning(
@@ -343,9 +336,9 @@ def run_first_launch(app, app_name):
         # First launch is complete — now safe to poll for OTA buff-content
         # (deferred so a rare update never races the welcome popup).
         content_update.check_and_apply(app, app.app_version, app.settings.get('content_version'))
+        game_folder.check_install_health(app)
 
     show_first_launch_dialog(
         app, app_name, on_game_set, on_load_default, on_resolution_set,
         default_profile.exists(), on_dialog_closed,
-        on_aoc_bypass_set=on_aoc_bypass_set,
     )

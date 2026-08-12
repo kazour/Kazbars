@@ -64,6 +64,7 @@ class BuildLoadingScreen(tk.Toplevel):
         self._current_step = -1
         self._step_name = "Preparing..."
         self._destroyed = False
+        self.on_closed = None
         self._after_id = None
         self._start_time = time.time()
         self._phase = 'progress'
@@ -264,15 +265,15 @@ class BuildLoadingScreen(tk.Toplevel):
         self.update()
 
     def show_summary(self, client_results, compile_result, profile_name=None,
-                     aoc_installed=False, aoc_running=False):
+                     game_running=False, flag_supported=True):
         """Transition from progress view to summary results view.
 
         Args:
             client_results: [(name, success, error_msg), ...] per-client install results
             compile_result: (success, message) from compilation step
             profile_name: name of saved profile (or None)
-            aoc_installed: whether Aoc.exe is active on this PC
-            aoc_running: whether an AoC game process is running
+            game_running: whether an AoC game process is running right now
+            flag_supported: whether the client recognizes IgnorePatcher.enable
         """
         self._phase = 'summary'
 
@@ -285,13 +286,13 @@ class BuildLoadingScreen(tk.Toplevel):
         self._canvas.destroy()
 
         self._build_summary_ui(client_results, compile_result, profile_name,
-                               aoc_installed, aoc_running)
+                               game_running, flag_supported)
 
         self.lift()
         self.focus_set()
 
     def _build_summary_ui(self, client_results, compile_result, profile_name,
-                          aoc_installed, aoc_running):
+                          game_running, flag_supported):
         """Build the results summary view."""
         compile_ok, compile_msg = compile_result
         any_installed = compile_ok and any(s for _, s, _ in client_results)
@@ -429,17 +430,15 @@ class BuildLoadingScreen(tk.Toplevel):
                                 font=FONT_SECTION, fill=THEME_COLORS['heading'])
             y += 20
 
-            if aoc_running:
+            # One install mode: the module is declared in the game's own XMLs, so a
+            # running client just needs /reloadui and a stopped one is launched
+            # directly — going through the patcher would undo the declarations.
+            if game_running:
                 instructions = [("In-game:", "/reloadui", THEME_COLORS['accent'])]
-            elif aoc_installed:
+            else:
                 instructions = [
                     ("Start game from:", "AgeOfConan.exe", THEME_COLORS['accent']),
                     ("Or:", "AgeOfConanDX10.exe", THEME_COLORS['accent']),
-                ]
-            else:
-                instructions = [
-                    ("In game chat:", "/reloadui", THEME_COLORS['accent']),
-                    ("Then:", "/reloadgrids", THEME_COLORS['accent']),
                 ]
 
             label_x = 140
@@ -451,14 +450,22 @@ class BuildLoadingScreen(tk.Toplevel):
                                     font=FONT_SECTION, fill=cmd_color)
                 y += 20
 
-            if aoc_installed and not aoc_running:
+            if not flag_supported:
                 y += 2
                 canvas.create_text(
                     42, y,
-                    text="\u26A0 Don't launch via Funcom patcher \u2014 it resets mods",
+                    text="\u26A0 This client can't skip the patcher \u2014 positions may reset",
                     anchor='w', font=FONT_SMALL, fill=THEME_COLORS['warning'],
                 )
                 y += 16
+
+            y += 2
+            canvas.create_text(
+                42, y,
+                text="After a game patch, run Game \u25B8 Repair game install",
+                anchor='w', font=FONT_SMALL, fill=THEME_COLORS['muted'],
+            )
+            y += 16
 
             canvas.create_text(42, y, text="Tip: Ctrl+Shift+Alt for Preview Mode",
                                 anchor='w', font=FONT_SMALL, fill=THEME_COLORS['muted'])
@@ -487,5 +494,14 @@ class BuildLoadingScreen(tk.Toplevel):
             try:
                 self.after_cancel(self._arm_timer)
             except (ValueError, tk.TclError):
+                pass
+        # Hand off to whatever wants the screen gone first (the desktop-shortcut
+        # offer). Deferred to the parent's loop so it opens after this window is
+        # really down, and the `_destroyed` guard above makes it fire at most once.
+        callback, self.on_closed = self.on_closed, None
+        if callback is not None:
+            try:
+                self._parent.after(0, callback)
+            except (RuntimeError, tk.TclError):
                 pass
         super().destroy()

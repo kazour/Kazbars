@@ -14,6 +14,7 @@ Layout::
 
     userdata/
       prefs.json                     ← machine-local prefs (schema in prefs.py)
+      prefs3_snapshot.xml            ← Prefs_3.xml copy, insurance for Repair
       settings/                      ← deeps / live_tracker / damageinfo settings
       profiles/*.json
       database_user.json             ← user buff deltas (seeded empty; Phase 3)
@@ -23,6 +24,7 @@ Layout::
 
 import json
 import logging
+import os
 from pathlib import Path
 
 from .paths import app_path
@@ -31,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 PREFS_FILENAME = "prefs.json"
 DATABASE_USER_FILENAME = "database_user.json"
+PREFS3_SNAPSHOT_FILENAME = "prefs3_snapshot.xml"
 
 # Seed for a fresh database_user.json — the v2 delta format Phase 3's DeltaStore
 # reads (user buff additions/overrides in `buffs`, hidden stock/content buffs as
@@ -64,6 +67,26 @@ def content_dir() -> Path:
 
 def content_backup_dir() -> Path:
     return content_dir() / ".bak"
+
+
+def funcom_prefs_path() -> Path | None:
+    """The *game's* prefs dir (``%LOCALAPPDATA%\\Funcom\\Conan\\Prefs``), whether or
+    not it exists yet. None only if LOCALAPPDATA is unset (never on Windows).
+
+    Outside ``userdata/`` — it belongs to Age of Conan, not to us — but resolved
+    here because two unrelated features read it (Backup & Restore bundles the
+    whole tree; the persistence layer reads `Prefs_3.xml` inside it), and a
+    second copy of this path is a silent way for them to drift apart.
+    """
+    local = os.environ.get('LOCALAPPDATA')
+    return Path(local) / "Funcom" / "Conan" / "Prefs" if local else None
+
+
+def prefs3_snapshot_path() -> Path:
+    """Our copy of the game's Prefs_3.xml, taken while the install is healthy so
+    Repair can put back archives a patcher run stripped. Deliberately outside the
+    backup allowlist — it mirrors game state, not the user's own data."""
+    return userdata_root() / PREFS3_SNAPSHOT_FILENAME
 
 
 def ensure_layout() -> None:

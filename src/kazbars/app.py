@@ -135,10 +135,8 @@ class KazBarsApp(ttkb.Window):
         self.focus_watcher = ForegroundWatcher(self)
         self.focus_watcher.start()
 
-        # Single game folder + Aoc.exe flag (re-derived from the live IFEO hook
-        # whenever the folder changes — see game_folder.reconcile_aoc_state)
+        # Single game folder (set via the first-launch dialog or the bottom bar)
         self.game_path = self.settings.get('game_path') or None
-        self.use_aoc_bypass = bool(self.settings.get('use_aoc_bypass', False))
 
         # Setup
         setup_custom_styles(self)
@@ -175,6 +173,10 @@ class KazBarsApp(ttkb.Window):
             # this from the first-launch completion path instead (see first_launch),
             # so a rare update never races the welcome flow.
             content_update.check_and_apply(self, APP_VERSION, self.settings.get('content_version'))
+            # Deferred like the first-launch dialog beside it: the check touches
+            # the game folder and can toast, neither of which belongs in the
+            # startup path before the window is up.
+            self.after(100, lambda: game_folder.check_install_health(self))
 
         update_check.check_for_updates(self, APP_VERSION)
 
@@ -379,6 +381,10 @@ class KazBarsApp(ttkb.Window):
             {'type': 'separator'},
             {'type': 'command', 'label': 'Backup & restore game settings…',
              'command': self._open_backup_dialog},
+            {'type': 'command', 'label': 'Repair game install…',
+             'command': self._repair_game_install},
+            {'type': 'command', 'label': 'Create game desktop shortcut…',
+             'command': self._create_game_desktop_link},
             {'type': 'command', 'label': 'Uninstall from game client…',
              'command': self._uninstall_game},
         ])
@@ -573,6 +579,12 @@ class KazBarsApp(ttkb.Window):
 
     def _show_game_context_menu(self, event):
         return game_folder.show_game_context_menu(self, event)
+
+    def _repair_game_install(self):
+        return game_folder.repair_game_install(self)
+
+    def _create_game_desktop_link(self):
+        return game_folder.offer_game_desktop_link(self)
 
     def _uninstall_game(self):
         return game_folder.uninstall_game(self)

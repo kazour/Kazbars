@@ -10,7 +10,18 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from .build_utils import CREATE_NO_WINDOW, strip_marker_block, update_script_with_marker
+from .build_utils import CREATE_NO_WINDOW, strip_marker_block
+from .game_persistence import (
+    FLAG_NAME,
+    GAME_EXES,
+    LEGACY_AOC_DIRS,
+    PATCHER_EXE,
+    discover_aoc_archive_declarations,
+    ensure_flag,
+    remove_flag,
+    splice_declarations,
+    strip_declarations,
+)
 from .grids_generator import build_grids
 
 logger = logging.getLogger(__name__)
@@ -22,8 +33,9 @@ logger = logging.getLogger(__name__)
 # KazBars.swf takes ownership and supersedes all of them.
 LEGACY_FLASH_FILES = ("kzgrids.swf", "KzGrids.swf", "KazGrids.swf")
 
-# Predecessor Aoc/* module folders to remove on install (case-insensitive on Windows).
-LEGACY_AOC_DIRS = ("KzGrids", "KazGrids", "Kazbars")
+# Chat-command scripts the pre-persistence build wrote for /loadclip loading.
+# The module now loads itself, so these are dead weight and get removed.
+LEGACY_SCRIPTS = ("reloadgrids", "unloadgrids")
 
 # Marker block strings used in Scripts/auto_login. Old markers are stripped
 # on every install/uninstall so a single rename pass converges.
@@ -99,9 +111,15 @@ def compile_to_staging(grids, database, assets_path, compiler, app_version,
     return staging_dir, result
 
 
-def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None,
+def install_to_client(staging_swf, game_path, damageinfo_swf=None,
                       damageinfo_pristine=None):
-    """Install compiled SWF + scripts to the game folder.
+    """Install the compiled SWF and make the game load it, permanently.
+
+    One mode for everyone: the module declarations are spliced straight into the
+    game's own MainPrefs.xml + Modules.xml and the engine's IgnorePatcher.enable
+    flag lets the client launch without the patcher putting them back. That is
+    what makes positions survive a relog — see ``game_persistence`` for THE STRIP
+    RULE and why other mods' declarations come along for the ride.
 
     ``damageinfo_swf`` (a staged modded DamageInfo.swf, or None) drives the Damage
     Numbers feature: a path installs the mod (backing up the stock file once); None
@@ -115,38 +133,28 @@ def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None,
     Returns (success, error_message).
     """
     flash_path = Path(game_path) / "Data" / "Gui" / "Default" / "Flash"
-    scripts_path = Path(game_path) / "Scripts"
 
     try:
         flash_path.mkdir(parents=True, exist_ok=True)
-        scripts_path.mkdir(parents=True, exist_ok=True)
 
-        cleanup_legacy_files(game_path)
-
-        # DamageInfo.swf is a core game file a running client can hold locked. Stage the
-        # change to a temp file first — the slow, failure-prone copy — then commit with
-        # os.replace, the only lock-prone step. Staging runs before KazBars.swf is copied,
-        # so a lock leaves the grids untouched.
-        try:
-            staged = _prepare_damageinfo(flash_path, damageinfo_swf, damageinfo_pristine)
-        except OSError:
+        # Runs before KazBars.swf is copied, so a locked DamageInfo.swf leaves
+        # the grids untouched.
+        if not commit_damageinfo(flash_path, damageinfo_swf, damageinfo_pristine):
             return False, _DAMAGEINFO_LOCK_MSG
-
-        if staged:
-            tmp, target = staged
-            try:
-                os.replace(tmp, target)
-            except OSError:
-                tmp.unlink(missing_ok=True)
-                return False, _DAMAGEINFO_LOCK_MSG
 
         shutil.copy2(staging_swf, flash_path / "KazBars.swf")
 
-        if use_aoc:
-            aoc_dir = Path(game_path) / "Data" / "Gui" / "Aoc" / "KazBars"
-            write_xml_add_files(aoc_dir)
+        splice_declarations(game_path, discover_aoc_archive_declarations(game_path))
+        ensure_flag(game_path)
 
-        create_scripts(scripts_path, use_aoc=use_aoc)
+        # Only once the new load path is actually in place: a failed splice must
+        # leave an upgrader's previous one (Aoc fragments / auto_login) working.
+        cleanup_legacy_files(game_path)
+    except ValueError as e:
+        return False, (
+            f"Could not update the game's interface files\n\n{e}\n\n"
+            "Run the game patcher once to restore them, then Game ▸ Repair game install."
+        )
     except OSError as e:
         return False, (
             f"Could not write files\n\n{e}\n\n"
@@ -154,6 +162,29 @@ def install_to_client(staging_swf, game_path, use_aoc, damageinfo_swf=None,
         )
 
     return True, ""
+
+
+def commit_damageinfo(flash_path, damageinfo_swf, damageinfo_pristine=None):
+    """Apply one Damage Numbers change to the live game file.
+
+    DamageInfo.swf is a core game file a running client can hold locked, so the
+    slow, failure-prone work (seed the backup, copy) is staged to a temp file
+    first and the only lock-prone step is a single ``os.replace``. Returns False
+    if the client held it — nothing was committed either way.
+    """
+    try:
+        staged = _prepare_damageinfo(flash_path, damageinfo_swf, damageinfo_pristine)
+    except OSError:
+        return False
+    if not staged:
+        return True
+    tmp, target = staged
+    try:
+        os.replace(tmp, target)
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        return False
+    return True
 
 
 def _prepare_damageinfo(flash_path, staged_swf, pristine_swf=None):
@@ -197,8 +228,14 @@ def _prepare_damageinfo(flash_path, staged_swf, pristine_swf=None):
 
 
 def cleanup_legacy_files(game_path):
-    """Remove leftover SWFs and Aoc-module folders from predecessor versions
-    (Kaz Flash Mods, Kaz Grids, the original KazBars mod) before the fresh install.
+    """Clear every earlier way of loading KazBars before the fresh install.
+
+    Two generations' worth: predecessor SWFs and module folders (Kaz Flash Mods,
+    Kaz Grids), and the pre-persistence era's own two load paths — the
+    ``Data/Gui/Aoc/KazBars`` fragments and the ``/loadclip`` reload scripts +
+    auto_login entry. Our own Aoc folder has to go: a user who still launches
+    through Aoc.exe would otherwise get KazBars declared twice, once by us
+    permanently and once by its per-session merge.
     """
     flash = Path(game_path) / "Data" / "Gui" / "Default" / "Flash"
     for stale in LEGACY_FLASH_FILES:
@@ -211,6 +248,37 @@ def cleanup_legacy_files(game_path):
         legacy_aoc = Path(game_path) / "Data" / "Gui" / "Aoc" / stale_dir
         if legacy_aoc.is_dir():
             shutil.rmtree(legacy_aoc, ignore_errors=True)
+
+    for script in LEGACY_SCRIPTS:
+        try:
+            (Path(game_path) / "Scripts" / script).unlink(missing_ok=True)
+        except OSError as e:
+            logger.warning("Could not remove %s: %s", script, e)
+
+    clean_auto_login(game_path)
+
+
+def clean_auto_login(game_path):
+    """Strip our marker block (and its predecessors') from Scripts/auto_login,
+    deleting the file if that leaves it empty. Returns True if anything changed."""
+    auto_login = Path(game_path) / "Scripts" / "auto_login"
+    if not auto_login.exists():
+        return False
+    try:
+        content = auto_login.read_text(encoding='utf-8')
+        cleaned = strip_marker_block(content, AUTO_LOAD_MARKER)
+        for legacy in LEGACY_AUTO_LOAD_MARKERS:
+            cleaned = strip_marker_block(cleaned, legacy)
+        if cleaned == content:
+            return False
+        if cleaned.strip():
+            auto_login.write_text(cleaned, encoding='utf-8')
+        else:
+            auto_login.unlink()
+        return True
+    except (UnicodeDecodeError, OSError):
+        logger.debug("Could not read/clean auto_login markers", exc_info=True)
+        return False
 
 
 def uninstall_from_client(game_path, damageinfo_pristine=None):
@@ -248,32 +316,25 @@ def uninstall_from_client(game_path, damageinfo_pristine=None):
         # content (written by the Damage Number Colors panel, like the buff-bar edits), so
         # they survive an uninstall — as does any .kazbars.bak, their manual restore point.
 
+        # Put the game's own XMLs back byte-for-byte and drop the bypass flag, so
+        # an uninstalled game folder is indistinguishable from a never-modded one.
+        removed.extend(strip_declarations(game_path))
+        if remove_flag(game_path):
+            removed.append(FLAG_NAME)
+
         aoc_dir = Path(game_path) / "Data" / "Gui" / "Aoc" / "KazBars"
         if aoc_dir.exists():
             shutil.rmtree(aoc_dir)
             removed.append("Aoc module files")
 
-        for script in ("reloadgrids", "unloadgrids"):
+        for script in LEGACY_SCRIPTS:
             p = Path(game_path) / "Scripts" / script
             if p.exists():
                 p.unlink()
                 removed.append(script)
 
-        auto_login = Path(game_path) / "Scripts" / "auto_login"
-        if auto_login.exists():
-            try:
-                content = auto_login.read_text(encoding='utf-8')
-                new_content = strip_marker_block(content, AUTO_LOAD_MARKER)
-                for legacy in LEGACY_AUTO_LOAD_MARKERS:
-                    new_content = strip_marker_block(new_content, legacy)
-                if new_content != content:
-                    if new_content.strip():
-                        auto_login.write_text(new_content, encoding='utf-8')
-                    else:
-                        auto_login.unlink()
-                    removed.append("auto_login entry")
-            except (UnicodeDecodeError, OSError):
-                logger.debug("Could not read/clean auto_login markers", exc_info=True)
+        if clean_auto_login(game_path):
+            removed.append("auto_login entry")
     except OSError as e:
         return False, f"Could not remove files:\n\n{e}"
 
@@ -282,50 +343,9 @@ def uninstall_from_client(game_path, damageinfo_pristine=None):
     return True, "Removed: " + ", ".join(removed)
 
 
-GAME_PROCESSES = ('AgeOfConan.exe', 'AgeOfConanDX10.exe')
-
-# Aoc.exe activates itself by writing an IFEO "Debugger" value on the game exes,
-# so every game launch on the machine is routed through it. That value is the
-# only reliable "is it actually on?" signal — the old file fingerprint (an
-# aoc.exe/Aoc.log sitting in Data/Gui/Aoc) proved only that it was *installed*,
-# which is why the app used to have to ask the user.
-IFEO_KEY = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options"
-AOC_LAUNCHER_EXE = "aoc.exe"
-
-
-def ifeo_hook_present():
-    """Return True if Aoc.exe currently intercepts game launches on this PC.
-
-    The hook is keyed on the bare image name and is machine-global, not
-    per-install — hence no ``game_path`` argument. Both registry views are
-    probed because the value can be written to either. Reading HKLM needs no
-    admin rights. Only a ``Debugger`` naming ``aoc.exe`` counts: a foreign
-    debugger on the game exe (a JIT debugger, an anti-cheat shim) is somebody
-    else's tooling, not the launcher bypass.
-    """
-    import winreg
-
-    for name in GAME_PROCESSES:
-        for view in (winreg.KEY_WOW64_32KEY, winreg.KEY_WOW64_64KEY):
-            try:
-                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
-                                    f"{IFEO_KEY}\\{name}", 0,
-                                    winreg.KEY_READ | view) as key:
-                    value = winreg.QueryValueEx(key, "Debugger")[0]
-            except OSError:
-                continue
-            if isinstance(value, str) and AOC_LAUNCHER_EXE in value.lower():
-                return True
-    return False
-
-
-def get_running_game_process():
-    """Return the name of a running AoC game process, or None.
-
-    Aoc.exe (the launcher bypass loader) doesn't lock the overlay files —
-    the actual game process does. Only the DX9/DX10 game exes matter here.
-    """
-    for name in GAME_PROCESSES:
+def _first_running(names):
+    """Name of the first of `names` that tasklist reports as running, or None."""
+    for name in names:
         try:
             result = subprocess.run(
                 ['tasklist', '/FI', f'IMAGENAME eq {name}', '/NH'],
@@ -339,64 +359,27 @@ def get_running_game_process():
     return None
 
 
+def get_running_game_process():
+    """Return the name of a running AoC game process, or None.
+
+    Aoc.exe (the launcher bypass loader) doesn't lock the overlay files —
+    the actual game process does. Only the DX9/DX10 game exes matter here.
+    """
+    return _first_running(GAME_EXES)
+
+
+def get_running_engine_process():
+    """Return the name of any running DV-engine process — client or patcher.
+
+    Repair has to wait for both. The patcher saves Prefs_3.xml on exit just like
+    the client does, so a live patcher run would strip the archives we are about
+    to re-inject (THE STRIP RULE, game_persistence).
+    """
+    return _first_running((*GAME_EXES, PATCHER_EXE))
+
+
 def is_aoc_running():
     """Return True if any AoC game process is currently running."""
     return get_running_game_process() is not None
 
 
-def write_xml_add_files(aoc_dir):
-    """Write MainPrefs.xml.add and Modules.xml.add for Aoc.exe module system."""
-    aoc_dir.mkdir(parents=True, exist_ok=True)
-
-    prefs = (
-        '\t<Value name="KazBars" value="true" />\n'
-        '\t<Archive name="KazBars settings" />\n'
-    )
-    modules = (
-        '\t<Module\n'
-        '\t\tname              = "KazBars"\n'
-        '\t\tmovie             = "KazBars.swf"\n'
-        '\t\tflags             = "GMF_CFG_STORE_USER_CONFIG"\n'
-        '\t\tdepth_layer       = "Top"\n'
-        '\t\tsub_depth         = "0"\n'
-        '\t\tvariable          = "KazBars"\n'
-        '\t\tcriteria          = "KazBars &amp;&amp; (guimode &amp; (GUIMODEFLAGS_INPLAY | GUIMODEFLAGS_ENABLEALLGUI))"\n'
-        '\t\tconfig_name       = "KazBars settings"\n'
-        '\t/>\n'
-    )
-
-    (aoc_dir / "MainPrefs.xml.add").write_text(prefs, encoding='utf-8')
-    (aoc_dir / "Modules.xml.add").write_text(modules, encoding='utf-8')
-
-
-def create_scripts(scripts_path, use_aoc=False):
-    """Write Scripts/reloadgrids, Scripts/unloadgrids and update Scripts/auto_login."""
-    reload_content = "/unloadclip KazBars.swf\n/delay 100\n/loadclip KazBars.swf"
-    unload_content = "/unloadclip KazBars.swf"
-    reload_script = scripts_path / "reloadgrids"
-    unload_script = scripts_path / "unloadgrids"
-    auto_login_script = scripts_path / "auto_login"
-
-    reload_script.write_text(reload_content, encoding='utf-8')
-    unload_script.write_text(unload_content, encoding='utf-8')
-
-    if use_aoc:
-        # Aoc.exe handles loading via xml.add — strip any KazBars/legacy markers
-        if auto_login_script.exists():
-            try:
-                content = auto_login_script.read_text(encoding='utf-8')
-            except (UnicodeDecodeError, OSError):
-                logger.warning("auto_login corrupt — overwriting")
-                content = ""
-            content = strip_marker_block(content, AUTO_LOAD_MARKER)
-            for legacy in LEGACY_AUTO_LOAD_MARKERS:
-                content = strip_marker_block(content, legacy)
-            if content.strip():
-                auto_login_script.write_text(content, encoding='utf-8')
-            else:
-                auto_login_script.unlink(missing_ok=True)
-    else:
-        update_script_with_marker(
-            auto_login_script, AUTO_LOAD_MARKER, reload_content,
-            old_markers=list(LEGACY_AUTO_LOAD_MARKERS),
-        )

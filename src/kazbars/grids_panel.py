@@ -330,7 +330,7 @@ class GridsPanel(ttk.Frame):
         self._tip_dismissed = True
         self._tip_frame.pack_forget()
 
-    def notify_build_done(self, aoc_installed, profile_path):
+    def notify_build_done(self, profile_path):
         """Called after a successful build — mark step 4 complete and re-show panel.
         Persists a signature of {profile path, built grids} so relaunching the app
         with the same profile and unchanged grids restores the green Build step.

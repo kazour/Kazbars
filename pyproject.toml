@@ -98,6 +98,7 @@ files = [
     "src/kazbars/deeps_settings.py",
     "src/kazbars/deeps_trackers.py",
     "src/kazbars/foreground.py",
+    "src/kazbars/game_persistence.py",
     "src/kazbars/grid_model.py",
     "src/kazbars/grids_generator.py",
     "src/kazbars/inspect.py",

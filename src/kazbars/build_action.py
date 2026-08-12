@@ -120,11 +120,13 @@ def build(app):
         app._mark_modified()
         app.grids_panel.refresh_panels(expand_index=-1)
 
-    # Aoc.exe users only: block while the game is running, but only on the
-    # first build. After a successful install, /reloadui handles the swap.
-    if app.use_aoc_bypass and not app.settings.get('has_built_before'):
-        from .build_executor import get_running_game_process
-        running = get_running_game_process()
+    # Block while any engine process is running, but only on the first build: the
+    # client has to start with our declarations in place for the archive to
+    # survive, and a patcher left open strips it on its own exit-save. After a
+    # successful install, /reloadui handles the swap.
+    if not app.settings.get('has_built_before'):
+        from .build_executor import get_running_engine_process
+        running = get_running_engine_process()
         if running:
             show_close_game_required_dialog(app, process_name=running)
             return
@@ -157,7 +159,6 @@ def build(app):
         'stopwatch_config': app.settings.get('stopwatch'),
         'inspect_config': app.settings.get('inspect'),
         'game_path': app.game_path,
-        'use_aoc': app.use_aoc_bypass,
         'di_enabled': di_enabled,
         'di_settings': di_settings,
         'profile_name': profile_name,
@@ -189,6 +190,7 @@ def _build_worker(app, loading, ctx):
     """Worker thread: compile → (optionally bake Damage Numbers) → install, each phase
     held for a beat. No Tk here — every UI touch hops to the main loop via `_post`."""
     from .build_executor import compile_to_staging, install_to_client, is_aoc_running
+    from .game_persistence import client_supports_flag
 
     staging_dir = None
     try:
@@ -230,41 +232,48 @@ def _build_worker(app, loading, ctx):
         started = time.monotonic()
         _post(app, loading.advance_step, "Installing...")
         ok, err = install_to_client(
-            staging_dir / "KazBars.swf", ctx['game_path'], ctx['use_aoc'],
+            staging_dir / "KazBars.swf", ctx['game_path'],
             damageinfo_swf=damageinfo_swf,
             damageinfo_pristine=Path(ctx['assets_path']) / "damageinfo" / "DamageInfo.swf",
         )
-        aoc_running = ctx['use_aoc'] and is_aoc_running()
+        game_running = is_aoc_running()
+        flag_supported = client_supports_flag(ctx['game_path'])
         _hold_phase(started)
         _post(app, _finish_success, app, loading, staging_dir, ctx,
-              compile_result, ok, err, aoc_running)
+              compile_result, ok, err, game_running, flag_supported)
     except Exception as e:
         logger.exception("Unexpected build error")
         _post(app, _build_error, app, loading, staging_dir, e)
 
 
-def _finish_success(app, loading, staging_dir, ctx, compile_result, ok, err, aoc_running):
+def _finish_success(app, loading, staging_dir, ctx, compile_result, ok, err,
+                    game_running, flag_supported):
     """Main thread: install-result toast + summary, then unlock + clean up."""
     try:
         if ok:
-            if ctx['use_aoc'] and aoc_running:
+            if game_running:
                 app_toast(app, "/reloadui in-game", 'success', 8)
-            elif ctx['use_aoc']:
-                app_toast(app, "launch the game", 'success', 8)
             else:
-                app_toast(app, "/reloadui + /reloadgrids", 'success', 8)
+                app_toast(app, "launch the game", 'success', 8)
             flash_status_bar(app.bottom_bar)
-            app.grids_panel.notify_build_done(ctx['use_aoc'], app.current_profile)
+            app.grids_panel.notify_build_done(app.current_profile)
             if not app.settings.get('has_built_before'):
                 app.settings.set('has_built_before', True)
                 app.settings.save()
         else:
             app_toast(app, "Build failed", 'error', 10)
             flash_status_bar(app.bottom_bar, THEME_COLORS['danger'])
+        # First successful build on this machine: once the summary is dismissed,
+        # offer the direct-launch shortcut. Not gated on the has_built_before
+        # flip — upgraders already have that set, and they are precisely the
+        # audience whose launch habit has to change.
+        if ok and not app.settings.get('desktop_shortcut_offered'):
+            loading.on_closed = lambda: game_folder.offer_game_desktop_link(
+                app, first_build=True)
         client_results = [(game_folder.format_game_path(ctx['game_path']), ok, err)]
         loading.show_summary(
             client_results, compile_result, profile_name=ctx['profile_name'],
-            aoc_installed=ctx['use_aoc'], aoc_running=aoc_running)
+            game_running=game_running, flag_supported=flag_supported)
     finally:
         _unlock(app, staging_dir)
 

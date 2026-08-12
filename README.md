@@ -24,7 +24,7 @@ Most of what KazBars builds is set up once and runs on its own after you close t
 
 **Target Inspect Panel** — an in-game combat sheet for whatever you have targeted: armor and protections with their mitigation percentages, crit, critigation, heal rating, bonus spell damage, and combat damage increase. Player targets add a PvP section; clear your target and the panel hides. Off by default
 
-**Damage Numbers** — a leaner, faster rewrite of the game's floating combat numbers, with new layout and behavior settings. Needs the Aoc.exe launcher bypass: it replaces a stock `.swf` the game's patcher restores otherwise, so rebuild after each patcher run if you don't have the bypass. Off by default
+**Damage Numbers** — a leaner, faster rewrite of the game's floating combat numbers, with new layout and behavior settings. It replaces one stock game file; if the game ever patches, rebuild once to put it back. Off by default
 
 **Deeps by Veni** — a real-time meter that reads your combat log for DPS out, DPS in, HPS out, HPS in, and ΔHP in.
 
@@ -46,11 +46,15 @@ Most of what KazBars builds is set up once and runs on its own after you close t
 
 3. The first-run setup window opens. Point it at your Age of Conan folder.
 
-4. If it detects the Aoc.exe launcher bypass in that folder, say whether you use it.
+4. Choose **Use Defaults** — ready-made grids for common raid buffs and debuffs, sized to your screen. (Or **Start Empty** to build your own from scratch.)
 
-5. Choose **Use Defaults** — ready-made grids for common raid buffs and debuffs, sized to your screen. (Or **Start Empty** to build your own from scratch.)
+5. Click `Build & Install`. Close the game and the patcher for your first build — it registers KazBars with the game permanently. After that, rebuild anytime and type `/reloadui` in-game.
 
-6. Click `Build & Install`. Close the game for your first build; after that, rebuild anytime and apply from chat — `/reloadui` if you use Aoc.exe, or `/reloadui` then `/reloadgrids` on the standard launcher.
+6. Launch the game from its own executable — KazBars offers to create a desktop shortcut (DX10 or DX9) after the first build. Launching this way skips the patcher, which is what keeps your setup registered.
+
+Positioning happens in-game: press Ctrl+Shift+Alt for preview mode and drag grids and panels where you want them. The game remembers positions, collapse states, and the control panel's switches across relogs and full restarts — like any other game window.
+
+If the game ever patches (it hasn't in years), run the official patcher once, then **Game ▸ Repair game install** — KazBars re-registers itself and restores your saved positions.
 
 Once you know the flow, make it yours: `+ Add Grid` for your own layouts, then `Tracked Buffs...` to pick what each one watches. Up to **64 slots total** across all your grids.
 
@@ -66,7 +70,7 @@ Questions, bug reports, and release news live on Discord. [Join the Discord](htt
 - Age of Conan installed
 - No Python install needed — ships as a standalone executable
 
-KazBars only reads files the game writes (combat logs, UI folder). It does not read game memory or inject anything into the game process.
+KazBars does not read game memory or inject anything into the game process. Installing writes to the game's UI folder and registers KazBars in two clearly marked blocks in the game's own config files, with pristine `.bak` backups beside them. It also drops `IgnorePatcher.enable` — Funcom's own engine flag, whose filename ships inside the game client itself — so launching the game executable directly skips the patcher. This is the same persistence path the community's Aoc.exe launcher has provided for some fifteen years, done less invasively: no registry hooks, no process interception, and everything KazBars adds to the game folder is inspectable. Uninstall restores every changed file byte-for-byte.
 
 ## Building from source
 
