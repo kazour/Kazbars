@@ -7,6 +7,7 @@ take the KazBarsApp instance as first arg.
 """
 
 import logging
+import tempfile
 from pathlib import Path
 from tkinter import filedialog
 
@@ -190,13 +191,56 @@ def repair_game_install(app):
     cleanup_legacy_files(app.game_path)
 
     restored = _reinject_managed_archives(declarations)
+    damageinfo_ok = _restore_damageinfo(app)
+
     if not flag_ok:
         app_toast(app, f"Repaired, but {gp.FLAG_NAME} couldn't be written.",
+                  'warning', 10)
+    elif not damageinfo_ok:
+        app_toast(app, "Repaired — run Build & Install to restore Damage Numbers.",
                   'warning', 10)
     elif restored:
         app_toast(app, f"Repaired — restored {', '.join(restored)}.", 'success', 8)
     else:
         app_toast(app, "Repaired — KazBars is declared again.", 'success', 8)
+
+
+def _restore_damageinfo(app):
+    """Re-install the Damage Numbers mod, which the patcher overwrote too.
+
+    The same patch that restores the interface XMLs restores the stock
+    DamageInfo.swf, so a Repair that skipped this would put the grids back and
+    silently leave the numbers vanilla. Rebakes from the current settings through
+    the compiler and commits down `build_executor`'s staged path, exactly as a
+    build does.
+
+    Returns False only when the mod is enabled and could not be restored — the
+    caller says so, but Repair still counts as done: the declarations are what
+    it exists for, and a rebuild fixes the rest.
+    """
+    from . import damageinfo_settings as dis
+    from .build_executor import commit_damageinfo
+    from .build_utils import find_compiler
+    from .damageinfo_generator import build_damageinfo
+
+    settings = dis.load_settings(app.settings_path)
+    if not settings.get('enabled'):
+        return True
+
+    compiler = find_compiler(app.assets_path, app.app_path)
+    if compiler is None:
+        logger.warning("Damage Numbers not restored: no compiler found")
+        return False
+
+    flash = Path(app.game_path) / "Data" / "Gui" / "Default" / "Flash"
+    pristine = Path(app.assets_path) / "damageinfo" / "DamageInfo.swf"
+    with tempfile.TemporaryDirectory(prefix="kazbars_repair_") as staging:
+        staged = Path(staging) / "DamageInfo.swf"
+        ok, msg = build_damageinfo(app.assets_path, settings, compiler, staged)
+        if not ok:
+            logger.warning("Damage Numbers not restored: %s", msg)
+            return False
+        return commit_damageinfo(flash, staged, pristine)
 
 
 def _managed_archive_names(declarations):

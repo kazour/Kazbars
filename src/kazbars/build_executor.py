@@ -137,22 +137,10 @@ def install_to_client(staging_swf, game_path, damageinfo_swf=None,
     try:
         flash_path.mkdir(parents=True, exist_ok=True)
 
-        # DamageInfo.swf is a core game file a running client can hold locked. Stage the
-        # change to a temp file first — the slow, failure-prone copy — then commit with
-        # os.replace, the only lock-prone step. Staging runs before KazBars.swf is copied,
-        # so a lock leaves the grids untouched.
-        try:
-            staged = _prepare_damageinfo(flash_path, damageinfo_swf, damageinfo_pristine)
-        except OSError:
+        # Runs before KazBars.swf is copied, so a locked DamageInfo.swf leaves
+        # the grids untouched.
+        if not commit_damageinfo(flash_path, damageinfo_swf, damageinfo_pristine):
             return False, _DAMAGEINFO_LOCK_MSG
-
-        if staged:
-            tmp, target = staged
-            try:
-                os.replace(tmp, target)
-            except OSError:
-                tmp.unlink(missing_ok=True)
-                return False, _DAMAGEINFO_LOCK_MSG
 
         shutil.copy2(staging_swf, flash_path / "KazBars.swf")
 
@@ -174,6 +162,29 @@ def install_to_client(staging_swf, game_path, damageinfo_swf=None,
         )
 
     return True, ""
+
+
+def commit_damageinfo(flash_path, damageinfo_swf, damageinfo_pristine=None):
+    """Apply one Damage Numbers change to the live game file.
+
+    DamageInfo.swf is a core game file a running client can hold locked, so the
+    slow, failure-prone work (seed the backup, copy) is staged to a temp file
+    first and the only lock-prone step is a single ``os.replace``. Returns False
+    if the client held it — nothing was committed either way.
+    """
+    try:
+        staged = _prepare_damageinfo(flash_path, damageinfo_swf, damageinfo_pristine)
+    except OSError:
+        return False
+    if not staged:
+        return True
+    tmp, target = staged
+    try:
+        os.replace(tmp, target)
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        return False
+    return True
 
 
 def _prepare_damageinfo(flash_path, staged_swf, pristine_swf=None):

@@ -307,12 +307,8 @@ SECTIONS: list[_Section] = [
                 "A patch restores the game's stock files, which takes the "
                 'KazBars registration with them. Run the official patcher '
                 'once, then Game ▸ Repair game install — it re-registers '
-                'KazBars and restores your saved positions from a safety '
-                'snapshot.',
-                [('Using the Damage Numbers mod? A patch also puts the stock '
-                  'numbers back — click ', None),
-                 ('Build & Install', _SUCCESS),
-                 (' once to restore the mod.', None)],
+                'KazBars, restores your saved positions from a safety '
+                'snapshot, and puts the Damage Numbers mod back if you use it.',
             ]),
             _sub('Buff-discovery console', [
                 "Don't know an effect's buff ID? Open Extras ▸ Inspect panel… "
