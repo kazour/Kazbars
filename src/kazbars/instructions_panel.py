@@ -105,8 +105,8 @@ SECTIONS: list[_Section] = [
                  (' at the bottom. This compiles your grids and writes them to '
                   'your game folder.', None)],
                 'Close the game and the patcher for your first build; after '
-                'that, rebuild anytime and type /reloadui in-game — see '
-                "'Building and Installing'.",
+                'that, rebuild anytime and type /reloadui in-game.',
+                _link('Building and Installing', 'building'),
             ]),
         ],
     },
@@ -115,22 +115,18 @@ SECTIONS: list[_Section] = [
         'id': 'what-builds',
         'title': 'What KazBars Builds',
         'body': [
-            'Everything KazBars builds is one kind of mod or another. The kind '
-            'tells you the one thing that matters: whether you ever need the '
-            'app open again.',
-            _sub('Set up once — then close the app', [
-                [('Grids, the Cast Timer, the Stopwatch, the Inspect panel and '
-                  'Damage Numbers all install with one ', None),
+            'KazBars makes two kinds of thing, and which kind you are looking '
+            'at answers the only question that matters day to day: do you ever '
+            'need the app open again?',
+            _sub('Built into the game — then close the app', [
+                [('Grids, Damage Numbers, the Stopwatch, the Inspect Panel and '
+                  'the Cast Timer are compiled into the game by ', None),
                  ('Build & Install', _SUCCESS),
-                 (". After that you type /reloadui in-game and you're done — they "
-                  'keep working whether or not KazBars is running. Open it again '
-                  'only when you want to change something.', None)],
-                'Those four extras also have toggle cards above the grid list — '
-                'click one to flip the feature in or out of your next build. '
-                'Configuring them stays in the Extras menu.',
-                'Default Buff Bars and Damage Number Colors skip the build '
-                "entirely — they edit the game's own files the moment you hit "
-                'Apply, so /reloadui is all they need.',
+                 ('. They keep working whether or not KazBars is running, so '
+                  'you only open it again to change something.', None)],
+                'The two skin editors are the exception — they write to the '
+                'game directly and need no build at all.',
+                _link('How Extras Ship', 'extras-shipping'),
             ]),
             _sub('Runs while you play — keep KazBars open', [
                 [('The ', None),
@@ -140,6 +136,34 @@ SECTIONS: list[_Section] = [
                  (' are desktop overlays that read your combat log in real time. '
                   'They draw on top of the game while you play, so they only work '
                   'while KazBars is open.', None)],
+            ]),
+        ],
+    },
+    {
+        'cat': 'Getting Started',
+        'id': 'profiles',
+        'title': 'Profiles',
+        'body': [
+            'A profile is a saved set of grids, and the File menu manages them: '
+            'New profile, Open profile…, Save profile, Save profile as…, and '
+            'Manage profiles… for the full list.',
+            'Load default profile drops in the starter layout — the same one '
+            'the first-launch dialog offers.',
+            _sub('Which profile opens on launch', [
+                'KazBars reopens whichever profile you had loaded last. The ★ '
+                'in Manage profiles… marks something different: your default is '
+                'the layout a first launch starts from, and the one Load '
+                'default profile brings back.',
+            ]),
+            _sub('Sharing a profile', [
+                'In Manage profiles…, Export to clipboard turns the selected '
+                'profile into one long string you can paste anywhere — Discord, '
+                'a forum post, a text file. Import from string… reads one back.',
+                'Any custom buffs the profile uses travel inside that string, so '
+                'whoever imports it needs nothing from your database.',
+                'Screen positions do not travel with a profile; they belong to '
+                'this PC.',
+                _link('Cast Timer', 'cast-timer'),
             ]),
         ],
     },
@@ -208,8 +232,8 @@ SECTIONS: list[_Section] = [
             'Flash — icons pulse near expiry. Set the threshold in seconds.',
             'Icon size and gaps — the size of each icon and the spacing '
             'between them.',
-            "For where a grid sits on screen, see 'Applying and Positioning "
-            "In-Game'.",
+            'Where a grid sits on screen is decided in-game, not here.',
+            _link('Applying and Positioning In-Game', 'positioning'),
         ],
     },
     {
@@ -253,6 +277,8 @@ SECTIONS: list[_Section] = [
                 'Type — Buff (grey), Debuff (red), or Misc (golden). Sets the '
                 'icon border and grouping.',
             ]),
+            "Don't know an effect's ID? The game can tell you.",
+            _link('Finding Buff IDs', 'finding-buff-ids'),
         ],
     },
     {
@@ -283,6 +309,32 @@ SECTIONS: list[_Section] = [
         ],
     },
     {
+        'cat': 'Buff Database',
+        'id': 'finding-buff-ids',
+        'title': 'Finding Buff IDs',
+        'body': [
+            'The buff-discovery console is an in-game window that logs every '
+            "effect's name and buff ID as it lands, so you can read an ID "
+            'straight off the screen instead of guessing. It switches on in '
+            'Extras ▸ Inspect panel….',
+            _sub('Turn it on', [
+                [('Tick ', None),
+                 ('Include the buff-discovery console in builds', _SUCCESS),
+                 (', then ', None),
+                 ('Build & Install', _SUCCESS),
+                 ('. Press Shift+Ctrl+Alt in-game to enter preview mode and the '
+                  'console appears.', None)],
+                'Everything that lands on you or your target is logged with its '
+                'name and buff ID. Copy the ID into the Database tab.',
+            ]),
+            'Drag the console by its title bar. The − button collapses it to a '
+            'small bar reading Console; click that bar to open it again. The '
+            'game remembers where you left it, its fold, and whether it was open.',
+            "It's off by default, so finished builds don't carry it. Turn it "
+            'off and rebuild to remove it.',
+        ],
+    },
+    {
         'cat': 'Building & In-Game',
         'id': 'building',
         'title': 'Building and Installing',
@@ -295,41 +347,29 @@ SECTIONS: list[_Section] = [
               'with untouched .bak backups beside them. ', None),
              ('Close the game and the patcher before your first build.', _DANGER),
              (' After that, rebuild anytime and apply with /reloadui.', None)],
-            _sub('Launching the game', [
-                'Start the game from AgeOfConan.exe or AgeOfConanDX10.exe '
-                "directly — KazBars drops IgnorePatcher.enable, the engine's "
-                'own flag, so a direct launch skips the patcher. After your '
-                'first successful build, KazBars offers to create a desktop '
-                'shortcut (DX10 or DX9); Game ▸ Create game desktop '
-                'shortcut… makes one anytime.',
-            ]),
-            _sub('After a game patch', [
-                "A patch restores the game's stock files, which takes the "
-                'KazBars registration with them. Run the official patcher '
-                'once, then Game ▸ Repair game install — it re-registers '
-                'KazBars, restores your saved positions from a safety '
-                'snapshot, and puts the Damage Numbers mod back if you use it.',
-            ]),
-            _sub('Buff-discovery console', [
-                "Don't know an effect's buff ID? Open Extras ▸ Inspect panel… "
-                'and tick Include the buff-discovery console in builds, then '
-                'Build & Install. In preview mode (Shift+Ctrl+Alt), the console '
-                "logs every effect's name and buff ID as it lands on you or "
-                'your target — copy the ID into the Database.',
-                'Drag it by its title bar; it stays on screen and comes back '
-                'where you left it. The − button collapses it to a small bar '
-                'reading Console; click that bar to open the console again.',
-                'The game remembers its spot, its fold, and whether you left '
-                'it open — across relogs and full restarts.',
-                "It's off by default and only included when you enable it, so "
-                "finished builds don't carry it. Turn it off and rebuild to "
-                'remove it.',
-            ]),
-            _sub('Removing KazBars from your game folder', [
-                'Game ▸ Uninstall from game client… removes KazBars.swf '
-                'and related files, and restores every game file KazBars '
-                'changed byte-for-byte.',
-            ]),
+            'Two things are worth knowing from here on: how you start the game, '
+            'and what a game patch does to all this.',
+            _link('Launching the Game', 'launching'),
+            _link('After a Game Patch', 'game-patch'),
+        ],
+    },
+    {
+        'cat': 'Building & In-Game',
+        'id': 'launching',
+        'title': 'Launching the Game',
+        'body': [
+            'Start the game from AgeOfConan.exe or AgeOfConanDX10.exe directly '
+            "rather than from the patcher. KazBars drops IgnorePatcher.enable "
+            "in your game folder — the engine's own flag — so a direct launch "
+            'skips the patcher, and your grids load with the positions you gave '
+            'them.',
+            'After your first successful build KazBars offers to make a desktop '
+            'shortcut for you. Game ▸ Create game desktop shortcut… makes one '
+            'anytime, for DX10 or DX9.',
+            'Launching through the patcher is not harmful, just undone — it '
+            "restores the game's stock files and takes the registration with "
+            'them.',
+            _link('After a Game Patch', 'game-patch'),
         ],
     },
     {
@@ -443,54 +483,30 @@ SECTIONS: list[_Section] = [
     },
     {
         'cat': 'Extras',
-        'id': 'cast-timer',
-        'title': 'Cast Timer',
+        'id': 'extras-shipping',
+        'title': 'How Extras Ship',
         'body': [
-            'Extras ▸ Cast timer… adds a timer-only overlay for your own and '
-            "your target's cast time — floating text over the game's cast bar, "
-            'with no bar of its own. Off by default; when off, the build '
-            'carries no cast-timer code at all.',
-            _sub('Turn it on', [
-                [('Open the dialog, tick ', None),
-                 ('Include the cast timer in builds', _SUCCESS),
-                 (', then ', None),
+            'The Extras menu holds two kinds of add-on, split by the captions '
+            'in the menu itself. Every section in this category follows one of '
+            'the two rules below, so each one only covers what it actually does.',
+            _sub('Build & Install to apply', [
+                [('Damage Numbers, the Stopwatch, the Inspect Panel and the Cast '
+                  'Timer are off by default, and off means the build carries no '
+                  'code for them at all. Tick the box in the dialog, press ', None),
                  ('Apply', _SUCCESS),
-                 (' — it saves and closes the window. Cancel, Escape or the X '
-                  'discard everything you changed.', None)],
-                [('Nothing reaches the game until your next ', None),
+                 (' to save and close, then ', None),
                  ('Build & Install', _SUCCESS),
-                 (', same as grids. One toggle runs both the Player and '
-                  'Target sides.', None)],
-                'The Cast Timer card above the grid list flips this same '
-                'switch — the dialog stays the place to configure it.',
+                 ('. Cancel, Escape or the X discard your changes.', None)],
+                'Each of the four also has a toggle card above the grid list. '
+                'The card flips the same switch the dialog does — the dialog '
+                'stays the place to configure it.',
             ]),
-            _sub('What you can set', [
-                'Player position and Target position — where each timer sits '
-                'on screen.',
-                'Text — Bold, Font size (8–48) and Color, shared by both '
-                'timers. The sample beside them shows what the overlay will '
-                'draw.',
-                'Show — Elapsed counts up, Total is the estimated cast length, '
-                'Both shows 1.2 / 2.5.',
+            _sub('/reloadui to apply', [
+                "Default Buff Bars and Damage Number Colors edit the game's own "
+                'files the moment you press Apply.',
+                'There is no master toggle and nothing to build — type '
+                '/reloadui in-game and the change is there.',
             ]),
-            _sub('Positioning', [
-                'Press Shift+Ctrl+Alt in-game to toggle preview mode and '
-                'drag each timer — the game remembers drags across relogs. '
-                "The dialog's X/Y are just the defaults a first-ever "
-                'session starts from.',
-            ]),
-            _sub('Saved on this PC, not in your profile', [
-                'Cast-timer settings live with your app preferences, the same '
-                'as the stopwatch and the inspect panel — the positions depend '
-                'on your screen, not on your buff layout. So switching '
-                'profiles leaves the timer alone, and a profile someone shares '
-                'with you no longer carries their positions.',
-            ]),
-            _note(
-                'If you had a cast timer set before this version, open the '
-                'dialog and set it once more. Your old profiles still hold the '
-                'values, but nothing reads them any more.',
-                _WARNING),
         ],
     },
     {
@@ -511,47 +527,8 @@ SECTIONS: list[_Section] = [
                 'backed up once before the first change. Set your game folder '
                 'first.',
             ]),
-        ],
-    },
-    {
-        'cat': 'Extras',
-        'id': 'damage-numbers',
-        'title': 'Damage Numbers',
-        'body': [
-            'Extras ▸ Damage number mod… installs a leaner rewrite of Age of '
-            "Conan's floating combat numbers, in place of the stock ones. The "
-            'headline fix: ranged hits stop shrinking to nothing at distance.',
-            _sub('Turn it on', [
-                [('Off by default. Tick ', None),
-                 ('Enable the Damage Numbers mod', _SUCCESS),
-                 (', set your options, then ', None),
-                 ('Apply', _SUCCESS),
-                 (' — it saves and closes the window. Cancel, Escape or the X '
-                  'discard everything you changed.', None)],
-                [('Nothing reaches the game until your next ', None),
-                 ('Build & Install', _SUCCESS),
-                 (', same as grids.', None)],
-                'Your stock file is backed up the first time, so turning it off '
-                'and rebuilding restores the original.',
-                'The Damage Numbers card above the grid list flips this same '
-                'switch — the dialog stays the place to configure it.',
-            ]),
-            _sub('What you can tune', [
-                'Keep ranged numbers big — holds the size of ranged hits past '
-                "~15 real metres so they don't fade with distance. Melee is "
-                'never touched.',
-                'Shadow, pop-in, and fade speed — with Default and Performance '
-                'presets.',
-                'Where rising, dropping and zig-zag numbers land on screen. '
-                'Which of the three a number uses is set per source in Damage '
-                'Number Colors.',
-                'Split signed numbers into Column B — of the numbers already '
-                'dropping into the fixed column, plain damage stays in Column A '
-                'and the signed ones (heals, stamina, mana) move to Column B.',
-                'Keep enemy drains overhead — mana and stamina you drain from '
-                'enemies keep floating over them even when your own resource '
-                'numbers are set to Dropping.',
-            ]),
+            'Apply writes the files there and then; /reloadui shows the result.',
+            _link('How Extras Ship', 'extras-shipping'),
         ],
     },
     {
@@ -559,17 +536,10 @@ SECTIONS: list[_Section] = [
         'id': 'damage-number-colors',
         'title': 'Damage Number Colors',
         'body': [
-            'Extras ▸ Damage number colors… sets the color and the direction '
-            'of every combat-number source on its own — incoming vs outgoing '
-            'hits, crits, spells, combos, heals, mana, and stamina — laid out '
-            'self on the left, your target on the right.',
-            [('Works like the ', None),
-             ('Default Buff Bars', _ACCENT),
-             (' editor: make your changes, hit ', None),
-             ('Apply', _SUCCESS),
-             (', then type /reloadui in-game to see them. No ', None),
-             ('Build & Install', _SUCCESS),
-             (' and no master toggle — it edits the game files directly.', None)],
+            'Extras ▸ Damage number colors… sets the color and the direction of '
+            'every combat-number source separately — incoming and outgoing hits, '
+            'crits, spells, combos, heals, mana and stamina. Your own numbers '
+            "are the left column, your target's the right.",
             _sub('Direction', [
                 'Every row also picks where that number goes: Rising floats it '
                 'above the head, Dropping lands it in the fixed column, Zig-zag '
@@ -593,6 +563,41 @@ SECTIONS: list[_Section] = [
                 'or uninstalling never puts it back. Reset is how you get stock '
                 'back.',
             ]),
+            _link('How Extras Ship', 'extras-shipping'),
+        ],
+    },
+    {
+        'cat': 'Extras',
+        'id': 'damage-numbers',
+        'title': 'Damage Numbers',
+        'body': [
+            'Extras ▸ Damage number mod… installs a leaner rewrite of Age of '
+            "Conan's floating combat numbers, in place of the stock ones. The "
+            'headline fix: ranged hits stop shrinking to nothing at distance.',
+            _sub('Turn it on', [
+                [('Tick ', None),
+                 ('Enable the Damage Numbers mod', _SUCCESS),
+                 (' in the dialog and set your options.', None)],
+                'Your stock file is backed up the first time, so turning the mod '
+                'off and rebuilding restores the original.',
+                _link('How Extras Ship', 'extras-shipping'),
+            ]),
+            _sub('What you can tune', [
+                'Keep ranged numbers big — holds the size of ranged hits past '
+                "~15 real metres so they don't fade with distance. Melee is "
+                'never touched.',
+                'Shadow, pop-in, and fade speed — with Default and Performance '
+                'presets.',
+                'Where rising, dropping and zig-zag numbers land on screen. '
+                'Which of the three a number uses is set per source in Damage '
+                'Number Colors.',
+                'Split signed numbers into Column B — among the numbers already '
+                'dropping into the fixed column, plain damage stays in Column A '
+                'while the signed ones (heals, stamina, mana) move to Column B.',
+                'Keep enemy drains overhead — mana and stamina you drain from '
+                'enemies keep floating over them even when your own resource '
+                'numbers are set to Dropping.',
+            ]),
         ],
     },
     {
@@ -602,17 +607,7 @@ SECTIONS: list[_Section] = [
         'body': [
             'Extras ▸ Stopwatch… adds a count-up Start / Pause / Reset '
             'timer that lives inside the overlay. It works in fullscreen and '
-            'never steals focus from AoC. Off by default; when off, the build '
-            'carries no stopwatch code at all.',
-            _sub('Turn it on', [
-                [('Open the dialog, tick ', None),
-                 ('Include the stopwatch in builds', _SUCCESS),
-                 (', then ', None),
-                 ('Build & Install', _SUCCESS),
-                 ('. It ships with your next build, same as grids.', None)],
-                'The Stopwatch card above the grid list flips this same '
-                'switch — the dialog stays the place to configure it.',
-            ]),
+            'never steals focus from AoC.',
             _sub('Using it in-game', [
                 'A compact draggable panel shows h:mm:ss. The − button collapses '
                 'it to just the title bar, which then shows the running time; '
@@ -624,75 +619,55 @@ SECTIONS: list[_Section] = [
                 'Font size (8–48) is baked in at build time — the whole panel '
                 'scales with it.',
             ]),
+            [('Tick ', None),
+             ('Include the stopwatch in builds', _SUCCESS),
+             (' to ship it with your next build.', None)],
+            _link('How Extras Ship', 'extras-shipping'),
         ],
     },
     {
         'cat': 'Extras',
         'id': 'inspect',
-        'title': 'Inspect panel',
+        'title': 'Inspect Panel',
         'body': [
-            'Extras ▸ Inspect panel… adds an in-game panel that shows '
-            "the combat sheet of whatever you target — the stats the game's "
-            "default inspect window can't reveal. Target a player, mob, or "
-            'boss and about three-quarters of a second later the panel '
-            'appears with their numbers; clear your target and it hides. Off '
-            'by default; when off, the build carries no inspect-panel code '
-            'at all.',
-            _sub('Turn it on', [
-                [('Open the dialog, tick ', None),
-                 ('Include the inspect panel in builds', _SUCCESS),
-                 (', then ', None),
-                 ('Build & Install', _SUCCESS),
-                 ('. It ships with your next build, same as grids.', None)],
-                'The Inspect panel card above the grid list flips this same '
-                'switch — the dialog stays the place to configure it.',
-            ]),
+            'Extras ▸ Inspect panel… adds an in-game panel showing the combat '
+            "sheet of whatever you target — the stats the game's own inspect "
+            'window cannot reveal. Target a player, mob or boss and the panel '
+            'appears about three-quarters of a second later; clear your target '
+            'and it hides.',
             _sub('What it shows', [
                 'The name strip reads Name Class (Level/PvP level) — Kazour '
                 'Bear Shaman (80/10), for example. Class shows on player '
-                'targets; the parenthetical drops what a target '
-                "doesn't have, so a mob reads Name (83).",
+                "targets; the parenthetical drops what a target doesn't have, "
+                'so a mob reads Name (83).',
                 'Health (live current/max and %), Armor, the five protections '
                 '(Holy, Unholy, Cold, Elec, Fire), Critigation Chance, '
                 'Critigation Amount, Heal Rating, Bonus Spell Dmg, '
                 'Combat Rating, Weapon Dmg M/R (a plain melee/ranged percent '
                 'pair), Critical Chance, Critical Damage, Tenacity, '
                 "and Ferocity — in the game sheet's own Rating (Effect%) "
-                'language.',
-                "A dash marks lines a target simply doesn't have — mobs and "
-                'bosses expose less than players.',
-                'Player targets get an extra PvP block: PvP armor, '
-                'protections, bonus spell damage, combat rating, and '
-                'kills/deaths. Mobs and bosses get the PvE block only.',
-                "Targets that aren't level 80 show raw ratings without the "
-                'percent decodes — the conversions are level-80 measurements.',
+                'language. A dash marks a line the target simply lacks, and '
+                'below level 80 the raw ratings show without percent decodes, '
+                'because the conversions are level-80 measurements.',
+                [('Player targets add a PvP block — PvP armor, protections, '
+                  'bonus spell damage, combat rating, and kills/deaths. Untick '
+                  '', None),
+                 ('Show the PvP section', _SUCCESS),
+                 (' to leave it out of the build.', None)],
             ]),
             _sub('The Perks row', [
-                'On player targets, a Perks row at the bottom shows the AA '
-                "perks detected on the target, mirroring the game's own perk "
-                'bar: six boxes in three color-coded pairs — two blue for '
-                'General, two red for Archetype, two dark for Class. Each '
-                'perk sits in its own pair, so the color tells you what kind '
-                'of perk it is.',
-                "Three of every class's seven perks cost both Class slots. "
-                'The panel paints those across both dark boxes the way the '
-                'game does, so a double-slot perk reads as two identical '
-                'icons.',
-                "An empty box means the target hasn't slotted anything there, "
-                "or the slot holds an active perk that isn't running — the "
-                'row reads perk buffs, so an active perk shows only while its '
-                'effect is up. A few perks buff nearby allies, so an icon can '
-                'also mean the target received it from a groupmate.',
-            ]),
-            _sub('Sections', [
-                [('The PvP block and the Perks row are each behind a toggle '
-                  "in the dialog's Sections group — ", None),
-                 ('Show the PvP section', _SUCCESS),
-                 (' and ', None),
+                "On player targets, six boxes mirror the game's own perk bar in "
+                'three color-coded pairs — two blue for General, two red for '
+                'Archetype, two dark for Class — so a perk always lands in its '
+                'own pair and the color tells you what kind it is.',
+                "Three of every class's seven perks cost both Class slots, and "
+                'the panel paints those across both dark boxes the way the game '
+                'does, so they read as two identical icons.',
+                [('The row reads perk buffs, not slots: an active perk shows '
+                  'only while its effect is running, and a perk a groupmate '
+                  'gave your target can appear too. Untick ', None),
                  ('Track slotted perks', _SUCCESS),
-                 (', both on by default. Untick one and the next ', None),
-                 ('Build & Install', _SUCCESS),
-                 (' leaves it out of the overlay.', None)],
+                 (' to leave the row out of the build.', None)],
             ]),
             _sub('Positioning and text size', [
                 'Drag the panel by its name strip; live coordinates show as '
@@ -701,17 +676,105 @@ SECTIONS: list[_Section] = [
                 "relogs — the dialog's X/Y set where a first-ever session "
                 'starts, and it can start the panel collapsed.',
                 'No target handy? Preview mode (Shift+Ctrl+Alt) shows a '
-                'placeholder panel to position against.',
-                'Font size (8–48) is baked in at build time — the whole panel '
-                'scales with it.',
+                'placeholder panel to position against. Font size (8–48) is '
+                'baked in at build time — the whole panel scales with it.',
             ]),
-            _sub('Buff-discovery console', [
-                'The same dialog carries Include the buff-discovery console in '
-                "builds. It's the other in-game inspection tool — a window "
-                "that logs every effect's name and buff ID as it lands — so "
-                'both switch on from one place. It collapses to a small bar of '
-                'its own the same way this panel does; Building and Installing '
-                'covers the rest.',
+            [('Tick ', None),
+             ('Include the inspect panel in builds', _SUCCESS),
+             (' to ship it. The same dialog carries the buff-discovery console.',
+              None)],
+            _link('How Extras Ship', 'extras-shipping'),
+            _link('Finding Buff IDs', 'finding-buff-ids'),
+        ],
+    },
+    {
+        'cat': 'Extras',
+        'id': 'cast-timer',
+        'title': 'Cast Timer',
+        'body': [
+            'Extras ▸ Cast timer… adds a timer-only overlay for your own and '
+            "your target's cast time — floating text over the game's cast bar, "
+            'with no bar of its own.',
+            _sub('What you can set', [
+                'Player position and Target position — where each timer sits '
+                'on screen.',
+                'Text — Bold, Font size (8–48) and Color, shared by both '
+                'timers. The sample beside them shows what the overlay will '
+                'draw.',
+                'Show — Elapsed counts up, Total is the estimated cast length, '
+                'Both shows 1.2 / 2.5.',
+            ]),
+            _sub('Positioning', [
+                'Press Shift+Ctrl+Alt in-game to toggle preview mode and '
+                'drag each timer — the game remembers drags across relogs. '
+                "The dialog's X/Y are just the defaults a first-ever "
+                'session starts from.',
+            ]),
+            _sub('Saved on this PC, not in your profile', [
+                'Cast-timer settings live with your app preferences, the same '
+                'as the stopwatch and the inspect panel — the positions depend '
+                'on your screen, not on your buff layout. So switching '
+                'profiles leaves the timer alone, and a profile someone shares '
+                'with you no longer carries their positions.',
+            ]),
+            [('Tick ', None),
+             ('Include the cast timer in builds', _SUCCESS),
+             (' to ship it. One toggle runs both the Player and Target sides.',
+              None)],
+            _link('How Extras Ship', 'extras-shipping'),
+            _note(
+                'If you had a cast timer set before this version, open the '
+                'dialog and set it once more. Your old profiles still hold the '
+                'values, but nothing reads them any more.',
+                _WARNING),
+        ],
+    },
+    {
+        'cat': 'Maintenance',
+        'id': 'game-patch',
+        'title': 'After a Game Patch',
+        'body': [
+            "A game patch restores Age of Conan's stock files, and that takes "
+            'the KazBars registration with them. The symptom is plain: you '
+            'launch, and the grids are gone.',
+            'Run the official patcher once to finish updating, then Game ▸ '
+            'Repair game install. It re-registers KazBars, restores your saved '
+            'positions from a safety snapshot, and puts the Damage Numbers mod '
+            'back if you use it.',
+            _sub('You usually hear about it first', [
+                'KazBars checks the registration every time it starts. If '
+                'anything is missing it raises a warning you can click to '
+                'repair, so the prompt normally arrives before you notice '
+                'anything is wrong.',
+                'Close the game and the patcher before repairing — a patcher '
+                'still running will undo the fix when it exits.',
+            ]),
+        ],
+    },
+    {
+        'cat': 'Maintenance',
+        'id': 'updates',
+        'title': 'Updates',
+        'body': [
+            'The Updates menu covers two separate things: the buff database '
+            'KazBars ships with, and KazBars itself.',
+            _sub('Buff-database updates', [
+                [('The stock buff catalog refreshes over the internet. ', None),
+                 ('Automatically update the buff database', _SUCCESS),
+                 (' is on by default, and Check for buff-database updates now '
+                  'asks immediately.', None)],
+                'An update never touches your own entries. Buffs you add or '
+                'edit sit in a layer above the stock catalog and always win, so '
+                'an update cannot overwrite or delete your work.',
+                'Revert last buff-database update undoes the most recent one — '
+                'the most recent only, not a history.',
+            ]),
+            _sub('App updates', [
+                'Check for app updates now asks GitHub whether a newer release '
+                'exists. If one does, clicking the notice opens its download '
+                'page in your browser.',
+                'KazBars never updates itself — you download the new version '
+                'and replace your copy.',
             ]),
         ],
     },
@@ -730,6 +793,22 @@ SECTIONS: list[_Section] = [
                 'first — a bad restore is reversible. Close Age of Conan before '
                 'backing up or restoring.',
             ]),
+        ],
+    },
+    {
+        'cat': 'Maintenance',
+        'id': 'uninstall',
+        'title': 'Removing KazBars',
+        'body': [
+            'Game ▸ Uninstall from game client… takes KazBars back out of your '
+            'game folder — KazBars.swf, the registration blocks, the '
+            'patcher-bypass flag — and restores every game file it changed '
+            'byte-for-byte from the backups it made. The Damage Numbers mod '
+            'reverts to the stock file at the same time.',
+            'Two things stay on purpose: your damage-number colors, which are '
+            'your content rather than ours, and everything KazBars keeps on '
+            'this PC — profiles, database entries and settings.',
+            _link('Damage Number Colors', 'damage-number-colors'),
         ],
     },
 ]
