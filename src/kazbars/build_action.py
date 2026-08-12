@@ -248,6 +248,13 @@ def _finish_success(app, loading, staging_dir, ctx, compile_result, ok, err,
         else:
             app_toast(app, "Build failed", 'error', 10)
             flash_status_bar(app.bottom_bar, THEME_COLORS['danger'])
+        # First successful build on this machine: once the summary is dismissed,
+        # offer the direct-launch shortcut. Not gated on the has_built_before
+        # flip — upgraders already have that set, and they are precisely the
+        # audience whose launch habit has to change.
+        if ok and not app.settings.get('desktop_shortcut_offered'):
+            loading.on_closed = lambda: game_folder.offer_game_desktop_link(
+                app, first_build=True)
         client_results = [(game_folder.format_game_path(ctx['game_path']), ok, err)]
         loading.show_summary(
             client_results, compile_result, profile_name=ctx['profile_name'],

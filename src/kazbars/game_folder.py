@@ -9,7 +9,7 @@ take the KazBarsApp instance as first arg.
 from pathlib import Path
 from tkinter import filedialog
 
-from ttkbootstrap.dialogs import Messagebox
+from ttkbootstrap.dialogs import Messagebox, MessageDialog
 
 from . import game_persistence as gp
 from . import userdata
@@ -151,8 +151,8 @@ def repair_game_install(app):
         app_toast(app, f"Close {running} first, then repair.", 'warning', 8)
         return
 
+    declarations = gp.discover_aoc_archive_declarations(app.game_path)
     try:
-        declarations = gp.discover_aoc_archive_declarations(app.game_path)
         gp.splice_declarations(app.game_path, declarations)
     except ValueError:
         # Damaged markers: the surgical path can't run, so fall back to each
@@ -217,6 +217,63 @@ def check_install_health(app):
             "The game no longer loads KazBars — click to repair.",
             'warning', 12, key='install_health',
             on_click=lambda: repair_game_install(app))
+
+
+def offer_game_desktop_link(app, first_build=False):
+    """Offer a desktop shortcut that launches the game directly.
+
+    The persistence era changes how the game should be started: the Funcom
+    patcher restores the stock XMLs, so going through it costs the user their
+    declarations until the next Repair. A shortcut straight to a client exe makes
+    the right way the easy way. Offered once automatically after a successful
+    build; the Game menu re-offers it whenever the user asks.
+    """
+    if not app.game_path or not Path(app.game_path).is_dir():
+        if not first_build:
+            Messagebox.show_warning(
+                "No game folder set. Configure one in the bottom bar first.",
+                title="No Game Folder")
+        return
+
+    available = [name for name in gp.GAME_EXES
+                 if (Path(app.game_path) / name).is_file()]
+    if not available:
+        if not first_build:
+            Messagebox.show_warning(
+                "No Age of Conan executable found in the game folder.",
+                title="Nothing to Link")
+        return
+
+    # Mark it offered on *show*, not on accept — declining is an answer, and
+    # re-asking after every build would be nagging.
+    app.settings.set('desktop_shortcut_offered', True)
+    app.settings.save()
+
+    labels = {'AgeOfConanDX10.exe': "Create DX10 shortcut",
+              'AgeOfConan.exe': "Create DX9 shortcut"}
+    # Decline leftmost, DX10 rightmost as the primary: it's the modern client and
+    # what most players run. GAME_EXES order already puts DX9 before DX10.
+    buttons = ['Not now:secondary'] + [
+        f"{labels[name]}:{'primary' if name == 'AgeOfConanDX10.exe' else 'secondary'}"
+        for name in available
+    ]
+
+    dialog = MessageDialog(
+        "Start the game from a desktop shortcut to keep your grid positions.\n\n"
+        "Launching through the Funcom patcher resets the interface files "
+        "KazBars installs — you'd need Game ▸ Repair game install each time.",
+        title="Create a Desktop Shortcut", parent=app, buttons=buttons)
+    dialog.show()
+
+    chosen = next((name for name in available if labels[name] == dialog.result), None)
+    if chosen is None:
+        return
+
+    ok, msg = gp.create_game_desktop_link(app.game_path, chosen)
+    if ok:
+        app_toast(app, f"Shortcut created: {labels[chosen]}", 'success', 8)
+    else:
+        Messagebox.show_error(msg, title="Shortcut Failed")
 
 
 def update_build_state(app):

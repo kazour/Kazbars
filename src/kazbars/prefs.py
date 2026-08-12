@@ -82,6 +82,7 @@ PREFS_SCHEMA = Schema(
         "last_profile": Field(None),
         "default_profile": Field(None),
         "has_built_before": Field(False, kind="bool"),
+        "desktop_shortcut_offered": Field(False, kind="bool"),
         "last_build_signature": Field(None),
         "build_console": Field(False, kind="bool"),
         # In-game stopwatch — ONE structured dict (defaults/clamps in stopwatch.py).

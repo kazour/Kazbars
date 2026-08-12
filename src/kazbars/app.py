@@ -380,6 +380,8 @@ class KazBarsApp(ttkb.Window):
              'command': self._open_backup_dialog},
             {'type': 'command', 'label': 'Repair game install…',
              'command': self._repair_game_install},
+            {'type': 'command', 'label': 'Create game desktop shortcut…',
+             'command': self._create_game_desktop_link},
             {'type': 'command', 'label': 'Uninstall from game client…',
              'command': self._uninstall_game},
         ])
@@ -577,6 +579,9 @@ class KazBarsApp(ttkb.Window):
 
     def _repair_game_install(self):
         return game_folder.repair_game_install(self)
+
+    def _create_game_desktop_link(self):
+        return game_folder.offer_game_desktop_link(self)
 
     def _uninstall_game(self):
         return game_folder.uninstall_game(self)

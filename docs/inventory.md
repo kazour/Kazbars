@@ -13,16 +13,16 @@
 |---|---:|
 | `src/kazbars/__init__.py` | 11 |
 | `src/kazbars/__main__.py` | 43 |
-| `src/kazbars/app.py` | 723 |
+| `src/kazbars/app.py` | 728 |
 | `src/kazbars/app_popups.py` | 489 |
 | `src/kazbars/boss_timer.py` | 399 |
 | `src/kazbars/buff_database.py` | 176 |
 | `src/kazbars/buff_db_layers.py` | 267 |
 | `src/kazbars/buff_display_editor.py` | 592 |
 | `src/kazbars/buff_xml.py` | 319 |
-| `src/kazbars/build_action.py` | 290 |
+| `src/kazbars/build_action.py` | 297 |
 | `src/kazbars/build_executor.py` | 372 |
-| `src/kazbars/build_loading.py` | 497 |
+| `src/kazbars/build_loading.py` | 507 |
 | `src/kazbars/build_utils.py` | 106 |
 | `src/kazbars/cast_timer.py` | 93 |
 | `src/kazbars/cast_timer_panel.py` | 238 |
@@ -45,7 +45,7 @@
 | `src/kazbars/first_launch.py` | 344 |
 | `src/kazbars/focus_watcher.py` | 85 |
 | `src/kazbars/foreground.py` | 111 |
-| `src/kazbars/game_folder.py` | 243 |
+| `src/kazbars/game_folder.py` | 300 |
 | `src/kazbars/game_persistence.py` | 545 |
 | `src/kazbars/game_resolution.py` | 105 |
 | `src/kazbars/grid_dialogs.py` | 865 |
@@ -60,7 +60,7 @@
 | `src/kazbars/live_tracker_settings.py` | 183 |
 | `src/kazbars/overlay_engine.py` | 800 |
 | `src/kazbars/paths.py` | 46 |
-| `src/kazbars/prefs.py` | 106 |
+| `src/kazbars/prefs.py` | 107 |
 | `src/kazbars/profile_io.py` | 267 |
 | `src/kazbars/profile_manager.py` | 323 |
 | `src/kazbars/profile_share.py` | 137 |

@@ -35,7 +35,7 @@ Steps:
 20. `show_summary(..., game_running=…, flag_supported=…)` — src/kazbars/build_loading.py — reload instructions are `/reloadui` when the game is running, else the two client exes to launch directly. `client_supports_flag()` (a chunked byte-scan of both exes for the flag string, run on the worker) gates an extra warning line for clients too old to skip the patcher; a patch-day line points at Game ▸ Repair game install either way
 21. `_unlock()` — src/kazbars/build_action.py — runs on the main thread from `_finish_success` / `_finish_failure` / `_build_error`: cleans up the staging dir via `shutil.rmtree`, releases the `_building` flag, re-binds Ctrl+B, syncs build button state
 
-End state: `KazBars.swf` installed under the game folder; the module is declared permanently in the game's own `MainPrefs.xml` + Modules target inside marker blocks, with a `.kazbars.bak` pair beside them and `IgnorePatcher.enable` in the game root — so positions saved to `Prefs_3.xml` survive a relog for every user, with no Aoc.exe and no reload scripts; every predecessor load path is gone; when Damage Numbers is enabled the modded `DamageInfo.swf` is installed (stock backed up to `DamageInfo.swf.kazbars.bak`), and when disabled any prior mod is reverted from that backup; the skin's `TextColors.xml` is left exactly as the color editor (Flow 21) wrote it — colors and directions both survive every build; build loading screen shows the result summary
+End state: `KazBars.swf` installed under the game folder; the module is declared permanently in the game's own `MainPrefs.xml` + Modules target inside marker blocks, with a `.kazbars.bak` pair beside them and `IgnorePatcher.enable` in the game root — so positions saved to `Prefs_3.xml` survive a relog for every user, with no Aoc.exe and no reload scripts; every predecessor load path is gone; when Damage Numbers is enabled the modded `DamageInfo.swf` is installed (stock backed up to `DamageInfo.swf.kazbars.bak`), and when disabled any prior mod is reverted from that backup; the skin's `TextColors.xml` is left exactly as the color editor (Flow 21) wrote it — colors and directions both survive every build; build loading screen shows the result summary, and on the first successful build its dismissal chains into the desktop-shortcut offer (Flow 30)
 
 ---
 
@@ -501,3 +501,20 @@ Steps:
 9. Result toast — src/kazbars/game_folder.py — success-styled, naming the restored archives when any were re-injected
 
 End state: the marker blocks are back in `MainPrefs.xml` and the current Modules target, `IgnorePatcher.enable` exists, and any archive the engine stripped is back in `Prefs_3.xml` — so the next launch loads KazBars with its saved positions. The snapshot is refreshed only while the install is healthy, which is what makes it trustworthy insurance.
+
+---
+
+## 30. offer a direct-launch desktop shortcut
+
+Trigger: The build-summary screen is dismissed after the first successful build on this machine (`desktop_shortcut_offered` unset), OR the user selects Game > Create game desktop shortcut...
+
+Steps:
+1. `_finish_success()` — src/kazbars/build_action.py — on a successful install, and only while `desktop_shortcut_offered` is unset, assigns `loading.on_closed` **before** `show_summary()`, so the offer is armed no matter how the user dismisses the screen. Deliberately not gated on the `has_built_before` flip: existing users already have that set, and they are exactly the audience whose launch habit has to change. Never armed on a failure path
+2. `BuildLoadingScreen.destroy()` — src/kazbars/build_loading.py — fires `on_closed` via `self._parent.after(0, …)` so the offer opens after the frameless window is really down; the callback is cleared as it is read and the existing `_destroyed` early-return guarantees it runs at most once
+3. `KazBarsApp._create_game_desktop_link()` — src/kazbars/app.py — one-line delegator to `game_folder.offer_game_desktop_link(self)`; this is the menu entry point, which passes `first_build=False` so an unusable game folder explains itself instead of staying silent
+4. `offer_game_desktop_link()` — src/kazbars/game_folder.py — named dispatcher: guards on a configured, existing folder, then lists only the `GAME_EXES` that actually exist in it (zero ⇒ skip). Sets `desktop_shortcut_offered` on **show**, not on accept — declining is an answer, and re-asking after every build would be nagging
+5. `MessageDialog(..., buttons=[…])` — the three-way precedent (the unsaved-changes prompt, `app.py`): decline leftmost, action verbs after it, "Create DX10 shortcut" rightmost as the primary. The message says why it matters — the Funcom patcher resets the interface files, costing a Repair each time
+6. `create_game_desktop_link()` — src/kazbars/game_persistence.py — builds the `.lnk` through `WScript.Shell` under `powershell -NoProfile -NonInteractive -Command`, list argv with `creationflags=CREATE_NO_WINDOW` and a 15 s timeout. The target path, working directory and link name travel in the **environment** (`KAZBARS_LINK_*`), never in the command string, so a game path with an apostrophe or non-ASCII characters needs no escaping and cannot be read as script. The desktop folder is resolved by the shell (`[Environment]::GetFolderPath('Desktop')`), so a OneDrive-redirected Desktop still works; the script echoes the path it wrote, which is what the caller verifies and reports
+7. Result — src/kazbars/game_folder.py — success toast naming the shortcut, or a Messagebox carrying the PowerShell failure detail
+
+End state: a desktop shortcut launches the chosen client exe directly with `-novideo` and the game folder as its working directory — the launch path that preserves the declarations. `desktop_shortcut_offered` is set either way, so the automatic offer never fires twice; the Game menu re-offers it on demand, for a second client or a deleted shortcut.

@@ -64,6 +64,7 @@ class BuildLoadingScreen(tk.Toplevel):
         self._current_step = -1
         self._step_name = "Preparing..."
         self._destroyed = False
+        self.on_closed = None
         self._after_id = None
         self._start_time = time.time()
         self._phase = 'progress'
@@ -493,5 +494,14 @@ class BuildLoadingScreen(tk.Toplevel):
             try:
                 self.after_cancel(self._arm_timer)
             except (ValueError, tk.TclError):
+                pass
+        # Hand off to whatever wants the screen gone first (the desktop-shortcut
+        # offer). Deferred to the parent's loop so it opens after this window is
+        # really down, and the `_destroyed` guard above makes it fire at most once.
+        callback, self.on_closed = self.on_closed, None
+        if callback is not None:
+            try:
+                self._parent.after(0, callback)
+            except (RuntimeError, tk.TclError):
                 pass
         super().destroy()
