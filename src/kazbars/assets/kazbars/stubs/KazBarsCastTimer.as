@@ -3,10 +3,10 @@
 // dropping the bar/mask/color visuals. Pure dynamic text fields (device fonts),
 // so it needs no new symbols in base.swf.
 //
-// Positioning mirrors grids: PLAYER_X/Y + TARGET_X/Y are baked into config and
-// are the only positions that survive relaunch on /loadclip default clients;
-// preview drag persists via the config archive for aoc.exe clients, as does the
-// preview control panel's master switch (ctv) — inactive renders nothing, live
+// Positioning mirrors grids: PLAYER_X/Y + TARGET_X/Y baked into config are the
+// defaults a first-ever session starts from; preview drag persists via the
+// config archive (permanent since the persistence era), as does the preview
+// control panel's master switch (ctv) — inactive renders nothing, live
 // casts included.
 //
 // Driven from KazBars: createFields() in onLoad, connectPlayer()/setTarget()
@@ -382,7 +382,7 @@ class KazBarsCastTimer {
     }
 
     // =========================================================================
-    // Persistence (aoc.exe clients only — default /loadclip clients have no archive)
+    // Persistence (module config archive — permanent for every user)
     // =========================================================================
 
     public function loadPositions(config:Object):Void {

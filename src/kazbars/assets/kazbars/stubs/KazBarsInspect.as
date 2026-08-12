@@ -18,10 +18,10 @@
 // names it from a baked table, hit-tested off a Mouse listener rather than
 // rollover handlers — see hoverTick().
 //
-// Positioning mirrors the stopwatch: X/Y, font size and collapsed state are
-// baked into config (the only position that survives relaunch on /loadclip
-// clients; the name strip shows live coordinates while dragging), and aoc.exe
-// clients persist drag + collapse via the archive (inx/iny/inc, master switch
+// Positioning mirrors the stopwatch: X/Y, font size and collapsed state baked
+// into config are the first-session defaults (the name strip shows live
+// coordinates while dragging), and drag + collapse persist via the archive
+// (inx/iny/inc, master switch
 // inv). All geometry
 // derives from fontSize.
 //
@@ -456,8 +456,8 @@ class KazBarsInspect {
         pveValTF.text = lastPve;
         pvpValTF.text = lastPvp;
 
-        // Shown only while dragging — the value a /loadclip user copies back
-        // into the app. Right-aligned against the collapse glyph, the family
+        // Shown only while dragging — a copyable readout for pinning a spot
+        // in the app. Right-aligned against the collapse glyph, the family
         // convention (stopwatch, console), so it stays clear of the name.
         coordTF = makeTF(m_Panel, "coords", PAD, PAD, W - PAD * 2 - BTN, Math.round(FS * 1.3),
                          Math.max(9, Math.round(FS * 0.8)), false, 0x999999, "right");
@@ -1498,7 +1498,7 @@ class KazBarsInspect {
     }
 
     // =========================================================================
-    // Drag + persistence (archive is aoc.exe only; /loadclip clients have none)
+    // Drag + persistence (module config archive — permanent for every user)
     // =========================================================================
 
     public function beginDrag(da:MovieClip):Void {

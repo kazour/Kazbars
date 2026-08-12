@@ -10,11 +10,11 @@
 // FS*2 — the same bar the inspect panel folds to — so the two pair at any font
 // size, not just at the default 12 the numbers used to be hard-coded for.
 //
-// Positioning mirrors the cast timer: X/Y are baked into config (the only
-// position that survives relaunch on /loadclip default clients; the title bar
-// shows live coordinates while dragging so users can copy them into the app);
-// aoc.exe clients persist drag position + collapsed state via the module
-// config archive (swx/swy/swc, and the control-panel master switch swv).
+// Positioning mirrors the cast timer: the baked X/Y are the defaults a
+// first-ever session starts from (the title bar shows live coordinates while
+// dragging so users can copy them into the app); drag position + collapsed
+// state persist for every user via the module config archive (swx/swy/swc,
+// and the control-panel master switch swv).
 //
 // Driven from KazBars: createPanel() in onLoad, loadState()/saveState() from
 // the module archive, cleanup() on deactivate.
@@ -134,8 +134,8 @@ class KazBarsStopwatch {
         collTF = makeTF(m_Panel, "coll", COLL_PAD, 0, W - COLL_PAD * 2 - BTN,
                         LINE_H, FS, true, 0xF7A22B, "left");
 
-        // Live position readout — visible only while dragging (the value a
-        // /loadclip user copies into the app to make a spot permanent). Shares
+        // Live position readout — visible only while dragging (a copyable
+        // value for pinning a default spot in the app). Shares
         // the title band, right-aligned, so the two never sit on each other.
         coordTF = makeTF(m_Panel, "coords", PAD, 0, W - PAD * 2 - BTN, LINE_H,
                          Math.max(9, Math.round(FS * 0.8)), false, 0x999999, "right");
@@ -422,7 +422,7 @@ class KazBarsStopwatch {
     }
 
     // =========================================================================
-    // Persistence (aoc.exe clients only — default /loadclip clients have no archive)
+    // Persistence (module config archive — permanent for every user)
     // =========================================================================
 
     public function loadState(config:Object):Void {
