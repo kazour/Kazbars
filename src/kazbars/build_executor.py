@@ -11,6 +11,7 @@ import tempfile
 from pathlib import Path
 
 from .build_utils import CREATE_NO_WINDOW, strip_marker_block, update_script_with_marker
+from .game_persistence import GAME_EXES, LEGACY_AOC_DIRS
 from .grids_generator import build_grids
 
 logger = logging.getLogger(__name__)
@@ -21,9 +22,6 @@ logger = logging.getLogger(__name__)
 # Kaz Flash Mods era; KazGrids.swf was the Kaz Grids era. The current
 # KazBars.swf takes ownership and supersedes all of them.
 LEGACY_FLASH_FILES = ("kzgrids.swf", "KzGrids.swf", "KazGrids.swf")
-
-# Predecessor Aoc/* module folders to remove on install (case-insensitive on Windows).
-LEGACY_AOC_DIRS = ("KzGrids", "KazGrids", "Kazbars")
 
 # Marker block strings used in Scripts/auto_login. Old markers are stripped
 # on every install/uninstall so a single rename pass converges.
@@ -289,16 +287,13 @@ def detect_aoc_launcher(game_path):
     return (aoc_dir / "aoc.exe").exists() or (aoc_dir / "Aoc.log").exists()
 
 
-GAME_PROCESSES = ('AgeOfConan.exe', 'AgeOfConanDX10.exe')
-
-
 def get_running_game_process():
     """Return the name of a running AoC game process, or None.
 
     Aoc.exe (the launcher bypass loader) doesn't lock the overlay files —
     the actual game process does. Only the DX9/DX10 game exes matter here.
     """
-    for name in GAME_PROCESSES:
+    for name in GAME_EXES:
         try:
             result = subprocess.run(
                 ['tasklist', '/FI', f'IMAGENAME eq {name}', '/NH'],

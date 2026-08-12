@@ -17,7 +17,7 @@ from kazbars.build_executor import (
     AUTO_LOAD_MARKER,
     DAMAGEINFO_BACKUP,
     DAMAGEINFO_FILE,
-    GAME_PROCESSES,
+    GAME_EXES,
     LEGACY_AOC_DIRS,
     LEGACY_FLASH_FILES,
     cleanup_legacy_files,
@@ -449,12 +449,12 @@ class TestRunningGameProcess:
         def fake_run(cmd, **kwargs):
             name = cmd[2].split("eq ")[1]
             seen.append(name)
-            if name == GAME_PROCESSES[0]:
+            if name == GAME_EXES[0]:
                 raise OSError("tasklist unavailable")
             return types.SimpleNamespace(stdout=f"{name} running")
 
         monkeypatch.setattr(build_executor.subprocess, "run", fake_run)
 
         # First probe raises, loop continues, second matches.
-        assert get_running_game_process() == GAME_PROCESSES[1]
-        assert seen == list(GAME_PROCESSES)
+        assert get_running_game_process() == GAME_EXES[1]
+        assert seen == list(GAME_EXES)

@@ -21,7 +21,7 @@
 | `src/kazbars/buff_display_editor.py` | 592 |
 | `src/kazbars/buff_xml.py` | 319 |
 | `src/kazbars/build_action.py` | 289 |
-| `src/kazbars/build_executor.py` | 375 |
+| `src/kazbars/build_executor.py` | 370 |
 | `src/kazbars/build_loading.py` | 491 |
 | `src/kazbars/build_utils.py` | 106 |
 | `src/kazbars/cast_timer.py` | 93 |
@@ -46,6 +46,7 @@
 | `src/kazbars/focus_watcher.py` | 85 |
 | `src/kazbars/foreground.py` | 111 |
 | `src/kazbars/game_folder.py` | 180 |
+| `src/kazbars/game_persistence.py` | 541 |
 | `src/kazbars/game_resolution.py` | 105 |
 | `src/kazbars/grid_dialogs.py` | 865 |
 | `src/kazbars/grid_editor_panel.py` | 635 |
@@ -77,7 +78,7 @@
 | `src/kazbars/ui_tk_style.py` | 67 |
 | `src/kazbars/ui_widgets.py` | 320 |
 | `src/kazbars/update_check.py` | 114 |
-| `src/kazbars/userdata.py` | 86 |
+| `src/kazbars/userdata.py` | 95 |
 | `src/kazbars/window_position.py` | 116 |
 | `tests/test_app_contract.py` | 104 |
 | `tests/test_as2_class_names.py` | 61 |
@@ -104,6 +105,7 @@
 | `tests/test_docs_in_sync.py` | 301 |
 | `tests/test_focus_watcher.py` | 96 |
 | `tests/test_foreground.py` | 95 |
+| `tests/test_game_persistence.py` | 600 |
 | `tests/test_grid_model.py` | 79 |
 | `tests/test_grids_generator.py` | 321 |
 | `tests/test_hud_overlay.py` | 141 |
