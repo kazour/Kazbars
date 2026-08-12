@@ -3,10 +3,12 @@
 Covers the filesystem side of the build pipeline (the riskiest untested path
 per the audit), with no MTASC and no Tk: SWF deployment, the permanent module
 declarations + patcher-bypass flag that make positions persist, clearing both
-predecessor eras' load paths, launcher detection, byte-exact uninstall, and the
-running-game-process argv. The surgery itself is unit-tested in
-test_game_persistence.py; the actual MTASC compile is covered separately
-(test_build_compile.py); the Build & Install Tk flow is exercised manually.
+predecessor eras' load paths (and leaving them alone when the splice fails),
+byte-exact uninstall, and the process-probe argv — including the patcher, whose
+exit-save strips archives just as a client's does. The surgery itself is
+unit-tested in test_game_persistence.py; the actual MTASC compile is covered
+separately (test_build_compile.py); the Build & Install Tk flow is exercised
+manually.
 
 Run: `pytest tests/test_build_executor.py` (from repo root).
 """
@@ -18,17 +20,23 @@ from kazbars.build_executor import (
     AUTO_LOAD_MARKER,
     DAMAGEINFO_BACKUP,
     DAMAGEINFO_FILE,
-    GAME_EXES,
-    LEGACY_AOC_DIRS,
     LEGACY_FLASH_FILES,
     LEGACY_SCRIPTS,
     cleanup_legacy_files,
+    get_running_engine_process,
     get_running_game_process,
     install_to_client,
     is_aoc_running,
     uninstall_from_client,
 )
-from kazbars.game_persistence import BACKUP_SUFFIX, FLAG_NAME, MARKER_BEGIN
+from kazbars.game_persistence import (
+    BACKUP_SUFFIX,
+    FLAG_NAME,
+    GAME_EXES,
+    LEGACY_AOC_DIRS,
+    MARKER_BEGIN,
+    PATCHER_EXE,
+)
 
 # Minimal stand-ins for the game's XMLs — the splice only needs a </Root> to
 # anchor to. Written as bytes so the LF endings survive on Windows.
@@ -60,6 +68,20 @@ def _make_game(tmp_path, name="game"):
     _default(game).mkdir(parents=True, exist_ok=True)
     (_default(game) / "MainPrefs.xml").write_bytes(STOCK_XML)
     (_default(game) / "Modules.xml").write_bytes(STOCK_XML)
+    return game
+
+
+def _seed_legacy_layout(game):
+    """A pre-persistence install: both old load paths present at once."""
+    aoc = game / "Data" / "Gui" / "Aoc" / "KazBars"
+    aoc.mkdir(parents=True, exist_ok=True)
+    (aoc / "MainPrefs.xml.add").write_text("x", encoding="utf-8")
+    (aoc / "Modules.xml.add").write_text("x", encoding="utf-8")
+    _scripts(game).mkdir(parents=True, exist_ok=True)
+    for script in LEGACY_SCRIPTS:
+        (_scripts(game) / script).write_text("x", encoding="utf-8")
+    (_scripts(game) / "auto_login").write_text(
+        f"/say hi\n\n{AUTO_LOAD_MARKER}\n/loadclip KazBars.swf\n", encoding="utf-8")
     return game
 
 
@@ -134,7 +156,24 @@ class TestInstall:
         ok, err = install_to_client(_staging_swf(tmp_path), str(game))
 
         assert ok is False
+        # The escape that always works — pointing at Repair alone would be
+        # circular when Repair is what just failed.
+        assert "run the game patcher once" in err.lower()
         assert "Repair game install" in err
+
+    def test_failed_splice_leaves_the_old_load_path_intact(self, tmp_path):
+        game = _seed_legacy_layout(_make_game(tmp_path))
+        (_default(game) / "MainPrefs.xml").unlink()
+
+        ok, _ = install_to_client(_staging_swf(tmp_path), str(game))
+
+        # Nothing declares KazBars now, so an upgrader's previous load path is
+        # the only thing still working — it must survive the failure.
+        assert ok is False
+        assert (game / "Data" / "Gui" / "Aoc" / "KazBars" / "MainPrefs.xml.add").exists()
+        assert (_scripts(game) / "reloadgrids").exists()
+        assert AUTO_LOAD_MARKER in (
+            _scripts(game) / "auto_login").read_text(encoding="utf-8")
 
     def test_damaged_markers_report_a_repairable_failure(self, tmp_path):
         game = _make_game(tmp_path)
@@ -245,6 +284,24 @@ class TestUninstall:
 
         assert "/say hi" in auto_login.read_text(encoding="utf-8")
         assert AUTO_LOAD_MARKER not in auto_login.read_text(encoding="utf-8")
+
+    def test_removes_a_pre_persistence_layout(self, tmp_path):
+        # An upgrader who never rebuilt: uninstall still has to clear both old
+        # load paths, not just the declarations this version writes.
+        game = _seed_legacy_layout(_make_game(tmp_path))
+        (_flash(game)).mkdir(parents=True, exist_ok=True)
+        (_flash(game) / "KazBars.swf").write_bytes(b"FWS\x06old")
+
+        ok, msg = uninstall_from_client(str(game))
+
+        assert ok is True
+        assert not (game / "Data" / "Gui" / "Aoc" / "KazBars").exists()
+        for script in LEGACY_SCRIPTS:
+            assert not (_scripts(game) / script).exists()
+        assert AUTO_LOAD_MARKER not in (
+            _scripts(game) / "auto_login").read_text(encoding="utf-8")
+        assert "Aoc module files" in msg
+        assert "auto_login entry" in msg
 
     def test_nothing_to_remove(self, tmp_path):
         ok, msg = uninstall_from_client(str(tmp_path))
@@ -460,3 +517,21 @@ class TestRunningGameProcess:
         # First probe raises, loop continues, second matches.
         assert get_running_game_process() == GAME_EXES[1]
         assert seen == list(GAME_EXES)
+
+    def test_engine_probe_includes_the_patcher(self, monkeypatch):
+        seen = []
+
+        def fake_run(cmd, **kwargs):
+            name = cmd[2].split("eq ")[1]
+            seen.append(name)
+            # Only the patcher is up — the client exes are not.
+            stdout = f"{name} 4321 Console" if name == PATCHER_EXE else ""
+            return types.SimpleNamespace(stdout=stdout)
+
+        monkeypatch.setattr(build_executor.subprocess, "run", fake_run)
+
+        # The patcher saves Prefs_3.xml on exit, so it strips a fresh archive
+        # just as a client would — the first build and Repair both wait for it.
+        assert get_running_engine_process() == PATCHER_EXE
+        assert seen == [*GAME_EXES, PATCHER_EXE]
+        assert get_running_game_process() is None

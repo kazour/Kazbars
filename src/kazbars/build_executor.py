@@ -137,8 +137,6 @@ def install_to_client(staging_swf, game_path, damageinfo_swf=None,
     try:
         flash_path.mkdir(parents=True, exist_ok=True)
 
-        cleanup_legacy_files(game_path)
-
         # DamageInfo.swf is a core game file a running client can hold locked. Stage the
         # change to a temp file first — the slow, failure-prone copy — then commit with
         # os.replace, the only lock-prone step. Staging runs before KazBars.swf is copied,
@@ -160,10 +158,14 @@ def install_to_client(staging_swf, game_path, damageinfo_swf=None,
 
         splice_declarations(game_path, discover_aoc_archive_declarations(game_path))
         ensure_flag(game_path)
+
+        # Only once the new load path is actually in place: a failed splice must
+        # leave an upgrader's previous one (Aoc fragments / auto_login) working.
+        cleanup_legacy_files(game_path)
     except ValueError as e:
         return False, (
             f"Could not update the game's interface files\n\n{e}\n\n"
-            "Run Game ▸ Repair game install to restore them from the backup."
+            "Run the game patcher once to restore them, then Game ▸ Repair game install."
         )
     except OSError as e:
         return False, (

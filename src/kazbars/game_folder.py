@@ -6,6 +6,7 @@ UI + persistence for the configured Age of Conan install folder. Includes the
 take the KazBarsApp instance as first arg.
 """
 
+import logging
 from pathlib import Path
 from tkinter import filedialog
 
@@ -15,6 +16,8 @@ from . import game_persistence as gp
 from . import userdata
 from .ui_helpers import PAD_XS, THEME_COLORS
 from .ui_widgets import add_tooltip, app_toast, confirm
+
+logger = logging.getLogger(__name__)
 
 
 def refresh_game_path_label(app):
@@ -155,15 +158,16 @@ def repair_game_install(app):
     try:
         gp.splice_declarations(app.game_path, declarations)
     except ValueError:
-        # Damaged markers: the surgical path can't run, so fall back to each
-        # file's one-time backup and splice onto that known-good text.
+        # The file itself is unusable, so the surgical path can't run: fall back
+        # to each file's backup and splice onto that known-good text.
         gp.strip_declarations(app.game_path)
         try:
             gp.splice_declarations(app.game_path, declarations)
         except (ValueError, OSError) as e:
             Messagebox.show_error(
                 f"Couldn't repair the game files.\n\n{e}\n\n"
-                "Run Build & Install to reinstall from scratch.",
+                "Run the game patcher once to restore them, then "
+                "Game ▸ Repair game install.",
                 title="Repair Failed")
             return
     except OSError as e:
@@ -172,24 +176,58 @@ def repair_game_install(app):
             title="Repair Failed")
         return
 
-    gp.ensure_flag(app.game_path)
+    flag_ok = True
+    try:
+        gp.ensure_flag(app.game_path)
+    except OSError as e:
+        flag_ok = False
+        logger.warning("Could not create %s: %s", gp.FLAG_NAME, e)
+
+    # An upgrader reaches Repair from the startup toast with their pre-persistence
+    # load path still live (auto_login entry or Aoc fragments). Leaving it would
+    # load the overlay twice, so clear it now that the new one is in place.
+    from .build_executor import cleanup_legacy_files
+    cleanup_legacy_files(app.game_path)
 
     restored = _reinject_managed_archives(declarations)
-    if restored:
+    if not flag_ok:
+        app_toast(app, f"Repaired, but {gp.FLAG_NAME} couldn't be written.",
+                  'warning', 10)
+    elif restored:
         app_toast(app, f"Repaired — restored {', '.join(restored)}.", 'success', 8)
     else:
         app_toast(app, "Repaired — KazBars is declared again.", 'success', 8)
 
 
-def _reinject_managed_archives(declarations):
-    """Put back any archive the engine stripped, from our snapshot. Covers the
-    mods we adopted declarations for too — we are the reason they survive."""
+def _managed_archive_names(declarations):
+    """Our archive plus every one we adopted a declaration for — we are the
+    reason a bare session preserves theirs, so they are ours to restore too."""
+    return {gp.ARCHIVE_NAME} | gp.archive_names_in('\n'.join(declarations))
+
+
+def _prefs3_pair():
+    """(live Prefs_3.xml, our snapshot) when both are usable, else None."""
     live = gp.prefs3_path()
     snapshot = userdata.prefs3_snapshot_path()
     if live is None or not snapshot.is_file():
+        return None
+    return live, snapshot
+
+
+def _missing_managed_archives(declarations):
+    """Managed archives the engine has stripped that our snapshot can supply."""
+    pair = _prefs3_pair()
+    if pair is None:
         return ()
-    names = {gp.ARCHIVE_NAME} | gp.archive_names_in('\n'.join(declarations))
-    return gp.reinject_archives(live, snapshot, names)
+    return gp.missing_archives(*pair, _managed_archive_names(declarations))
+
+
+def _reinject_managed_archives(declarations):
+    """Put back any archive the engine stripped, from our snapshot."""
+    pair = _prefs3_pair()
+    if pair is None:
+        return ()
+    return gp.reinject_archives(*pair, _managed_archive_names(declarations))
 
 
 def check_install_health(app):
@@ -209,14 +247,47 @@ def check_install_health(app):
         return
 
     if gp.is_merged(app.game_path):
-        gp.snapshot_prefs3(userdata.prefs3_snapshot_path())
-        gp.ensure_flag(app.game_path)
+        _refresh_repair_insurance(app)
     else:
         app_toast(
             app,
             "The game no longer loads KazBars — click to repair.",
             'warning', 12, key='install_health',
             on_click=lambda: repair_game_install(app))
+
+
+def _refresh_repair_insurance(app):
+    """Healthy install: restore anything the engine stripped, then re-snapshot.
+
+    A user who recovers by rebuilding rather than by Repair arrives here with the
+    declarations back but the positions already gone, so the re-injection has to
+    live on this path too — otherwise a stripped archive would sit unused in the
+    snapshot forever. Order matters: re-inject first, so the snapshot taken
+    afterwards is the complete one.
+
+    Every write here is best-effort. A read-only game folder must not stop the
+    app from starting — this runs during startup.
+    """
+    declarations = gp.discover_aoc_archive_declarations(app.game_path)
+    if _missing_managed_archives(declarations):
+        from .build_executor import get_running_engine_process
+        running = get_running_engine_process()
+        if running:
+            # Its exit-save would strip the re-injection straight back out, and
+            # the live file is incomplete — so don't snapshot over a good one.
+            app_toast(app, f"Close {running} to restore your saved positions.",
+                      'warning', 10, key='install_health')
+            return
+        restored = _reinject_managed_archives(declarations)
+        if restored:
+            app_toast(app, f"Restored saved positions: {', '.join(restored)}.",
+                      'success', 8, key='install_health')
+
+    try:
+        gp.snapshot_prefs3(userdata.prefs3_snapshot_path())
+        gp.ensure_flag(app.game_path)
+    except OSError as e:
+        logger.warning("Could not refresh repair insurance: %s", e)
 
 
 def offer_game_desktop_link(app, first_build=False):

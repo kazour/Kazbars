@@ -106,12 +106,13 @@ def build(app):
         app._mark_modified()
         app.grids_panel.refresh_panels(expand_index=-1)
 
-    # Block while the game is running, but only on the first build: the client
-    # has to start with our declarations in place for the archive to survive.
-    # After a successful install, /reloadui handles the swap.
+    # Block while any engine process is running, but only on the first build: the
+    # client has to start with our declarations in place for the archive to
+    # survive, and a patcher left open strips it on its own exit-save. After a
+    # successful install, /reloadui handles the swap.
     if not app.settings.get('has_built_before'):
-        from .build_executor import get_running_game_process
-        running = get_running_game_process()
+        from .build_executor import get_running_engine_process
+        running = get_running_engine_process()
         if running:
             show_close_game_required_dialog(app, process_name=running)
             return

@@ -211,17 +211,28 @@ def _insert_point(text, path):
 
 
 def _seed_backup(path, text):
-    """Keep one pre-splice copy of the file, written only the first time."""
-    backup = path.with_name(path.name + BACKUP_SUFFIX)
-    if not backup.exists():
-        _write(backup, text)
+    """Capture the pre-splice text as this file's restore point.
+
+    Only ever reached for a file carrying no block of ours, so `text` IS the
+    game's own unmodified file — which is why this overwrites rather than
+    seeding once. After a patch the game ships new XMLs and we splice them
+    fresh; keeping the pre-patch copy would make a later restore revert the
+    game itself. A marker refresh never lands here, so a genuine pre-splice
+    backup is never replaced by an already-spliced one.
+    """
+    _write(path.with_name(path.name + BACKUP_SUFFIX), text)
 
 
 def _splice_file(path, lines):
     """Insert or refresh our marked block in one XML. Returns True if it changed."""
     if not path.is_file():
         raise ValueError(f"{path.name} is missing from the game folder.")
-    text = _read(path)
+    try:
+        text = _read(path)
+    except UnicodeDecodeError:
+        # A ValueError subclass, so callers would otherwise report a decode dump
+        # as "damaged markers". Say what is actually wrong.
+        raise ValueError(f"{path.name} isn't readable as UTF-8 text.") from None
     nl = _newline(text)
     block = nl.join((MARKER_BEGIN, *lines, MARKER_END)) + nl
 
@@ -270,31 +281,45 @@ def is_merged(game_path):
 
 
 def _strip_file(path):
-    """Remove our block from one XML, or restore the whole file from its one-time
-    backup when the markers are damaged. Drops the backup either way. Returns True
-    if the file changed."""
+    """Remove our block from one XML, or restore the file wholesale from its
+    backup when the file itself is unusable.
+
+    Unusable means the surgical path cannot run at all: unreadable or gone,
+    damaged markers, or no longer XML-shaped (no `</Root>` to splice against —
+    which is also what a later re-splice would choke on, so the restore is the
+    only way out). A file that is simply unmarked is NOT unusable: that is a
+    never-installed folder, or a freshly patched one whose new stock text must
+    not be reverted to our older backup.
+
+    The backup is dropped only once a strip or a restore actually succeeded, so
+    a pass that achieved nothing leaves the user's escape hatch in place.
+    Returns True if the file changed.
+    """
     backup = path.with_name(path.name + BACKUP_SUFFIX)
     text = _read_or_none(path)
     changed = False
-    recoverable = text is None  # unreadable or gone — only the backup can help
+    unusable = text is None
 
     if text is not None:
         try:
             span = _marker_span(text, path)
         except ValueError:
             logger.warning("Damaged markers in %s — restoring from backup", path.name)
-            recoverable = True
+            unusable = True
         else:
             if span:
                 start, end = span
                 _write(path, text[:start] + text[end:])
                 changed = True
+            elif '</Root>' not in text:
+                logger.warning("%s is not XML-shaped — restoring from backup", path.name)
+                unusable = True
 
-    if recoverable and backup.is_file():
+    if unusable and backup.is_file():
         _write(path, _read(backup))
         changed = True
 
-    if backup.is_file():
+    if changed and backup.is_file():
         backup.unlink()
     return changed
 
@@ -453,6 +478,22 @@ def _archive_blocks(text):
     return {m.group(1): m.group(0) for m in _ARCHIVE_BLOCK_RE.finditer(text)}
 
 
+def missing_archives(live, snapshot, names):
+    """Of `names`, the archives the live prefs file lacks and the snapshot holds.
+
+    Asks "is anything worth restoring?" without restoring it, so a caller can
+    check first and hold off while an engine process is alive — its exit-save
+    would strip the re-injection straight back out.
+    """
+    live_text = _read_or_none(Path(live))
+    snap_text = _read_or_none(Path(snapshot))
+    if live_text is None or snap_text is None:
+        return ()
+    present = archive_names_in(live_text)
+    blocks = _archive_blocks(snap_text)
+    return tuple(sorted(n for n in names if n not in present and n in blocks))
+
+
 def reinject_archives(live, snapshot, names):
     """Put archives the engine stripped back into Prefs_3.xml from a snapshot.
 
@@ -461,16 +502,15 @@ def reinject_archives(live, snapshot, names):
     names re-injected.
     """
     live, snapshot = Path(live), Path(snapshot)
+    missing = missing_archives(live, snapshot, names)
+    if not missing:
+        return ()
+
     live_text = _read_or_none(live)
     snap_text = _read_or_none(snapshot)
     if live_text is None or snap_text is None:
         return ()
-
-    present = archive_names_in(live_text)
     blocks = _archive_blocks(snap_text)
-    missing = [name for name in names if name not in present and name in blocks]
-    if not missing:
-        return ()
 
     try:
         at = _insert_point(live_text, live)

@@ -29,6 +29,7 @@ from kazbars.game_persistence import (
     ensure_flag,
     is_merged,
     main_prefs_path,
+    missing_archives,
     modules_target,
     prefs3_path,
     reinject_archives,
@@ -171,15 +172,39 @@ class TestSplice:
         assert '<Archive name="Position" />' not in text
         assert text.count(MARKER_BEGIN) == 1
 
-    def test_seeds_backup_once_with_pre_splice_bytes(self, tmp_path):
+    def test_seeds_backup_with_pre_splice_bytes(self, tmp_path):
         game = _make_game(tmp_path)
         backup = main_prefs_path(game).with_name("MainPrefs.xml" + BACKUP_SUFFIX)
 
         splice_declarations(game)
         assert _read(backup) == STOCK_MAINPREFS
 
+        # A marker refresh must never overwrite the backup with spliced text.
         splice_declarations(game, ('\t<Archive name="Position" />',))
         assert _read(backup) == STOCK_MAINPREFS
+
+    def test_backup_follows_the_game_after_a_patch(self, tmp_path):
+        game = _make_game(tmp_path)
+        backup = main_prefs_path(game).with_name("MainPrefs.xml" + BACKUP_SUFFIX)
+        splice_declarations(game)
+
+        # The patcher restores its own (newer) stock file, markers and all gone.
+        patched = STOCK_MAINPREFS.replace('599229', '600000')
+        _write(main_prefs_path(game), patched)
+        splice_declarations(game)
+
+        # Re-seeded from what the game now ships — restoring later must not
+        # revert the install to pre-patch text.
+        assert _read(backup) == patched
+
+    def test_non_utf8_file_says_so(self, tmp_path):
+        game = _make_game(tmp_path)
+        main_prefs_path(game).write_bytes(b'<Root>\xff\xfe</Root>\n')
+
+        # UnicodeDecodeError is a ValueError subclass, so without handling this
+        # would surface to the user as "damaged markers".
+        with pytest.raises(ValueError, match="UTF-8"):
+            splice_declarations(game)
 
     def test_preserves_lf_line_endings(self, tmp_path):
         game = _make_game(tmp_path)
@@ -291,6 +316,43 @@ class TestStrip:
     def test_reports_nothing_when_never_installed(self, tmp_path):
         game = _make_game(tmp_path)
         assert strip_declarations(game) == []
+
+    def test_shapeless_file_restores_from_backup(self, tmp_path):
+        game = _make_game(tmp_path)
+        splice_declarations(game)
+        # Truncated past the markers and past </Root>: nothing to strip
+        # surgically, and a re-splice would have nothing to anchor to either.
+        _write(main_prefs_path(game), '<?xml version="1.0" ?>\n<Root>\n  <Value')
+
+        strip_declarations(game)
+
+        assert main_prefs_path(game).read_bytes() == STOCK_MAINPREFS.encode()
+        # Repair's fallback re-splices onto the restored text.
+        splice_declarations(game)
+        assert MARKER_BEGIN in _read(main_prefs_path(game))
+
+    def test_keeps_the_backup_when_nothing_was_stripped(self, tmp_path):
+        game = _make_game(tmp_path)
+        splice_declarations(game)
+        backup = main_prefs_path(game).with_name("MainPrefs.xml" + BACKUP_SUFFIX)
+        # Someone removed our block by hand: the file is fine, so there is
+        # nothing to do — but their restore point must not be burned.
+        _write(main_prefs_path(game), STOCK_MAINPREFS)
+
+        strip_declarations(game)
+
+        assert backup.is_file()
+        assert _read(backup) == STOCK_MAINPREFS
+
+    def test_keeps_the_backup_when_restore_is_impossible(self, tmp_path):
+        game = _make_game(tmp_path)
+        splice_declarations(game)
+        backup = _default_modules(game).with_name("Modules.xml" + BACKUP_SUFFIX)
+        backup.unlink()
+        _write(_default_modules(game), 'garbage, no root tag')
+
+        assert strip_declarations(game) == ["Default/MainPrefs.xml"]
+        assert _read(_default_modules(game)) == 'garbage, no root tag'
 
 
 # =========================================================================== #
@@ -460,6 +522,32 @@ class TestSnapshot:
     def test_no_localappdata(self, monkeypatch):
         monkeypatch.delenv('LOCALAPPDATA', raising=False)
         assert prefs3_path() is None
+
+
+class TestMissingArchives:
+    def test_reports_what_the_snapshot_can_supply(self, tmp_path, prefs3):
+        snapshot = tmp_path / "snapshot.xml"
+        _write(snapshot, STOCK_PREFS3)
+        _write(prefs3, STOCK_PREFS3.replace('name="KazBars settings"',
+                                            'name="Gone"'))
+
+        assert missing_archives(prefs3, snapshot,
+                                {ARCHIVE_NAME, "Position"}) == (ARCHIVE_NAME,)
+
+    def test_empty_when_live_has_everything(self, tmp_path, prefs3):
+        snapshot = tmp_path / "snapshot.xml"
+        _write(snapshot, STOCK_PREFS3)
+
+        assert missing_archives(prefs3, snapshot, {ARCHIVE_NAME, "Position"}) == ()
+
+    def test_ignores_names_the_snapshot_lacks(self, tmp_path, prefs3):
+        snapshot = tmp_path / "snapshot.xml"
+        _write(snapshot, STOCK_PREFS3)
+
+        assert missing_archives(prefs3, snapshot, {"Never Seen"}) == ()
+
+    def test_empty_without_a_snapshot(self, tmp_path, prefs3):
+        assert missing_archives(prefs3, tmp_path / "nope.xml", {ARCHIVE_NAME}) == ()
 
 
 class TestReinject:
