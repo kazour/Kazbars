@@ -173,7 +173,10 @@ class KazBarsApp(ttkb.Window):
             # this from the first-launch completion path instead (see first_launch),
             # so a rare update never races the welcome flow.
             content_update.check_and_apply(self, APP_VERSION, self.settings.get('content_version'))
-            game_folder.check_install_health(self)
+            # Deferred like the first-launch dialog beside it: the check touches
+            # the game folder and can toast, neither of which belongs in the
+            # startup path before the window is up.
+            self.after(100, lambda: game_folder.check_install_health(self))
 
         update_check.check_for_updates(self, APP_VERSION)
 

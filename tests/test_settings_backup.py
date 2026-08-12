@@ -13,12 +13,12 @@ Run: `pytest tests/test_settings_backup.py` (from repo root).
 import zipfile
 
 from kazbars.settings_backup import (
-    funcom_prefs_path,
     locate_funcom_prefs,
     read_manifest,
     restore_zip,
     write_backup_zip,
 )
+from kazbars.userdata import funcom_prefs_path
 
 
 def _make_tree(root, files: dict[str, bytes]) -> None:

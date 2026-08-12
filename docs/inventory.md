@@ -13,7 +13,7 @@
 |---|---:|
 | `src/kazbars/__init__.py` | 11 |
 | `src/kazbars/__main__.py` | 43 |
-| `src/kazbars/app.py` | 728 |
+| `src/kazbars/app.py` | 731 |
 | `src/kazbars/app_popups.py` | 489 |
 | `src/kazbars/boss_timer.py` | 399 |
 | `src/kazbars/buff_database.py` | 176 |
@@ -23,7 +23,7 @@
 | `src/kazbars/build_action.py` | 298 |
 | `src/kazbars/build_executor.py` | 374 |
 | `src/kazbars/build_loading.py` | 507 |
-| `src/kazbars/build_utils.py` | 106 |
+| `src/kazbars/build_utils.py` | 86 |
 | `src/kazbars/cast_timer.py` | 93 |
 | `src/kazbars/cast_timer_panel.py` | 238 |
 | `src/kazbars/combat_monitor.py` | 301 |
@@ -46,7 +46,7 @@
 | `src/kazbars/focus_watcher.py` | 85 |
 | `src/kazbars/foreground.py` | 111 |
 | `src/kazbars/game_folder.py` | 371 |
-| `src/kazbars/game_persistence.py` | 585 |
+| `src/kazbars/game_persistence.py` | 594 |
 | `src/kazbars/game_resolution.py` | 105 |
 | `src/kazbars/grid_dialogs.py` | 865 |
 | `src/kazbars/grid_editor_panel.py` | 635 |
@@ -64,7 +64,7 @@
 | `src/kazbars/profile_io.py` | 267 |
 | `src/kazbars/profile_manager.py` | 323 |
 | `src/kazbars/profile_share.py` | 137 |
-| `src/kazbars/settings_backup.py` | 472 |
+| `src/kazbars/settings_backup.py` | 465 |
 | `src/kazbars/settings_core.py` | 255 |
 | `src/kazbars/settings_manager.py` | 56 |
 | `src/kazbars/stopwatch.py` | 51 |
@@ -78,7 +78,7 @@
 | `src/kazbars/ui_tk_style.py` | 67 |
 | `src/kazbars/ui_widgets.py` | 320 |
 | `src/kazbars/update_check.py` | 114 |
-| `src/kazbars/userdata.py` | 95 |
+| `src/kazbars/userdata.py` | 109 |
 | `src/kazbars/window_position.py` | 116 |
 | `tests/test_app_contract.py` | 104 |
 | `tests/test_as2_class_names.py` | 61 |
@@ -105,7 +105,7 @@
 | `tests/test_docs_in_sync.py` | 301 |
 | `tests/test_focus_watcher.py` | 96 |
 | `tests/test_foreground.py` | 95 |
-| `tests/test_game_persistence.py` | 688 |
+| `tests/test_game_persistence.py` | 706 |
 | `tests/test_grid_model.py` | 79 |
 | `tests/test_grids_generator.py` | 321 |
 | `tests/test_hud_overlay.py` | 141 |

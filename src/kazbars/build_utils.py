@@ -84,23 +84,3 @@ def strip_marker_block(content, marker):
     return '\n'.join(out).rstrip('\n')
 
 
-def update_script_with_marker(script_path, marker, content, old_markers=None):
-    """Update or create a script file with marker-delimited content block."""
-    script_path = Path(script_path)
-    script_path.parent.mkdir(parents=True, exist_ok=True)
-    block = f"{marker}\n{content}\n"
-
-    if script_path.exists():
-        try:
-            existing = script_path.read_text(encoding='utf-8')
-        except (UnicodeDecodeError, OSError):
-            logger.warning("%s corrupt — overwriting with new content", script_path.name)
-            existing = ""
-        existing = strip_marker_block(existing, marker)
-        for old in (old_markers or []):
-            existing = strip_marker_block(existing, old)
-        new_content = f"{existing}\n\n{block}" if existing.strip() else block
-    else:
-        new_content = block
-
-    script_path.write_text(new_content, encoding='utf-8')

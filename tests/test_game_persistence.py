@@ -14,6 +14,7 @@ import subprocess
 
 import pytest
 
+from kazbars import game_persistence
 from kazbars.build_utils import CREATE_NO_WINDOW
 from kazbars.game_persistence import (
     ARCHIVE_NAME,
@@ -390,6 +391,23 @@ class TestClientSupportsFlag:
 
     def test_false_when_exes_missing(self, tmp_path):
         assert client_supports_flag(_make_game(tmp_path)) is False
+
+    def test_answer_is_memoized_per_game_folder(self, tmp_path, monkeypatch):
+        game = _make_game(tmp_path)
+        (game / "AgeOfConan.exe").write_bytes(b'\x00' * 16)
+        (game / "AgeOfConanDX10.exe").write_bytes(FLAG_NAME.encode())
+        scans = []
+        real = game_persistence._scan_bytes
+        monkeypatch.setattr(game_persistence, '_scan_bytes',
+                            lambda p, n, **kw: scans.append(p) or real(p, n, **kw))
+
+        assert client_supports_flag(game) is True
+        first = len(scans)
+        assert client_supports_flag(game) is True
+
+        # The scan reads up to ~68 MB of executable; every build asks.
+        assert first > 0
+        assert len(scans) == first
 
     def test_finds_a_match_straddling_a_chunk_boundary(self, tmp_path):
         needle = FLAG_NAME.encode()

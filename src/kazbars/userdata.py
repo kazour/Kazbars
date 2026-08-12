@@ -24,6 +24,7 @@ Layout::
 
 import json
 import logging
+import os
 from pathlib import Path
 
 from .paths import app_path
@@ -66,6 +67,19 @@ def content_dir() -> Path:
 
 def content_backup_dir() -> Path:
     return content_dir() / ".bak"
+
+
+def funcom_prefs_path() -> Path | None:
+    """The *game's* prefs dir (``%LOCALAPPDATA%\\Funcom\\Conan\\Prefs``), whether or
+    not it exists yet. None only if LOCALAPPDATA is unset (never on Windows).
+
+    Outside ``userdata/`` — it belongs to Age of Conan, not to us — but resolved
+    here because two unrelated features read it (Backup & Restore bundles the
+    whole tree; the persistence layer reads `Prefs_3.xml` inside it), and a
+    second copy of this path is a silent way for them to drift apart.
+    """
+    local = os.environ.get('LOCALAPPDATA')
+    return Path(local) / "Funcom" / "Conan" / "Prefs" if local else None
 
 
 def prefs3_snapshot_path() -> Path:

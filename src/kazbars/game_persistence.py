@@ -32,6 +32,7 @@ import subprocess
 from pathlib import Path
 
 from .build_utils import CREATE_NO_WINDOW
+from .userdata import funcom_prefs_path
 
 logger = logging.getLogger(__name__)
 
@@ -136,10 +137,8 @@ def _modules_locations(game_path):
 
 def prefs3_path():
     """Where the client saves module archives, or None if LOCALAPPDATA is unset."""
-    local = os.environ.get('LOCALAPPDATA')
-    if not local:
-        return None
-    return Path(local) / "Funcom" / "Conan" / "Prefs" / "Prefs_3.xml"
+    prefs_dir = funcom_prefs_path()
+    return prefs_dir / "Prefs_3.xml" if prefs_dir else None
 
 
 # ============================================================================
@@ -382,6 +381,12 @@ def _scan_bytes(path, needle, chunk=1 << 20):
         return False
 
 
+# Answers per game folder, kept for the app's lifetime: the scan reads up to
+# ~68 MB of executable, and the client only changes on patch day (which needs a
+# relaunch to Repair from anyway).
+_flag_support: dict[str, bool] = {}
+
+
 def client_supports_flag(game_path):
     """True if either client exe recognizes IgnorePatcher.enable.
 
@@ -389,8 +394,12 @@ def client_supports_flag(game_path):
     old enough to lack it still gets the declarations — only the bare-launch part
     of the story doesn't apply, and the build summary says so.
     """
-    return any(_scan_bytes(Path(game_path) / name, FLAG_NAME.encode('ascii'))
-               for name in GAME_EXES)
+    key = str(game_path)
+    if key not in _flag_support:
+        _flag_support[key] = any(
+            _scan_bytes(Path(game_path) / name, FLAG_NAME.encode('ascii'))
+            for name in GAME_EXES)
+    return _flag_support[key]
 
 
 # ============================================================================
