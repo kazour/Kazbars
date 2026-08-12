@@ -173,6 +173,7 @@ class KazBarsApp(ttkb.Window):
             # this from the first-launch completion path instead (see first_launch),
             # so a rare update never races the welcome flow.
             content_update.check_and_apply(self, APP_VERSION, self.settings.get('content_version'))
+            game_folder.check_install_health(self)
 
         update_check.check_for_updates(self, APP_VERSION)
 
@@ -377,6 +378,8 @@ class KazBarsApp(ttkb.Window):
             {'type': 'separator'},
             {'type': 'command', 'label': 'Backup & restore game settings…',
              'command': self._open_backup_dialog},
+            {'type': 'command', 'label': 'Repair game install…',
+             'command': self._repair_game_install},
             {'type': 'command', 'label': 'Uninstall from game client…',
              'command': self._uninstall_game},
         ])
@@ -571,6 +574,9 @@ class KazBarsApp(ttkb.Window):
 
     def _show_game_context_menu(self, event):
         return game_folder.show_game_context_menu(self, event)
+
+    def _repair_game_install(self):
+        return game_folder.repair_game_install(self)
 
     def _uninstall_game(self):
         return game_folder.uninstall_game(self)

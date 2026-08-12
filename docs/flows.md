@@ -247,8 +247,9 @@ Steps:
 4. `change_game_folder()` — src/kazbars/game_folder.py — opens `filedialog.askdirectory`; validates AoC folder structure (warns if `Data/Gui/Default` is missing); warns if the resulting `KazBars.swf` path exceeds 240 characters
 5. `save_game_path()` — src/kazbars/game_folder.py — persists `game_path` to settings; calls `grids_panel.notify_game_path_changed()` so the panel can refresh
 6. `refresh_game_path_label()` — src/kazbars/game_folder.py — updates the path label text/tooltip and calls `update_build_state()` to re-enable or disable the Build button based on the new path's existence
+7. `check_install_health()` — src/kazbars/game_folder.py — the new folder is a different install, so its declarations are re-verified straight away (Flow 29, steps 5–7): a healthy one refreshes the `Prefs_3.xml` snapshot, an unhealthy one raises the click-to-repair toast
 
-End state: `game_path` persisted; path label updated; Build button state synced
+End state: `game_path` persisted; path label updated; Build button state synced; the new folder's install health checked
 
 ---
 
@@ -481,3 +482,22 @@ Steps:
 4. Per-flip toast via `app_toast` — on ⇒ "<Feature> on — Build & Install to apply" (success); off ⇒ "<Feature> off — next build removes it" ("restores stock" for Damage numbers), `key='extras_<name>'` so rapid flips coalesce instead of stacking.
 
 End state: the feature's own store reflects the new gate (prefs.json for stopwatch/inspect/cast timer, `userdata/settings/damageinfo_settings.json` for damage numbers) — identical to ticking the master toggle in the feature's dialog and Applying. Nothing is applied in-game until the next Build & Install (Flow 1). The row itself is built by `GridsPanel` as a child of the panel (not the normal view), so it stays visible in the zero-grids empty state; the tip bar anchors above it.
+
+---
+
+## 29. repair the game install (and the startup health check)
+
+Trigger: User selects Game > Repair game install..., OR clicks the "The game no longer loads KazBars" toast raised by the startup health check
+
+Steps:
+1. `check_install_health()` — src/kazbars/game_folder.py — runs at startup from `KazBarsApp._load_initial_state()` (returning-user branch, right after `content_update.check_and_apply`), from `first_launch.on_dialog_closed` on a fresh install, and from `change_game_folder()` (Flow 14). Skips silently unless there is something to judge: not mid-build (`app._building`), a game folder is set, `has_built_before` is on, and `Data/Gui/Default/Flash/KazBars.swf` is actually there
+2. `is_merged()` — src/kazbars/game_persistence.py — healthy means our marker block is present in `MainPrefs.xml` **and** in `modules_target()`. Checking the *current* target is what catches a UI mod that added a `Customized/Modules.xml` after us: our Default block is no longer the one the game loads, so this correctly reads as unhealthy
+3. **Healthy** → `snapshot_prefs3()` — src/kazbars/game_persistence.py — copies `%LOCALAPPDATA%\Funcom\Conan\Prefs\Prefs_3.xml` to `userdata/prefs3_snapshot.xml`, but only when that file still contains the `KazBars settings` archive, so an already-stripped prefs file can never overwrite a good snapshot. `ensure_flag()` re-creates `IgnorePatcher.enable` if something removed it
+4. **Unhealthy** → `app_toast(..., 'warning', 12, key='install_health', on_click=…)` — src/kazbars/ui_widgets.py — one coalescing toast whose click runs `repair_game_install(app)`; the menu item calls the same function
+5. `KazBarsApp._repair_game_install()` — src/kazbars/app.py — one-line delegator to `game_folder.repair_game_install(self)`
+6. `repair_game_install()` — src/kazbars/game_folder.py — guards on a configured, existing folder, then on `get_running_engine_process()` — src/kazbars/build_executor.py — which checks the two client exes **and** `ConanPatcher.exe`: the patcher saves `Prefs_3.xml` on exit too, so repairing under a live patcher run would have its shutdown strip the archives we just restored. A hit aborts with a "Close <process> first" toast
+7. `discover_aoc_archive_declarations()` + `splice_declarations()` + `ensure_flag()` — src/kazbars/game_persistence.py — the same three calls the build makes (Flow 1, steps 16–17), so a patch-day repair restores exactly what a build would. A `ValueError` (damaged markers) falls back to `strip_declarations()` — which restores each XML from its one-time `.kazbars.bak` — and splices onto that known-good text; a second failure surfaces a Messagebox pointing at Build & Install
+8. `_reinject_managed_archives()` — src/kazbars/game_folder.py — named dispatcher: builds the managed set as `{'KazBars settings'} | archive_names_in(declarations)` — the adopted mods' archives are ours to protect too, since we are the reason a bare session preserves them — and calls `reinject_archives()` — src/kazbars/game_persistence.py — which copies whole `<Archive>` elements out of the snapshot **only** for names missing from the live `Prefs_3.xml`. A stale snapshot can therefore never overwrite a position the user has moved since
+9. Result toast — src/kazbars/game_folder.py — success-styled, naming the restored archives when any were re-injected
+
+End state: the marker blocks are back in `MainPrefs.xml` and the current Modules target, `IgnorePatcher.enable` exists, and any archive the engine stripped is back in `Prefs_3.xml` — so the next launch loads KazBars with its saved positions. The snapshot is refreshed only while the install is healthy, which is what makes it trustworthy insurance.

@@ -39,6 +39,10 @@ logger = logging.getLogger(__name__)
 # either can be the target of the direct-launch desktop shortcut.
 GAME_EXES = ('AgeOfConan.exe', 'AgeOfConanDX10.exe')
 
+# The Funcom patcher. It restores the stock XMLs (undoing our splice) and saves
+# Prefs_3.xml on exit, so Repair must never run while it is alive.
+PATCHER_EXE = 'ConanPatcher.exe'
+
 # Our own module folders under Data/Gui/Aoc — the current name plus every
 # predecessor (Kaz Flash Mods → Kaz Grids → KazBars). The persistence era owns
 # the declarations directly, so all of these are removed on install and skipped

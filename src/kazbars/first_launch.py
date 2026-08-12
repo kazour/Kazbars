@@ -336,6 +336,7 @@ def run_first_launch(app, app_name):
         # First launch is complete — now safe to poll for OTA buff-content
         # (deferred so a rare update never races the welcome popup).
         content_update.check_and_apply(app, app.app_version, app.settings.get('content_version'))
+        game_folder.check_install_health(app)
 
     show_first_launch_dialog(
         app, app_name, on_game_set, on_load_default, on_resolution_set,

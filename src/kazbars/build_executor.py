@@ -15,6 +15,7 @@ from .game_persistence import (
     FLAG_NAME,
     GAME_EXES,
     LEGACY_AOC_DIRS,
+    PATCHER_EXE,
     discover_aoc_archive_declarations,
     ensure_flag,
     remove_flag,
@@ -329,13 +330,9 @@ def uninstall_from_client(game_path, damageinfo_pristine=None):
     return True, "Removed: " + ", ".join(removed)
 
 
-def get_running_game_process():
-    """Return the name of a running AoC game process, or None.
-
-    Aoc.exe (the launcher bypass loader) doesn't lock the overlay files —
-    the actual game process does. Only the DX9/DX10 game exes matter here.
-    """
-    for name in GAME_EXES:
+def _first_running(names):
+    """Name of the first of `names` that tasklist reports as running, or None."""
+    for name in names:
         try:
             result = subprocess.run(
                 ['tasklist', '/FI', f'IMAGENAME eq {name}', '/NH'],
@@ -347,6 +344,25 @@ def get_running_game_process():
         except Exception:
             continue
     return None
+
+
+def get_running_game_process():
+    """Return the name of a running AoC game process, or None.
+
+    Aoc.exe (the launcher bypass loader) doesn't lock the overlay files —
+    the actual game process does. Only the DX9/DX10 game exes matter here.
+    """
+    return _first_running(GAME_EXES)
+
+
+def get_running_engine_process():
+    """Return the name of any running DV-engine process — client or patcher.
+
+    Repair has to wait for both. The patcher saves Prefs_3.xml on exit just like
+    the client does, so a live patcher run would strip the archives we are about
+    to re-inject (THE STRIP RULE, game_persistence).
+    """
+    return _first_running((*GAME_EXES, PATCHER_EXE))
 
 
 def is_aoc_running():

@@ -11,6 +11,8 @@ from tkinter import filedialog
 
 from ttkbootstrap.dialogs import Messagebox
 
+from . import game_persistence as gp
+from . import userdata
 from .ui_helpers import PAD_XS, THEME_COLORS
 from .ui_widgets import add_tooltip, app_toast, confirm
 
@@ -66,6 +68,7 @@ def change_game_folder(app):
     app.game_path = str(Path(path).resolve())
     save_game_path(app)
     refresh_game_path_label(app)
+    check_install_health(app)
 
 
 def clear_game_path(app):
@@ -122,6 +125,98 @@ def uninstall_game(app):
         app_toast(app, msg, 'success', 8)
     else:
         Messagebox.show_error(msg, title="Uninstall Failed")
+
+
+def repair_game_install(app):
+    """Re-apply the module declarations after a game patch wiped them.
+
+    The patcher restores the stock `MainPrefs.xml`/`Modules.xml`, which takes our
+    declarations with them; the next launch would then start without them and the
+    engine would strip the saved positions (THE STRIP RULE, game_persistence).
+    This puts the declarations and the bypass flag back and, if the archives were
+    already lost, re-injects them from the healthy snapshot the health check took.
+
+    Refuses to run while any engine process is alive — the patcher saves
+    `Prefs_3.xml` on exit too, so its shutdown would undo a fresh re-injection.
+    """
+    if not app.game_path or not Path(app.game_path).is_dir():
+        Messagebox.show_warning(
+            "No game folder set. Configure one in the bottom bar first.",
+            title="No Game Folder")
+        return
+
+    from .build_executor import get_running_engine_process
+    running = get_running_engine_process()
+    if running:
+        app_toast(app, f"Close {running} first, then repair.", 'warning', 8)
+        return
+
+    try:
+        declarations = gp.discover_aoc_archive_declarations(app.game_path)
+        gp.splice_declarations(app.game_path, declarations)
+    except ValueError:
+        # Damaged markers: the surgical path can't run, so fall back to each
+        # file's one-time backup and splice onto that known-good text.
+        gp.strip_declarations(app.game_path)
+        try:
+            gp.splice_declarations(app.game_path, declarations)
+        except (ValueError, OSError) as e:
+            Messagebox.show_error(
+                f"Couldn't repair the game files.\n\n{e}\n\n"
+                "Run Build & Install to reinstall from scratch.",
+                title="Repair Failed")
+            return
+    except OSError as e:
+        Messagebox.show_error(
+            f"Couldn't write to the game folder.\n\n{e}",
+            title="Repair Failed")
+        return
+
+    gp.ensure_flag(app.game_path)
+
+    restored = _reinject_managed_archives(declarations)
+    if restored:
+        app_toast(app, f"Repaired — restored {', '.join(restored)}.", 'success', 8)
+    else:
+        app_toast(app, "Repaired — KazBars is declared again.", 'success', 8)
+
+
+def _reinject_managed_archives(declarations):
+    """Put back any archive the engine stripped, from our snapshot. Covers the
+    mods we adopted declarations for too — we are the reason they survive."""
+    live = gp.prefs3_path()
+    snapshot = userdata.prefs3_snapshot_path()
+    if live is None or not snapshot.is_file():
+        return ()
+    names = {gp.ARCHIVE_NAME} | gp.archive_names_in('\n'.join(declarations))
+    return gp.reinject_archives(live, snapshot, names)
+
+
+def check_install_health(app):
+    """Verify the game still loads KazBars, and keep the repair snapshot fresh.
+
+    Runs at startup and whenever the game folder changes. Healthy means our
+    markers are present at the *current* targets — which is why installing a UI
+    mod that introduces a `Customized/Modules.xml` reads as unhealthy: our Default
+    block is no longer the one the game loads, and Repair moves it.
+    """
+    if getattr(app, '_building', False) or not app.game_path:
+        return
+    if not app.settings.get('has_built_before'):
+        return
+    game = Path(app.game_path)
+    if not (game / "Data" / "Gui" / "Default" / "Flash" / "KazBars.swf").is_file():
+        return
+
+    if gp.is_merged(app.game_path):
+        gp.snapshot_prefs3(userdata.prefs3_snapshot_path())
+        gp.ensure_flag(app.game_path)
+    else:
+        app_toast(
+            app,
+            "The game no longer loads KazBars — click to repair.",
+            'warning', 12, key='install_health',
+            on_click=lambda: repair_game_install(app))
 
 
 def update_build_state(app):
