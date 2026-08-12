@@ -30,10 +30,15 @@ from .ui_helpers import (
 #   "text"                      a plain body paragraph
 #   [("text", color), ...]      a rich paragraph (per-run color; None = body)
 #   _note("text", color)        a colored standalone paragraph
+#   _link("Title", "id")        a click-through to another section
 #   _sub("Title", [items], c)   a subsection: a titled label over its own items
-#                               (each item a plain or rich paragraph)
+#                               (each item a plain or rich paragraph, or a link)
 # Renderers below walk this structure; the nav and the search index are both
 # built from it, so adding a section is a one-place edit.
+#
+# Section ids are anchors: _link targets resolve against them at import time
+# (see _validate_link_targets), so a typo'd or renamed id fails on import rather
+# than dead-ending a reader. Renaming an id means updating every link to it.
 
 _SUCCESS = THEME_COLORS['success']
 _ACCENT = THEME_COLORS['accent']
@@ -48,6 +53,12 @@ def _sub(title, items, color=None):
 
 def _note(text, color):
     return ('note', text, color)
+
+
+def _link(label, target_id):
+    """A jump to another section. `label` must be that section's exact title —
+    the reason for following it belongs in the sentence before, not in here."""
+    return ('link', label, target_id)
 
 
 class _Section(TypedDict):
@@ -289,13 +300,13 @@ SECTIONS: list[_Section] = [
                 "directly — KazBars drops IgnorePatcher.enable, the engine's "
                 'own flag, so a direct launch skips the patcher. After your '
                 'first successful build, KazBars offers to create a desktop '
-                'shortcut (DX10 or DX9); Game → Create game desktop '
+                'shortcut (DX10 or DX9); Game ▸ Create game desktop '
                 'shortcut… makes one anytime.',
             ]),
             _sub('After a game patch', [
                 "A patch restores the game's stock files, which takes the "
                 'KazBars registration with them. Run the official patcher '
-                'once, then Game → Repair game install — it re-registers '
+                'once, then Game ▸ Repair game install — it re-registers '
                 'KazBars and restores your saved positions from a safety '
                 'snapshot.',
                 [('Using the Damage Numbers mod? A patch also puts the stock '
@@ -304,7 +315,7 @@ SECTIONS: list[_Section] = [
                  (' once to restore the mod.', None)],
             ]),
             _sub('Buff-discovery console', [
-                "Don't know an effect's buff ID? Open Extras → Inspect panel… "
+                "Don't know an effect's buff ID? Open Extras ▸ Inspect panel… "
                 'and tick Include the buff-discovery console in builds, then '
                 'Build & Install. In preview mode (Shift+Ctrl+Alt), the console '
                 "logs every effect's name and buff ID as it lands on you or "
@@ -319,7 +330,7 @@ SECTIONS: list[_Section] = [
                 'remove it.',
             ]),
             _sub('Removing KazBars from your game folder', [
-                'Game → Uninstall from game client… removes KazBars.swf '
+                'Game ▸ Uninstall from game client… removes KazBars.swf '
                 'and related files, and restores every game file KazBars '
                 'changed byte-for-byte.',
             ]),
@@ -357,7 +368,7 @@ SECTIONS: list[_Section] = [
         'id': 'resolution',
         'title': 'Game Resolution',
         'body': [
-            'Game → Game resolution... sets the screen size KazBars builds '
+            'Game ▸ Game resolution... sets the screen size KazBars builds '
             'for. Grid X/Y are positions on that screen, so the resolution '
             'has to match the one you play at.',
             'Change it and your loaded grids re-anchor to the new size — a '
@@ -439,7 +450,7 @@ SECTIONS: list[_Section] = [
         'id': 'cast-timer',
         'title': 'Cast Timer',
         'body': [
-            'Extras → Cast timer… adds a timer-only overlay for your own and '
+            'Extras ▸ Cast timer… adds a timer-only overlay for your own and '
             "your target's cast time — floating text over the game's cast bar, "
             'with no bar of its own. Off by default; when off, the build '
             'carries no cast-timer code at all.',
@@ -491,7 +502,7 @@ SECTIONS: list[_Section] = [
         'id': 'default-buff-bars',
         'title': 'Default Buff Bars',
         'body': [
-            "Extras → Default buff bars… edits Age of Conan's own built-in "
+            "Extras ▸ Default buff bars… edits Age of Conan's own built-in "
             'buff bars — the Player and Target portrait icons, the top bar, '
             'and floating portraits. This is separate from your KazBars grids, '
             'which it leaves alone.',
@@ -511,7 +522,7 @@ SECTIONS: list[_Section] = [
         'id': 'damage-numbers',
         'title': 'Damage Numbers',
         'body': [
-            'Extras → Damage number mod… installs a leaner rewrite of Age of '
+            'Extras ▸ Damage number mod… installs a leaner rewrite of Age of '
             "Conan's floating combat numbers, in place of the stock ones. The "
             'headline fix: ranged hits stop shrinking to nothing at distance.',
             _sub('Turn it on', [
@@ -552,7 +563,7 @@ SECTIONS: list[_Section] = [
         'id': 'damage-number-colors',
         'title': 'Damage Number Colors',
         'body': [
-            'Extras → Damage number colors… sets the color and the direction '
+            'Extras ▸ Damage number colors… sets the color and the direction '
             'of every combat-number source on its own — incoming vs outgoing '
             'hits, crits, spells, combos, heals, mana, and stamina — laid out '
             'self on the left, your target on the right.',
@@ -593,7 +604,7 @@ SECTIONS: list[_Section] = [
         'id': 'stopwatch',
         'title': 'Stopwatch',
         'body': [
-            'Extras → Stopwatch… adds a count-up Start / Pause / Reset '
+            'Extras ▸ Stopwatch… adds a count-up Start / Pause / Reset '
             'timer that lives inside the overlay. It works in fullscreen and '
             'never steals focus from AoC. Off by default; when off, the build '
             'carries no stopwatch code at all.',
@@ -624,7 +635,7 @@ SECTIONS: list[_Section] = [
         'id': 'inspect',
         'title': 'Inspect panel',
         'body': [
-            'Extras → Inspect panel… adds an in-game panel that shows '
+            'Extras ▸ Inspect panel… adds an in-game panel that shows '
             "the combat sheet of whatever you target — the stats the game's "
             "default inspect window can't reveal. Target a player, mob, or "
             'boss and about three-quarters of a second later the panel '
@@ -713,7 +724,7 @@ SECTIONS: list[_Section] = [
         'id': 'backup',
         'title': 'Backup and Restore',
         'body': [
-            'Game → Backup & restore game settings... writes one portable '
+            'Game ▸ Backup & restore game settings... writes one portable '
             '.zip of your Age of Conan config — keybinds, HUD layout, '
             'graphics, every character — plus your KazBars profiles and '
             'settings. This is your recovery path after a reformat or a '
@@ -742,6 +753,10 @@ def _flatten_text(value, out):
         kind = value[0]
         if kind == 'note':
             out.append(value[1])
+        elif kind == 'link':
+            # The label is the target's title — searching for it should still
+            # land on the section that links there, not just the target.
+            out.append(value[1])
         elif kind == 'sub':
             out.append(value[1])
             for item in value[2]:
@@ -756,6 +771,43 @@ def _haystack(section):
     for block in section['body']:
         _flatten_text(block, words)
     return ' '.join(words).lower()
+
+
+def _link_targets(value, out):
+    """Collect every `_link` target id in a block tree into `out`."""
+    if isinstance(value, list):
+        for part in value:
+            _link_targets(part, out)
+    elif isinstance(value, tuple):
+        if value[0] == 'link':
+            out.append(value[2])
+        elif value[0] == 'sub':
+            for item in value[2]:
+                _link_targets(item, out)
+
+
+def _validate_link_targets():
+    """Fail on import if any link points at an id no section carries.
+
+    Cross-references are only worth adding if they can't rot: a renamed id, or a
+    typo, breaks here rather than dead-ending a reader mid-guide. Any test that
+    imports this module is the gate.
+    """
+    known = {s['id'] for s in SECTIONS}
+    for section in SECTIONS:
+        targets = []
+        for block in section['body']:
+            _link_targets(block, targets)
+        for target in targets:
+            if target not in known:
+                raise ValueError(
+                    f"instructions_panel: section {section['id']!r} links to "
+                    f"{target!r}, which is not a section id."
+                )
+
+
+_SECTION_BY_ID = {s['id']: s for s in SECTIONS}
+_validate_link_targets()
 
 
 # Reading column constraints. ~75ch upper bound at 9px Segoe (≈5px/char average)
@@ -777,9 +829,10 @@ class InstructionsPanel(ttk.Frame):
     def __init__(self, parent):
         super().__init__(parent)
         self._body_font = tkfont.Font(font=FONT_BODY)
+        self._link_font_hover = tkfont.Font(font=FONT_BODY, underline=True)
         self._frame_bg = ttk.Style().lookup('TFrame', 'background') or TK_COLORS['bg']
         self._haystacks = {s['id']: _haystack(s) for s in SECTIONS}
-        self._section_by_id = {s['id']: s for s in SECTIONS}
+        self._section_by_id = _SECTION_BY_ID
         self._nav_rows = {}        # id -> tk.Label
         self._nav_order = []       # ordered [('header', cat, w, [ids]) | ('row', id, w, None)]
         self._wrap_labels = []     # [(label, margin)] for the live content section
@@ -916,6 +969,8 @@ class InstructionsPanel(ttk.Frame):
         elif isinstance(block, tuple) and block[0] == 'note':
             self._paragraph(parent, block[1], _CONTENT_MARGIN,
                             padx=PAD_TAB, foreground=block[2])
+        elif isinstance(block, tuple) and block[0] == 'link':
+            self._link_row(parent, block[1], block[2], padx=(PAD_TAB, PAD_TAB))
         elif isinstance(block, tuple) and block[0] == 'sub':
             self._subsection(parent, block[1], block[2], block[3])
 
@@ -928,8 +983,20 @@ class InstructionsPanel(ttk.Frame):
         for item in items:
             if isinstance(item, list):
                 self._rich_paragraph(frame, item, padx=(PAD_INNER, 0))
+            elif isinstance(item, tuple) and item[0] == 'link':
+                self._link_row(frame, item[1], item[2], padx=(PAD_INNER, 0))
             else:
                 self._paragraph(frame, item, _SUBSECTION_MARGIN, padx=(PAD_INNER, 0))
+
+    def _link_row(self, parent, label, target_id, padx=(0, 0)):
+        """A click-through to another section — same selection path as the nav,
+        so the nav highlight and scroll reset come along for free."""
+        lbl = tk.Label(parent, text=f'→ {label}', font=FONT_BODY, fg=_ACCENT,
+                       bg=self._frame_bg, anchor='w', cursor='hand2')
+        lbl.pack(fill='x', padx=padx, pady=(0, PAD_XS))
+        lbl.bind('<Button-1>', lambda _e: self._select(target_id))
+        lbl.bind('<Enter>', lambda _e: lbl.configure(font=self._link_font_hover))
+        lbl.bind('<Leave>', lambda _e: lbl.configure(font=FONT_BODY))
 
     def _paragraph(self, parent, text, margin, padx=0, foreground=None):
         lbl = ttk.Label(parent, text=text, font=FONT_BODY,
