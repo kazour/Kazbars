@@ -5,10 +5,10 @@
 // Chrome and palette are the inspect panel's (KazBarsInspect.as, and
 // docs/inspect-panel.md section 5): warm near-black plate, 1px black-over-bronze
 // double frame, Conan-orange title, bronze hairline rules, square corners. Like
-// the console it is a transient tool with no font-size config, so its dimensions
-// are named constants at the values the panel's ratios land on at FS 12. It does
-// not fold — it only exists while preview mode is on, and folding a panel whose
-// whole job is showing which things are hidden would hide the answer.
+// the console, every dimension is a ratio of a base font size rather than a
+// baked FS-12 number. It does not fold — it only exists while preview mode is
+// on, and folding a panel whose whole job is showing which things are hidden
+// would hide the answer.
 //
 // Rows are rebuilt on every preview entry, each one seeded from what the item
 // is actually doing right now, and a box IS that item's master switch: unchecked
@@ -31,19 +31,21 @@ class KazBarsPreviewPanel {
     private var curW:Number;
     private var curH:Number;
 
-    // Layout — the console's FS-12 constants, plus the row grid. Columns wrap
-    // at MAX_PER_COL so a 64-grid build stays on the Stage.
-    private var PAD:Number;
-    private var TITLE_H:Number;
-    private var LINE:Number;
-    private var BOX:Number;
-    private var ROW_H:Number;
-    private var BTN_W:Number;
-    private var BTN_H:Number;
+    // Layout — the console's ratios off a shared base font size, plus the row
+    // grid. Columns wrap at MAX_PER_COL so a 64-grid build stays on the Stage.
+    private var FS:Number;        // base font size; everything below scales off it
+    private var PAD:Number;       // 0.85
+    private var TITLE_H:Number;   // 1.85
+    private var LINE:Number;      // 1.4
+    private var BOX:Number;       // 1.0
+    private var ROW_H:Number;     // 1.667
+    private var BTN_W:Number;     // 5.0
+    private var BTN_H:Number;     // 1.85
     private var BTN_Y:Number;
     private var ROWS_Y:Number;
-    private var COL_W:Number;
-    private var MAX_PER_COL:Number;
+    private var COL_W:Number;     // 18.33
+    private var NAME_FS:Number;   // 1.15  title font size
+    private var MAX_PER_COL:Number;   // a row count, not a size — never scaled
 
     public function KazBarsPreviewPanel(kb:Object, root:MovieClip) {
         owner = kb;
@@ -51,17 +53,34 @@ class KazBarsPreviewPanel {
         rows = new Array();
         posX = Number.NaN;   // unset until dragged or loaded from the archive
         posY = Number.NaN;
-        PAD = 10;
-        TITLE_H = 22;
-        LINE = 17;
-        BOX = 12;
-        ROW_H = 20;
-        BTN_W = 60;
-        BTN_H = 22;
-        BTN_Y = TITLE_H + 6;
-        ROWS_Y = BTN_Y + BTN_H + 10;
-        COL_W = 220;
         MAX_PER_COL = 16;
+        // Nothing has to call configure() for the panel to be usable, so it
+        // seeds itself at the default size here rather than leaving every
+        // constant NaN until someone does.
+        configure(null);
+    }
+
+    // =========================================================================
+    // Setup
+    // =========================================================================
+
+    // Mirrors KazBarsStopwatch/KazBarsInspect, minus their bail-on-null: those
+    // two are always configured before they build, this one is not.
+    public function configure(cfg:Object):Void {
+        if (cfg == null) cfg = {};
+        FS = Number(cfg.fontSize);
+        if (isNaN(FS) || FS < 8) FS = 12;
+        PAD = Math.round(FS * 0.85);
+        TITLE_H = Math.round(FS * 1.85);
+        LINE = Math.round(FS * 1.4);
+        BOX = Math.round(FS);
+        ROW_H = Math.round(FS * 1.667);
+        BTN_W = Math.round(FS * 5);
+        BTN_H = Math.round(FS * 1.85);
+        BTN_Y = TITLE_H + Math.round(FS * 0.5);
+        ROWS_Y = BTN_Y + BTN_H + Math.round(FS * 0.85);
+        COL_W = Math.round(FS * 18.33);
+        NAME_FS = Math.round(FS * 1.15);
         curW = PAD * 2 + COL_W;
         curH = ROWS_Y + PAD;
     }
@@ -106,13 +125,14 @@ class KazBarsPreviewPanel {
         drawChrome(curW, curH);
 
         titleTF = makeTF(panelClip, "title", PAD, Math.floor((TITLE_H - (LINE + 4)) / 2),
-                         curW - PAD * 2, LINE + 4, 14, true, 0xF7A22B, "left");
+                         curW - PAD * 2, LINE + 4, NAME_FS, true, 0xF7A22B, "left");
         titleTF.text = "Control Panel";
 
         // Live position readout — visible only while dragging, the panel's
         // convention. Shares the title line, right-aligned.
         coordTF = makeTF(panelClip, "coords", PAD, Math.floor((TITLE_H - LINE) / 2),
-                         curW - PAD * 2, LINE, 10, false, 0x999999, "right");
+                         curW - PAD * 2, LINE,
+                         Math.max(9, Math.round(FS * 0.8)), false, 0x999999, "right");
         coordTF._visible = false;
 
         var btnAll:MovieClip = makeButton(panelClip, "btnAll", "All", PAD, BTN_Y);
@@ -232,14 +252,17 @@ class KazBarsPreviewPanel {
         box.beginFill(0x0C0A07, 90);
         rectPath(box, 0, 0, BOX, BOX);
         box.endFill();
+        // Tick drawn to the box rather than to a 12px box's coordinates: three
+        // points at 1/6, 5/12 and 5/6 of the side, the shape it has always had.
         var chk:MovieClip = c.createEmptyMovieClip("chk", 2);
-        chk.lineStyle(2, 0x7AC142, 100);
-        chk.moveTo(2, 6);
-        chk.lineTo(5, 10);
-        chk.lineTo(10, 2);
+        chk.lineStyle(Math.max(1, Math.round(BOX / 6)), 0x7AC142, 100);
+        chk.moveTo(Math.round(BOX / 6), Math.round(BOX / 2));
+        chk.lineTo(Math.round(BOX * 5 / 12), Math.round(BOX * 5 / 6));
+        chk.lineTo(Math.round(BOX * 5 / 6), Math.round(BOX / 6));
         chk._visible = checked;
         var lbl:TextField = makeTF(c, "lbl", BOX + 6, -3, labelW, LINE,
-                                   10, false, 0xC8C0B0, "left");
+                                   Math.max(9, Math.round(FS * 0.8)), false,
+                                   0xC8C0B0, "left");
         lbl.text = label;
         // Hit area is a child at depth 0 so it sits under the art but still
         // takes the press across the whole label.
@@ -264,7 +287,9 @@ class KazBarsPreviewPanel {
         c.lineStyle(1, 0x4A3B22, 100);
         rectPath(c, 0, 0, BTN_W, BTN_H);
         var tf:TextField = makeTF(c, "label", 0, Math.floor((BTN_H - LINE) / 2),
-                                  BTN_W, LINE, 11, true, 0xC8C0B0, "center");
+                                  BTN_W, LINE,
+                                  Math.max(9, Math.round(FS * 0.9)), true,
+                                  0xC8C0B0, "center");
         tf.text = label;
         c.useHandCursor = true;
         c.onRollOver = function() { this.label.textColor = 0xF7A22B; };
