@@ -79,9 +79,9 @@ def open_stopwatch_dialog(app):
               font=FONT_SECTION, foreground=THEME_COLORS['heading']
               ).pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
     ttk.Label(content,
-              text="Where the panel appears in-game. Dragging its title bar shows\n"
-                   "live coordinates — copy them here to make a spot permanent.\n"
-                   "Aoc.exe clients remember drags automatically.",
+              text="Where the panel first appears in-game. Drag its title bar\n"
+                   "to move it — the game remembers, across relogs and restarts.\n"
+                   "X/Y here only seed a first-ever session.",
               font=FONT_SMALL, foreground=THEME_COLORS['muted'], justify='left'
               ).pack(anchor='w', pady=(0, PAD_XS))
 

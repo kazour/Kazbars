@@ -15,11 +15,11 @@ piece. It is **nullable**: `None` means "follow the shared `panel_font_size`",
 which is what all four in-game panels do by default; a number is a deliberate
 per-panel override. This dialog hosts the shared control (as it already hosts
 the console's build gate), and the build path is the only place the two are
-resolved into one number. `x`/`y` are baked into the generated SWF (the only position that
-survives relaunch on `/loadclip` default clients — the panel shows live
-coordinates while its name strip is dragged so users can copy them here);
-aoc.exe clients persist drag position and collapsed state via the module
-config archive.
+resolved into one number. `x`/`y` are baked into the generated SWF as the
+first-session seed (the panel shows live coordinates while its name strip is
+dragged so users can copy them here); from then on the game persists drag
+position and collapsed state in the module config archive, for every user
+(`game_persistence`).
 """
 
 import logging

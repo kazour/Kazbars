@@ -25,7 +25,7 @@ Buff/debuff overlay editor for **Age of Conan**. Design icon grids or bars that 
 
 **Stopwatch** — a simple, draggable Start / Pause / Reset count-up timer. Off by default
 
-**Damage Numbers** — a leaner, faster rewrite of the game's floating combat numbers with new layout and behavior settings. Needs the Aoc.exe launcher bypass: it replaces a stock `.swf` file that the game's patcher restores otherwise. Rebuild after each patcher run if you don't have launcher bypass. Off by default
+**Damage Numbers** — a leaner, faster rewrite of the game's floating combat numbers, with new layout and behavior settings. Off by default
 
 **Deeps by Veni** — a real-time meter that reads the combat log for your DPS out, DPS in, HPS out, HPS in, and ΔHP in
 
@@ -44,9 +44,11 @@ Buff/debuff overlay editor for **Age of Conan**. Design icon grids or bars that 
 1. Download `KazBars.zip` below and extract it anywhere.
 2. Run `KazBars.exe` as Administrator.
 3. The first-run setup window opens. Point it at your Age of Conan folder.
-4. If it detects the Aoc.exe launcher bypass in that folder, say whether you use it.
-5. Choose **Use Defaults** — ready-made grids for common raid buffs and debuffs, sized to your screen. (Or **Start Empty** to build your own from scratch.)
-6. Click `Build & Install`. Close the game for your first build; after that, rebuild anytime and apply from chat — `/reloadui` if you use Aoc.exe, or `/reloadui` then `/reloadgrids` on the standard launcher.
+4. Choose **Use Defaults** — ready-made grids for common raid buffs and debuffs, sized to your screen. (Or **Start Empty** to build your own from scratch.)
+5. Click `Build & Install`. Close the game and the patcher for your first build. After that, rebuild anytime and type `/reloadui` in-game.
+6. Launch the game from its own executable, not the patcher — KazBars offers to create a desktop shortcut (DX10 or DX9) after your first build. Launching this way is what keeps your setup in place.
+
+Positioning happens in-game: press Shift+Ctrl+Alt for preview mode and drag your grids and panels where you want them. The game remembers where you left them, across relogs and restarts.
 
 Once you know the flow, make it yours: `+ Add Grid` for your own layouts, then `Tracked Buffs...` to pick what each one watches.
 

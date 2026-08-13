@@ -482,8 +482,8 @@ def test_grid_shown_is_master_switch():
 
 
 def test_console_master_switch_defaults_active():
-    """Fresh archive (and every /loadclip client) opens the console at login;
-    an archived cnv == 0 closes it again on activation."""
+    """A fresh archive opens the console at login; an archived cnv == 0
+    closes it again on activation."""
     main_code, _ = _all_extras_gen().generate()
 
     assert main_code.index("console.createConsole();") < main_code.index(

@@ -84,9 +84,9 @@ def open_cast_timer_dialog(app):
                 "overlay. Takes effect on the next Build & Install.")
 
     ttk.Label(content,
-              text="Where each timer sits on screen. Shift+Ctrl+Alt toggles\n"
-                   "preview mode in-game: drag a timer and its coordinates show,\n"
-                   "ready to copy back here. Aoc.exe clients remember drags.",
+              text="Where each timer first appears in-game. Shift+Ctrl+Alt\n"
+                   "toggles preview mode: drag a timer and the game remembers.\n"
+                   "X/Y here only seed a first-ever session.",
               font=FONT_SMALL, foreground=THEME_COLORS['muted'], justify='left'
               ).pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
 
