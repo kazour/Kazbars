@@ -3,9 +3,11 @@ KazBars — Target inspect panel dialog.
 
 Extras-menu settings for the in-game target inspect panel (KazBarsInspect
 stub): the build gate, the baked default position, the baked font size, and
-the start-collapsed flag. It also hosts the buff-discovery console's build
-gate (flat prefs key `build_console`) — the console is the other SWF-side
-inspection tool, so both are switched on from one place.
+the start-collapsed flag. It also hosts two settings that are not the inspect
+panel's own, for the same "these belong together" reason: the buff-discovery
+console's build gate (flat prefs key `build_console`), and the text size the
+four in-game panels share (flat prefs key `panel_font_size`) — the console and
+the preview control panel have no dialog of their own to host either.
 Persists machine-local in prefs.json under `inspect` (data layer:
 `inspect.py`); the build bakes the values into the generated SWF.
 Functions take the KazBarsApp instance as first arg.
@@ -34,7 +36,7 @@ from .ui_widgets import add_tooltip, app_toast
 from .window_position import bind_window_position_save, restore_window_position
 
 _WIDTH = 400
-_HEIGHT = 560
+_HEIGHT = 680
 
 
 def open_inspect_dialog(app):
@@ -98,13 +100,47 @@ def open_inspect_dialog(app):
     ttk.Label(content, text="Text size",
               font=FONT_SECTION, foreground=THEME_COLORS['heading']
               ).pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
-    size_var = tk.IntVar(value=cfg['fontSize'])
+    ttk.Label(content,
+              text="One size for all four in-game panels — stopwatch, inspect panel,\n"
+                   "buff console and control panel. It's set here because the last two\n"
+                   "have no dialog of their own.",
+              font=FONT_SMALL, foreground=THEME_COLORS['muted'], justify='left'
+              ).pack(anchor='w', pady=(0, PAD_XS))
+
+    shared_before = app.settings.get('panel_font_size')
+    shared_var = tk.IntVar(value=shared_before)
+    shared_row = ttk.Frame(content)
+    shared_row.pack(anchor='w', pady=(0, PAD_XS))
+    shared_spin = labeled_spinbox(shared_row, "All panels ", shared_var,
+                                  from_=8, to=48, width=6)
+    add_tooltip(shared_spin,
+                "Each panel scales as one piece, collapsed bars included, so they "
+                "keep matching at any size. Takes effect on the next "
+                "Build & Install.")
+
+    # fontSize is None when the panel follows the shared size. The spinbox still
+    # shows a number so unticking the box has somewhere to start from.
+    follow_var = tk.BooleanVar(value=cfg['fontSize'] is None)
+    follow_cb = ttk.Checkbutton(content, text="Use the shared size for this panel",
+                                variable=follow_var)
+    follow_cb.pack(anchor='w', pady=(0, PAD_XS))
+    add_tooltip(follow_cb,
+                "Untick to make the inspect panel bigger or smaller than the rest.")
+
+    size_var = tk.IntVar(value=shared_before if cfg['fontSize'] is None else cfg['fontSize'])
     size_row = ttk.Frame(content)
     size_row.pack(anchor='w', pady=(0, PAD_SMALL))
-    size_spin = labeled_spinbox(size_row, "Font size ", size_var, from_=8, to=48, width=6)
+    size_spin = labeled_spinbox(size_row, "Inspect panel only ", size_var,
+                                from_=8, to=48, width=6)
     add_tooltip(size_spin,
-                "Baked at build time — the whole panel scales with it. "
+                "This panel's own size, used instead of the shared one. "
                 "Takes effect on the next Build & Install.")
+
+    def _sync_size_override(*_):
+        size_spin.configure(state='disabled' if follow_var.get() else 'normal')
+
+    follow_var.trace_add('write', _sync_size_override)
+    _sync_size_override()
 
     collapsed_var = tk.BooleanVar(value=cfg['startCollapsed'])
     collapsed_cb = ttk.Checkbutton(content, text="Start collapsed (name strip only)",
@@ -159,28 +195,36 @@ def open_inspect_dialog(app):
             return default
 
     def _apply():
+        shared = _read(shared_var, shared_before)
         new_cfg = validate_config({
             'enabled': enabled_var.get(),
             'x': _read(x_var, cfg['x']),
             'y': _read(y_var, cfg['y']),
-            'fontSize': _read(size_var, cfg['fontSize']),
+            # Checked means "no opinion" — never the number left in the disabled
+            # spinbox, or unticking once would freeze the panel off the shared value.
+            'fontSize': None if follow_var.get() else _read(size_var, shared),
             'startCollapsed': collapsed_var.get(),
             'showPvp': pvp_var.get(),
             'showPerks': perks_var.get(),
         })
-        # The console rides along on the same Apply — one save() covers both keys.
+        # The shared size and the console gate ride along on the same Apply —
+        # one save() covers all three keys.
+        app.settings.set('panel_font_size', shared)
         app.settings.set('build_console', console_var.get())
         app.settings.set('inspect', new_cfg)
         app.settings.save()
         app.grids_panel.refresh_extras_shortcuts()
-        if new_cfg == cfg:
-            # Nothing about the panel moved, so the only reason to be here was
-            # the console — say so rather than report an inspect save that isn't.
-            app_toast(app, "Console saved — Build & Install to apply", 'success')
-        elif new_cfg['enabled']:
-            app_toast(app, "Inspect panel saved — Build & Install to apply", 'success')
+        # Three separate settings live in this dialog, so name whichever moved
+        # rather than reporting an inspect save that isn't one.
+        if new_cfg != cfg:
+            if new_cfg['enabled']:
+                app_toast(app, "Inspect panel saved — Build & Install to apply", 'success')
+            else:
+                app_toast(app, "Inspect panel off — next build removes it", 'info')
+        elif shared != shared_before:
+            app_toast(app, "Panel text size saved — Build & Install to apply", 'success')
         else:
-            app_toast(app, "Inspect panel off — next build removes it", 'info')
+            app_toast(app, "Console saved — Build & Install to apply", 'success')
         dialog.destroy()
 
     ttk.Button(btns, text="Apply", bootstyle="success",

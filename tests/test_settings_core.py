@@ -135,6 +135,39 @@ class TestValidateAll:
 
 
 # --------------------------------------------------------------------------- #
+# nullable_int — "no opinion" stored distinctly from a number
+# --------------------------------------------------------------------------- #
+
+class TestNullableInt:
+    def test_unset_values_stay_none(self):
+        # kind='int' cannot express this: it coerces every one of these to the
+        # default, so a setting could never say "defer to the shared value".
+        v = settings_core.nullable_int(min=8, max=48)
+        assert v(None) is None
+        assert v('') is None
+        assert v('garbage') is None
+        assert v([]) is None
+
+    def test_numbers_are_coerced_and_clamped(self):
+        v = settings_core.nullable_int(min=8, max=48)
+        assert v(16) == 16
+        assert v('16') == 16
+        assert v(16.4) == 16
+        assert v(2) == 8
+        assert v(99) == 48
+
+    def test_bounds_are_optional(self):
+        assert settings_core.nullable_int()(9999) == 9999
+
+    def test_reads_back_through_a_field(self):
+        s = Schema('n.json', 1, {'size': Field(None, validate=settings_core.nullable_int(
+            min=8, max=48))})
+        assert settings_core.validate_all(s, {})['size'] is None
+        assert settings_core.validate_all(s, {'size': 99})['size'] == 48
+        assert settings_core.validate_all(s, {'size': None})['size'] is None
+
+
+# --------------------------------------------------------------------------- #
 # get_defaults freshness
 # --------------------------------------------------------------------------- #
 

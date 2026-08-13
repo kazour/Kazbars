@@ -34,6 +34,7 @@ class KazBarsPreviewPanel {
     // Layout — the console's ratios off a shared base font size, plus the row
     // grid. Columns wrap at MAX_PER_COL so a 64-grid build stays on the Stage.
     private var FS:Number;        // base font size; everything below scales off it
+    private var FS_REQ:Number;    // the size configure() was given, before any fit clamp
     private var PAD:Number;       // 0.85
     private var TITLE_H:Number;   // 1.85
     private var LINE:Number;      // 1.4
@@ -68,8 +69,17 @@ class KazBarsPreviewPanel {
     // two are always configured before they build, this one is not.
     public function configure(cfg:Object):Void {
         if (cfg == null) cfg = {};
-        FS = Number(cfg.fontSize);
-        if (isNaN(FS) || FS < 8) FS = 12;
+        FS_REQ = Number(cfg.fontSize);
+        if (isNaN(FS_REQ) || FS_REQ < 8) FS_REQ = 12;
+        applySize(FS_REQ);
+    }
+
+    // Split out of configure() because show() re-runs it a notch smaller when the
+    // row count would walk the panel off the Stage: the requested size has to
+    // survive that, so the next entry starts from it again rather than from
+    // whatever the last one's grid count clamped it to.
+    private function applySize(size:Number):Void {
+        FS = size;
         PAD = Math.round(FS * 0.85);
         TITLE_H = Math.round(FS * 1.85);
         LINE = Math.round(FS * 1.4);
@@ -81,8 +91,15 @@ class KazBarsPreviewPanel {
         ROWS_Y = BTN_Y + BTN_H + Math.round(FS * 0.85);
         COL_W = Math.round(FS * 18.33);
         NAME_FS = Math.round(FS * 1.15);
-        curW = PAD * 2 + COL_W;
-        curH = ROWS_Y + PAD;
+        measure(1, 0);
+    }
+
+    // The panel's footprint for a given row layout — the one place cols/rows
+    // become a width and a height, so the fit loop in show() and the empty seed
+    // in applySize() can't drift apart.
+    private function measure(cols:Number, rowsInCol:Number):Void {
+        curW = PAD * 2 + cols * COL_W;
+        curH = ROWS_Y + rowsInCol * ROW_H + PAD;
     }
 
     // =========================================================================
@@ -116,8 +133,20 @@ class KazBarsPreviewPanel {
 
         var cols:Number = Math.max(1, Math.ceil(rows.length / MAX_PER_COL));
         var firstCol:Number = Math.min(rows.length, MAX_PER_COL);
-        curW = PAD * 2 + cols * COL_W;
-        curH = ROWS_Y + firstCol * ROW_H + PAD;
+
+        // This is the only panel whose footprint grows with content — one row
+        // per grid, a fresh column every MAX_PER_COL — so a size that suits a
+        // three-grid build walks a sixty-grid one off the screen. It steps its
+        // own size down until it fits rather than the shared range being cut
+        // for everyone. Rows are rebuilt on every preview entry from the
+        // requested size, so this is self-correcting and can never strand a
+        // user with a panel they cannot reach.
+        applySize(FS_REQ);
+        measure(cols, firstCol);
+        while (FS > 8 && (curW > Stage.width || curH > Stage.height)) {
+            applySize(FS - 1);
+            measure(cols, firstCol);
+        }
 
         // Chrome is its own child clip, the family's arrangement — it can be
         // cleared and redrawn without taking the contents with it.

@@ -257,11 +257,21 @@ def test_stopwatch_on_emits_hooks_and_data():
     assert "stopwatch.saveState(config);" in main_code
     assert "stopwatch.cleanup();" in main_code
 
-    # Data block
+    # Data block — a number of its own overrides the shared panel size
     assert "d.SW = {x: 750, y: 410, fontSize: 16, collapsed: true};" in data_code
 
     # No leftover tokens
     assert "{{SW_" not in main_code
+
+
+def test_stopwatch_without_its_own_size_follows_the_shared_one():
+    gen = CodeGenerator(
+        [_minimal_grid()], _load_db(), "0.0.0",
+        stopwatch_config={"enabled": True, "x": 750, "y": 410, "fontSize": None},
+        panel_font_size=20,
+    )
+    _, data_code = gen.generate()
+    assert "d.SW = {x: 750, y: 410, fontSize: 20, collapsed: false};" in data_code
 
 
 # --------------------------------------------------------------------------
@@ -316,12 +326,23 @@ def test_inspect_on_emits_hooks_and_data():
     # Save fires from BOTH persist paths (exitPreview + OnModuleDeactivated)
     assert main_code.count("inspect.saveState(config);") == 2
 
-    # Data block
+    # Data block — a number of its own overrides the shared panel size
     assert ("d.INS = {x: 40, y: 240, fontSize: 14, collapsed: true, "
             "showPvp: true, showPerks: false};" in data_code)
 
     # No leftover tokens
     assert "{{INS_" not in main_code
+
+
+def test_inspect_without_its_own_size_follows_the_shared_one():
+    gen = CodeGenerator(
+        [_minimal_grid()], _load_db(), "0.0.0",
+        inspect_config={"enabled": True, "x": 40, "y": 240, "fontSize": None},
+        panel_font_size=20,
+    )
+    _, data_code = gen.generate()
+    assert ("d.INS = {x: 40, y: 240, fontSize: 20, collapsed: false, "
+            "showPvp: true, showPerks: true};" in data_code)
 
 
 # --------------------------------------------------------------------------
@@ -361,6 +382,34 @@ def test_preview_panel_always_emitted():
     assert "ppanel.loadState(config);" in main_code
 
     assert "{{PP_" not in main_code
+
+
+def test_shared_panel_font_is_always_emitted_and_configured():
+    """`d.PF` is unconditional — the control panel compiles into every build, so
+    a mistake here breaks every build rather than only console-enabled ones. Its
+    identifiers must also stay clear of the bare 'stopwatch'/'inspect' substrings
+    the off-path tests assert against the whole generated class."""
+    main_code, data_code = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0").generate()
+    assert "d.PF = {fontSize: 12};" in data_code
+    assert "ppanel.configure(d.PF);" in main_code
+    assert "console.configure(d.PF);" not in main_code
+
+    gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0",
+                        include_console=True, panel_font_size=20)
+    main_code, data_code = gen.generate()
+    assert "d.PF = {fontSize: 20};" in data_code
+    assert "console.configure(d.PF);" in main_code
+
+
+def test_shared_panel_font_is_clamped():
+    def size_of(value):
+        return CodeGenerator([_minimal_grid()], _load_db(), "0.0.0",
+                             panel_font_size=value).panel_font_size
+
+    assert size_of(None) == 12
+    assert size_of("garbage") == 12
+    assert size_of(2) == 8
+    assert size_of(99) == 48
 
 
 def test_preview_panel_no_extras_has_no_extra_rows():

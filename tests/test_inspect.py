@@ -17,7 +17,8 @@ from kazbars.inspect import (
 def test_defaults_disabled():
     cfg = get_default_config()
     assert cfg["enabled"] is False
-    assert cfg["fontSize"] == 12
+    # None = follow the shared panel_font_size; a number is a deliberate override.
+    assert cfg["fontSize"] is None
     # A fresh copy, not the shared module dict.
     cfg["enabled"] = True
     assert INSPECT_DEFAULTS["enabled"] is False
@@ -42,6 +43,15 @@ def test_validate_clamps_position():
 def test_validate_clamps_font_size():
     assert validate_config({"fontSize": 4})["fontSize"] == 8
     assert validate_config({"fontSize": 99})["fontSize"] == 48
+    assert validate_config({"fontSize": 16})["fontSize"] == 16
+
+
+def test_font_size_override_can_be_cleared():
+    # An emptied or absent override means "follow the shared size", and has to
+    # survive a save/load round trip as None rather than snapping back to 12.
+    assert validate_config({"fontSize": None})["fontSize"] is None
+    assert validate_config({"fontSize": ""})["fontSize"] is None
+    assert validate_config({})["fontSize"] is None
 
 
 def test_start_collapsed_defaults_off_and_coerces():

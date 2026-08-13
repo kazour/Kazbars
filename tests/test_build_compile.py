@@ -128,6 +128,20 @@ def test_inspect_feature_compiles():
     assert ok, msg
 
 
+def test_shared_panel_font_at_a_non_default_size_compiles():
+    # d.PF is emitted into every build and both stubs now resolve their whole
+    # layout from it, so a non-12 size has to reach MTASC intact — including the
+    # log-entry font tag, whose size is spliced into an AS2 string literal.
+    ok, msg, _ = _compile(
+        [_grid()],
+        include_console=True,
+        stopwatch_config={"enabled": True, "fontSize": None},
+        inspect_config={"enabled": True, "fontSize": 30},
+        panel_font_size=20,
+    )
+    assert ok, msg
+
+
 def test_all_features_together_compile():
     cast = {"enableP": True, "enableT": False, "playerX": 900, "playerY": 600}
     sw = {"enabled": True}
