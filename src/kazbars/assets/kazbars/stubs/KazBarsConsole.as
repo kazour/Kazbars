@@ -4,13 +4,13 @@
 // docs/inspect-panel.md section 5): warm near-black plate, 1px black-over-bronze
 // double frame, Conan-orange title, bronze hairline rules, square corners. The
 // two columns keep their player/target identity, retuned onto the panel's own
-// perk-pair blue and red so the console reads as part of the same HUD. It is a
-// transient discovery tool with no font-size config, so its dimensions are
-// named constants at the values the panel's ratios land on at FS 12, and it
-// folds to the same 190x24 bar the stopwatch and inspect panel do. The expanded
-// footprint follows the checked sides — 500x320 with both columns, a single
-// 280-wide column with one, a short toggle strip with none — and a side flip
-// rebuilds the clip in place rather than reflowing every child.
+// perk-pair blue and red so the console reads as part of the same HUD. Every
+// dimension is a ratio of a base font size, the family's arrangement, so the
+// console folds to the same bar the stopwatch and inspect panel do at any size
+// rather than only at the default 12. The expanded footprint follows the
+// checked sides — 500x320 with both columns at FS 12, a single 280-wide column
+// with one, a short toggle strip with none — and a side flip rebuilds the clip
+// in place rather than reflowing every child.
 //
 // Drag is clamped to the Stage and the position and fold state persist in the
 // module config archive (cnx/cny/cnc) beside the master switch (cnv) and the
@@ -45,29 +45,36 @@ class KazBarsConsole {
     public var logPlayerEnabled:Boolean;
     public var logTargetEnabled:Boolean;
 
-    // Layout — the FS-12 equivalents of the inspect panel's ratios. CW/CH are
-    // the current build's expanded footprint, picked per checked sides.
+    // Layout — the inspect panel's ratios off a shared base font size. CW/CH
+    // are the current build's expanded footprint, picked per checked sides.
+    private var FS:Number;        // base font size; everything below scales off it
     private var CW:Number;
     private var CH:Number;
-    private var CW_FULL:Number;   // both columns
-    private var CW_ONE:Number;    // one column (or none)
-    private var CH_FULL:Number;
-    private var CH_NONE:Number;   // no columns: title, toggles, bottom bar
-    private var CB_OFF:Number;    // header text -> its checkbox
+    private var CW_FULL:Number;   // 41.67 both columns
+    private var CW_ONE:Number;    // 23.33 one column (or none)
+    private var CH_FULL:Number;   // 26.67
+    private var CH_NONE:Number;   // 8.33  no columns: title, toggles, bottom bar
+    private var CB_OFF:Number;    // 9.17  header text -> its checkbox
     private var UNIT:Number;      // header + checkbox pair width
-    private var PAD:Number;
-    private var TITLE_H:Number;
-    private var HDR_Y:Number;
-    private var BODY_Y:Number;
-    private var COL_W:Number;
-    private var LINE:Number;
-    private var BOX:Number;
-    private var BTN:Number;
-    private var BTN_W:Number;
-    private var BTN_H:Number;
-    private var COLL_W:Number;
-    private var COLL_H:Number;
-    private var COLL_PAD:Number;
+    private var PAD:Number;       // 0.85
+    private var TITLE_H:Number;   // 1.85
+    private var HDR_Y:Number;     // 2.75
+    private var BODY_Y:Number;    // 4.67
+    private var COL_W:Number;     // 19.17
+    private var LINE:Number;      // 1.4
+    private var BOX:Number;       // 1.0
+    private var BTN:Number;       // 1.1
+    private var BTN_W:Number;     // 5.0
+    private var BTN_H:Number;     // 1.85
+    private var NAME_FS:Number;   // 1.15  title font size
+    private var COLL_W:Number;    // 15.8
+    private var COLL_H:Number;    // 2.0
+    private var COLL_PAD:Number;  // 0.55
+    // Bottom strip: the Clear button's band. The mid rule stops just above the
+    // button, the logs a little higher still, so both are measured up from the
+    // plate's bottom edge rather than baked as a gap.
+    private var RULE_BOT:Number;  // 2.92
+    private var LOG_BOT:Number;   // 3.33
 
     // Every log entry spells out its own face and size: Scaleform re-parses
     // htmlText from scratch, so setNewTextFormat on the field does not reach an
@@ -91,30 +98,50 @@ class KazBarsConsole {
         dragY = 0;
         logPlayerEnabled = true;
         logTargetEnabled = true;
-        CW_FULL = 500;
-        CW_ONE = 280;
-        CH_FULL = 320;
-        CH_NONE = 100;
-        CB_OFF = 110;
+        // Nothing has to call configure() for the console to be usable, so it
+        // seeds itself at the default size here rather than leaving every
+        // constant NaN until someone does.
+        configure(null);
+    }
+
+    // =========================================================================
+    // Setup
+    // =========================================================================
+
+    // Mirrors KazBarsStopwatch/KazBarsInspect, minus their bail-on-null: those
+    // two are always configured before they build, this one is not.
+    public function configure(cfg:Object):Void {
+        if (cfg == null) cfg = {};
+        FS = Number(cfg.fontSize);
+        if (isNaN(FS) || FS < 8) FS = 12;
+        PAD = Math.round(FS * 0.85);
+        TITLE_H = Math.round(FS * 1.85);
+        HDR_Y = Math.round(FS * 2.75);
+        BODY_Y = Math.round(FS * 4.67);
+        COL_W = Math.round(FS * 19.17);
+        LINE = Math.round(FS * 1.4);
+        BOX = Math.round(FS);
+        BTN = Math.round(FS * 1.1);
+        BTN_W = Math.round(FS * 5);
+        BTN_H = Math.round(FS * 1.85);
+        NAME_FS = Math.round(FS * 1.15);
+        COLL_W = Math.round(FS * 15.8);
+        COLL_H = Math.round(FS * 2);
+        COLL_PAD = Math.round(FS * 0.55);
+        RULE_BOT = Math.round(FS * 2.92);
+        LOG_BOT = Math.round(FS * 3.33);
+        CW_FULL = Math.round(FS * 41.67);
+        CW_ONE = Math.round(FS * 23.33);
+        CH_FULL = Math.round(FS * 26.67);
+        CH_NONE = Math.round(FS * 8.33);
+        CB_OFF = Math.round(FS * 9.17);
+        UNIT = CB_OFF + BOX;
         CW = CW_FULL;
         CH = CH_FULL;
-        PAD = 10;
-        TITLE_H = 22;
-        HDR_Y = 33;
-        BODY_Y = 56;
-        COL_W = 230;
-        LINE = 17;
-        BOX = 12;
-        UNIT = CB_OFF + BOX;
-        BTN = 13;
-        BTN_W = 60;
-        BTN_H = 22;
-        COLL_W = 190;
-        COLL_H = 24;
-        COLL_PAD = 7;
         curW = CW;
         curH = CH;
-        ENTRY_FONT = '<font face="Arial" size="11" color="';
+        ENTRY_FONT = '<font face="Arial" size="'
+                   + Math.max(9, Math.round(FS * 0.9)) + '" color="';
     }
 
     public function isActive():Boolean {
@@ -160,10 +187,10 @@ class KazBarsConsole {
         var logW:Number = both ? COL_W : CW - PAD * 2;
 
         var tp:TextField = makeTF(m_Body, "tp", px, HDR_Y, CB_OFF, LINE + 2,
-                                  12, true, 0x7FB0D6, "left");
+                                  FS, true, 0x7FB0D6, "left");
         tp.text = "PLAYER BUFFS";
         var tt:TextField = makeTF(m_Body, "tt", tx, HDR_Y, CB_OFF, LINE + 2,
-                                  12, true, 0xD68585, "left");
+                                  FS, true, 0xD68585, "left");
         tt.text = "TARGET BUFFS";
 
         playerText = null;
@@ -173,14 +200,14 @@ class KazBarsConsole {
                                                    logW, targetLog);
 
         var pcb:MovieClip = makeCheckbox("pcb", px + CB_OFF, HDR_Y + 2, null,
-                                         logPlayerEnabled, 20);
+                                         logPlayerEnabled, BOX + 8);
         pcb.hit.onPress = function() {
             self.logPlayerEnabled = !self.logPlayerEnabled;
             self.rebuild();
         };
 
         var tcb:MovieClip = makeCheckbox("tcb", tx + CB_OFF, HDR_Y + 2, null,
-                                         logTargetEnabled, 20);
+                                         logTargetEnabled, BOX + 8);
         tcb.hit.onPress = function() {
             self.logTargetEnabled = !self.logTargetEnabled;
             self.rebuild();
@@ -194,7 +221,9 @@ class KazBarsConsole {
         rectPath(clr, 0, 0, BTN_W, BTN_H);
         clr.endFill();
         var clbl:TextField = makeTF(clr, "label", 0, Math.floor((BTN_H - LINE) / 2),
-                                    BTN_W, LINE, 11, true, 0xC8C0B0, "center");
+                                    BTN_W, LINE,
+                                    Math.max(9, Math.round(FS * 0.9)), true,
+                                    0xC8C0B0, "center");
         clbl.text = "Clear";
         clr.useHandCursor = true;
         clr.onRelease = function() { self.clearLog(); };
@@ -206,16 +235,16 @@ class KazBarsConsole {
         // time. Same reason the inspect panel carries a separate collapsed label.
         titleTF = makeTF(consoleClip, "title", PAD, Math.floor((TITLE_H - (LINE + 4)) / 2),
                          CW - PAD * 2 - BTN, LINE + 4,
-                         14, true, 0xF7A22B, "left");
+                         NAME_FS, true, 0xF7A22B, "left");
         titleTF.text = "Buff Console";
         collTF = makeTF(consoleClip, "coll", COLL_PAD, Math.floor((COLL_H - LINE) / 2),
-                        COLL_W - COLL_PAD * 2 - BTN, LINE, 12, true, 0xF7A22B, "left");
+                        COLL_W - COLL_PAD * 2 - BTN, LINE, FS, true, 0xF7A22B, "left");
         collTF.text = "Console";
 
         // Live position readout — visible only while dragging, the panel's
         // convention. Shares the title line, right-aligned.
         coordTF = makeTF(consoleClip, "coords", PAD, 0, CW - PAD * 2 - BTN, LINE,
-                         10, false, 0x999999, "right");
+                         Math.max(9, Math.round(FS * 0.8)), false, 0x999999, "right");
         coordTF._visible = false;
 
         // Drag handle over the title line, stopping short of the collapse glyph
@@ -230,7 +259,8 @@ class KazBarsConsole {
         collapseBtn = consoleClip.createEmptyMovieClip("btnCollapse", consoleClip.getNextHighestDepth());
         collapseBtn._self = this;
         collapseBtn.useHandCursor = true;
-        makeTF(collapseBtn, "label", 0, 0, BTN, BTN + 2, 11, true, 0xC8C0B0, "center");
+        makeTF(collapseBtn, "label", 0, 0, BTN, BTN + 2,
+               Math.max(9, Math.round(FS * 0.9)), true, 0xC8C0B0, "center");
         collapseBtn.onRelease = function() { this._self.toggleCollapsed(); };
         collapseBtn.onRollOver = function() { this.label.textColor = 0xF7A22B; };
         collapseBtn.onRollOut = function() { this.label.textColor = 0xC8C0B0; };
@@ -314,7 +344,7 @@ class KazBarsConsole {
                 chrome.moveTo(CW / 2 + PAD, BODY_Y - 5);
                 chrome.lineTo(CW / 2 + PAD + COL_W, BODY_Y - 5);
                 chrome.moveTo(CW / 2, TITLE_H);
-                chrome.lineTo(CW / 2, CH - 35);
+                chrome.lineTo(CW / 2, CH - RULE_BOT);
             }
         }
     }
@@ -340,8 +370,9 @@ class KazBarsConsole {
     // value green without a field per line. Lives on the body clip so a fold
     // takes it with everything else.
     private function makeLog(id:String, x:Number, w:Number, html:String):TextField {
-        var tf:TextField = makeTF(m_Body, id, x, BODY_Y, w, CH - BODY_Y - 40,
-                                  11, false, 0xC8C0B0, "left");
+        var tf:TextField = makeTF(m_Body, id, x, BODY_Y, w, CH - BODY_Y - LOG_BOT,
+                                  Math.max(9, Math.round(FS * 0.9)), false,
+                                  0xC8C0B0, "left");
         tf.selectable = true;
         tf.multiline = true;
         tf.wordWrap = true;
@@ -361,15 +392,18 @@ class KazBarsConsole {
         box.beginFill(0x0C0A07, 90);
         rectPath(box, 0, 0, BOX, BOX);
         box.endFill();
+        // Tick drawn to the box rather than to a 12px box's coordinates: three
+        // points at 1/6, 5/12 and 5/6 of the side, the shape it has always had.
         var chk:MovieClip = c.createEmptyMovieClip("chk", 2);
-        chk.lineStyle(2, 0x7AC142, 100);
-        chk.moveTo(2, 6);
-        chk.lineTo(5, 10);
-        chk.lineTo(10, 2);
+        chk.lineStyle(Math.max(1, Math.round(BOX / 6)), 0x7AC142, 100);
+        chk.moveTo(Math.round(BOX / 6), Math.round(BOX / 2));
+        chk.lineTo(Math.round(BOX * 5 / 12), Math.round(BOX * 5 / 6));
+        chk.lineTo(Math.round(BOX * 5 / 6), Math.round(BOX / 6));
         chk._visible = checked;
         if (label != null) {
             var lbl:TextField = makeTF(c, "lbl", BOX + 4, -3, 80, LINE,
-                                       10, false, 0xC8C0B0, "left");
+                                       Math.max(9, Math.round(FS * 0.8)), false,
+                                       0xC8C0B0, "left");
             lbl.text = label;
         }
         // Hit area is a child at depth 0 so it sits under the art but still
