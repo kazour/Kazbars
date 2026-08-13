@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "content_version": 19,
+  "content_version": 21,
   "min_app_version": "2.2.2",
-  "notes": "Ruin line: encounter-level attribution for three add-applied ruins",
+  "notes": "Added 20 wrack and torment boss debuffs to the buff catalog",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
-      "sha256": "effd16fc28f2966c31c0e9037c69c2e514cad35f7e4f3666acdb637ccb849c0e"
+      "sha256": "1f66e2d58d7eb5a55d87a83611f7aca9add3ab485b4ac27126dea120a70b1533"
     },
     "Default.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.json",
