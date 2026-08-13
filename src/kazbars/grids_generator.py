@@ -14,6 +14,7 @@ from .cast_timer import is_enabled as cast_is_enabled
 from .cast_timer import validate_config as validate_cast_config
 from .grid_model import MAX_TOTAL_SLOTS
 from .inspect import validate_config as validate_inspect_config
+from .prefs import validate_panel_font_size
 from .stopwatch import validate_config as validate_stopwatch_config
 
 logger = logging.getLogger(__name__)
@@ -85,6 +86,7 @@ class CodeGenerator:
         cast_config=None,
         stopwatch_config=None,
         inspect_config=None,
+        panel_font_size=None,
     ):
         """Initialize the code generator with grid configs and the buff database."""
         # Filter out disabled grids
@@ -105,6 +107,11 @@ class CodeGenerator:
         # Target inspect panel: same gate pattern again.
         self.inspect_config = validate_inspect_config(inspect_config)
         self.include_inspect = self.inspect_config["enabled"]
+        # Shared text size for the four in-game panels. The console and the
+        # preview control panel have no config of their own and always take it;
+        # the stopwatch and inspect panel take it unless their own fontSize is
+        # set. Baking is the only place the two are resolved into one number.
+        self.panel_font_size = validate_panel_font_size(panel_font_size)
 
     def sanitize_id(self, grid_id):
         """Convert a grid ID to a safe AS2 identifier by replacing invalid characters."""
@@ -325,6 +332,13 @@ class CodeGenerator:
         cast_cfg = "\n        castTimer.configure(d.CAST);" if self.include_cast_timer else ""
         sw_cfg = "\n        stopwatch.configure(d.SW);" if self.include_stopwatch else ""
         ins_cfg = "\n        inspect.configure(d.INS);" if self.include_inspect else ""
+        # The control panel is never gated, so its configure is unconditional;
+        # the console's follows its build gate. Both re-run before anything is
+        # drawn — each stub already seeded itself at the default from its
+        # constructor, so a build that skips this still renders.
+        pf_cfg = "\n        ppanel.configure(d.PF);"
+        if self.include_console:
+            pf_cfg += "\n        console.configure(d.PF);"
         return f"""
     private function initConfig():Void {{
         var d:Object = KazBarsData.init();
@@ -333,8 +347,22 @@ class CodeGenerator:
         ISDEB = d.ISDEB;
         BUFFTYPE = d.BUFFTYPE;
         STACK_LEVEL = d.STACK_LEVEL;
-        CUSTOMICON = d.CUSTOMICON;{cast_cfg}{sw_cfg}{ins_cfg}
+        CUSTOMICON = d.CUSTOMICON;{pf_cfg}{cast_cfg}{sw_cfg}{ins_cfg}
     }}"""
+
+    def _resolved_font_size(self, config):
+        """The size actually baked for one panel: its own `fontSize` when it set
+        one, otherwise the shared `panel_font_size`. The single place the shared
+        value and a per-panel override are collapsed into one number."""
+        own = config.get("fontSize")
+        return self.panel_font_size if own is None else int(own)
+
+    def _panel_font_data_block(self):
+        """AS2 `d.PF = {...}` literal — the shared panel text size, for the two
+        panels with no config of their own to override it from. Emitted
+        unconditionally: `KazBarsPreviewPanel` is not gated and compiles into
+        every build."""
+        return f"\n        d.PF = {{fontSize: {self.panel_font_size}}};"
 
     def _cast_data_block(self):
         """AS2 `d.CAST = {...}` literal for the cast-timer overlay. Color is
@@ -360,7 +388,7 @@ class CodeGenerator:
         collapsed = "true" if c["startCollapsed"] else "false"
         return (
             f"\n        d.SW = {{x: {int(c['x'])}, y: {int(c['y'])}, "
-            f"fontSize: {int(c['fontSize'])}, collapsed: {collapsed}}};"
+            f"fontSize: {self._resolved_font_size(c)}, collapsed: {collapsed}}};"
         )
 
     def _inspect_data_block(self):
@@ -371,7 +399,7 @@ class CodeGenerator:
         show_perks = "true" if c["showPerks"] else "false"
         return (
             f"\n        d.INS = {{x: {int(c['x'])}, y: {int(c['y'])}, "
-            f"fontSize: {int(c['fontSize'])}, collapsed: {collapsed}, "
+            f"fontSize: {self._resolved_font_size(c)}, collapsed: {collapsed}, "
             f"showPvp: {show_pvp}, showPerks: {show_perks}}};"
         )
 
@@ -392,6 +420,7 @@ class CodeGenerator:
 """
         ]
 
+        lines.append(self._panel_font_data_block())
         if self.include_cast_timer:
             lines.append(self._cast_data_block())
         if self.include_stopwatch:
@@ -632,6 +661,7 @@ def build_grids(
     cast_config: dict | None = None,
     stopwatch_config: dict | None = None,
     inspect_config: dict | None = None,
+    panel_font_size: int | None = None,
 ) -> tuple[bool, str]:
     """
     Complete build process for KazBars.swf.
@@ -670,6 +700,7 @@ def build_grids(
             cast_config=cast_config,
             stopwatch_config=stopwatch_config,
             inspect_config=inspect_config,
+            panel_font_size=panel_font_size,
         )
         main_code, data_code = generator.generate()
 

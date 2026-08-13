@@ -317,6 +317,8 @@ SECTIONS: list[_Section] = [
             ]),
             'Drag it by its title bar; − collapses it to a small bar, click '
             'to reopen. The game remembers spot, fold, and open state.',
+            'Its text uses the size all four in-game panels share, set in '
+            'the same dialog.',
             "Off by default, so finished builds don't carry it. Turn it off "
             'and rebuild to remove it.',
         ],
@@ -371,6 +373,9 @@ SECTIONS: list[_Section] = [
                 'Preview mode also shows a Control Panel: one checkbox per '
                 'grid and extra. Each box is a persistent master switch — '
                 'unchecked stays off until you re-check it.',
+                'Its text uses the size all four in-game panels share '
+                '(Extras ▸ Inspect panel…). With many grids it shrinks '
+                'itself to stay on screen.',
             ]),
             _sub('X/Y in the app', [
                 'The Grids-tab X/Y only seed a first-ever session. Once you '
@@ -459,7 +464,7 @@ SECTIONS: list[_Section] = [
         'title': 'How Extras Ship',
         'body': [
             'The Extras menu holds two kinds of add-on — its own captions '
-            'split them. Every extra follows one of these two rules.',
+            'split them. Every extra applies one of these two ways.',
             _sub('Build & Install to apply', [
                 [('Damage Numbers, Stopwatch, Inspect Panel and Cast Timer '
                   'are off by default — off means zero code in the build. '
@@ -475,6 +480,18 @@ SECTIONS: list[_Section] = [
                 'Default Buff Bars and Damage Number Colors edit the '
                 "game's own files on Apply.",
                 'Nothing to build — /reloadui in-game shows the change.',
+            ]),
+            _sub('One text size, four panels', [
+                'Stopwatch, inspect panel, buff console and control panel '
+                'share one text size (8–48), baked at build time. Each '
+                'panel scales as one piece, collapsed bars included.',
+                'Set it in Extras ▸ Inspect panel…, under Text size. It '
+                'lives there because the console and control panel have no '
+                'dialog of their own.',
+                [('To size the stopwatch or inspect panel differently, '
+                  'untick ', None),
+                 ('Use the shared size for this panel', _SUCCESS),
+                 (' in its own dialog.', None)],
             ]),
         ],
     },
@@ -570,8 +587,8 @@ SECTIONS: list[_Section] = [
                 'Drag the title bar; live coordinates show. The game '
                 "remembers position and fold — the dialog's X/Y only seed "
                 'the first session.',
-                'Font size (8–48) is baked at build time; the whole panel '
-                'scales with it.',
+                'Text size is the one all four in-game panels share — the '
+                'dialog can override it for the stopwatch alone.',
             ]),
             [('Tick ', None),
              ('Include the stopwatch in builds', _SUCCESS),
@@ -612,7 +629,9 @@ SECTIONS: list[_Section] = [
                 'Drag by the name strip; − collapses to just the strip. The '
                 'game remembers position and fold.',
                 'No target? Preview mode (Shift+Ctrl+Alt) shows a '
-                'placeholder. Font size (8–48) scales the whole panel.',
+                'placeholder.',
+                'This dialog sets the text size all four in-game panels '
+                'share — or the inspect panel alone.',
             ]),
             [('Tick ', None),
              ('Include the inspect panel in builds', _SUCCESS),

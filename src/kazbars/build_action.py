@@ -158,6 +158,7 @@ def build(app):
         'cast_config': cast_config,
         'stopwatch_config': app.settings.get('stopwatch'),
         'inspect_config': app.settings.get('inspect'),
+        'panel_font_size': app.settings.get('panel_font_size'),
         'game_path': app.game_path,
         'di_enabled': di_enabled,
         'di_settings': di_settings,
@@ -201,6 +202,7 @@ def _build_worker(app, loading, ctx):
             include_console=ctx['include_console'], cast_config=ctx['cast_config'],
             stopwatch_config=ctx['stopwatch_config'],
             inspect_config=ctx['inspect_config'],
+            panel_font_size=ctx['panel_font_size'],
         )
         if not compile_result[0]:
             _hold_phase(started)

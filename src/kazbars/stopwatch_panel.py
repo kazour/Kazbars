@@ -3,7 +3,9 @@ KazBars — In-game stopwatch dialog.
 
 Extras-menu settings for the in-game stopwatch panel (KazBarsStopwatch stub):
 the build gate, the baked default position, the baked font size, and the
-start-collapsed flag.
+start-collapsed flag. The font size is an *override* of the text size the four
+in-game panels share — the shared value itself is set in the Inspect Panel
+dialog, so there is one control rather than four that can disagree.
 Persists machine-local in prefs.json under `stopwatch` (data layer:
 `stopwatch.py`); the build bakes the values into the generated SWF.
 Functions take the KazBarsApp instance as first arg.
@@ -32,7 +34,7 @@ from .ui_widgets import add_tooltip, app_toast
 from .window_position import bind_window_position_save, restore_window_position
 
 _WIDTH = 400
-_HEIGHT = 390
+_HEIGHT = 450
 
 
 def open_stopwatch_dialog(app):
@@ -94,15 +96,35 @@ def open_stopwatch_dialog(app):
     ttk.Label(content, text="Text size",
               font=FONT_SECTION, foreground=THEME_COLORS['heading']
               ).pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
-    size_var = tk.IntVar(value=cfg['fontSize'])
+    # fontSize is None when the panel follows the shared size. The spinbox still
+    # shows a number so unticking the box has somewhere to start from. The shared
+    # size itself is set in the Inspect Panel dialog (decision: one control, and
+    # the console and control panel have no dialog to host it).
+    shared = app.settings.get('panel_font_size')
+    follow_var = tk.BooleanVar(value=cfg['fontSize'] is None)
+    follow_cb = ttk.Checkbutton(content, text="Use the shared size for this panel",
+                                variable=follow_var)
+    follow_cb.pack(anchor='w', pady=(0, PAD_XS))
+    add_tooltip(follow_cb,
+                "Extras ▸ Inspect panel… sets the text size all four in-game "
+                "panels share. Untick to make the stopwatch bigger or smaller "
+                "than the rest.")
+
+    size_var = tk.IntVar(value=shared if cfg['fontSize'] is None else cfg['fontSize'])
     size_row = ttk.Frame(content)
     size_row.pack(anchor='w', pady=(0, PAD_SMALL))
-    size_spin = labeled_spinbox(size_row, "Font size ", size_var, from_=8, to=48, width=6)
+    size_spin = labeled_spinbox(size_row, "Stopwatch only ", size_var,
+                                from_=8, to=48, width=6)
     add_tooltip(size_spin,
-                "Baked at build time — the whole panel scales with it, collapsed "
-                "bar included, so set it to the same size as the inspect panel "
-                "and the two collapsed bars match. Takes effect on the next "
-                "Build & Install.")
+                "This panel's own size, used instead of the shared one. The whole "
+                "panel scales with it, collapsed bar included. Takes effect on "
+                "the next Build & Install.")
+
+    def _sync_size_override(*_):
+        size_spin.configure(state='disabled' if follow_var.get() else 'normal')
+
+    follow_var.trace_add('write', _sync_size_override)
+    _sync_size_override()
 
     collapsed_var = tk.BooleanVar(value=cfg['startCollapsed'])
     collapsed_cb = ttk.Checkbutton(content, text="Start collapsed (title bar only)",
@@ -128,7 +150,9 @@ def open_stopwatch_dialog(app):
             'enabled': enabled_var.get(),
             'x': _read(x_var, cfg['x']),
             'y': _read(y_var, cfg['y']),
-            'fontSize': _read(size_var, cfg['fontSize']),
+            # Checked means "no opinion" — never the number left in the disabled
+            # spinbox, or unticking once would freeze the panel off the shared value.
+            'fontSize': None if follow_var.get() else _read(size_var, shared),
             'startCollapsed': collapsed_var.get(),
         })
         app.settings.set('stopwatch', new_cfg)

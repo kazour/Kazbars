@@ -11,7 +11,10 @@ the codegen, prefs schema, and tests.
 `fontSize` is baked at build time (cast-timer precedent) and drives the whole
 panel: every dimension in the stub derives from it, so the panel scales as one
 piece — and its collapsed bar keeps pairing with the inspect panel's, which is
-built from the same ratios. Positioning mirrors the cast timer: `x`/`y` are
+built from the same ratios. It is **nullable**: `None` means "follow the shared
+`panel_font_size`", which is what all four in-game panels do by default; a
+number is a deliberate per-panel override. The build path is the only place the
+two are resolved into one number. Positioning mirrors the cast timer: `x`/`y` are
 baked into the generated SWF (the only position that survives relaunch on
 `/loadclip` default clients — the panel shows live coordinates while its title
 bar is dragged so users can copy them here); aoc.exe clients persist drag
@@ -21,7 +24,7 @@ position and collapsed state via the module config archive.
 import logging
 
 from .grid_model import SCREEN_MAX_X, SCREEN_MAX_Y
-from .settings_core import Field, Schema, get_defaults, validate_all
+from .settings_core import Field, Schema, get_defaults, nullable_int, validate_all
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +35,7 @@ _SCHEMA = Schema('stopwatch', 1, {
     "enabled": Field(False, kind='bool'),
     "x": Field(850, kind='int', min=0, max=SCREEN_MAX_X),
     "y": Field(300, kind='int', min=0, max=SCREEN_MAX_Y),
-    "fontSize": Field(12, kind='int', min=8, max=48),
+    "fontSize": Field(None, validate=nullable_int(min=8, max=48)),
     "startCollapsed": Field(False, kind='bool'),
 })
 
