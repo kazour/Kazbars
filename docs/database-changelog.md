@@ -26,6 +26,39 @@ new file in `docs/README.md`. Look an ID up across all of them with
 
 ---
 
+## 2026-08-09
+**Wrack and torment lines — four more boss debuffs.** Continues the previous day's pass, same
+sourcing: confirmed against observed in-game application data and cross-checked with the boss
+rosters. No existing entry changed, so no profile whitelist is affected (`Default.json`
+untouched).
+- **Added:** `Kian Lai's Wrack 1-5 (Kian Lai)` — #General debuff, stacking (5 ranks): `4043129`, `4043131`, `4043132`, `4043133`, `4043134`. The boss's stacking armor debuff, and the wrack counterpart to `Kian Lai's Ruin (Kian Lai)`; the game data stores it under the bare name `Kian Lai`. Also applied by the encounter's second boss.
+- **Added:** `Bhangi Khan Wrack 1-5` — #General debuff, stacking (5 ranks): `4549463`, `4549505`, `4549506`, `4549507`, `4549508`. Completes that boss's tracked set alongside his two ruins and his torment.
+- **Added:** `Mind Wrack (Necropolis)` — `4239687`, `4502967`, #General debuff. A lightning-resistance debuff applied by an add in that instance. Distinct from `Mind Wrack (Stun)`, which is a player ability.
+- **Added:** `Ghostly Torment (Necropolis)` — `4239695`, #General debuff. Applied by an add in that instance; a delayed debuff that deals area damage when it expires.
+
+## 2026-08-08
+**Wrack and torment lines — sixteen boss debuffs.** The wrack and torment counterparts to the
+ruin line, confirmed against observed in-game application data and cross-checked with the boss
+rosters. Several encounters that previously had only their ruin tracked now carry the full
+dispel set. No existing entry changed, so no profile whitelist is affected (`Default.json`
+untouched).
+- **Added:** `Corrupted Claws Wrack 1-4 (Bone Golems)` — #General debuff, stacking (4 ranks): `4704444`, `4704445`, `4704446`, `4704447`. Named for the applying add; the parent encounter is not identified.
+- **Added:** `Scorching Wrack 1-4 (Abyssal Convoker)` — #General debuff, stacking (4 ranks): `4935086`, `4935087`, `4935088`, `4935089`.
+- **Added:** `Malicious Wrack 1-5 (Jing-Zhi)` — #General debuff, stacking (5 ranks): `4515806`, `4515807`, `4515818`, `4515819`, `4515820`. The wrack half of the pair whose ruin is `Malicious Ruin (Cavern of Malice)`.
+- **Added:** `Lighter than Air Wrack (Air and Water)` — `4550619`, #General debuff.
+- **Added:** `Poison Pincer Wrack (Sodabeh)` — `4838217`, #General debuff. Applied by the boss's two offspring adds.
+- **Added:** `Scorching Torment (Devourer)` — `4935118`, #General debuff.
+- **Added:** `Enslaving Torment (Kun Whu)` — `4049150`, #General debuff. A charm effect, dispel-classed as a torment.
+- **Added:** `Slaughterer's Torment (Tetharos)` — `4490631`, #General debuff.
+- **Added:** `Drowned God's Wrack (Thrice Drowned)` — `4991713`, #General debuff. A second spell ID exists for the arena variant of this encounter and is deliberately not tracked pending verification.
+- **Added:** `Advisor's Wrack (Argo-satha)` — `4732523`, #General debuff.
+- **Added:** `Advisor's Torment (Argo-satha)` — `4732526`, #General debuff. With `Advisor's Ruin (Argo-satha)`, this completes the boss's hard-mode proc set.
+- **Added:** `Crushed Armor Wrack (Kamangir)` — `4752009`, #General debuff. A separate encounter's copy of the debuff tracked as `Crushed Armor Wrack (T4 adds)`; the two share a display name but not a spell ID.
+- **Added:** `Sonic Missile Elemental Wrack (I-Po)` — `4548156`, #General debuff.
+- **Added:** `Ghost Fangs Torment (Bhangi Khan)` — `4549368`, #General debuff.
+- **Added:** `Wrack Armor (Ironwright)` — `4707552`, #General debuff.
+- **Added:** `Tainted Claws Wrack (Craterspawn)` — `4752047`, #General debuff.
+
 ## 2026-07-27
 **Ruin line — four entries withdrawn.** Removed from the catalog after observed
 application data showed their source encounters are well represented yet never apply
@@ -174,5 +207,5 @@ unchanged, so no grid or profile whitelist is affected (`Default.json` untouched
 ---
 
 *Entries are reconstructed from `git log` on `Database.json` (this repo) and the predecessor
-`KzBuilder-public` repo; spell IDs reflect the current database, which holds **383 buffs**.
+`KzBuilder-public` repo; spell IDs reflect the current database, which holds **403 buffs**.
 Going forward, log changes here as they happen.*

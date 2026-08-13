@@ -3555,6 +3555,195 @@
       ],
       "category": "#General",
       "type": "debuff"
+    },
+    {
+      "name": "Corrupted Claws Wrack 1-4 (Bone Golems)",
+      "ids": [
+        4704444,
+        4704445,
+        4704446,
+        4704447
+      ],
+      "category": "#General",
+      "type": "debuff",
+      "stacking": true,
+      "stackEnd": 4
+    },
+    {
+      "name": "Lighter than Air Wrack (Air and Water)",
+      "ids": [
+        4550619
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Poison Pincer Wrack (Sodabeh)",
+      "ids": [
+        4838217
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Scorching Torment (Devourer)",
+      "ids": [
+        4935118
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Scorching Wrack 1-4 (Abyssal Convoker)",
+      "ids": [
+        4935086,
+        4935087,
+        4935088,
+        4935089
+      ],
+      "category": "#General",
+      "type": "debuff",
+      "stacking": true,
+      "stackEnd": 4
+    },
+    {
+      "name": "Malicious Wrack 1-5 (Jing-Zhi)",
+      "ids": [
+        4515806,
+        4515807,
+        4515818,
+        4515819,
+        4515820
+      ],
+      "category": "#General",
+      "type": "debuff",
+      "stacking": true,
+      "stackEnd": 5
+    },
+    {
+      "name": "Enslaving Torment (Kun Whu)",
+      "ids": [
+        4049150
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Slaughterer's Torment (Tetharos)",
+      "ids": [
+        4490631
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Drowned God's Wrack (Thrice Drowned)",
+      "ids": [
+        4991713
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Advisor's Wrack (Argo-satha)",
+      "ids": [
+        4732523
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Advisor's Torment (Argo-satha)",
+      "ids": [
+        4732526
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Crushed Armor Wrack (Kamangir)",
+      "ids": [
+        4752009
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Sonic Missile Elemental Wrack (I-Po)",
+      "ids": [
+        4548156
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Ghost Fangs Torment (Bhangi Khan)",
+      "ids": [
+        4549368
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Wrack Armor (Ironwright)",
+      "ids": [
+        4707552
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Tainted Claws Wrack (Craterspawn)",
+      "ids": [
+        4752047
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Mind Wrack (Necropolis)",
+      "ids": [
+        4239687,
+        4502967
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Ghostly Torment (Necropolis)",
+      "ids": [
+        4239695
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Kian Lai's Wrack 1-5 (Kian Lai)",
+      "ids": [
+        4043129,
+        4043131,
+        4043132,
+        4043133,
+        4043134
+      ],
+      "category": "#General",
+      "type": "debuff",
+      "stacking": true,
+      "stackEnd": 5
+    },
+    {
+      "name": "Bhangi Khan Wrack 1-5",
+      "ids": [
+        4549463,
+        4549505,
+        4549506,
+        4549507,
+        4549508
+      ],
+      "category": "#General",
+      "type": "debuff",
+      "stacking": true,
+      "stackEnd": 5
     }
   ]
 }
