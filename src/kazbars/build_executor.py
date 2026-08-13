@@ -363,8 +363,8 @@ def _first_running(names):
 def get_running_game_process():
     """Return the name of a running AoC game process, or None.
 
-    Aoc.exe (the launcher bypass loader) doesn't lock the overlay files —
-    the actual game process does. Only the DX9/DX10 game exes matter here.
+    Only the DX9/DX10 client exes lock the overlay files, so those are the
+    only ones a build has to wait for; the patcher matters to Repair alone.
     """
     return _first_running(GAME_EXES)
 

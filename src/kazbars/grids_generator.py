@@ -526,8 +526,8 @@ class CodeGenerator:
             tokens = {
                 "{{CONSOLE_LOG_PLAYER}}": "if (console.isActive() && buff.m_Name != null) console.logPlayer(buff.m_Name, bid);",
                 "{{CONSOLE_LOG_TARGET}}": "if (console.isActive() && buff.m_Name != null) console.logTarget(buff.m_Name, bid);",
-                # Open at login is the default, and the only default a /loadclip
-                # client ever gets — no archive reaches it to say otherwise.
+                # Open at login is the default a first-ever session gets, before
+                # any archived state exists to say otherwise.
                 "{{CONSOLE_CREATE}}": "console.createConsole();",
                 "{{CONSOLE_EXIT_PERSIST}}": 'config.ReplaceEntry("cnv", console.isActive() ? 1 : 0);\n'
                 '            config.ReplaceEntry("log_p", console.logPlayerEnabled ? 1 : 0);\n'

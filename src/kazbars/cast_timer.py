@@ -9,9 +9,9 @@ since screen position depends on the machine's resolution). No Tk — importable
 by the codegen, prefs schema, and tests.
 
 Positioning mirrors grids: `playerX/Y` and `targetX/Y` are baked into the
-generated SWF (the only positions that survive relaunch on `/loadclip` default
-clients) and also serve as the preview-drag starting point; aoc.exe clients
-persist drag positions via the config archive.
+generated SWF as the first-session seed and the preview-drag starting point.
+From then on the game itself persists drag positions in the module config
+archive, for every user (`game_persistence`).
 """
 
 import logging

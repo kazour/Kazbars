@@ -184,8 +184,8 @@ def show_close_game_required_dialog(parent, process_name="the game"):
     No return value — caller always aborts the build. The user closes the
     popup, closes the game, and clicks Build & Install again.
 
-    process_name is the actual running exe (Aoc.exe / AgeOfConan.exe /
-    AgeOfConanDX10.exe) detected by build_executor.get_running_game_process.
+    process_name is the actual running exe (AgeOfConan.exe / AgeOfConanDX10.exe)
+    detected by build_executor.get_running_game_process.
     """
     h = 250
     popup, canvas = make_popup_shell(parent, h)
