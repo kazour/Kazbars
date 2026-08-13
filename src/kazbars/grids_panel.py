@@ -3,8 +3,6 @@ KazBars — Grid Editor Panel
 Grid configuration UI: add/edit/delete grids, whitelist editing, slot assignment.
 """
 
-import hashlib
-import json
 import logging
 import tkinter as tk
 from tkinter import ttk
@@ -27,7 +25,7 @@ from .grid_model import (
     scale_grid_position,
     validate_grid,
 )
-from .settings_manager import get_setting, set_setting
+from .settings_manager import get_setting
 from .ui_components import DragReorderManager, create_scrollable_frame
 from .ui_forms import draw_grid_cells
 from .ui_helpers import (
@@ -76,6 +74,12 @@ class GridsPanel(ttk.Frame):
         self.grids = []
         self.grid_panels = []
         self._tip_dismissed = False
+        # The step guide is a first-run thing: it retires for good once a build
+        # has ever landed. Latched at construction rather than read live, because
+        # `has_built_before` flips one line after notify_build_done() — a live
+        # read would yank the completed checklist out from under the first-time
+        # user on whatever they touched next, before they'd seen it go green.
+        self._onboarding = not get_setting('has_built_before')
         self._build_done = False
         self._profile_generation = 0
 
@@ -330,26 +334,12 @@ class GridsPanel(ttk.Frame):
         self._tip_dismissed = True
         self._tip_frame.pack_forget()
 
-    def notify_build_done(self, profile_path):
-        """Called after a successful build — mark step 4 complete and re-show panel.
-        Persists a signature of {profile path, built grids} so relaunching the app
-        with the same profile and unchanged grids restores the green Build step.
-        Loading a different profile (even one whose grids hash to the same shape)
-        won't false-match because the profile path is part of the signature."""
+    def notify_build_done(self):
+        """Called after a successful build — mark step 4 complete.
+        A dismissed guide stays dismissed: the user closed it, and the build they
+        went on to run is no reason to put it back in front of them."""
         self._build_done = True
-        self._tip_dismissed = False
-        set_setting('last_build_signature', self._compute_grids_signature(profile_path))
         self._update_tip()
-
-    def _compute_grids_signature(self, profile_path):
-        """Stable hash of {profile, grids}. `profile_path` is the loaded profile
-        path or `None` for the bundled default — both are valid identities, so
-        signatures pin to whichever the user actually built."""
-        payload = json.dumps(
-            {'profile': profile_path, 'grids': self.grids},
-            sort_keys=True, ensure_ascii=False,
-        )
-        return hashlib.sha1(payload.encode('utf-8')).hexdigest()
 
     def notify_game_path_changed(self):
         """Called when the active game folder changes."""
@@ -362,7 +352,7 @@ class GridsPanel(ttk.Frame):
 
     def _update_tip(self):
         """Update step guide state and show/hide the tip panel."""
-        if self._tip_dismissed:
+        if self._tip_dismissed or not self._onboarding:
             self._tip_frame.pack_forget()
             return
 
@@ -461,12 +451,8 @@ class GridsPanel(ttk.Frame):
             grid['slotAssignments'] = migrated
         return grid
 
-    def load_profile_data(self, grids, profile_path=None):
+    def load_profile_data(self, grids):
         """Load grid configs, validate/clamp values, and rebuild panels.
-
-        `profile_path` identifies the profile being loaded (None for bundled
-        default). Used to pin the build signature: only the same profile +
-        same grids shape restores `_build_done`.
 
         Returns dict of {grid_name: [missing_refs]} for any buffs that couldn't
         be resolved during migration. Caller decides when/how to surface it,
@@ -490,11 +476,9 @@ class GridsPanel(ttk.Frame):
         for old, new in dedupe_grid_ids(validated):
             logger.warning("Duplicate grid name '%s' renamed to '%s'", old, new)
         self.grids = validated
-        # Restore _build_done from the persisted signature only when both the
-        # profile identity and the grids hash match: relaunch on the same
-        # profile keeps step 4 green; cross-profile load resets it.
-        stored_sig = get_setting('last_build_signature')
-        self._build_done = bool(stored_sig) and stored_sig == self._compute_grids_signature(profile_path)
+        # Whatever was built, it wasn't this: a freshly loaded profile un-ticks
+        # step 4 the same way an in-place edit does.
+        self._build_done = False
         self.refresh_panels()
         return missing_by_grid
 

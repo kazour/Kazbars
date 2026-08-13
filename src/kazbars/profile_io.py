@@ -139,12 +139,11 @@ def apply_profile_data(app, path, data, *, corrupt=False):
     data = _migrate_profile(data)
 
     # Don't anchor saves to a shipped Default.json (stock or OTA): a subsequent
-    # Save would overwrite the template / OTA cache. Force Save As instead. Also
-    # the profile identity in the build-signature comparison below.
+    # Save would overwrite the template / OTA cache. Force Save As instead.
     profile_key = None if Path(path).resolve() in _shipped_default_paths(app) else str(path)
 
     grids = data.get('grids', [])
-    missing_by_grid = app.grids_panel.load_profile_data(grids, profile_path=profile_key)
+    missing_by_grid = app.grids_panel.load_profile_data(grids)
     if missing_by_grid:
         warn_missing_buffs(app, missing_by_grid)
 

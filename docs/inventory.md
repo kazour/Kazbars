@@ -52,7 +52,7 @@
 | `src/kazbars/grid_editor_panel.py` | 635 |
 | `src/kazbars/grid_model.py` | 192 |
 | `src/kazbars/grids_generator.py` | 747 |
-| `src/kazbars/grids_panel.py` | 690 |
+| `src/kazbars/grids_panel.py` | 674 |
 | `src/kazbars/inspect.py` | 56 |
 | `src/kazbars/inspect_panel.py` | 253 |
 | `src/kazbars/instructions_panel.py` | 1081 |
@@ -60,8 +60,8 @@
 | `src/kazbars/live_tracker_settings.py` | 183 |
 | `src/kazbars/overlay_engine.py` | 800 |
 | `src/kazbars/paths.py` | 46 |
-| `src/kazbars/prefs.py` | 162 |
-| `src/kazbars/profile_io.py` | 267 |
+| `src/kazbars/prefs.py` | 161 |
+| `src/kazbars/profile_io.py` | 266 |
 | `src/kazbars/profile_manager.py` | 323 |
 | `src/kazbars/profile_share.py` | 137 |
 | `src/kazbars/settings_backup.py` | 465 |

@@ -132,7 +132,6 @@ PREFS_SCHEMA = Schema(
         "default_profile": Field(None),
         "has_built_before": Field(False, kind="bool"),
         "desktop_shortcut_offered": Field(False, kind="bool"),
-        "last_build_signature": Field(None),
         "build_console": Field(False, kind="bool"),
         # Shared text size for the four in-game panels (see _upgrade_panel_font).
         # Stopwatch/inspect fall back to it whenever their own fontSize is None.

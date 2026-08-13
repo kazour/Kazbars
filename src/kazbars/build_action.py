@@ -258,7 +258,7 @@ def _finish_success(app, loading, staging_dir, ctx, compile_result, ok, err,
             else:
                 app_toast(app, "launch the game", 'success', 8)
             flash_status_bar(app.bottom_bar)
-            app.grids_panel.notify_build_done(app.current_profile)
+            app.grids_panel.notify_build_done()
             if not app.settings.get('has_built_before'):
                 app.settings.set('has_built_before', True)
                 app.settings.save()
