@@ -26,6 +26,34 @@ new file in `docs/README.md`. Look an ID up across all of them with
 
 ---
 
+## 2026-08-14
+**Player crowd control — five classes re-verified in game.** A pass over `#Crowd Control`
+covering Demonologist, Necromancer, Tempest of Set, Ranger and Guardian: every entry for those
+classes was cast in game and its spell ID read off the live effect, then missing ranks and
+untracked abilities were added. Only player-applied crowd control is in scope, so effects a
+monster applies are not included. One entry's ID was wrong and never matched anything in game;
+it is corrected below. `Default.json` referenced none of the corrected IDs, so no profile
+whitelist changed.
+- **Added:** `Pin Down (Slow)` — #Crowd Control misc: `3156306`, `3156578`, `3156620`, `3234178`, `4620950`, `4620951`, `4620952`, `4620953`. A ranger snare with two parallel rank ladders — the ordinary version and the stronger one applied when the combo's power bonus lands.
+- **Added:** `Hands of the Underworld (Slow)` — `217127`, `217128`, `217129`, #Crowd Control misc. All three ranks slow; the spell's own tooltip calls rank 1 a root, but in game it is a slow like the other two.
+- **Added:** `Improved Shield Bash (Slow)` — `872911`, `872913`, #Crowd Control misc. The snare a guardian feat adds to the shield sweep combo; the two IDs are its two feat ranks.
+- **Added:** `Skewered (Slow)` — `4056369`, #Crowd Control misc. A guardian pole-arm snare. One ID covers all three feat ranks, which change only its duration.
+- **Added:** `Shield Bash (Slow)` — `3184165`, #Crowd Control misc. The snare version of the shield combo.
+- **Added:** `Constriction (Slow)` — `4309904`, #Crowd Control misc. The slow that lands when the tempest's stun of the same name expires.
+- **Added:** `Cyclone (Slow)` — `4930599`, #Crowd Control misc. The slow from the tempest's summoned cyclone.
+- **Added:** `Chill (Slow)` — `3666157`, #Crowd Control misc. Applied by the necromancer's fatality pet, not by the necromancer.
+- **Added:** `Ice Shackle (Slow)` — `3816130`, #Crowd Control misc.
+- **Added:** `Charged Storm Chains (Slow)` — `1139366`, #Crowd Control misc.
+- **Added:** `Agonizing Jolts (Slow)` — `1136432`, #Crowd Control misc.
+- **Added:** `Black Ashes debuff` — `1148644`, Demonologist debuff. The damage debuff left by a firestorm.
+- **Fixed:** `Incendiary Shot (Fear)` spell ID `4646965` → `4646963`. The tracked ID is a same-named twin that never fires, so the entry could never light up; `4646963` is the one the game applies. No profile whitelist referenced the old ID.
+- **Fixed:** `Storm Chains (Root)` now tracks all five ranks: `1148666`, `217111`, `217112`, `217113`, `217114` (previously rank 5 only).
+- **Fixed:** `Fiery Torment (Stun)` now tracks all three ranks: `217104`, `217105`, `217106` (previously rank 3 only).
+- **Fixed:** `Freeze (Stun)` now tracks rank 1 as well: `223235`, `223236`, `223248`. The third ID is a longer-lasting variant of rank 2, not a duplicate.
+- **Fixed:** `Unimaginable Terror (Fear)` now tracks rank 1 as well: `223495`, `223496`.
+- **Fixed:** `Possession (Stun)` now tracks both stun IDs: `1148380`, `1148381`.
+- **Renamed:** `Hunting Hawk (Silence)` → `Hunting Hawk (Silence/Stun)` (`4268126`). The same effect silences a player but stuns a monster, so the old name described only half of it.
+
 ## 2026-08-09
 **Wrack and torment lines — four more boss debuffs.** Continues the previous day's pass, same
 sourcing: confirmed against observed in-game application data and cross-checked with the boss
@@ -207,5 +235,5 @@ unchanged, so no grid or profile whitelist is affected (`Default.json` untouched
 ---
 
 *Entries are reconstructed from `git log` on `Database.json` (this repo) and the predecessor
-`KzBuilder-public` repo; spell IDs reflect the current database, which holds **403 buffs**.
+`KzBuilder-public` repo; spell IDs reflect the current database, which holds **415 buffs**.
 Going forward, log changes here as they happen.*

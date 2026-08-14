@@ -1264,6 +1264,8 @@
     {
       "name": "Fiery Torment (Stun)",
       "ids": [
+        217104,
+        217105,
         217106
       ],
       "category": "#Crowd Control",
@@ -1289,7 +1291,8 @@
     {
       "name": "Possession (Stun)",
       "ids": [
-        1148380
+        1148380,
+        1148381
       ],
       "category": "#Crowd Control",
       "type": "misc"
@@ -1504,8 +1507,9 @@
     {
       "name": "Freeze (Stun)",
       "ids": [
-        223248,
-        223236
+        223235,
+        223236,
+        223248
       ],
       "category": "#Crowd Control",
       "type": "misc"
@@ -1547,6 +1551,7 @@
     {
       "name": "Unimaginable Terror (Fear)",
       "ids": [
+        223495,
         223496
       ],
       "category": "#Crowd Control",
@@ -1675,7 +1680,7 @@
       "type": "buff"
     },
     {
-      "name": "Hunting Hawk (Silence)",
+      "name": "Hunting Hawk (Silence/Stun)",
       "ids": [
         4268126
       ],
@@ -1693,7 +1698,7 @@
     {
       "name": "Incendiary Shot (Fear)",
       "ids": [
-        4646965
+        4646963
       ],
       "category": "#Crowd Control",
       "type": "misc"
@@ -2909,6 +2914,10 @@
     {
       "name": "Storm Chains (Root)",
       "ids": [
+        1148666,
+        217111,
+        217112,
+        217113,
         217114
       ],
       "category": "#Crowd Control",
@@ -3744,6 +3753,112 @@
       "type": "debuff",
       "stacking": true,
       "stackEnd": 5
+    },
+    {
+      "name": "Hands of the Underworld (Slow)",
+      "ids": [
+        217127,
+        217128,
+        217129
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Charged Storm Chains (Slow)",
+      "ids": [
+        1139366
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Agonizing Jolts (Slow)",
+      "ids": [
+        1136432
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Ice Shackle (Slow)",
+      "ids": [
+        3816130
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Chill (Slow)",
+      "ids": [
+        3666157
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Constriction (Slow)",
+      "ids": [
+        4309904
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Cyclone (Slow)",
+      "ids": [
+        4930599
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Pin Down (Slow)",
+      "ids": [
+        3156306,
+        3156578,
+        3156620,
+        3234178,
+        4620950,
+        4620951,
+        4620952,
+        4620953
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Shield Bash (Slow)",
+      "ids": [
+        3184165
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Skewered (Slow)",
+      "ids": [
+        4056369
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Improved Shield Bash (Slow)",
+      "ids": [
+        872911,
+        872913
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Black Ashes debuff",
+      "ids": [
+        1148644
+      ],
+      "category": "Demonologist",
+      "type": "debuff"
     }
   ]
 }

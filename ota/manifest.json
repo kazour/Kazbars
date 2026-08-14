@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "content_version": 21,
+  "content_version": 22,
   "min_app_version": "2.2.2",
-  "notes": "Added 20 wrack and torment boss debuffs to the buff catalog",
+  "notes": "Player crowd control pass: 12 new entries and 7 corrected across five classes",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
-      "sha256": "1f66e2d58d7eb5a55d87a83611f7aca9add3ab485b4ac27126dea120a70b1533"
+      "sha256": "395fe67ca7f226e279b7519dce253f1857356d1fe72ec48af9e6e38e03680add"
     },
     "Default.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.json",
