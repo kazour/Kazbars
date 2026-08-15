@@ -2531,11 +2531,12 @@
       "type": "buff"
     },
     {
-      "name": "Tome of Epithur",
+      "name": "Tome of Epithur (Necro)",
       "ids": [
-        222609
+        222609,
+        222610
       ],
-      "category": "Necromancer",
+      "category": "#Group Buffs",
       "type": "buff"
     },
     {
@@ -2932,6 +2933,14 @@
       "name": "Gate of Hell (Root)",
       "ids": [
         1148639
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Gate of Hell (Stun)",
+      "ids": [
+        1148638
       ],
       "category": "#Crowd Control",
       "type": "misc"
@@ -3786,14 +3795,6 @@
         217127,
         217128,
         217129
-      ],
-      "category": "#Crowd Control",
-      "type": "misc"
-    },
-    {
-      "name": "Charged Storm Chains (Slow)",
-      "ids": [
-        1139366
       ],
       "category": "#Crowd Control",
       "type": "misc"

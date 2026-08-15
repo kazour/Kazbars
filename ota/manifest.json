@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "content_version": 23,
+  "content_version": 24,
   "min_app_version": "2.2.2",
-  "notes": "Player crowd control: the remaining seven classes \u2014 11 new entries, 6 with corrected ranks, 13 renamed or recategorized",
+  "notes": "Crowd control follow-up: a demon-stun entry added, a group buff's second ID recovered, one entry removed",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
-      "sha256": "3ca72651ce32b82a7afc652c9483427b5c4f146fe18c98abc565f2b2f063a579"
+      "sha256": "e7929db4fa6b0dabeece2471578e7a1ade64001b39d19960fa4405b37738718f"
     },
     "Default.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.json",

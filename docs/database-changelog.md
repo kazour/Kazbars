@@ -64,6 +64,16 @@ changed.
 - **Renamed:** `Lotus Toxin: Grim Essence (Fizzle)` → `Lotus Toxin: Grim Essence (Silence)` (`4350347`). It removes casting entirely rather than only making spells more likely to fail, which is what the other `(Fizzle)` entries do.
 - **Renamed:** `Poison Blades (Fizzle)` → `Poisoned Blades (Fizzle)` (`3727070`). Matches the name the game uses.
 
+**Follow-up — durations and strengths confirmed in game.** A second pass re-cast the demonologist
+and necromancer crowd control to check every entry's duration and magnitude against the live
+effect. Nearly all were already correct; the changes below are the exceptions. `Default.json`
+referenced none of the IDs involved, so no profile whitelist changed.
+- **Added:** `Gate of Hell (Stun)` — `1148638`, #Crowd Control misc. The spell has two mutually exclusive halves: it stuns demons for 6 seconds and roots everything else for 8. Only the root half was tracked, so the case the spell is named for lit up nothing.
+- **Fixed:** `Tome of Epithur` now tracks both IDs: `222609`, `222610`. The buff grants the caster one effect and the rest of the party another, under separate IDs, and only the caster's was tracked — so a grouped player saw nothing when a necromancer cast it.
+- **Renamed:** `Tome of Epithur` → `Tome of Epithur (Necro)` (`222609`, `222610`). Every class-specific entry in #Group Buffs carries its class this way.
+- **Reclassified:** `Tome of Epithur (Necro)` — Necromancer → #Group Buffs (`222609`, `222610`). It buffs the whole party, not only the caster.
+- **Removed:** `Charged Storm Chains (Slow)` — `1139366`. The feat of that name adds a snare to `Storm Chains` without producing an effect of its own: the spell IDs are identical whether or not it is specced, so this ID could never appear and the entry could never light up.
+
 ## 2026-08-14
 **Player crowd control — five classes re-verified in game.** A pass over `#Crowd Control`
 covering Demonologist, Necromancer, Tempest of Set, Ranger and Guardian: every entry for those
