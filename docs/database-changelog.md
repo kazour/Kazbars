@@ -26,6 +26,44 @@ new file in `docs/README.md`. Look an ID up across all of them with
 
 ---
 
+## 2026-08-15
+**Player crowd control — the remaining seven classes.** Completes the pass begun on 2026-08-14,
+covering Conqueror, Dark Templar, Priest of Mitra, Bear Shaman, Herald of Xotli, Barbarian and
+Assassin. Every entry for those classes was cast in game and its spell ID read off the live
+effect, then missing ranks and untracked abilities were added. Only player-applied crowd control
+is in scope. Two entries that were filed under their class turned out to be crowd control and
+have moved into `#Crowd Control`; several fear entries also apply a snare on the same ID and are
+renamed to say so. `Default.json` referenced none of the changed IDs, so no profile whitelist
+changed.
+- **Added:** `Hinder Movement (Slow)` — `149422`, `149423`, `4239837`, #Crowd Control misc. A bear shaman snare; the third ID is the rank granted by an alternate advancement ability, which the game names separately but which is the same snare.
+- **Added:** `Grim Weakness (Slow)` — #Crowd Control misc, stacking (5 ranks): `4350137`, `4350136`, `4350135`, `4350134`, `4350133`. An assassin snare that lands at full strength and **decays** one stack at a time, so the ranks count down rather than up.
+- **Added:** `Concussion (Slow)` — `1093905`, `1093913`, `1093921`, #Crowd Control misc. The snare a barbarian feat adds to the stunning punch combos; the three IDs are its three feat ranks, which change only its duration.
+- **Added:** `Repudiate (Slow)` — `198393`, #Crowd Control misc. A priest of Mitra ground-target snare.
+- **Added:** `Repudiate Evil (Fear)` — `198391`, #Crowd Control misc. The same cast fears undead instead of slowing them; this is that branch.
+- **Added:** `Avatar of Mitra (Fear)` — `3766764`, #Crowd Control misc. Undead, demons and minions flee from this spell instead of being stunned by it.
+- **Added:** `Dark Burden (Slow)` — `792747`, #Crowd Control misc. A dark templar snare.
+- **Added:** `Crushing Onslaught (Slow)` — `4332487`, #Crowd Control misc. The snare half of a conqueror proc; its damage half is the existing `Crushing Onslaught` entry under Conqueror.
+- **Added:** `Crippling Laceration (Slow)` — `893047`, #Crowd Control misc. The snare a conqueror feat adds to two of its combos.
+- **Added:** `Arctic Slumber (Slow)` — `4188307`, #Crowd Control misc. A bear shaman snare; one ID covers both its unfeated and feated strength.
+- **Added:** `Staggering Voice (Slow)` — `3536860`, #Crowd Control misc. The snare a tempest of Set feat adds to its silence.
+- **Fixed:** `Stunning Punch (Stun)` now tracks all fifteen IDs — five ranks across three feat tiers: `3542742`, `149195`, `149196`, `149197`, `4501845`; `3542743`, `1093765`, `1093780`, `1093782`, `4501844`; `3542744`, `1093766`, `1093781`, `1093783`, `4501847`. Investing in the feat that lengthens the stun switches the ability to an entirely different set of IDs, so an entry holding only one tier stopped matching as soon as a player specced into the next.
+- **Fixed:** `Overwhelm (Fear+Slow)` now tracks all six ranks: `156681`, `156682`, `156683`, `156684`, `156685`, `4501889` (previously rank 6 only).
+- **Fixed:** `Eye of Judgment (Fear+Slow)` now tracks all four ranks: `3663585`, `198385`, `198386`, `198387` (previously rank 4 only).
+- **Fixed:** `Condemn (Stun)` now tracks all three ranks: `198397`, `198398`, `4309208` (previously rank 2 only). The third rank comes from an alternate advancement ability the game names separately.
+- **Fixed:** `Cripple (Root)` now tracks rank 3 as well: `710440`, `710441`, `4502108`.
+- **Fixed:** `Avert Thine Eyes (Miss)` now tracks all three ranks: `4892126`, `4892127`, `4892128` (previously rank 3 only).
+- **Reclassified:** `Avert Thine Eyes` — Priest of Mitra debuff → #Crowd Control misc, and renamed `Avert Thine Eyes (Miss)` (`4892126`, `4892127`, `4892128`). It is a crowd control effect and belongs with the rest.
+- **Reclassified:** `Ursine Brawl` — Bear Shaman debuff → #Crowd Control misc, and renamed `Ursine Brawl (Miss)` (`149410`, `149411`, `149412`, `4501853`). Same reason.
+- **Renamed:** `Overwhelm (Fear)` → `Overwhelm (Fear+Slow)` (`156681`). The one effect both fears and snares, so the old name described only half of it.
+- **Renamed:** `Overwhelming Shout (Fear)` → `Overwhelming Shout (Fear+Slow)` (`3487052`). Same reason.
+- **Renamed:** `Dooming Presence (Fear)` → `Dooming Presence (Fear+Slow)` (`792735`). Same reason.
+- **Renamed:** `Eye of Judgment (Fear)` → `Eye of Judgment (Fear+Slow)` (`3663585`). Same reason.
+- **Renamed:** `Dread Visage (Fear)` → `Dread Visage (Fear+Slow)` (`196430`). Same reason.
+- **Renamed:** `Death's Gaze (Fear)` → `Death's Gaze (Fear+Slow)` (`3675546`). Same reason.
+- **Renamed:** `Curse of the Lotus (Fear)` → `Curse of the Lotus (Fear+Slow)` (`3784874`). Same reason.
+- **Renamed:** `Lotus Toxin: Grim Essence (Fizzle)` → `Lotus Toxin: Grim Essence (Silence)` (`4350347`). It removes casting entirely rather than only making spells more likely to fail, which is what the other `(Fizzle)` entries do.
+- **Renamed:** `Poison Blades (Fizzle)` → `Poisoned Blades (Fizzle)` (`3727070`). Matches the name the game uses.
+
 ## 2026-08-14
 **Player crowd control — five classes re-verified in game.** A pass over `#Crowd Control`
 covering Demonologist, Necromancer, Tempest of Set, Ranger and Guardian: every entry for those
@@ -235,5 +273,5 @@ unchanged, so no grid or profile whitelist is affected (`Default.json` untouched
 ---
 
 *Entries are reconstructed from `git log` on `Database.json` (this repo) and the predecessor
-`KzBuilder-public` repo; spell IDs reflect the current database, which holds **415 buffs**.
+`KzBuilder-public` repo; spell IDs reflect the current database, which holds **426 buffs**.
 Going forward, log changes here as they happen.*

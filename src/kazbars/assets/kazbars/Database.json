@@ -786,7 +786,7 @@
       "type": "buff"
     },
     {
-      "name": "Curse of the Lotus (Fear)",
+      "name": "Curse of the Lotus (Fear+Slow)",
       "ids": [
         3784874
       ],
@@ -794,7 +794,7 @@
       "type": "misc"
     },
     {
-      "name": "Death's Gaze (Fear)",
+      "name": "Death's Gaze (Fear+Slow)",
       "ids": [
         3675546
       ],
@@ -845,7 +845,7 @@
       "type": "buff"
     },
     {
-      "name": "Lotus Toxin: Grim Essence (Fizzle)",
+      "name": "Lotus Toxin: Grim Essence (Silence)",
       "ids": [
         4350347
       ],
@@ -954,7 +954,20 @@
     {
       "name": "Stunning Punch (Stun)",
       "ids": [
+        3542742,
+        149195,
+        149196,
+        149197,
         4501845,
+        3542743,
+        1093765,
+        1093780,
+        1093782,
+        4501844,
+        3542744,
+        1093766,
+        1093781,
+        1093783,
         4501847
       ],
       "category": "#Crowd Control",
@@ -1094,15 +1107,15 @@
       "type": "misc"
     },
     {
-      "name": "Ursine Brawl",
+      "name": "Ursine Brawl (Miss)",
       "ids": [
         149410,
         149411,
         149412,
         4501853
       ],
-      "category": "Bear Shaman",
-      "type": "debuff"
+      "category": "#Crowd Control",
+      "type": "misc"
     },
     {
       "name": "Crushing Onslaught",
@@ -1147,8 +1160,13 @@
       "type": "buff"
     },
     {
-      "name": "Overwhelm (Fear)",
+      "name": "Overwhelm (Fear+Slow)",
       "ids": [
+        156681,
+        156682,
+        156683,
+        156684,
+        156685,
         4501889
       ],
       "category": "#Crowd Control",
@@ -1163,7 +1181,7 @@
       "type": "misc"
     },
     {
-      "name": "Dooming Presence (Fear)",
+      "name": "Dooming Presence (Fear+Slow)",
       "ids": [
         792735
       ],
@@ -1362,7 +1380,7 @@
       "type": "buff"
     },
     {
-      "name": "Overwhelming Shout (Fear)",
+      "name": "Overwhelming Shout (Fear+Slow)",
       "ids": [
         3487052
       ],
@@ -1424,7 +1442,7 @@
       "type": "buff"
     },
     {
-      "name": "Dread Visage (Fear)",
+      "name": "Dread Visage (Fear+Slow)",
       "ids": [
         196430
       ],
@@ -1574,17 +1592,21 @@
       "type": "misc"
     },
     {
-      "name": "Avert Thine Eyes",
+      "name": "Avert Thine Eyes (Miss)",
       "ids": [
+        4892126,
+        4892127,
         4892128
       ],
-      "category": "Priest of Mitra",
-      "type": "debuff"
+      "category": "#Crowd Control",
+      "type": "misc"
     },
     {
       "name": "Condemn (Stun)",
       "ids": [
-        198398
+        198397,
+        198398,
+        4309208
       ],
       "category": "#Crowd Control",
       "type": "misc"
@@ -1598,8 +1620,11 @@
       "type": "misc"
     },
     {
-      "name": "Eye of Judgment (Fear)",
+      "name": "Eye of Judgment (Fear+Slow)",
       "ids": [
+        3663585,
+        198385,
+        198386,
         198387
       ],
       "category": "#Crowd Control",
@@ -3006,7 +3031,8 @@
       "name": "Cripple (Root)",
       "ids": [
         710440,
-        710441
+        710441,
+        4502108
       ],
       "category": "#Crowd Control",
       "type": "misc"
@@ -3306,7 +3332,7 @@
       "type": "debuff"
     },
     {
-      "name": "Poison Blades (Fizzle)",
+      "name": "Poisoned Blades (Fizzle)",
       "ids": [
         3727070
       ],
@@ -3859,6 +3885,104 @@
       ],
       "category": "Demonologist",
       "type": "debuff"
+    },
+    {
+      "name": "Crippling Laceration (Slow)",
+      "ids": [
+        893047
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Crushing Onslaught (Slow)",
+      "ids": [
+        4332487
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Dark Burden (Slow)",
+      "ids": [
+        792747
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Repudiate (Slow)",
+      "ids": [
+        198393
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Repudiate Evil (Fear)",
+      "ids": [
+        198391
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Avatar of Mitra (Fear)",
+      "ids": [
+        3766764
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Hinder Movement (Slow)",
+      "ids": [
+        149422,
+        149423,
+        4239837
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Arctic Slumber (Slow)",
+      "ids": [
+        4188307
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Concussion (Slow)",
+      "ids": [
+        1093905,
+        1093913,
+        1093921
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Grim Weakness (Slow)",
+      "ids": [
+        4350137,
+        4350136,
+        4350135,
+        4350134,
+        4350133
+      ],
+      "category": "#Crowd Control",
+      "type": "misc",
+      "stacking": true,
+      "stackEnd": 5
+    },
+    {
+      "name": "Staggering Voice (Slow)",
+      "ids": [
+        3536860
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
     }
   ]
 }

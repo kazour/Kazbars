@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "content_version": 22,
+  "content_version": 23,
   "min_app_version": "2.2.2",
-  "notes": "Player crowd control pass: 12 new entries and 7 corrected across five classes",
+  "notes": "Player crowd control: the remaining seven classes \u2014 11 new entries, 6 with corrected ranks, 13 renamed or recategorized",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
-      "sha256": "395fe67ca7f226e279b7519dce253f1857356d1fe72ec48af9e6e38e03680add"
+      "sha256": "3ca72651ce32b82a7afc652c9483427b5c4f146fe18c98abc565f2b2f063a579"
     },
     "Default.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.json",
