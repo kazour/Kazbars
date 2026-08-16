@@ -73,6 +73,8 @@ referenced none of the IDs involved, so no profile whitelist changed.
 - **Renamed:** `Tome of Epithur` → `Tome of Epithur (Necro)` (`222609`, `222610`). Every class-specific entry in #Group Buffs carries its class this way.
 - **Reclassified:** `Tome of Epithur (Necro)` — Necromancer → #Group Buffs (`222609`, `222610`). It buffs the whole party, not only the caster.
 - **Removed:** `Charged Storm Chains (Slow)` — `1139366`. The feat of that name adds a snare to `Storm Chains` without producing an effect of its own: the spell IDs are identical whether or not it is specced, so this ID could never appear and the entry could never light up.
+- **Added:** `Touch of Winter (Slow)` — `1376440`, #Crowd Control misc. A necromancer feat adds this snare to `Gelid Bones`; one ID covers every rank of the spell, since the snare does not change with rank.
+- **Renamed:** `Double Tap (Stun)` → `Momentum (Stun)` (`3130398`). The ability is called Momentum; nothing in game is named Double Tap. The ID, category and duration were already right.
 
 ## 2026-08-14
 **Player crowd control — five classes re-verified in game.** A pass over `#Crowd Control`
@@ -283,5 +285,5 @@ unchanged, so no grid or profile whitelist is affected (`Default.json` untouched
 ---
 
 *Entries are reconstructed from `git log` on `Database.json` (this repo) and the predecessor
-`KzBuilder-public` repo; spell IDs reflect the current database, which holds **426 buffs**.
+`KzBuilder-public` repo; spell IDs reflect the current database, which holds **427 buffs**.
 Going forward, log changes here as they happen.*

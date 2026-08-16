@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "content_version": 24,
+  "content_version": 25,
   "min_app_version": "2.2.2",
-  "notes": "Crowd control follow-up: a demon-stun entry added, a group buff's second ID recovered, one entry removed",
+  "notes": "A necromancer feat snare added, and a stun entry renamed to its real ability",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
-      "sha256": "e7929db4fa6b0dabeece2471578e7a1ade64001b39d19960fa4405b37738718f"
+      "sha256": "1403f0e76d378de594569d2928bdd56995375f1563704a21e6c2ce54a26ed0cf"
     },
     "Default.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.json",
