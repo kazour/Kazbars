@@ -730,7 +730,7 @@
       "type": "buff"
     },
     {
-      "name": "Double Tap (Stun)",
+      "name": "Momentum (Stun)",
       "ids": [
         3130398
       ],
@@ -3811,6 +3811,14 @@
       "name": "Ice Shackle (Slow)",
       "ids": [
         3816130
+      ],
+      "category": "#Crowd Control",
+      "type": "misc"
+    },
+    {
+      "name": "Touch of Winter (Slow)",
+      "ids": [
+        1376440
       ],
       "category": "#Crowd Control",
       "type": "misc"
