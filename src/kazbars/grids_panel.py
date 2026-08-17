@@ -416,7 +416,10 @@ class GridsPanel(ttk.Frame):
         """Normalize whitelist entries to primary spell IDs.
 
         Accepts legacy int IDs and legacy name strings. Orphans are appended
-        to `missing` (list of strings) and dropped from the result.
+        to `missing` (list of strings) but PRESERVED in the result — the
+        profile autosaves, so a load-time drop would destroy the ref within
+        seconds; unresolved entries are inert (the build skips them) and
+        revive when the buff exists again.
         """
         result = []
         for item in whitelist:
@@ -426,12 +429,14 @@ class GridsPanel(ttk.Frame):
                     result.append(entry['ids'][0])
                 else:
                     missing.append(f"id:{item}")
+                    result.append(item)
             elif isinstance(item, str):
                 entry = self.database.get_entry_by_name(item)
                 if entry and entry.get('ids'):
                     result.append(entry['ids'][0])
                 else:
                     missing.append(item)
+                    result.append(item)
         return result
 
     def _migrate_grid(self, grid, missing):

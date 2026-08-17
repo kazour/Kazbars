@@ -1,0 +1,276 @@
+{
+  "schema": 1,
+  "id": "00000000",
+  "name": "Default",
+  "authored_at": [
+    2560,
+    1440
+  ],
+  "modules": {
+    "grids": {
+      "grids": [
+        {
+          "id": "My Buffs",
+          "enabled": false,
+          "type": "player",
+          "rows": 3,
+          "cols": 3,
+          "iconSize": 48,
+          "gap": -3,
+          "x": 684,
+          "y": 1000,
+          "slotMode": "dynamic",
+          "showTimers": true,
+          "timerFontSize": 18,
+          "timerFlashThreshold": 6,
+          "timerYOffset": -3,
+          "stackFontSize": 16,
+          "enableFlashing": true,
+          "fillDirection": "BL-TR",
+          "sortOrder": "longest",
+          "layout": "buffFirst",
+          "whitelist": [
+            5017472,
+            4330152,
+            3202863,
+            4489251,
+            4047227,
+            5017456,
+            145782,
+            154775,
+            144105,
+            3191514,
+            146103,
+            5017458,
+            4484855,
+            143948,
+            145790,
+            143746,
+            146099,
+            791221,
+            146122,
+            154770,
+            146124,
+            145626,
+            154750,
+            5017457,
+            143626
+          ],
+          "slotAssignments": {}
+        },
+        {
+          "id": "Raid Debuffs",
+          "enabled": true,
+          "type": "player",
+          "rows": 1,
+          "cols": 3,
+          "iconSize": 56,
+          "gap": -1,
+          "x": 930,
+          "y": 1000,
+          "slotMode": "dynamic",
+          "showTimers": true,
+          "timerFontSize": 18,
+          "timerFlashThreshold": 6,
+          "timerYOffset": -3,
+          "stackFontSize": 16,
+          "enableFlashing": true,
+          "fillDirection": "LR",
+          "sortOrder": "longest",
+          "layout": "buffFirst",
+          "whitelist": [
+            5062623,
+            5051640,
+            4857484,
+            5052584,
+            5014793,
+            4924718,
+            4857492,
+            5052352,
+            5054493,
+            5052200,
+            5052211,
+            5016774,
+            5052368,
+            4701862,
+            5052114,
+            5016222,
+            4836424,
+            5016792,
+            4259934,
+            4757336,
+            4857485,
+            4836738,
+            5014799,
+            4552633,
+            4857503,
+            5056787,
+            4680545,
+            5014916,
+            4281931,
+            4414104,
+            5056777,
+            5052580,
+            5064067,
+            5014753,
+            5014791,
+            4383191,
+            4357732,
+            5055907,
+            4704427,
+            4383121,
+            5064459,
+            5064042,
+            4752750,
+            4706108,
+            4383111,
+            4189297,
+            5064063,
+            5014940,
+            4836609,
+            5051633,
+            4924714,
+            5014715,
+            5054121,
+            4836739,
+            4704872,
+            4752518,
+            5052277,
+            4757361,
+            5016796,
+            4261544,
+            4836737,
+            4553214,
+            4357818,
+            4757309,
+            5015024,
+            5016429,
+            4836698,
+            4281812,
+            4552666,
+            4281285,
+            5015019
+          ],
+          "slotAssignments": {}
+        },
+        {
+          "id": "Target Buffs",
+          "enabled": true,
+          "type": "target",
+          "rows": 2,
+          "cols": 3,
+          "iconSize": 56,
+          "gap": -1,
+          "x": 1198,
+          "y": 1000,
+          "slotMode": "static",
+          "showTimers": true,
+          "timerFontSize": 18,
+          "timerFlashThreshold": 6,
+          "timerYOffset": -3,
+          "stackFontSize": 16,
+          "enableFlashing": true,
+          "fillDirection": "BL-TR",
+          "sortOrder": "longest",
+          "layout": "debuffFirst",
+          "whitelist": [],
+          "slotAssignments": {
+            "0": [
+              974157,
+              3076662
+            ],
+            "1": [
+              5014930,
+              4857536,
+              4206340,
+              5052693,
+              4857488,
+              3591149,
+              4857489,
+              4757285,
+              4380771,
+              5014929,
+              5014931,
+              5052177,
+              4857490
+            ],
+            "2": [
+              4924367,
+              1126244,
+              4268126,
+              974548,
+              3727070,
+              4350347,
+              4277186
+            ],
+            "3": [
+              4487417,
+              4325954
+            ],
+            "4": [
+              4229891,
+              4086624
+            ],
+            "5": [
+              1126126,
+              4931433,
+              4927248,
+              1126127
+            ]
+          }
+        },
+        {
+          "id": "Target Debuffs",
+          "enabled": false,
+          "type": "target",
+          "rows": 3,
+          "cols": 3,
+          "iconSize": 48,
+          "gap": -3,
+          "x": 1738,
+          "y": 1000,
+          "slotMode": "static",
+          "showTimers": false,
+          "timerFontSize": 18,
+          "timerFlashThreshold": 6,
+          "timerYOffset": -3,
+          "stackFontSize": 16,
+          "enableFlashing": true,
+          "fillDirection": "BL-TR",
+          "sortOrder": "longest",
+          "layout": "debuffFirst",
+          "whitelist": [],
+          "slotAssignments": {
+            "0": [
+              3963058
+            ],
+            "1": [
+              3963061
+            ],
+            "2": [
+              3963068
+            ],
+            "3": [
+              3963299
+            ],
+            "4": [
+              3963193
+            ],
+            "5": [
+              3963268
+            ],
+            "6": [
+              3963059
+            ],
+            "7": [
+              3963062
+            ],
+            "8": [
+              3963070
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

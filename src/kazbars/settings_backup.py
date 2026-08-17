@@ -73,15 +73,19 @@ def locate_funcom_prefs():
     return prefs if prefs and prefs.is_dir() else None
 
 
-def _add_tree(zf, root, arc_prefix):
+def _add_tree(zf, root, arc_prefix, skip_suffixes=(), skip_dirs=()):
     """Add every file under `root` to `zf` as `arc_prefix/<relpath>`. Skips
-    *.tmp; counts unreadable/locked files rather than aborting. Returns
+    *.tmp plus any `skip_suffixes`/`skip_dirs` (top-level dir names) the
+    caller names; counts unreadable/locked files rather than aborting. Returns
     (added, skipped)."""
     added = skipped = 0
     for path in sorted(root.rglob("*")):
-        if not path.is_file() or path.suffix == ".tmp":
+        if not path.is_file() or path.suffix in (".tmp", *skip_suffixes):
             continue
-        arcname = f"{arc_prefix}/{path.relative_to(root).as_posix()}"
+        rel = path.relative_to(root)
+        if skip_dirs and rel.parts[0] in skip_dirs:
+            continue
+        arcname = f"{arc_prefix}/{rel.as_posix()}"
         try:
             zf.write(path, arcname)
             added += 1
@@ -127,7 +131,10 @@ def write_backup_zip(
             sections["funcom"] = {"files": added, "skipped": skipped, "source": str(funcom_dir)}
         kz = {}
         if profiles_dir and Path(profiles_dir).is_dir():
-            added, _ = _add_tree(zf, Path(profiles_dir), f"{KAZBARS_ARC}/profiles")
+            # Session snapshots and trashed profiles are local recovery state,
+            # not the user's data — they stay out of backups.
+            added, _ = _add_tree(zf, Path(profiles_dir), f"{KAZBARS_ARC}/profiles",
+                                 skip_suffixes=(".bak",), skip_dirs=("trash",))
             kz["profiles"] = added
         if settings_dir and Path(settings_dir).is_dir():
             added, _ = _add_tree(zf, Path(settings_dir), f"{KAZBARS_ARC}/settings")
@@ -450,7 +457,7 @@ def restore_settings(app, dialog, include_prefs=False):
 
     # Re-merge the buff DB from the restored database_user.json — else the next
     # Database-editor save recomputes deltas from pre-restore memory and clobbers
-    # the restored custom buffs. Mirrors profile_manager._import.
+    # the restored custom buffs.
     app.database.reload()
     if db_panel is not None:
         db_panel.refresh_from_database()

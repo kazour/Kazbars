@@ -128,8 +128,10 @@ PREFS_SCHEMA = Schema(
         # (e.g. grid_model.get_game_resolution_or_default validates the list).
         "game_path": Field(None),
         "game_resolution": Field(None),
-        "last_profile": Field(None),
-        "default_profile": Field(None),
+        # The one profile pointer: the active profile's in-document id. The old
+        # last_profile/default_profile path pair is gone — strict validate_all
+        # erases stale keys on the next save, no migration rung needed.
+        "active_profile": Field(None),
         "has_built_before": Field(False, kind="bool"),
         "desktop_shortcut_offered": Field(False, kind="bool"),
         "build_console": Field(False, kind="bool"),

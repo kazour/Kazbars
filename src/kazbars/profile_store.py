@@ -80,6 +80,12 @@ class ProfileStore:
         self._doc['name'] = str(name).strip() or self._doc['name']
         self._touch()
 
+    def set_authored_at(self, resolution) -> None:
+        """Re-anchor the document's provenance resolution (after a load-time
+        rescale or a game-resolution change re-bases the coordinates)."""
+        self._doc['authored_at'] = [int(resolution[0]), int(resolution[1])]
+        self._touch()
+
     def revert_to_session_start(self) -> None:
         """Restore the session-start snapshot. The revert is itself a mutation,
         so the restored state autosaves like any other edit."""

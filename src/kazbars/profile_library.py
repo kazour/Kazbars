@@ -157,16 +157,22 @@ class ProfileLibrary:
                     return doc
         return None
 
+    def has_template(self) -> bool:
+        """Whether any template on the chain passes the gate (drives whether
+        first-launch offers the 'Use Defaults' card)."""
+        return self._load_template() is not None
+
     def duplicate(self, profile_id: str) -> dict | None:
         held = self.load(profile_id)
         if held is None:
             return None
         doc = copy.deepcopy(held[1])
         doc['id'] = mint_id()
-        doc['name'] = self._unique_name(f"{doc['name']} (copy)")
+        doc['name'] = self.unique_name(f"{doc['name']} (copy)")
         return doc if self.write(doc) else None
 
-    def _unique_name(self, wanted: str) -> str:
+    def unique_name(self, wanted: str) -> str:
+        """`wanted`, suffixed ' 2', ' 3', … until no listed profile carries it."""
         taken = {str(d['name']).casefold() for _, d in self.list_profiles()}
         if wanted.casefold() not in taken:
             return wanted
