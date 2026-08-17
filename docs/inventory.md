@@ -13,13 +13,13 @@
 |---|---:|
 | `src/kazbars/__init__.py` | 11 |
 | `src/kazbars/__main__.py` | 43 |
-| `src/kazbars/app.py` | 794 |
+| `src/kazbars/app.py` | 799 |
 | `src/kazbars/app_popups.py` | 489 |
 | `src/kazbars/boss_timer.py` | 399 |
 | `src/kazbars/buff_database.py` | 176 |
 | `src/kazbars/buff_db_layers.py` | 267 |
-| `src/kazbars/buff_display_editor.py` | 592 |
-| `src/kazbars/buff_xml.py` | 319 |
+| `src/kazbars/buff_display_editor.py` | 667 |
+| `src/kazbars/buff_xml.py` | 377 |
 | `src/kazbars/build_action.py` | 324 |
 | `src/kazbars/build_executor.py` | 387 |
 | `src/kazbars/build_loading.py` | 507 |
@@ -29,10 +29,10 @@
 | `src/kazbars/combat_monitor.py` | 301 |
 | `src/kazbars/content_update.py` | 400 |
 | `src/kazbars/custom_menu_bar.py` | 446 |
-| `src/kazbars/damageinfo_colors_panel.py` | 416 |
+| `src/kazbars/damageinfo_colors_panel.py` | 527 |
 | `src/kazbars/damageinfo_generator.py` | 134 |
 | `src/kazbars/damageinfo_panel.py` | 435 |
-| `src/kazbars/damageinfo_settings.py` | 471 |
+| `src/kazbars/damageinfo_settings.py` | 533 |
 | `src/kazbars/database_editor.py` | 850 |
 | `src/kazbars/deeps_meter.py` | 485 |
 | `src/kazbars/deeps_overlay.py` | 757 |
@@ -60,7 +60,7 @@
 | `src/kazbars/live_tracker_settings.py` | 175 |
 | `src/kazbars/overlay_engine.py` | 800 |
 | `src/kazbars/paths.py` | 46 |
-| `src/kazbars/prefs.py` | 158 |
+| `src/kazbars/prefs.py` | 196 |
 | `src/kazbars/profile_document.py` | 253 |
 | `src/kazbars/profile_io.py` | 301 |
 | `src/kazbars/profile_library.py` | 282 |
@@ -86,14 +86,14 @@
 | `tests/test_as2_class_names.py` | 61 |
 | `tests/test_boss_timer.py` | 151 |
 | `tests/test_buff_db_layers.py` | 266 |
-| `tests/test_buff_xml.py` | 272 |
+| `tests/test_buff_xml.py` | 324 |
 | `tests/test_build_compile.py` | 154 |
 | `tests/test_build_executor.py` | 537 |
 | `tests/test_cast_timer.py` | 122 |
 | `tests/test_cluster_isolation.py` | 188 |
 | `tests/test_combat_monitor.py` | 150 |
 | `tests/test_content_update.py` | 305 |
-| `tests/test_damageinfo_colors_panel.py` | 186 |
+| `tests/test_damageinfo_colors_panel.py` | 293 |
 | `tests/test_damageinfo_generator.py` | 183 |
 | `tests/test_damageinfo_settings.py` | 336 |
 | `tests/test_data_integrity.py` | 127 |

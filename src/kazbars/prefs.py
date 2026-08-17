@@ -19,7 +19,7 @@ import logging
 from typing import Any
 
 from . import CONTENT_BASELINE_VERSION
-from .settings_core import Field, Migration, Schema, nullable_int
+from .settings_core import Field, Migration, Schema, Store, nullable_int
 from .userdata import PREFS_FILENAME
 
 logger = logging.getLogger(__name__)
@@ -65,6 +65,26 @@ def _validate_section_open(value: Any) -> dict:
     if not isinstance(value, dict):
         return {}
     return {k: bool(v) for k, v in value.items() if isinstance(k, str)}
+
+
+def _validate_last_patch(value: Any) -> dict:
+    """Keep ``{game_path: {section_key: {...last-applied section value...}}}``
+    entries; drop anything malformed. Machine-local mirror of what a PATCH-lane
+    section (``damage_colors``/``buff_bars``) last actually wrote into *this
+    game folder's* XML — the active profile's own section is the loadout-level
+    intent, which can drift from this once a profile switch skips re-Applying
+    (PATCH lane never fires on switch). Written by the XML editors' Apply;
+    consumption (a divergence badge) is a later phase."""
+    if not isinstance(value, dict):
+        return {}
+    out: dict[str, dict] = {}
+    for game_path, sections in value.items():
+        if not isinstance(game_path, str) or not isinstance(sections, dict):
+            continue
+        kept = {k: v for k, v in sections.items() if isinstance(k, str) and isinstance(v, dict)}
+        if kept:
+            out[game_path] = kept
+    return out
 
 
 # The four in-game panels — stopwatch, inspect, buff console, preview control
@@ -153,6 +173,24 @@ PREFS_SCHEMA = Schema(
         "buff_selector_category": Field("All"),
         "buff_selector_type": Field("All"),
         "buff_display_section_open": Field({}, validate=_validate_section_open),
+        # Machine-local record of what a PATCH-lane section last wrote into a
+        # given game folder's XML (see _validate_last_patch).
+        "last_patch": Field({}, validate=_validate_last_patch),
     },
     migrations=(Migration(2, _upgrade_panel_font),),
 )
+
+
+def record_last_patch(store: Store, game_path: str, section_key: str, value: dict) -> None:
+    """Update `last_patch[game_path][section_key]` and save.
+
+    Called by the XML editors' Apply (damageinfo_colors_panel,
+    buff_display_editor) so `last_patch` mirrors what actually landed on
+    disk for this game folder, independent of whichever profile is active.
+    """
+    last_patch = dict(store.get('last_patch'))
+    per_game = dict(last_patch.get(game_path, {}))
+    per_game[section_key] = value
+    last_patch[game_path] = per_game
+    store.set('last_patch', last_patch)
+    store.save()
