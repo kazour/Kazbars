@@ -9,16 +9,24 @@ covers that). The dialog/toast orchestration around it is exercised manually.
 Run: `pytest tests/test_game_folder.py` (from repo root).
 """
 
-from kazbars import build_utils, damageinfo_generator, damageinfo_settings
+from kazbars import build_utils, damageinfo_generator
 from kazbars.build_executor import DAMAGEINFO_BACKUP, DAMAGEINFO_FILE
 from kazbars.game_folder import _restore_damageinfo
+
+
+class _FakeProfileStore:
+    def __init__(self, section):
+        self._section = section
+
+    def get_section(self, _key):
+        return self._section
 
 
 class _App:
     """The four attributes `_restore_damageinfo` reads off KazBarsApp."""
 
-    def __init__(self, tmp_path, game):
-        self.settings_path = tmp_path / "settings"
+    def __init__(self, tmp_path, game, *, enabled):
+        self.profile_store = _FakeProfileStore({'enabled': enabled})
         self.assets_path = tmp_path / "assets"
         self.app_path = tmp_path / "app"
         self.game_path = str(game)
@@ -32,12 +40,10 @@ def _setup(tmp_path, *, enabled, monkeypatch, compiler=True, bake=(True, "")):
     game = tmp_path / "game"
     _flash(game).mkdir(parents=True)
     (_flash(game) / DAMAGEINFO_FILE).write_bytes(b"STOCK")
-    app = _App(tmp_path, game)
+    app = _App(tmp_path, game, enabled=enabled)
     (app.assets_path / "damageinfo").mkdir(parents=True)
     (app.assets_path / "damageinfo" / DAMAGEINFO_FILE).write_bytes(b"STOCK")
 
-    monkeypatch.setattr(damageinfo_settings, 'load_settings',
-                        lambda _p: {'enabled': enabled})
     monkeypatch.setattr(build_utils, 'find_compiler',
                         lambda _a, _b: tmp_path / "mtasc.exe" if compiler else None)
 

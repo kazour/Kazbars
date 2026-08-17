@@ -19,14 +19,19 @@ Persisted state:
 Not persisted: the alarm-active state (recomputed every tick from threshold
 + current DPS) or the monitoring-running state (always starts stopped; no
 auto-resume per the locked decision).
+
+Lives in the profile document as the `deeps` section (LIVE lane — Deeps has no
+build-time output, so every field retunes the open overlay immediately on
+profile switch); registered by app.py, mirroring `live_tracker_settings`.
 """
 
 import logging
-from pathlib import Path
 from typing import Any
 
 from . import settings_core
 from .overlay_engine import FONT_FAMILY_CHOICES, OverlayConfig
+from .profile_document import LANE_LIVE
+from .profile_document import SectionSpec as ProfileSectionSpec
 from .settings_core import Field, Schema
 
 logger = logging.getLogger(__name__)
@@ -37,17 +42,14 @@ __all__ = [
     "DEEPS_DEFAULTS",
     "DEEPS_RANGES",
     "FONT_FAMILY_CHOICES",
-    "SETTINGS_FILENAME",
+    "PROFILE_SECTION",
     "_READOUT_PRESETS",
     "_SURVIVAL_PRESETS",
     "apply_overlay_config_to_deeps",
     "get_default_settings",
-    "get_settings_path",
-    "load_settings",
     "normalize_readout_preset",
     "normalize_survival_preset",
     "overlay_config_from_deeps",
-    "save_settings",
     "validate_all_settings",
     "validate_setting",
 ]
@@ -198,11 +200,10 @@ _CHOICE_KEYS = {
 # =========================================================================== #
 # SCHEMA                                                                       #
 # =========================================================================== #
-# The persistence/validation contract, derived from the tables above so the two
-# can't drift. Domain logic (the preset normalisers, overlay adapters) stays
-# out of the load path — the engine owns only coercion + fill + atomic I/O.
-
-SETTINGS_FILENAME = "deeps_settings.json"
+# The validation contract, derived from the tables above so the two can't
+# drift. Domain logic (the preset normalisers, overlay adapters) stays out of
+# the coercion path. `filename=''` — this schema owns no file; it's the
+# profile section's schema (settings_core's disk-less-section convention).
 
 _ENUM_CHOICES = {
     "layout": _LAYOUT_CHOICES,
@@ -245,7 +246,12 @@ def _build_fields() -> dict[str, Field]:
     return fields
 
 
-_SCHEMA = Schema(SETTINGS_FILENAME, 1, _build_fields())
+_SCHEMA = Schema('', 1, _build_fields())
+
+# The Deeps overlay's slice of the profile document — flat: the config dict
+# itself is the section, like the baked extras (cast_timer/stopwatch/inspect).
+# LIVE lane: every field retunes the open overlay immediately.
+PROFILE_SECTION = ProfileSectionSpec('deeps', _SCHEMA, LANE_LIVE)
 
 
 # =========================================================================== #
@@ -328,26 +334,3 @@ def apply_overlay_config_to_deeps(settings: dict, cfg: OverlayConfig) -> None:
     settings["overlay_font_family"] = cfg.font_family
     settings["overlay_font_size"] = cfg.font_size
     settings["overlay_bg_opacity"] = cfg.bg_opacity
-
-
-# =========================================================================== #
-# FILE I/O                                                                    #
-# =========================================================================== #
-# `SETTINGS_FILENAME` is defined up in the SCHEMA section (the Schema needs it).
-
-
-def get_settings_path(settings_folder: str | Path) -> str:
-    """Full path to deeps_settings.json inside `settings_folder`."""
-    return str(Path(settings_folder) / SETTINGS_FILENAME)
-
-
-def load_settings(settings_folder: str | Path) -> dict:
-    """Load, migrate, validate, fill. Returns defaults if the file is missing or
-    unparseable — never raises (the engine logs failures at debug level)."""
-    return settings_core.load(_SCHEMA, settings_folder)
-
-
-def save_settings(settings_folder: str | Path, settings: dict) -> bool:
-    """Validate and write atomically (temp + rename). Creates the folder if
-    missing; values are clamped before the write so disk never holds junk."""
-    return settings_core.save(_SCHEMA, settings_folder, settings)

@@ -23,7 +23,9 @@ def test_ensure_layout_creates_tree_and_seeds(monkeypatch, tmp_path):
     userdata.ensure_layout()
     root = tmp_path / "userdata"
     assert root.is_dir()
-    assert (root / "settings").is_dir()
+    # settings/ is retired — Deeps/Live Tracker/Damage Numbers live in the
+    # profile document now.
+    assert not (root / "settings").exists()
     assert (root / "profiles").is_dir()
     assert (root / "profiles" / "trash").is_dir()
     assert (root / "content").is_dir()
@@ -62,7 +64,6 @@ def test_subpaths_resolve_under_userdata(monkeypatch, tmp_path):
     root = userdata.userdata_root()
     assert root == tmp_path / "userdata"
     assert userdata.prefs_path() == root / "prefs.json"
-    assert userdata.settings_dir() == root / "settings"
     assert userdata.profiles_dir() == root / "profiles"
     assert userdata.profiles_trash_dir() == root / "profiles" / "trash"
     assert userdata.database_user_path() == root / "database_user.json"

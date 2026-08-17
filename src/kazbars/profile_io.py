@@ -79,10 +79,10 @@ def startup_profile(app):
 def apply_document(app):
     """Dispatch the store's document into the running app.
 
-    Side effects: grids panel (missing-ref warning), live BossTimer (if open),
-    extras shortcut cards, `active_profile` pref, window title, File menu
-    profile rows. Positions are fractions — no resolution rescale exists;
-    `authored_at` is display-only provenance.
+    Side effects: grids panel (missing-ref warning), live BossTimer + Deeps
+    overlays (if open), extras shortcut cards, `active_profile` pref, window
+    title, File menu profile rows. Positions are fractions — no resolution
+    rescale exists; `authored_at` is display-only provenance.
     """
     store = app.profile_store
     grids = copy.deepcopy(store.get_section('grids').get('grids', []))
@@ -92,6 +92,8 @@ def apply_document(app):
 
     if bt := app._boss_timer_if_alive():
         bt.load_profile_data(store.get_section('boss_timer'))
+    if dp := app._deeps_panel_if_alive():
+        dp.load_profile_data(store.get_section('deeps'))
 
     # The baked extras (stopwatch/inspect/cast timer) travel with the profile —
     # resync the main-screen shortcut cards to the incoming sections.

@@ -19,6 +19,8 @@ from kazbars import (
     build_action,
     cast_timer,
     content_update,
+    damageinfo_settings,
+    deeps_settings,
     game_folder,
     grid_model,
     inspect,
@@ -72,7 +74,6 @@ from kazbars.userdata import (
     database_user_path,
     ensure_layout,
     profiles_dir,
-    settings_dir,
     userdata_root,
 )
 from kazbars.window_position import bind_window_position_save, restore_window_position
@@ -102,7 +103,6 @@ class KazBarsApp(ttkb.Window):
 
         ensure_layout()
         self.profiles_path = profiles_dir()
-        self.settings_path = settings_dir()
 
         # Machine-local prefs (prefs.json) via the strict settings_core engine.
         self.settings = Store(PREFS_SCHEMA, userdata_root())
@@ -126,11 +126,13 @@ class KazBarsApp(ttkb.Window):
         self.registry = SectionRegistry()
         self.registry.register(grid_model.PROFILE_SECTION)
         self.registry.register(live_tracker_settings.PROFILE_SECTION)
+        self.registry.register(deeps_settings.PROFILE_SECTION)
         # The three baked extras, in Extras-menu order (fixes their order in
         # written documents).
         self.registry.register(stopwatch.PROFILE_SECTION)
         self.registry.register(inspect.PROFILE_SECTION)
         self.registry.register(cast_timer.PROFILE_SECTION)
+        self.registry.register(damageinfo_settings.PROFILE_SECTION)
         self.library = ProfileLibrary(
             self.profiles_path, self.registry, profile_io.template_paths(self))
 
@@ -562,9 +564,19 @@ class KazBarsApp(ttkb.Window):
             bt.focus_force()
             bt.restore_overlay()
             return
-        self.boss_timer_panel = LiveTrackerPanel(
-            self, self.settings_path, lambda: self.game_path
-        )
+        self.boss_timer_panel = LiveTrackerPanel(self, lambda: self.game_path)
+
+    def _deeps_panel_if_alive(self):
+        """Return the Deeps panel if it exists and is alive, else None."""
+        if self.deeps_panel is None:
+            return None
+        try:
+            if self.deeps_panel.winfo_exists():
+                return self.deeps_panel
+        except Exception:
+            logger.debug("deeps_panel existence probe failed", exc_info=True)
+        self.deeps_panel = None
+        return None
 
     def _open_deeps_panel(self):
         """Open the Deeps panel (single-instance) — mirrors _open_boss_timer."""
@@ -685,6 +697,11 @@ class KazBarsApp(ttkb.Window):
         if self.profile_store:
             self.profile_store.set_section('boss_timer', data)
 
+    def on_deeps_profile_data(self, data):
+        """Deeps pushes its profile slice on every settings change."""
+        if self.profile_store:
+            self.profile_store.set_section('deeps', data)
+
     def _update_title(self):
         """Window title = app + active profile name (no dirty marker — the
         profile autosaves)."""
@@ -770,13 +787,8 @@ class KazBarsApp(ttkb.Window):
         if bt := self._boss_timer_if_alive():
             bt.cleanup()
             bt.destroy()
-        dp = self.deeps_panel
-        if dp is not None:
-            try:
-                if dp.winfo_exists():
-                    dp.cleanup()
-                    dp.destroy()
-            except tk.TclError:
-                pass
+        if dp := self._deeps_panel_if_alive():
+            dp.cleanup()
+            dp.destroy()
 
         self.destroy()

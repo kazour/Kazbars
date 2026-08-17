@@ -17,7 +17,6 @@ Sliders run in offset space but their readout shows the resulting game value
 
 import logging
 import tkinter as tk
-from pathlib import Path
 from tkinter import ttk
 
 from . import damageinfo_settings as dis
@@ -68,7 +67,7 @@ _CARDS = (
 class DamageNumbersPanel(tk.Toplevel):
     """Configuration window for the Damage Numbers mod."""
 
-    def __init__(self, parent: tk.Misc, settings_path: str | Path) -> None:
+    def __init__(self, parent: tk.Misc) -> None:
         super().__init__(parent)
         self.title("Damage Numbers")
         self.resizable(False, False)
@@ -80,8 +79,8 @@ class DamageNumbersPanel(tk.Toplevel):
         self.withdraw()
         self.grab_set()
 
-        self.settings_folder = str(settings_path)
-        self.settings = dis.load_settings(self.settings_folder)
+        self.settings = dis.validate_all_settings(
+            dict(parent.profile_store.get_section('damage_numbers')))  # type: ignore[attr-defined]
 
         # Widget registries (keyed by setting) so presets can re-sync the UI.
         self._scales: dict[str, ttk.Scale] = {}
@@ -349,7 +348,8 @@ class DamageNumbersPanel(tk.Toplevel):
         dialogs do — with the mod off, the next build *removes* it, and saying
         "Build & Install to apply" would read as the opposite.
         """
-        dis.save_settings(self.settings_folder, self.settings)
+        self.master.profile_store.set_section(  # type: ignore[attr-defined]
+            'damage_numbers', self.settings)
         # The parent is the app root; guard so a bare-parent construction
         # (tests) doesn't require the full app surface.
         grids_panel = getattr(self.master, 'grids_panel', None)
@@ -430,6 +430,6 @@ def open_damage_numbers_panel(app: tk.Misc) -> DamageNumbersPanel:
                 return panel
         except tk.TclError:
             pass
-    panel = DamageNumbersPanel(app, app.settings_path)  # type: ignore[attr-defined]
+    panel = DamageNumbersPanel(app)
     app.damage_numbers_panel = panel  # type: ignore[attr-defined]
     return panel

@@ -29,17 +29,15 @@ import logging
 import time
 import tkinter as tk
 from collections.abc import Callable
-from pathlib import Path
 from tkinter import ttk
 
 from .deeps_meter import DeepsMeter, MeterSnapshot, Status
 from .deeps_overlay import ALL_CELL_IDS as _ALL_CELL_IDS
 from .deeps_overlay import CELL_LABELS, DeepsOverlay
 from .deeps_settings import (
-    load_settings,
     normalize_readout_preset,
     normalize_survival_preset,
-    save_settings,
+    validate_all_settings,
     validate_setting,
 )
 from .ui_forms import (
@@ -101,7 +99,7 @@ _WINDOW_CHOICES = (5, 7, 11, 13)
 #            quietly in peripheral vision; only the colors pull the eye.
 #
 # Values map 1:1 onto the overlay smoother's three knobs; the panel writes
-# them into `self.settings` whenever the user picks a preset, so the disk
+# them into `self.settings` whenever the user picks a preset, so the profile
 # state, the panel state, and the overlay state never drift. The preset
 # table itself lives in `deeps_settings._READOUT_PRESETS` so the normalize
 # logic is unit-testable without spinning up Tk.
@@ -138,7 +136,6 @@ class DeepsPanel(tk.Toplevel):
     def __init__(
         self,
         parent: tk.Misc,
-        settings_path: str | Path,
         game_path_getter: Callable[[], str | None],
     ) -> None:
         super().__init__(parent)
@@ -153,15 +150,16 @@ class DeepsPanel(tk.Toplevel):
         )
         bind_window_position_save(self, "deeps", save_size=False)
 
-        self.settings_folder = str(settings_path)
         self.game_path_getter = game_path_getter
+        self._profile_hook = getattr(parent, "on_deeps_profile_data", None)
 
-        # Persisted state — load before building widgets so var defaults
-        # come from the user's saved settings.
-        self.settings = load_settings(self.settings_folder)
+        # Persisted state — seeded from the profile document's `deeps` section
+        # (never disk — userdata/settings/ is retired) before building widgets
+        # so var defaults come from the user's saved settings.
+        self.settings = validate_all_settings(dict(parent.profile_store.get_section('deeps')))
         # Normalize the three smoother keys to match the persisted preset, so
-        # the overlay starts coherent (`disk == memory == overlay`). A
-        # power-user JSON edit that desyncs preset name vs. underlying values
+        # the overlay starts coherent (`profile == memory == overlay`). A
+        # hand-edited profile that desyncs preset name vs. underlying values
         # gets snapped back to the preset on next load.
         self._normalize_readout_preset(save=False)
         # Same coherence pass for the survival-tint preset (Tank / Standard).
@@ -207,8 +205,11 @@ class DeepsPanel(tk.Toplevel):
         self._start_btn: ttk.Button | None = None
         self._lock_btn: ttk.Button | None = None
         self._pet_caveat: ttk.Label | None = None
+        self._size_scale: ttk.Scale | None = None
         self._size_value_label: ttk.Label | None = None
+        self._opacity_scale: ttk.Scale | None = None
         self._opacity_value_label: ttk.Label | None = None
+        self._alarm_scale: ttk.Scale | None = None
         self._alarm_value_label: ttk.Label | None = None
         self._survival_caption: ttk.Label | None = None
 
@@ -302,14 +303,14 @@ class DeepsPanel(tk.Toplevel):
 
         # Font size — slider 12-48 pt. The live label tracks the drag; the
         # setting persists on release so one drag is a single write.
-        _, self._size_value_label = create_slider_row(
+        self._size_scale, self._size_value_label = create_slider_row(
             lf, "Size:", 12, 48,
             int(self.settings["overlay_font_size"]), "pt",
             self._on_size_slider, self._on_appearance_change,
         )
 
         # Background opacity — slider 0-100 %, mapped to smooth per-pixel alpha.
-        _, self._opacity_value_label = create_slider_row(
+        self._opacity_scale, self._opacity_value_label = create_slider_row(
             lf, "Background:", 0, 100,
             round(float(self.settings["overlay_bg_opacity"]) * 100), "%",
             self._on_opacity_slider, self._on_appearance_change,
@@ -408,6 +409,69 @@ class DeepsPanel(tk.Toplevel):
             ).pack(side="left")
         return combo
 
+    def _push_profile(self) -> None:
+        """Push `self.settings` into the profile document's `deeps` section
+        (the store's own debounced autosave persists it)."""
+        if self._profile_hook:
+            self._profile_hook(self.get_profile_data())
+
+    def get_profile_data(self) -> dict:
+        """Settings dict for embedding in the profile document (LIVE section)."""
+        return dict(self.settings)
+
+    def load_profile_data(self, config: dict) -> None:
+        """Apply an incoming profile's `deeps` section — profile switch
+        restyles the open panel and its overlay live."""
+        if not config:
+            return
+        self.settings = validate_all_settings(config)
+        self._normalize_readout_preset(save=False)
+        self._normalize_survival_preset(save=False)
+        self.settings["alarm_threshold"] = float(self._clamp_alarm(self.settings["alarm_threshold"]))
+        self.meter.set_include_pet_damage(self.settings["include_pet_damage"])
+        self.meter.set_window_seconds(self.settings["window_seconds"])
+        if self.overlay is not None:
+            self.overlay.apply_settings(self.settings)
+        self._sync_widgets_from_settings()
+        self._push_thresholds()
+
+    def _sync_widgets_from_settings(self) -> None:
+        """Resync every control to `self.settings` (profile switch)."""
+        self._survival_var.set(str(self.settings["survival_preset"]))
+        self._pet_var.set(bool(self.settings["include_pet_damage"]))
+        self._layout_var.set(str(self.settings["layout"]))
+        self._font_family_var.set(str(self.settings["overlay_font_family"]))
+
+        size = int(self.settings["overlay_font_size"])
+        self._font_size_var.set(str(size))
+        if self._size_scale is not None:
+            self._size_scale.set(size)
+        if self._size_value_label is not None:
+            self._size_value_label.configure(text=f"{size}pt")
+
+        pct = round(float(self.settings["overlay_bg_opacity"]) * 100)
+        self._bg_opacity_var.set(str(pct))
+        if self._opacity_scale is not None:
+            self._opacity_scale.set(pct)
+        if self._opacity_value_label is not None:
+            self._opacity_value_label.configure(text=f"{pct}%")
+
+        self._window_var.set(str(int(self.settings["window_seconds"])))
+        self._preset_var.set(str(self.settings["readout_preset"]))
+
+        visible_set = set(self.settings.get("visible_cells", []))
+        for cid, var in self._cell_vars.items():
+            var.set(cid in visible_set)
+
+        alarm = self._clamp_alarm(self.settings["alarm_threshold"])
+        if self._alarm_scale is not None:
+            self._alarm_scale.set(alarm)
+        if self._alarm_value_label is not None:
+            self._alarm_value_label.configure(text=f"{alarm}/s")
+
+        self._refresh_survival_caption()
+        self._refresh_lock_button()
+
     def _on_window_change(self) -> None:
         """Window-width dropdown — persist + rebuild the meter's trackers.
 
@@ -417,7 +481,7 @@ class DeepsPanel(tk.Toplevel):
         secs = validate_setting("window_seconds", self._window_var.get())
         self._window_var.set(str(int(secs)))
         self.settings["window_seconds"] = secs
-        save_settings(self.settings_folder, self.settings)
+        self._push_profile()
         self.meter.set_window_seconds(secs)
 
     def _normalize_readout_preset(self, *, save: bool) -> None:
@@ -432,7 +496,7 @@ class DeepsPanel(tk.Toplevel):
         """
         normalize_readout_preset(self.settings)
         if save:
-            save_settings(self.settings_folder, self.settings)
+            self._push_profile()
 
     def _normalize_survival_preset(self, *, save: bool) -> None:
         """Force `self.settings` coherent with the persisted survival preset.
@@ -442,7 +506,7 @@ class DeepsPanel(tk.Toplevel):
         (no save — first user action commits) and on preset click (save=True)."""
         normalize_survival_preset(self.settings)
         if save:
-            save_settings(self.settings_folder, self.settings)
+            self._push_profile()
 
     def _on_preset_change(self) -> None:
         """User picked a Readout style — normalize settings, persist, push all
@@ -482,7 +546,7 @@ class DeepsPanel(tk.Toplevel):
         """Push the current visible-cells selection to the overlay + save."""
         visible = [cid for cid in _ALL_CELL_IDS if self._cell_vars[cid].get()]
         self.settings["visible_cells"] = visible
-        save_settings(self.settings_folder, self.settings)
+        self._push_profile()
         if self.overlay is not None:
             self.overlay.set_visible_cells(visible)
 
@@ -498,7 +562,7 @@ class DeepsPanel(tk.Toplevel):
         # lives in settings (no tk var); drag updates in-memory so the tick's
         # hysteresis reacts live, release persists. Seed is clamped into band.
         alarm_seed = self._clamp_alarm(self.settings["alarm_threshold"])
-        _, self._alarm_value_label = create_slider_row(
+        self._alarm_scale, self._alarm_value_label = create_slider_row(
             lf, "DPS-out alarm:", _ALARM_MIN, _ALARM_MAX, alarm_seed, "/s",
             self._on_alarm_slider, self._on_alarm_commit, value_width=7,
         )
@@ -544,7 +608,7 @@ class DeepsPanel(tk.Toplevel):
 
     def _on_alarm_commit(self) -> None:
         """Alarm slider released — persist + sync the overlay's threshold field."""
-        save_settings(self.settings_folder, self.settings)
+        self._push_profile()
         self._push_thresholds()
 
     def _on_survival_preset_change(self) -> None:
@@ -624,13 +688,13 @@ class DeepsPanel(tk.Toplevel):
         self.settings["overlay_x"] = x
         self.settings["overlay_y"] = y
         self.settings["overlay_positioned"] = positioned
-        save_settings(self.settings_folder, self.settings)
+        self._push_profile()
 
     def _on_overlay_lock_changed(self, locked: bool) -> None:
         """The overlay's own lock indicator was clicked — persist + resync the
         panel's Lock button so both surfaces agree."""
         self.settings["overlay_locked"] = locked
-        save_settings(self.settings_folder, self.settings)
+        self._push_profile()
         self._refresh_lock_button()
 
     # ------------------------------------------------------------------ #
@@ -691,7 +755,7 @@ class DeepsPanel(tk.Toplevel):
         new_state = not self.overlay.is_locked()
         self.overlay.set_locked(new_state)
         self.settings["overlay_locked"] = new_state
-        save_settings(self.settings_folder, self.settings)
+        self._push_profile()
         self._refresh_lock_button()
 
     def _refresh_lock_button(self) -> None:
@@ -709,7 +773,7 @@ class DeepsPanel(tk.Toplevel):
     def _on_layout_change(self) -> None:
         layout = self._layout_var.get()
         self.settings["layout"] = layout
-        save_settings(self.settings_folder, self.settings)
+        self._push_profile()
         if self.overlay is not None:
             self.overlay.set_layout(layout)
 
@@ -741,7 +805,7 @@ class DeepsPanel(tk.Toplevel):
         self.settings["overlay_font_family"] = family
         self.settings["overlay_font_size"] = size
         self.settings["overlay_bg_opacity"] = opacity
-        save_settings(self.settings_folder, self.settings)
+        self._push_profile()
 
         if self.overlay is not None:
             self.overlay.set_font(str(family), int(size))
@@ -754,7 +818,7 @@ class DeepsPanel(tk.Toplevel):
     def _on_pet_change(self) -> None:
         on = bool(self._pet_var.get())
         self.settings["include_pet_damage"] = on
-        save_settings(self.settings_folder, self.settings)
+        self._push_profile()
         self.meter.set_include_pet_damage(on)
 
     # ------------------------------------------------------------------ #
@@ -928,6 +992,6 @@ def open_deeps_panel(app: tk.Misc) -> DeepsPanel:
                 return panel
         except tk.TclError:
             pass
-    panel = DeepsPanel(app, app.settings_path, lambda: app.game_path)
+    panel = DeepsPanel(app, lambda: app.game_path)
     app.deeps_panel = panel  # type: ignore[attr-defined]
     return panel

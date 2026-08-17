@@ -1,15 +1,16 @@
-"""Tests for damageinfo_settings — schema, validation, presets, I/O.
+"""Tests for damageinfo_settings — schema, validation, presets, the
+PROFILE_SECTION contract.
 
 Pure-data layer (no Tk, no MTASC). Mirrors test_deeps_settings.
 """
 
-import json
 import re
 
 import pytest
 
 from kazbars import damageinfo_settings as dis
 from kazbars.paths import ASSETS
+from kazbars.profile_document import LANE_BUILD
 
 
 # --------------------------------------------------------------------------- #
@@ -273,44 +274,17 @@ def test_apply_preset_preserves_unrelated_keys():
 
 
 # --------------------------------------------------------------------------- #
-# file I/O
+# PROFILE_SECTION contract
 # --------------------------------------------------------------------------- #
-def test_save_load_round_trip(tmp_path):
-    s = dis.get_default_settings()
-    s['enabled'] = True
-    s['ranged_keep'] = 1  # on (default is off) — round-trips a changed bool
-    s['shadow_mode'] = 1
-    assert dis.save_settings(tmp_path, s)
-    loaded = dis.load_settings(tmp_path)
-    assert loaded['enabled'] is True
-    assert loaded['ranged_keep'] == 1
-    assert loaded['shadow_mode'] == 1
-
-
-def test_load_missing_returns_defaults(tmp_path):
-    assert dis.load_settings(tmp_path) == dis.get_default_settings()
-
-
-def test_load_corrupt_returns_defaults(tmp_path):
-    (tmp_path / dis.SETTINGS_FILENAME).write_text('{not json', encoding='utf-8')
-    assert dis.load_settings(tmp_path) == dis.get_default_settings()
-
-
-def test_load_partial_fills_defaults(tmp_path):
-    (tmp_path / dis.SETTINGS_FILENAME).write_text(
-        json.dumps({'enabled': True, 'ranged_keep': 1}), encoding='utf-8')
-    loaded = dis.load_settings(tmp_path)
-    assert loaded['enabled'] is True
-    assert loaded['ranged_keep'] == 1
-    assert loaded['shadow_mode'] == 2  # filled
-
-
-def test_save_validates_out_of_range(tmp_path):
-    s = dis.get_default_settings()
-    s['dir1_x_offset'] = 99999  # out of range
-    dis.save_settings(tmp_path, s)
-    on_disk = json.loads((tmp_path / dis.SETTINGS_FILENAME).read_text(encoding='utf-8'))
-    assert on_disk['dir1_x_offset'] == 200  # clamped before write
+def test_profile_section_contract():
+    # Flat section: the settings dict itself. BUILD lane (baked into the SWF
+    # by Build & Install), dense (validate_all fills), no buff refs to harvest.
+    assert dis.PROFILE_SECTION.key == 'damage_numbers'
+    assert dis.PROFILE_SECTION.lane == LANE_BUILD
+    assert dis.PROFILE_SECTION.sparse is False
+    assert dis.PROFILE_SECTION.harvest_refs is None
+    assert dis.PROFILE_SECTION.defaults() == dis.get_default_settings()
+    assert dis.PROFILE_SECTION.validate({'enabled': True})['enabled'] is True
 
 
 # --------------------------------------------------------------------------- #
@@ -354,20 +328,9 @@ def test_normalize_color():
     assert dis.normalize_color(123) is None         # non-str
 
 
-def test_source_colors_not_persisted(tmp_path):
-    # Colors are no longer a setting — an unknown 'source_colors' key is dropped on write
-    # (the colors panel edits TextColors.xml directly instead).
+def test_source_colors_not_a_setting():
+    # Colors are not a setting — an unknown 'source_colors' key is dropped by
+    # validate_all_settings (the colors panel edits TextColors.xml directly).
     s = dis.get_default_settings()
     s['source_colors'] = {'self_attacked': 'FF0000'}  # legacy key from an old install
-    assert dis.save_settings(tmp_path, s)
-    on_disk = json.loads((tmp_path / dis.SETTINGS_FILENAME).read_text(encoding='utf-8'))
-    assert 'source_colors' not in on_disk
-    assert 'source_colors' not in dis.load_settings(tmp_path)
-
-
-def test_save_settings_validates_and_clamps(tmp_path):
-    s = dis.get_default_settings()
-    s['dir1_x_offset'] = 99999  # out of range
-    dis.save_settings(tmp_path, s)
-    on_disk = json.loads((tmp_path / dis.SETTINGS_FILENAME).read_text(encoding='utf-8'))
-    assert on_disk['dir1_x_offset'] == 200  # clamped before write
+    assert 'source_colors' not in dis.validate_all_settings(s)
