@@ -226,10 +226,25 @@ def _validate_grids_list(value):
     return grids
 
 
+def _harvest_grid_refs(section):
+    """Every buff ref the grids section carries (whitelists + slot
+    assignments, scalar or list) — the export layer resolves and filters."""
+    refs = []
+    for g in section.get('grids', []):
+        refs.extend(g.get('whitelist', []))
+        for val in g.get('slotAssignments', {}).values():
+            if isinstance(val, list):
+                refs.extend(val)
+            elif val is not None:
+                refs.append(val)
+    return refs
+
+
 # The grid editor's slice of the profile document: `{'grids': [...]}`.
 # Registered by app.py at startup.
 PROFILE_SECTION = ProfileSectionSpec(
     'grids',
     Schema('', 1, {'grids': Field([], validate=_validate_grids_list)}),
     LANE_BUILD,
+    harvest_refs=_harvest_grid_refs,
 )

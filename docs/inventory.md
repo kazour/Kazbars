@@ -13,7 +13,7 @@
 |---|---:|
 | `src/kazbars/__init__.py` | 11 |
 | `src/kazbars/__main__.py` | 43 |
-| `src/kazbars/app.py` | 764 |
+| `src/kazbars/app.py` | 774 |
 | `src/kazbars/app_popups.py` | 489 |
 | `src/kazbars/boss_timer.py` | 399 |
 | `src/kazbars/buff_database.py` | 176 |
@@ -50,7 +50,7 @@
 | `src/kazbars/game_resolution.py` | 107 |
 | `src/kazbars/grid_dialogs.py` | 865 |
 | `src/kazbars/grid_editor_panel.py` | 635 |
-| `src/kazbars/grid_model.py` | 235 |
+| `src/kazbars/grid_model.py` | 250 |
 | `src/kazbars/grids_generator.py` | 747 |
 | `src/kazbars/grids_panel.py` | 679 |
 | `src/kazbars/inspect.py` | 56 |
@@ -62,9 +62,9 @@
 | `src/kazbars/paths.py` | 46 |
 | `src/kazbars/prefs.py` | 163 |
 | `src/kazbars/profile_document.py` | 220 |
-| `src/kazbars/profile_io.py` | 212 |
+| `src/kazbars/profile_io.py` | 301 |
 | `src/kazbars/profile_library.py` | 282 |
-| `src/kazbars/profile_share.py` | 137 |
+| `src/kazbars/profile_share.py` | 140 |
 | `src/kazbars/profile_store.py` | 136 |
 | `src/kazbars/settings_backup.py` | 472 |
 | `src/kazbars/settings_core.py` | 298 |
@@ -125,7 +125,7 @@
 | `tests/test_profile_document.py` | 193 |
 | `tests/test_profile_io.py` | 27 |
 | `tests/test_profile_library.py` | 212 |
-| `tests/test_profile_share.py` | 152 |
+| `tests/test_profile_share.py` | 198 |
 | `tests/test_profile_store.py` | 138 |
 | `tests/test_resolution_scaling.py` | 71 |
 | `tests/test_settings_backup.py` | 159 |
