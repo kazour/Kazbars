@@ -1,4 +1,14 @@
-"""KazBars — Default Buff Display editor."""
+"""KazBars — Default Buff Display editor.
+
+**Inherited vs. overridden.** Each of the four sections (Player/Target/Top/
+Floating) starts fully *inherited* — every field shows whatever the live XML
+file says. Touching a field makes it this profile's *override*: an explicit
+value the panel enforces on Apply, persisted per-label in the profile
+document's ``buff_bars`` section (PATCH lane — never written to XML by a mere
+profile switch, only by this dialog's own Apply). Apply writes only the
+fields a section currently overrides, never the untouched rest — mirrors
+``damageinfo_colors_panel``'s override tracking, scoped per ``_Section``.
+"""
 
 import logging
 import tkinter as tk
@@ -9,9 +19,15 @@ from ttkbootstrap.dialogs import Messagebox
 
 from .buff_xml import (
     BUFF_FILES,
+    COLS_MAX,
+    COLS_MIN,
     FILTER_BOTH,
     FILTER_FRIENDLY,
     FILTER_HOSTILE,
+    ICON_SIZE_MAX,
+    ICON_SIZE_MIN,
+    SPACING_MAX,
+    SPACING_MIN,
     _backup_once,
     _detect_custom_ui,
     _format_point,
@@ -21,6 +37,7 @@ from .buff_xml import (
     _resolve_paths,
     _write_bufflistview,
 )
+from .prefs import record_last_patch
 from .settings_manager import get_setting, safe_write_text, set_setting
 from .ui_collapsible import CollapsibleSection
 from .ui_components import create_scrollable_frame
@@ -59,12 +76,6 @@ BADGE_DEFAULT = 'Default'
 BADGE_CUSTOMIZED = 'Customized'
 BADGE_MISSING = 'Missing'
 BADGE_UNSUPPORTED = 'Unsupported'
-
-# Stock icon size is 31; bounds bracket the usable range so a stray
-# scroll-wheel can't make the HUD invisible (4px) or destroy layout (200px).
-ICON_SIZE_MIN, ICON_SIZE_MAX = 8, 128
-SPACING_MIN, SPACING_MAX = 0, 50
-COLS_MIN, COLS_MAX = 1, 30
 
 # First-launch default opens Player only — most users want to verify their
 # primary buff bar without scrolling past the rest.
@@ -106,6 +117,11 @@ def _render_inline_message(parent, text):
 # ============================================================================
 # SECTION (one per file)
 # ============================================================================
+# The five overridable fields, in `_snapshot()`'s fixed order — shared by the
+# change-diff in `_on_change` and `_compute_overrides`.
+_FIELD_NAMES = ('icon_size', 'icon_spacing', 'max_columns', 'filter', 'enabled')
+
+
 class _Section:
     """One row in the dialog: header + form for a single XML file."""
 
@@ -123,6 +139,9 @@ class _Section:
         self.source_path = None
         self.state = self.STATE_OK
         self._source_text = None
+        # The live file's own enabled state at load — what a non-overridden
+        # `enabled` falls back to on write (leave the file's toggle alone).
+        self._loaded_enabled = True
 
         self.icon_size_var = tk.StringVar()
         self.spacing_var = tk.StringVar()
@@ -132,6 +151,10 @@ class _Section:
 
         self._baseline = None
         self._last_snapshot = None
+        # This profile's existing overrides for this label, and the live set
+        # (seeded from it, then mutated by every field the user touches).
+        self._baseline_override: dict = {}
+        self._overridden: set[str] = set()
 
         self._row_labels = []
         self._badge_var = tk.StringVar(value='')
@@ -161,7 +184,11 @@ class _Section:
                 return
             self.state = self.STATE_OK
             self._source_text = xml_text
-            self._populate_vars(attrs)
+            self._loaded_enabled = bool(attrs.get('enabled', True))
+            section = self.dialog.app.profile_store.get_section('buff_bars')
+            self._baseline_override = dict(section.get(self.label, {}))
+            self._overridden = set(self._baseline_override)
+            self._populate_vars(attrs, self._baseline_override)
             self._baseline = self._snapshot()
             self._last_snapshot = self._baseline
         except OSError as e:
@@ -170,7 +197,7 @@ class _Section:
         finally:
             self._refresh_badge()
 
-    def _populate_vars(self, attrs):
+    def _populate_vars(self, attrs, override):
         # Custom UIs may have non-square icons or non-uniform spacing; we
         # collapse to the first coord (X / W) and the user's next edit squares it.
         size_xy = _parse_point(attrs.get('icon_size'))
@@ -179,11 +206,17 @@ class _Section:
         raw_filter = attrs.get('filter')
         flt = raw_filter if raw_filter in (FILTER_FRIENDLY, FILTER_HOSTILE, FILTER_BOTH) else ''
 
-        self.icon_size_var.set(str(size_xy[0]) if size_xy else '')
-        self.spacing_var.set(str(spacing_xy[0]) if spacing_xy else '')
-        self.cols_var.set(str(max_cols) if max_cols is not None else '')
-        self.filter_var.set(flt)
-        self.enabled_var.set(bool(attrs.get('enabled', True)))
+        # An overridden field shows this profile's stored value; an
+        # inherited one shows whatever the live file says, same as before
+        # overrides existed.
+        self.icon_size_var.set(str(override.get(
+            'icon_size', size_xy[0] if size_xy else '')))
+        self.spacing_var.set(str(override.get(
+            'icon_spacing', spacing_xy[0] if spacing_xy else '')))
+        self.cols_var.set(str(override.get(
+            'max_columns', max_cols if max_cols is not None else '')))
+        self.filter_var.set(override.get('filter', flt))
+        self.enabled_var.set(bool(override.get('enabled', attrs.get('enabled', True))))
 
     def _snapshot(self):
         return (
@@ -192,10 +225,36 @@ class _Section:
             bool(self.enabled_var.get()),
         )
 
+    def _compute_overrides(self) -> dict:
+        """Currently-staged value for every field this section overrides —
+        `write_to_disk`, the profile persist, and `dirty()` all share this so
+        they can never drift apart. Clamped/coerced the same way the old
+        unconditional write was, so an out-of-range typed value can't reach
+        the file even as an override."""
+        out: dict = {}
+        int_specs = (
+            (self.icon_size_var, ICON_SIZE_MIN, ICON_SIZE_MAX, 'icon_size'),
+            (self.spacing_var, SPACING_MIN, SPACING_MAX, 'icon_spacing'),
+            (self.cols_var, COLS_MIN, COLS_MAX, 'max_columns'),
+        )
+        for var, lo, hi, key in int_specs:
+            if key not in self._overridden:
+                continue
+            n = _maybe_int(var.get())
+            if n is not None:
+                out[key] = max(lo, min(hi, n))
+        if 'filter' in self._overridden:
+            flt = self.filter_var.get()
+            if flt in (FILTER_FRIENDLY, FILTER_HOSTILE, FILTER_BOTH):
+                out['filter'] = flt
+        if 'enabled' in self._overridden:
+            out['enabled'] = bool(self.enabled_var.get())
+        return out
+
     def dirty(self):
         if self.state != self.STATE_OK:
             return False
-        return self._snapshot() != self._baseline
+        return self._compute_overrides() != self._baseline_override
 
     # ------------------------------------------------------------------
     # Widget construction
@@ -290,6 +349,11 @@ class _Section:
         snap = self._snapshot()
         if snap == self._last_snapshot:
             return
+        # Whichever field(s) actually moved become this profile's overrides —
+        # an explicit choice, same as damageinfo_colors_panel's row edits.
+        for field, old, new in zip(_FIELD_NAMES, self._last_snapshot, snap):
+            if old != new:
+                self._overridden.add(field)
         self._last_snapshot = snap
         self._apply_disabled_style()
         self._refresh_filter_hint()
@@ -364,25 +428,25 @@ class _Section:
         if source_text is None:
             source_text = self.source_path.read_text(encoding='utf-8')
 
-        # Only fields with a valid value land in attrs. Blanks and unparseable
-        # entries stay out so the source's existing attribute — or its absence —
-        # is preserved. Numeric fields are clamped so a typed value past the
-        # spinbox arrows (e.g. 999) can't reach the file.
+        # Only the fields this profile currently overrides land in attrs —
+        # everything this profile never touched (or stopped touching) is
+        # left exactly as the source file already has it.
+        overrides = self._compute_overrides()
         attrs = {}
-        int_specs = (
-            (self.icon_size_var, ICON_SIZE_MIN, ICON_SIZE_MAX, 'icon_size',    lambda v: _format_point(v, v)),
-            (self.spacing_var,   SPACING_MIN,   SPACING_MAX,   'icon_spacing', lambda v: _format_point(v, v)),
-            (self.cols_var,      COLS_MIN,      COLS_MAX,      'max_columns',  str),
-        )
-        for var, lo, hi, key, fmt in int_specs:
-            n = _maybe_int(var.get())
-            if n is not None:
-                attrs[key] = fmt(max(lo, min(hi, n)))
-        flt = self.filter_var.get()
-        if flt in (FILTER_FRIENDLY, FILTER_HOSTILE, FILTER_BOTH):
-            attrs['filter'] = flt
+        if 'icon_size' in overrides:
+            attrs['icon_size'] = _format_point(overrides['icon_size'], overrides['icon_size'])
+        if 'icon_spacing' in overrides:
+            attrs['icon_spacing'] = _format_point(overrides['icon_spacing'], overrides['icon_spacing'])
+        if 'max_columns' in overrides:
+            attrs['max_columns'] = str(overrides['max_columns'])
+        if 'filter' in overrides:
+            attrs['filter'] = overrides['filter']
 
-        new_text = _write_bufflistview(source_text, attrs, bool(self.enabled_var.get()))
+        # A non-overridden `enabled` leaves the file's own toggle alone —
+        # _write_bufflistview has no "don't touch" option of its own.
+        enabled = overrides.get('enabled', self._loaded_enabled)
+
+        new_text = _write_bufflistview(source_text, attrs, enabled)
         if new_text is None:
             raise RuntimeError(
                 f"<BuffListView> element not found in {self.source_path}"
@@ -395,6 +459,8 @@ class _Section:
     def load_after_write(self):
         """Re-read after a successful write so source_path/baseline reflect
         the new on-disk state (Customized now wins for this file)."""
+        self._baseline_override = self._compute_overrides()
+        self._overridden = set(self._baseline_override)
         self.source_path = self.customized_path
         try:
             xml_text = self.source_path.read_text(encoding='utf-8')
@@ -403,7 +469,8 @@ class _Section:
         attrs = _read_bufflistview(xml_text)
         if attrs is not None:
             self._source_text = xml_text
-            self._populate_vars(attrs)
+            self._loaded_enabled = bool(attrs.get('enabled', True))
+            self._populate_vars(attrs, self._baseline_override)
             self._baseline = self._snapshot()
             self._last_snapshot = self._baseline
         self._refresh_badge()
@@ -543,9 +610,17 @@ class BuffDisplayDialog(tk.Toplevel):
             try:
                 section.write_to_disk()
                 section.load_after_write()
-                successes.append(section.label)
+                successes.append(section)
             except (OSError, RuntimeError) as e:
                 failures.append((section.label, str(e)))
+        if successes:
+            # PATCH lane: persisted on the profile document, never dispatched
+            # on a mere profile switch — only this Apply writes it.
+            buff_bars = dict(self.app.profile_store.get_section('buff_bars'))
+            for section in successes:
+                buff_bars[section.label] = section._baseline_override
+            self.app.profile_store.set_section('buff_bars', buff_bars)
+            record_last_patch(self.app.settings, self.app.game_path, 'buff_bars', buff_bars)
         self._refresh_apply_state()
         if failures:
             # Failure toast uses key= so retries coalesce. The OS-level reason
@@ -560,7 +635,7 @@ class BuffDisplayDialog(tk.Toplevel):
                 'danger', duration=10, key='buff_apply_failed',
             )
         else:
-            names = ", ".join(successes)
+            names = ", ".join(s.label for s in successes)
             app_toast(self, f"Saved: {names}", 'success')
 
     def _on_cancel(self):

@@ -17,6 +17,16 @@ built and installed at all). Pure data; no Tk. Mirrors ``deeps_settings.py``.
 
 Lives in the profile document as the ``damage_numbers`` section (BUILD lane —
 baked into the SWF by Build & Install); registered by app.py.
+
+Also owns the ``damage_colors`` PATCH-lane section (sparse — see
+``DAMAGE_COLORS_SECTION`` below): the per-source color/direction *overrides*
+the Damage Number Colors panel (``damageinfo_colors_panel.py``) writes into
+``TextColors.xml``. Colors/directions themselves are never baked or
+build-gated — this is a separate section from ``damage_numbers`` because it
+lives on a different lane (PATCH: written to game XML only on explicit Apply,
+never on profile switch) and is sparse (absent source = "no opinion, follow
+whatever the file already says" — most sources are never touched by a given
+profile).
 """
 
 import logging
@@ -24,7 +34,7 @@ import re
 from typing import Any
 
 from . import settings_core
-from .profile_document import LANE_BUILD
+from .profile_document import LANE_BUILD, LANE_PATCH
 from .profile_document import SectionSpec as ProfileSectionSpec
 from .settings_core import Field, Schema
 
@@ -358,6 +368,58 @@ def normalize_color(value: Any) -> str | None:
     if v[:2].lower() == '0x':
         v = v[2:]
     return v.upper() if _HEX6_RE.match(v) else None
+
+
+# ============================================================
+# damage_colors — sparse PATCH-lane overrides (TextColors.xml)
+# ============================================================
+# Every flytext type has a `direction`: 1 = above the head, -1 = fixed
+# column, 0 = zig-zag stack. Mirrors buff_xml's direction attribute values.
+_VALID_DIRECTIONS = (1, -1, 0)
+
+
+def _validate_color_overrides(value: Any) -> dict[str, str]:
+    """Sparse `{source_name: RRGGBB}` — unknown names and invalid hex drop."""
+    if not isinstance(value, dict):
+        return {}
+    out: dict[str, str] = {}
+    for name, v in value.items():
+        if name not in ALL_SOURCE_NAMES:
+            continue
+        color = normalize_color(v)
+        if color:
+            out[name] = color
+    return out
+
+
+def _validate_direction_overrides(value: Any) -> dict[str, int]:
+    """Sparse `{source_name: 1|-1|0}` — unknown names and invalid values drop."""
+    if not isinstance(value, dict):
+        return {}
+    out: dict[str, int] = {}
+    for name, v in value.items():
+        if name not in ALL_SOURCE_NAMES:
+            continue
+        try:
+            d = int(v)
+        except (TypeError, ValueError):
+            continue
+        if d in _VALID_DIRECTIONS:
+            out[name] = d
+    return out
+
+
+_DAMAGE_COLORS_SCHEMA = Schema('', 1, {
+    'colors': Field({}, validate=_validate_color_overrides),
+    'directions': Field({}, validate=_validate_direction_overrides),
+})
+
+# The Damage Number Colors panel's slice of the profile document — sparse:
+# `{}` default, absent source = "no opinion" (the panel shows whatever
+# TextColors.xml already says). PATCH lane: written to game XML only on
+# explicit Apply, never on profile switch. Registered by app.py.
+DAMAGE_COLORS_SECTION = ProfileSectionSpec(
+    'damage_colors', _DAMAGE_COLORS_SCHEMA, LANE_PATCH, sparse=True)
 
 
 # ============================================================

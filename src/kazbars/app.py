@@ -16,6 +16,7 @@ from ttkbootstrap.dialogs import MessageDialog
 from kazbars import (
     APP_NAME,
     buff_display_editor,
+    buff_xml,
     build_action,
     cast_timer,
     content_update,
@@ -133,6 +134,10 @@ class KazBarsApp(ttkb.Window):
         self.registry.register(inspect.PROFILE_SECTION)
         self.registry.register(cast_timer.PROFILE_SECTION)
         self.registry.register(damageinfo_settings.PROFILE_SECTION)
+        # The XML editors' sparse PATCH-lane overrides — never dispatched on
+        # profile switch (profile_io.apply_document only touches BUILD/LIVE).
+        self.registry.register(damageinfo_settings.DAMAGE_COLORS_SECTION)
+        self.registry.register(buff_xml.PROFILE_SECTION)
         self.library = ProfileLibrary(
             self.profiles_path, self.registry, profile_io.template_paths(self))
 

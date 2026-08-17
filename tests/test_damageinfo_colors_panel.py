@@ -1,16 +1,23 @@
 """Data-layer tests for damageinfo_colors_panel.
 
 The panel UI is Tk and verified manually; the load-bearing logic is pure file I/O:
-``_read_colors``/``_read_directions`` (what seeds each row / what "reset" reads) and
-``apply_colors`` (write to Customized, created from Default, colors + directions). Both
-are unit-tested here. This panel is the only writer of TextColors.xml — the build and
-uninstall never touch it — so the direction scenarios that used to live in
+``_read_colors``/``_read_directions`` (what seeds each row / what "reset" reads),
+``apply_colors`` (write to Customized, created from Default, colors + directions), and
+``compute_apply`` (which fields the override-tracking state machine actually writes /
+persists on Apply — the panel's own override/un-override bookkeeping, extracted pure so
+it doesn't need a live Tk widget tree). This panel is the only writer of TextColors.xml —
+the build and uninstall never touch it — so the direction scenarios that used to live in
 test_build_executor are covered here too.
 
 Run: `pytest tests/test_damageinfo_colors_panel.py` (from repo root).
 """
 
-from kazbars.damageinfo_colors_panel import _read_colors, _read_directions, apply_colors
+from kazbars.damageinfo_colors_panel import (
+    _read_colors,
+    _read_directions,
+    apply_colors,
+    compute_apply,
+)
 
 SAMPLE = (
     '<TextColors>\n'
@@ -184,3 +191,103 @@ def test_direction_injected_when_the_source_omits_it(tmp_path):
 
 def test_none_when_no_textcolors_anywhere_with_directions(tmp_path):
     assert apply_colors(str(tmp_path), {}, {'self_attacked': -1}) is None
+
+
+# --------------------------------------------------------------------------- #
+# compute_apply — the override/un-override state machine, pure
+# --------------------------------------------------------------------------- #
+def test_fresh_profile_writes_and_persists_nothing():
+    # Nothing overridden, nothing was overridden before — a fresh profile
+    # opening this panel and clicking Apply must be a true no-op.
+    write, persist = compute_apply({'self_attacked': 'FFFFFF'}, set(), {})
+    assert write == {}
+    assert persist == {}
+
+
+def test_one_new_override_writes_and_persists_exactly_that_field():
+    picks = {'self_attacked': 'FF0000', 'other_healed': '00FF00'}
+    write, persist = compute_apply(picks, {'self_attacked'}, {})
+    assert write == {'self_attacked': 'FF0000'}
+    assert persist == {'self_attacked': 'FF0000'}
+
+
+def test_still_overridden_field_writes_its_current_pick():
+    picks = {'self_attacked': 'ABCDEF'}
+    write, persist = compute_apply(
+        picks, {'self_attacked'}, {'self_attacked': 'FF0000'})
+    assert write == {'self_attacked': 'ABCDEF'}
+    assert persist == {'self_attacked': 'ABCDEF'}
+
+
+def test_un_overridden_field_writes_its_restored_value_but_does_not_persist():
+    # The un-override handler already staged the restore value into picks
+    # before Apply runs; compute_apply just has to write it once and drop it
+    # from what gets persisted.
+    picks = {'self_attacked': 'FFFFFF'}  # restored (bak/default) value
+    write, persist = compute_apply(picks, set(), {'self_attacked': 'FF0000'})
+    assert write == {'self_attacked': 'FFFFFF'}
+    assert persist == {}
+
+
+def test_untouched_field_is_in_neither_write_nor_persist():
+    picks = {'self_attacked': 'FF0000', 'other_healed': '00FF00'}
+    write, persist = compute_apply(picks, {'self_attacked'}, {'self_attacked': 'FF0000'})
+    assert 'other_healed' not in write
+    assert 'other_healed' not in persist
+
+
+def test_mixed_new_kept_and_removed_overrides():
+    picks = {
+        'a': 'AAAAAA',  # kept override, value changed
+        'b': 'BBBBBB',  # brand-new override
+        'c': 'CCCCCC',  # just un-overridden, restored to this value
+        'd': 'DDDDDD',  # never touched
+    }
+    write, persist = compute_apply(
+        picks, overridden={'a', 'b'}, baseline_override={'a': 'FFFFFF', 'c': '111111'})
+    assert write == {'a': 'AAAAAA', 'b': 'BBBBBB', 'c': 'CCCCCC'}
+    assert persist == {'a': 'AAAAAA', 'b': 'BBBBBB'}
+
+
+# --------------------------------------------------------------------------- #
+# damage_colors PROFILE_SECTION contract
+# --------------------------------------------------------------------------- #
+def test_damage_colors_profile_section_contract():
+    from kazbars.damageinfo_settings import DAMAGE_COLORS_SECTION
+    from kazbars.profile_document import LANE_PATCH
+
+    # Sparse: `{}` default, PATCH lane (written to game XML only on explicit
+    # Apply, never on profile switch), no buff refs to harvest (source names
+    # are a closed enum, not buff-database entries).
+    assert DAMAGE_COLORS_SECTION.key == "damage_colors"
+    assert DAMAGE_COLORS_SECTION.lane == LANE_PATCH
+    assert DAMAGE_COLORS_SECTION.sparse is True
+    assert DAMAGE_COLORS_SECTION.harvest_refs is None
+    assert DAMAGE_COLORS_SECTION.defaults() == {}
+
+
+def test_damage_colors_validate_drops_unknown_source_and_invalid_color():
+    from kazbars.damageinfo_settings import DAMAGE_COLORS_SECTION
+
+    out = DAMAGE_COLORS_SECTION.validate({
+        'colors': {'self_attacked': '00ff00', 'not_a_real_source': 'FF0000', 'other_healed': 'zz'},
+    })
+    assert out == {'colors': {'self_attacked': '00FF00'}}
+
+
+def test_damage_colors_validate_absent_key_stays_absent():
+    from kazbars.damageinfo_settings import DAMAGE_COLORS_SECTION
+
+    # Sparse: a section that never mentions "directions" carries no opinion —
+    # validate_patch must not fill it with {}.
+    out = DAMAGE_COLORS_SECTION.validate({'colors': {'self_attacked': 'FFFFFF'}})
+    assert 'directions' not in out
+
+
+def test_damage_colors_validate_direction_range():
+    from kazbars.damageinfo_settings import DAMAGE_COLORS_SECTION
+
+    out = DAMAGE_COLORS_SECTION.validate({
+        'directions': {'self_attacked': -1, 'other_healed': 2, 'stamina_lost': '0'},
+    })
+    assert out == {'directions': {'self_attacked': -1, 'stamina_lost': 0}}

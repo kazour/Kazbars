@@ -270,3 +270,55 @@ def test_set_source_color_preserves_direction():
     assert _direction_of(new, 'stamina_lost') == '1'  # direction attr untouched
 
 
+# --------------------------------------------------------------------------- #
+# buff_bars PROFILE_SECTION contract
+# --------------------------------------------------------------------------- #
+def test_buff_bars_profile_section_contract():
+    from kazbars.buff_xml import BUFF_FILES, PROFILE_SECTION
+    from kazbars.profile_document import LANE_PATCH
+
+    # Sparse: `{}` default, PATCH lane, no buff refs to harvest (file labels
+    # are a closed enum, not buff-database entries).
+    assert PROFILE_SECTION.key == "buff_bars"
+    assert PROFILE_SECTION.lane == LANE_PATCH
+    assert PROFILE_SECTION.sparse is True
+    assert PROFILE_SECTION.harvest_refs is None
+    assert PROFILE_SECTION.defaults() == {}
+    # One sub-field per managed file, in BUFF_FILES order.
+    assert set(PROFILE_SECTION.schema.fields) == {label for label, _relpath in BUFF_FILES}
+
+
+def test_buff_bars_validate_drops_unknown_label_and_clamps_fields():
+    from kazbars.buff_xml import PROFILE_SECTION
+
+    out = PROFILE_SECTION.validate({
+        'Player': {'icon_size': 999, 'icon_spacing': -5, 'max_columns': 3, 'enabled': 0},
+        'NotARealLabel': {'icon_size': 40},
+    })
+    assert out == {'Player': {
+        'icon_size': 128, 'icon_spacing': 0, 'max_columns': 3, 'enabled': False,
+    }}
+
+
+def test_buff_bars_validate_absent_label_stays_absent():
+    from kazbars.buff_xml import PROFILE_SECTION
+
+    # Sparse: a document that never mentions "Target" carries no opinion for
+    # it — validate_patch must not fill it with {}.
+    out = PROFILE_SECTION.validate({'Player': {'icon_size': 40}})
+    assert 'Target' not in out
+
+
+def test_buff_bars_validate_drops_invalid_filter_keeps_valid():
+    from kazbars.buff_xml import FILTER_HOSTILE, PROFILE_SECTION
+
+    out = PROFILE_SECTION.validate({
+        'Top': {'filter': FILTER_HOSTILE},
+        # A present-but-declared label with an invalid filter validates to an
+        # empty sub-dict (still "present" — an unknown value inside a known
+        # label isn't the same as the label being absent).
+        'Floating': {'filter': 'not-a-real-filter'},
+    })
+    assert out == {'Top': {'filter': FILTER_HOSTILE}, 'Floating': {}}
+
+

@@ -14,9 +14,19 @@ skin's ``TextColors.xml`` **directly** on Apply — no build, no master-enable g
 always land in ``Customized/TextColors.xml`` (created from the stock ``Default/`` copy when
 absent — the game patcher resets ``Default/`` on update, so edits there don't stick). Only
 the ``color``/``direction`` attributes of each edited source change; every other byte is
-preserved. "Reset to game default" reads the stock color *and* direction from ``Default/``
-and stages them for the next Apply. Requires a game folder (the opener warns and bails
-without one).
+preserved. Requires a game folder (the opener warns and bails without one).
+
+**Inherited vs. overridden.** Every row starts *inherited* — showing whatever the live file
+says, same as any other tool's edit would. Touching a row's color/direction, or clicking its
+↺, makes that field this profile's *override*: an explicit value the panel enforces on
+Apply, persisted in the profile document's ``damage_colors`` section (PATCH lane — never
+written to XML by a mere profile switch, only by this dialog's own Apply). ↺ is
+context-sensitive: on an inherited row it reads "reset to game default" and *creates* an
+override pinned to the stock value (``Default/``); on an already-overridden row it reads
+"remove override" and un-manages the field, restoring whatever the file held the moment
+before KazBars ever touched it (the one-time ``.kazbars.bak`` snapshot — falling back to
+``Default/`` if no snapshot exists, e.g. a freshly-created Customized file). Apply writes
+only the fields that are — or just stopped being — overridden, never the untouched rest.
 """
 
 import logging
@@ -28,6 +38,7 @@ from ttkbootstrap.dialogs import Messagebox
 
 from . import buff_xml
 from . import damageinfo_settings as dis
+from .prefs import record_last_patch
 from .settings_manager import safe_write_text
 from .ui_components import create_scrollable_frame
 from .ui_forms import ColorSwatch, create_card
@@ -67,6 +78,12 @@ _DIRECTION_NAMES = [name for name, _ in _DIRECTIONS]
 _LABEL_TO_DIRECTION = dict(_DIRECTIONS)
 _DIRECTION_TO_LABEL = {value: name for name, value in _DIRECTIONS}
 _FALLBACK_DIRECTION = 1  # AoC's own default for a type whose element omits the attribute
+
+# The per-row ↺ button's two faces — see the module docstring's "Inherited vs.
+# overridden" note. Same bootstyle both ways; only the glyph + tooltip change,
+# so the row layout never shifts.
+_RESET_GLYPH = "↺"
+_UNOVERRIDE_GLYPH = "✕"
 
 # Group macros: one checkbox flips a whole set of rows to the fixed column (and back).
 # Both sets are the same ones the Damage Numbers mod used to flip at Build & Install.
@@ -123,6 +140,23 @@ def _read_directions(path) -> dict[str, int]:
     return out
 
 
+def compute_apply(picks: dict, overridden: set, baseline_override: dict) -> tuple[dict, dict]:
+    """From one field's live-staged state, compute (what to write to XML this
+    Apply, what to persist as the profile's active override set).
+
+    A field that's still overridden writes its current pick and persists. A
+    field that just stopped being overridden (was in `baseline_override`, no
+    longer in `overridden`) still needs one write — restoring whatever value
+    was staged for it (game default or the `.kazbars.bak` snapshot) — but
+    doesn't persist, since this profile no longer manages it. Every field
+    this profile never touched, and still isn't touching, is in neither dict
+    and so is left untouched by the write. Pure — no Tk, unit-tested directly.
+    """
+    persisted = {n: picks[n] for n in overridden}
+    reverted = {n: picks[n] for n in baseline_override if n not in overridden}
+    return {**persisted, **reverted}, persisted
+
+
 def apply_colors(game_path, colors: dict[str, str],
                  directions: dict[str, int] | None = None) -> Path | None:
     """Write ``colors`` (``{source_name: RRGGBB}``) and ``directions``
@@ -166,30 +200,42 @@ class DamageNumberColorsPanel(tk.Toplevel):
 
         self.game_path = game_path
         # source = the file the game reads (Customized if present, else Default); we always
-        # WRITE to Customized. `_current*` seeds the rows + is the dirty baseline;
-        # `_default*` is the stock Default value each "reset" reverts to.
+        # WRITE to Customized. `_current*` seeds the rows + reflects the live file;
+        # `_default*` is the stock Default value "reset to game default" targets;
+        # `_bak*` is the pre-KazBars snapshot "remove override" restores.
         self._default_path, self._customized_path, self._source_path = buff_xml._resolve_paths(
             game_path, _TEXTCOLORS_RELPATH
         )
+        self._bak_path = self._customized_path.with_name(
+            self._customized_path.name + buff_xml.BACKUP_SUFFIX)
         self._current = _read_colors(self._source_path)
         self._defaults = _read_colors(self._default_path)
         self._current_dirs = _read_directions(self._source_path)
         self._default_dirs = _read_directions(self._default_path)
+        self._bak_colors = _read_colors(self._bak_path)
+        self._bak_dirs = _read_directions(self._bak_path)
+
+        # This profile's existing overrides — the source of truth for which rows
+        # start "overridden" vs "inherited". Never written except by _on_apply.
+        section = parent.profile_store.get_section('damage_colors')  # type: ignore[attr-defined]
+        self._baseline_override_colors: dict[str, str] = dict(section.get('colors', {}))
+        self._baseline_override_dirs: dict[str, int] = dict(section.get('directions', {}))
 
         self._swatches: dict[str, ColorSwatch] = {}
         self._dir_vars: dict[str, tk.StringVar] = {}
+        self._reset_buttons: dict[str, ttk.Button] = {}
         self._macro_vars: list[tuple[tk.BooleanVar, tuple[str, ...]]] = []
         self._picks: dict[str, str] = {}
         self._dir_picks: dict[str, int] = {}
-        self._baseline: dict[str, str] = {}
-        self._dir_baseline: dict[str, int] = {}
+        # Live-staged override sets — seeded from the profile below, then mutated
+        # by every edit/reset/un-override for the rest of the session.
+        self._overridden: set[str] = set(self._baseline_override_colors)
+        self._dir_overridden: set[str] = set(self._baseline_override_dirs)
         self._apply_btn: ttk.Button | None = None
         self._apply_enabled: bool | None = None
         self._focus_target: ttk.Checkbutton | None = None  # first macro (initial focus)
 
         self._build_ui()
-        self._baseline = dict(self._picks)
-        self._dir_baseline = dict(self._dir_picks)
         self._refresh_macros()
         self._refresh_apply_state()
 
@@ -293,21 +339,25 @@ class DamageNumberColorsPanel(tk.Toplevel):
         ttk.Label(row, text=label, font=FONT_BODY,
                   foreground=THEME_COLORS['body']).pack(side="left")
 
-        reset = ttk.Button(row, text="↺", width=3, bootstyle="link",
+        reset = ttk.Button(row, width=3, bootstyle="link",
                            command=lambda n=name: self._reset_one(n))
         reset.pack(side="right")
-        add_tooltip(reset, "Reset this source's color and direction to the game default")
+        self._reset_buttons[name] = reset
 
-        current = self._current.get(name) or _FALLBACK_COLOR
+        # Overridden rows seed from this profile's stored value; inherited rows
+        # seed from the live file, same as before overrides existed.
+        current = self._baseline_override_colors.get(
+            name, self._current.get(name) or _FALLBACK_COLOR)
         self._picks[name] = current
         swatch = ColorSwatch(row, initial_color=f"#{current}",
                              on_change=lambda hex_, n=name: self._on_color(n, hex_))
         swatch.pack(side="right", padx=(0, PAD_XS))
         self._swatches[name] = swatch
 
-        # Seed from the live file, then the stock file, then AoC's own default.
-        direction = self._current_dirs.get(
-            name, self._default_dirs.get(name, _FALLBACK_DIRECTION))
+        # Seed from this profile's override, then the live file, then the stock
+        # file, then AoC's own default.
+        direction = self._baseline_override_dirs.get(
+            name, self._current_dirs.get(name, self._default_dirs.get(name, _FALLBACK_DIRECTION)))
         self._dir_picks[name] = direction
         var = tk.StringVar(value=_DIRECTION_TO_LABEL[direction])
         self._dir_vars[name] = var
@@ -316,16 +366,41 @@ class DamageNumberColorsPanel(tk.Toplevel):
         combo.pack(side="right", padx=(0, PAD_XS))
         combo.bind("<<ComboboxSelected>>", lambda e, n=name: self._on_direction(n))
 
+        self._refresh_reset_button(name)
+
+    # ------------------------------------------------------------------ #
+    # Override state                                                     #
+    # ------------------------------------------------------------------ #
+
+    def _refresh_reset_button(self, name: str) -> None:
+        """↺ (stage the game default, creating an override) on an inherited
+        row; ✕ (drop the override, restore the pre-KazBars value) on an
+        already-overridden one."""
+        btn = self._reset_buttons.get(name)
+        if btn is None:
+            return
+        overridden = name in self._overridden or name in self._dir_overridden
+        if overridden:
+            btn.configure(text=_UNOVERRIDE_GLYPH)
+            add_tooltip(btn, "Remove this override — restore what was here before KazBars")
+        else:
+            btn.configure(text=_RESET_GLYPH)
+            add_tooltip(btn, "Reset this source's color and direction to the game default")
+
     # ------------------------------------------------------------------ #
     # Change handlers                                                    #
     # ------------------------------------------------------------------ #
 
     def _on_color(self, name: str, hex_str: str) -> None:
         self._picks[name] = dis.normalize_color(hex_str) or _FALLBACK_COLOR
+        self._overridden.add(name)
+        self._refresh_reset_button(name)
         self._refresh_apply_state()
 
     def _on_direction(self, name: str) -> None:
         self._dir_picks[name] = _LABEL_TO_DIRECTION[self._dir_vars[name].get()]
+        self._dir_overridden.add(name)
+        self._refresh_reset_button(name)
         self._refresh_macros()
         self._refresh_apply_state()
 
@@ -334,6 +409,8 @@ class DamageNumberColorsPanel(tk.Toplevel):
         target = -1 if var.get() else 1
         for name in names:
             self._set_direction(name, target)
+            self._dir_overridden.add(name)
+            self._refresh_reset_button(name)
         self._refresh_apply_state()
 
     def _set_direction(self, name: str, value: int) -> None:
@@ -342,14 +419,35 @@ class DamageNumberColorsPanel(tk.Toplevel):
         self._dir_vars[name].set(_DIRECTION_TO_LABEL[value])
 
     def _restore_stock(self, name: str) -> None:
-        """Stage the stock color + direction from the Default/ file for one source."""
+        """Stage the stock color + direction from the Default/ file for one
+        source — an explicit choice, so it becomes this profile's override."""
         base = self._defaults.get(name) or _FALLBACK_COLOR
         self._picks[name] = base
         self._swatches[name].set_color(f"#{base}")
+        self._overridden.add(name)
         self._set_direction(name, self._default_dirs.get(name, _FALLBACK_DIRECTION))
+        self._dir_overridden.add(name)
+        self._refresh_reset_button(name)
+
+    def _un_override(self, name: str) -> None:
+        """Stop managing this row: drop it from the override set and restore
+        whatever the file held the moment before KazBars ever touched it (the
+        `.kazbars.bak` snapshot), falling back to the game default when no
+        snapshot exists (e.g. a freshly-created Customized file)."""
+        self._overridden.discard(name)
+        self._dir_overridden.discard(name)
+        restore_color = self._bak_colors.get(name) or self._defaults.get(name) or _FALLBACK_COLOR
+        self._picks[name] = restore_color
+        self._swatches[name].set_color(f"#{restore_color}")
+        restore_dir = self._bak_dirs.get(name, self._default_dirs.get(name, _FALLBACK_DIRECTION))
+        self._set_direction(name, restore_dir)
+        self._refresh_reset_button(name)
 
     def _reset_one(self, name: str) -> None:
-        self._restore_stock(name)
+        if name in self._overridden or name in self._dir_overridden:
+            self._un_override(name)
+        else:
+            self._restore_stock(name)
         self._refresh_macros()
         self._refresh_apply_state()
 
@@ -365,7 +463,10 @@ class DamageNumberColorsPanel(tk.Toplevel):
             var.set(all(self._dir_picks.get(n) == -1 for n in names))
 
     def _refresh_apply_state(self) -> None:
-        dirty = self._picks != self._baseline or self._dir_picks != self._dir_baseline
+        colors_now = {n: self._picks[n] for n in self._overridden}
+        dirs_now = {n: self._dir_picks[n] for n in self._dir_overridden}
+        dirty = (colors_now != self._baseline_override_colors
+                 or dirs_now != self._baseline_override_dirs)
         if self._apply_btn is None or dirty == self._apply_enabled:
             return
         self._apply_enabled = dirty
@@ -378,14 +479,14 @@ class DamageNumberColorsPanel(tk.Toplevel):
     def _on_apply(self) -> None:
         if self._source_path is None:
             return
-        # Colors are safe to re-write wholesale (skip-when-equal, never injected), but a
-        # direction write *injects* the attribute when the source omits it — so only the
-        # rows the user actually moved are sent, keeping the file's diff to the real edit.
-        directions = {n: v for n, v in self._dir_picks.items() if v != self._dir_baseline.get(n)}
-        if self._picks == self._baseline and not directions:
+        write_colors, colors_to_write = compute_apply(
+            self._picks, self._overridden, self._baseline_override_colors)
+        write_dirs, dirs_to_write = compute_apply(
+            self._dir_picks, self._dir_overridden, self._baseline_override_dirs)
+        if colors_to_write == self._baseline_override_colors and dirs_to_write == self._baseline_override_dirs:
             return
         try:
-            apply_colors(self.game_path, self._picks, directions)
+            apply_colors(self.game_path, write_colors, write_dirs)
         except OSError as e:
             logger.warning("Damage Number Colors apply failed: %s", e)
             app_toast(
@@ -394,12 +495,22 @@ class DamageNumberColorsPanel(tk.Toplevel):
                 "danger", duration=10, key="textcolors_apply_failed",
             )
             return
-        # Customized is now the live file — re-baseline so Apply disables until the next edit.
+        section = {'colors': dict(colors_to_write), 'directions': dict(dirs_to_write)}
+        # PATCH lane: persisted on the profile document, never dispatched on a
+        # mere profile switch — only this Apply writes it.
+        self.master.profile_store.set_section('damage_colors', section)  # type: ignore[attr-defined]
+        record_last_patch(self.master.settings, self.game_path,  # type: ignore[attr-defined]
+                          'damage_colors', section)
+        # Customized is now the live file — re-baseline so Apply disables until
+        # the next edit; a field that just stopped being overridden may have
+        # created the very first .kazbars.bak, so re-read it too.
         self._source_path = self._customized_path
         self._current = dict(self._picks)
         self._current_dirs = dict(self._dir_picks)
-        self._baseline = dict(self._picks)
-        self._dir_baseline = dict(self._dir_picks)
+        self._bak_colors = _read_colors(self._bak_path)
+        self._bak_dirs = _read_directions(self._bak_path)
+        self._baseline_override_colors = dict(colors_to_write)
+        self._baseline_override_dirs = dict(dirs_to_write)
         self._refresh_apply_state()
         app_toast(self, "Saved. Type /reloadui in-game to see it.", "success")
 

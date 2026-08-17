@@ -2,12 +2,22 @@
 
 Regex-only edits of <BuffListView/> tags inside AoC's HUD XML files. No Tk,
 no ttkbootstrap — safe to import from CI without the UI extra.
+
+Also owns the ``buff_bars`` PATCH-lane profile section (sparse — see
+``PROFILE_SECTION`` below): the per-file (Player/Target/Top/Floating)
+attribute *overrides* ``buff_display_editor.py`` writes into these XML files.
+Registered by app.py.
 """
 
 import logging
 import re
 import shutil
 from pathlib import Path
+from typing import Any
+
+from .profile_document import LANE_PATCH
+from .profile_document import SectionSpec as ProfileSectionSpec
+from .settings_core import Field, Schema
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +34,14 @@ FILTER_HOSTILE = 'hostile'
 FILTER_BOTH = 'friendly | hostile'
 
 BACKUP_SUFFIX = '.kazbars.bak'
+
+# <BuffListView> attribute bounds — stock icon size is 31; bounds bracket the
+# usable range so a stray scroll-wheel can't make the HUD invisible (4px) or
+# destroy layout (200px). Shared by buff_display_editor.py's spinboxes and
+# the buff_bars section validator below, so the two can't drift.
+ICON_SIZE_MIN, ICON_SIZE_MAX = 8, 128
+SPACING_MIN, SPACING_MAX = 0, 50
+COLS_MIN, COLS_MAX = 1, 30
 
 _BUFFLISTVIEW_TAG_RE = re.compile(r'<BuffListView\b[^>]*?/>', re.DOTALL)
 _KZ_OFF_RE = re.compile(
@@ -317,3 +335,43 @@ def set_source_color(xml_text, name, hex6):
     if not n or new_elem == m.group(0):
         return xml_text, False
     return xml_text[:m.start()] + new_elem + xml_text[m.end():], True
+
+
+# ============================================================================
+# buff_bars — sparse PATCH-lane overrides (one sub-section per BUFF_FILES label)
+# ============================================================================
+def _validate_buff_bars_overrides(value: Any) -> dict[str, Any]:
+    """Sparse per-field overrides for one <BuffListView> file — unknown keys
+    drop, each present field is clamped/coerced independently."""
+    if not isinstance(value, dict):
+        return {}
+    out: dict[str, Any] = {}
+    if 'icon_size' in value:
+        n = _maybe_int(value['icon_size'])
+        if n is not None:
+            out['icon_size'] = max(ICON_SIZE_MIN, min(ICON_SIZE_MAX, n))
+    if 'icon_spacing' in value:
+        n = _maybe_int(value['icon_spacing'])
+        if n is not None:
+            out['icon_spacing'] = max(SPACING_MIN, min(SPACING_MAX, n))
+    if 'max_columns' in value:
+        n = _maybe_int(value['max_columns'])
+        if n is not None:
+            out['max_columns'] = max(COLS_MIN, min(COLS_MAX, n))
+    if 'filter' in value and value['filter'] in (FILTER_FRIENDLY, FILTER_HOSTILE, FILTER_BOTH):
+        out['filter'] = value['filter']
+    if 'enabled' in value:
+        out['enabled'] = bool(value['enabled'])
+    return out
+
+
+_BUFF_BARS_SCHEMA = Schema('', 1, {
+    label: Field({}, validate=_validate_buff_bars_overrides)
+    for label, _relpath in BUFF_FILES
+})
+
+# The Default Buff Bars editor's slice of the profile document — sparse:
+# `{}` default, one sub-dict per file label, absent field = "no opinion" (the
+# editor shows whatever the file already says). PATCH lane: written to game
+# XML only on explicit Apply, never on profile switch. Registered by app.py.
+PROFILE_SECTION = ProfileSectionSpec('buff_bars', _BUFF_BARS_SCHEMA, LANE_PATCH, sparse=True)
