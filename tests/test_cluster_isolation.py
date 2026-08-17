@@ -60,6 +60,10 @@ INFRASTRUCTURE = {
     "paths",
     "settings_manager",
     "settings_core",
+    # profile_document is the section contract (SectionSpec/Schema slices) —
+    # cluster settings modules export a PROFILE_SECTION through it; it imports
+    # only settings_core, so it drags no panel code into a cluster.
+    "profile_document",
     "window_position",
     "ui_helpers",
     "ui_widgets",

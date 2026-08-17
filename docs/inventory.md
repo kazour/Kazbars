@@ -61,6 +61,7 @@
 | `src/kazbars/overlay_engine.py` | 800 |
 | `src/kazbars/paths.py` | 46 |
 | `src/kazbars/prefs.py` | 161 |
+| `src/kazbars/profile_document.py` | 220 |
 | `src/kazbars/profile_io.py` | 266 |
 | `src/kazbars/profile_manager.py` | 323 |
 | `src/kazbars/profile_share.py` | 137 |
@@ -88,7 +89,7 @@
 | `tests/test_build_compile.py` | 151 |
 | `tests/test_build_executor.py` | 537 |
 | `tests/test_cast_timer.py` | 97 |
-| `tests/test_cluster_isolation.py` | 184 |
+| `tests/test_cluster_isolation.py` | 188 |
 | `tests/test_combat_monitor.py` | 150 |
 | `tests/test_content_update.py` | 305 |
 | `tests/test_damageinfo_colors_panel.py` | 186 |
@@ -120,6 +121,7 @@
 | `tests/test_panels_construct.py` | 248 |
 | `tests/test_prefs_migration.py` | 107 |
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |
+| `tests/test_profile_document.py` | 193 |
 | `tests/test_profile_io.py` | 93 |
 | `tests/test_profile_share.py` | 152 |
 | `tests/test_resolution_scaling.py` | 71 |
