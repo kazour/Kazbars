@@ -63,8 +63,10 @@
 | `src/kazbars/prefs.py` | 161 |
 | `src/kazbars/profile_document.py` | 220 |
 | `src/kazbars/profile_io.py` | 266 |
+| `src/kazbars/profile_library.py` | 276 |
 | `src/kazbars/profile_manager.py` | 323 |
 | `src/kazbars/profile_share.py` | 137 |
+| `src/kazbars/profile_store.py` | 130 |
 | `src/kazbars/settings_backup.py` | 465 |
 | `src/kazbars/settings_core.py` | 298 |
 | `src/kazbars/settings_manager.py` | 56 |
@@ -79,7 +81,7 @@
 | `src/kazbars/ui_tk_style.py` | 67 |
 | `src/kazbars/ui_widgets.py` | 320 |
 | `src/kazbars/update_check.py` | 114 |
-| `src/kazbars/userdata.py` | 109 |
+| `src/kazbars/userdata.py` | 116 |
 | `src/kazbars/window_position.py` | 116 |
 | `tests/test_app_contract.py` | 104 |
 | `tests/test_as2_class_names.py` | 61 |
@@ -123,7 +125,9 @@
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |
 | `tests/test_profile_document.py` | 193 |
 | `tests/test_profile_io.py` | 93 |
+| `tests/test_profile_library.py` | 212 |
 | `tests/test_profile_share.py` | 152 |
+| `tests/test_profile_store.py` | 138 |
 | `tests/test_resolution_scaling.py` | 71 |
 | `tests/test_settings_backup.py` | 159 |
 | `tests/test_settings_core.py` | 373 |
@@ -134,4 +138,4 @@
 | `tests/test_toast_model.py` | 213 |
 | `tests/test_toggle_button_state.py` | 41 |
 | `tests/test_update_check.py` | 35 |
-| `tests/test_userdata.py` | 68 |
+| `tests/test_userdata.py` | 70 |

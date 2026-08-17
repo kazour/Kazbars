@@ -16,7 +16,9 @@ Layout::
       prefs.json                     ← machine-local prefs (schema in prefs.py)
       prefs3_snapshot.xml            ← Prefs_3.xml copy, insurance for Repair
       settings/                      ← deeps / live_tracker / damageinfo settings
-      profiles/*.json
+      profiles/*.json                ← profile documents (identity = in-doc id)
+        *.json.bak                   ← per-profile session-start snapshots
+        trash/                       ← deleted profiles, pruned to the 10 newest
       database_user.json             ← user buff deltas (seeded empty; Phase 3)
       content/                       ← OTA reference content (Phase 4)
         .bak/                        ← OTA rollback snapshots (Phase 4)
@@ -55,6 +57,10 @@ def settings_dir() -> Path:
 
 def profiles_dir() -> Path:
     return userdata_root() / "profiles"
+
+
+def profiles_trash_dir() -> Path:
+    return profiles_dir() / "trash"
 
 
 def database_user_path() -> Path:
@@ -98,6 +104,7 @@ def ensure_layout() -> None:
             userdata_root(),
             settings_dir(),
             profiles_dir(),
+            profiles_trash_dir(),
             content_dir(),
             content_backup_dir(),
         ):

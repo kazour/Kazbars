@@ -25,6 +25,7 @@ def test_ensure_layout_creates_tree_and_seeds(monkeypatch, tmp_path):
     assert root.is_dir()
     assert (root / "settings").is_dir()
     assert (root / "profiles").is_dir()
+    assert (root / "profiles" / "trash").is_dir()
     assert (root / "content").is_dir()
     assert (root / "content" / ".bak").is_dir()
     db = root / "database_user.json"
@@ -63,6 +64,7 @@ def test_subpaths_resolve_under_userdata(monkeypatch, tmp_path):
     assert userdata.prefs_path() == root / "prefs.json"
     assert userdata.settings_dir() == root / "settings"
     assert userdata.profiles_dir() == root / "profiles"
+    assert userdata.profiles_trash_dir() == root / "profiles" / "trash"
     assert userdata.database_user_path() == root / "database_user.json"
     assert userdata.content_dir() == root / "content"
     assert userdata.content_backup_dir() == root / "content" / ".bak"
