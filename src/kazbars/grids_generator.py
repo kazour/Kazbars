@@ -308,7 +308,9 @@ class CodeGenerator:
                         entry_ids = filtered
                 ids.extend(entry_ids)
             else:
-                logger.warning("Primary ID %d not in database — skipped", pid)
+                # Inert ref (see unresolved_refs) — skipped from the emitted
+                # tables; %s because a preserved legacy ref can be a name string.
+                logger.warning("Primary ID %s not in database — skipped", pid)
 
         seen = set()
         result = []
@@ -656,6 +658,39 @@ class CodeGenerator:
         for token, replacement in tokens.items():
             template = template.replace(token, replacement)
         return template
+
+
+def unresolved_refs(grids, database) -> list:
+    """Every ref in the enabled grids' whitelists/slot assignments the database
+    can't resolve — exactly what `_expand_primary_ids` will skip at emit. Pure;
+    `build_action` runs it pre-build so the summary can report the count. int
+    refs check `by_id`, preserved legacy strings check by name; deduped, first
+    occurrence order."""
+    out: list = []
+    seen: set = set()
+    for g in grids:
+        if not g.get('enabled', True):
+            continue
+        refs = list(g.get('whitelist') or [])
+        for val in (g.get('slotAssignments') or {}).values():
+            if isinstance(val, list):
+                refs.extend(val)
+            elif val:
+                refs.append(val)
+        for ref in refs:
+            if isinstance(ref, bool) or ref in seen:
+                continue
+            if isinstance(ref, int):
+                if database.by_id.get(ref):
+                    continue
+            elif isinstance(ref, str):
+                if database.get_entry_by_name(ref):
+                    continue
+            else:
+                continue
+            seen.add(ref)
+            out.append(ref)
+    return out
 
 
 # ============================================================================

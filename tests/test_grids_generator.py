@@ -551,3 +551,48 @@ def test_stub_archive_keys_present():
         src = (stubs / name).read_text(encoding="utf-8")
         assert f'FindEntry("{key}")' in src, f"{name} never reads {key}"
         assert f'ReplaceEntry("{key}"' in src, f"{name} never writes {key}"
+
+
+# --------------------------------------------------------------------------
+# Inert refs: unresolved_refs (the build-summary count) + emit-time skip
+# --------------------------------------------------------------------------
+
+
+def _known_primary_id(db):
+    return db.buffs[0]["ids"][0]
+
+
+def test_unresolved_refs_counts_unknown_ids_and_names_once():
+    from kazbars.grids_generator import unresolved_refs
+    db = _load_db()
+    known = _known_primary_id(db)
+    grids = [
+        dict(_minimal_grid(), whitelist=[known, 99999901, "Ghost Buff"]),
+        dict(_minimal_grid(), id="G2", slotMode="static",
+             slotAssignments={"0": [99999901], "1": "Ghost Buff", "2": []}),
+    ]
+    # Deduped across grids and across whitelist/slot forms, resolvable skipped.
+    assert unresolved_refs(grids, db) == [99999901, "Ghost Buff"]
+
+
+def test_unresolved_refs_ignores_disabled_grids():
+    from kazbars.grids_generator import unresolved_refs
+    grids = [dict(_minimal_grid(), enabled=False, whitelist=[99999901])]
+    assert unresolved_refs(grids, _load_db()) == []
+
+
+def test_unresolved_refs_empty_when_everything_resolves():
+    from kazbars.grids_generator import unresolved_refs
+    db = _load_db()
+    grids = [dict(_minimal_grid(), whitelist=[_known_primary_id(db)])]
+    assert unresolved_refs(grids, db) == []
+
+
+def test_unknown_refs_are_skipped_at_emit_not_crashed_on():
+    """An inert int or legacy-name ref must vanish from the emitted tables —
+    and never raise — exactly what unresolved_refs predicted for the summary."""
+    db = _load_db()
+    grid = dict(_minimal_grid(), whitelist=[_known_primary_id(db), 99999901, "Ghost Buff"])
+    main_code, data_code = CodeGenerator([grid], db, "0.0.0").generate()
+    assert "99999901" not in main_code + data_code
+    assert "Ghost Buff" not in main_code + data_code

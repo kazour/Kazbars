@@ -265,7 +265,7 @@ class BuildLoadingScreen(tk.Toplevel):
         self.update()
 
     def show_summary(self, client_results, compile_result, profile_name=None,
-                     game_running=False, flag_supported=True):
+                     game_running=False, flag_supported=True, unresolved=0):
         """Transition from progress view to summary results view.
 
         Args:
@@ -274,6 +274,7 @@ class BuildLoadingScreen(tk.Toplevel):
             profile_name: name of saved profile (or None)
             game_running: whether an AoC game process is running right now
             flag_supported: whether the client recognizes IgnorePatcher.enable
+            unresolved: count of inert buff refs the generator skipped
         """
         self._phase = 'summary'
 
@@ -286,13 +287,13 @@ class BuildLoadingScreen(tk.Toplevel):
         self._canvas.destroy()
 
         self._build_summary_ui(client_results, compile_result, profile_name,
-                               game_running, flag_supported)
+                               game_running, flag_supported, unresolved)
 
         self.lift()
         self.focus_set()
 
     def _build_summary_ui(self, client_results, compile_result, profile_name,
-                          game_running, flag_supported):
+                          game_running, flag_supported, unresolved=0):
         """Build the results summary view."""
         compile_ok, compile_msg = compile_result
         any_installed = compile_ok and any(s for _, s, _ in client_results)
@@ -417,6 +418,19 @@ class BuildLoadingScreen(tk.Toplevel):
             y += 2
             canvas.create_text(30, y, text=f"\u2713 Profile saved: {profile_name}",
                                 anchor='w', font=FONT_SMALL, fill=THEME_COLORS['success'])
+            y += 18
+
+        # Inert refs the generator skipped — the profile keeps them; a database
+        # update or import can bring them back (retires the load-time warning).
+        if compile_ok and unresolved:
+            y += 2
+            plural = "s" if unresolved != 1 else ""
+            canvas.create_text(
+                30, y,
+                text=f"\u26A0 {unresolved} unresolved buff{plural} excluded \u2014 "
+                     "a database update can bring them back",
+                anchor='w', font=FONT_SMALL, fill=THEME_COLORS['warning'],
+                width=WIDTH - 60)
             y += 18
 
         # Reload instructions (only if at least one client installed)
