@@ -58,10 +58,9 @@ TIMERS_RANGES: dict[str, dict[str, Any]] = {
 # =============================================================================
 # SCHEMA
 # =============================================================================
-# Derived from the tables above so the two can't drift; the engine owns coercion,
-# fill, and atomic I/O. Overlay adapters (below) stay out of the load path.
-
-SETTINGS_FILENAME = "live_tracker_settings.json"
+# Derived from the tables above so the two can't drift; the engine owns
+# coercion + fill. Overlay adapters (below) stay out of the validation path.
+# `filename=''` — disk-less, this schema only backs the profile section below.
 
 _BOOL_KEYS = ("locked", "visible", "positioned")
 
@@ -82,7 +81,7 @@ def _build_fields() -> dict[str, Field]:
     return fields
 
 
-_SCHEMA = Schema(SETTINGS_FILENAME, 1, _build_fields())
+_SCHEMA = Schema('', 1, _build_fields())
 
 # The Boss Timer's slice of the profile document: `{'overlay': {…}}`, same
 # shape LiveTrackerPanel.get_profile_data emits. Registered by app.py (the
@@ -135,22 +134,6 @@ def validate_all_settings(settings):
     return settings_core.validate_all(_SCHEMA, settings)
 
 
-# =============================================================================
-# SETTINGS FILE I/O
-# =============================================================================
-# `SETTINGS_FILENAME` is defined up in the SCHEMA section (the Schema needs it).
-
-
-def get_settings_path(settings_folder):
-    """Get the full path to live_tracker_settings.json."""
-    return str(Path(settings_folder) / SETTINGS_FILENAME)
-
-
-def load_settings(settings_folder):
-    """Load, migrate, validate, fill. Defaults on missing/corrupt — never raises."""
-    return settings_core.load(_SCHEMA, settings_folder)
-
-
 def overlay_config_from_timer(settings):
     """Build an `OverlayConfig` from the Live Tracker bare keys."""
     return OverlayConfig(
@@ -177,12 +160,6 @@ def overlay_config_to_timer(cfg):
         "bg_opacity": cfg.bg_opacity,
         "visible": cfg.visible,
     }
-
-
-def save_settings(settings_folder, settings):
-    """Validate and write atomically (temp + rename). Creates the folder if
-    missing; returns True on success."""
-    return settings_core.save(_SCHEMA, settings_folder, settings)
 
 
 # =============================================================================

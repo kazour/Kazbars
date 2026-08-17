@@ -16,7 +16,6 @@ from pathlib import Path
 
 from ttkbootstrap.dialogs import Messagebox
 
-from . import damageinfo_settings as dis
 from . import game_folder
 from .app_popups import show_close_game_required_dialog
 from .build_loading import BuildLoadingScreen
@@ -52,7 +51,7 @@ def build(app):
     grids = app.grids_panel.get_profile_data()
     total_slots = app.grids_panel.get_total_slots()
 
-    di_settings = dis.load_settings(app.settings_path)
+    di_settings = dict(app.profile_store.get_section('damage_numbers'))
     di_enabled = bool(di_settings.get('enabled'))
     di_assets_ok = (
         (Path(app.assets_path) / "damageinfo" / "DamageInfo.swf").exists()

@@ -40,18 +40,9 @@ def test_backup_restore_round_trip(tmp_path) -> None:
             "scratch.tmp": b"transient - must be skipped",
         },
     )
-    # The userdata/ allowlist: profiles/, settings/, database_user.json, prefs.json.
+    # The userdata/ allowlist: profiles/, database_user.json, prefs.json.
     profiles = tmp_path / "profiles"
     _make_tree(profiles, {"Default.json": b'{"grids": []}', "Alt.json": b"{}"})
-    settings = tmp_path / "settings"
-    _make_tree(
-        settings,
-        {
-            "deeps_settings.json": b'{"alarm_threshold": 2000}',
-            "live_tracker_settings.json": b'{"bg_opacity": 0.8}',
-            "damageinfo_settings.json": b'{"enabled": false}',
-        },
-    )
     database_user = tmp_path / "database_user.json"
     database_user.write_bytes(b'{"version": 2, "buffs": [], "deleted": []}')
     prefs = tmp_path / "prefs.json"
@@ -65,14 +56,13 @@ def test_backup_restore_round_trip(tmp_path) -> None:
         zip_path,
         funcom_dir=funcom,
         profiles_dir=profiles,
-        settings_dir=settings,
         database_user=database_user,
         prefs_file=prefs,
         app_version="9.9.9",
     )
 
     assert sections["funcom"]["files"] == 4  # .tmp excluded
-    assert sections["kazbars"] == {"profiles": 2, "settings": 3, "database_user": 1, "prefs": 1}
+    assert sections["kazbars"] == {"profiles": 2, "database_user": 1, "prefs": 1}
 
     # content/ never leaks into the archive.
     with zipfile.ZipFile(zip_path) as zf:
@@ -86,14 +76,12 @@ def test_backup_restore_round_trip(tmp_path) -> None:
     funcom_dest = tmp_path / "restored_prefs"
     userdata_dest = tmp_path / "restored_userdata"
     restored = restore_zip(zip_path, funcom_dest=funcom_dest, userdata_dest=userdata_dest)
-    assert restored == {"funcom": 4, "kazbars": 6}  # 2 profiles + 3 settings + db_user, NOT prefs
+    assert restored == {"funcom": 4, "kazbars": 3}  # 2 profiles + db_user, NOT prefs
 
     assert (funcom_dest / "Prefs_3.xml").read_bytes() == b"<Root/>"
     assert (funcom_dest / "acct/Char1/preview.bin").read_bytes() == b"\x00\x01\x02"
     assert not (funcom_dest / "scratch.tmp").exists()
     assert (userdata_dest / "profiles/Default.json").read_bytes() == b'{"grids": []}'
-    assert (userdata_dest / "settings/deeps_settings.json").exists()
-    assert (userdata_dest / "settings/damageinfo_settings.json").exists()
     assert (userdata_dest / "database_user.json").exists()
     # prefs.json is machine-local — left out unless explicitly opted in.
     assert not (userdata_dest / "prefs.json").exists()
@@ -103,7 +91,7 @@ def test_backup_restore_round_trip(tmp_path) -> None:
     restored2 = restore_zip(
         zip_path, funcom_dest=tmp_path / "fp2", userdata_dest=with_prefs, include_prefs=True
     )
-    assert restored2["kazbars"] == 7  # + prefs.json
+    assert restored2["kazbars"] == 4  # + prefs.json
     assert (with_prefs / "prefs.json").read_bytes() == b'{"game_path": "X"}'
 
 
@@ -113,10 +101,26 @@ def test_backup_omits_absent_sources(tmp_path) -> None:
     _make_tree(profiles, {"Only.json": b"{}"})
     zip_path = tmp_path / "kz_only.zip"
     sections = write_backup_zip(
-        zip_path, funcom_dir=None, profiles_dir=profiles, settings_dir=None, app_version="1.0"
+        zip_path, funcom_dir=None, profiles_dir=profiles, app_version="1.0"
     )
     assert "funcom" not in sections
     assert sections["kazbars"] == {"profiles": 1}
+
+
+def test_restore_skips_pre_p8_settings_entries(tmp_path) -> None:
+    """A backup made before P8 may still carry `kazbars/settings/*` (Deeps /
+    Live Tracker / Damage Numbers disk files) — restore must not resurrect
+    the retired `userdata/settings/` directory."""
+    z = tmp_path / "legacy.zip"
+    with zipfile.ZipFile(z, "w") as zf:
+        zf.writestr("kazbars/profiles/Default.json", '{"grids": []}')
+        zf.writestr("kazbars/settings/deeps_settings.json", '{"alarm_threshold": 2000}')
+        zf.writestr("kazbars/database_user.json", '{"version": 2, "buffs": [], "deleted": []}')
+    userdata_dest = tmp_path / "restored"
+    restored = restore_zip(z, funcom_dest=tmp_path / "fp", userdata_dest=userdata_dest)
+    assert restored["kazbars"] == 2  # profile + db_user, settings/ entry skipped
+    assert (userdata_dest / "profiles/Default.json").exists()
+    assert not (userdata_dest / "settings").exists()
 
 
 def test_read_manifest_rejects_foreign_zip(tmp_path) -> None:

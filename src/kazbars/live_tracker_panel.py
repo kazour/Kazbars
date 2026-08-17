@@ -15,9 +15,7 @@ from .boss_timer import BossTimer
 from .combat_monitor import CombatLogMonitor
 from .live_tracker_settings import (
     TIMERS_DEFAULTS,
-    load_settings,
     sanitize_log_name,
-    save_settings,
     validate_all_settings,
 )
 from .timer_overlay import TimerOverlay
@@ -69,15 +67,14 @@ class LiveTrackerPanel(tk.Toplevel):
     - Overlay controls (lock, background opacity, font family, font size)
 
     Usage:
-        panel = LiveTrackerPanel(parent, settings_path, game_path_getter)
+        panel = LiveTrackerPanel(parent, game_path_getter)
         # Close button withdraws; call cleanup() + destroy() on app exit.
     """
 
-    def __init__(self, parent, settings_path, game_path_getter):
+    def __init__(self, parent, game_path_getter):
         """
         Args:
-            parent: Parent Tk window
-            settings_path: Path to the settings folder (Path or str)
+            parent: Parent Tk window (the app — reads its `profile_store`)
             game_path_getter: Callable that returns the current AoC game path (str)
         """
         super().__init__(parent)
@@ -91,11 +88,12 @@ class LiveTrackerPanel(tk.Toplevel):
         )
         bind_window_position_save(self, 'live_tracker', save_size=False)
 
-        self.settings_folder = str(settings_path)
         self.game_path_getter = game_path_getter
 
-        # Load timer settings
-        self.timer_settings = load_settings(self.settings_folder)
+        # Seed from the profile document's `boss_timer` section (never disk —
+        # userdata/settings/ is retired).
+        self.timer_settings = validate_all_settings(
+            parent.profile_store.get_section('boss_timer').get('overlay', {}))
 
         # State
         self.overlay = None
@@ -450,16 +448,10 @@ class LiveTrackerPanel(tk.Toplevel):
     # =========================================================================
 
     def save_settings(self):
-        """Save current overlay settings to disk."""
-        if self.overlay:
-            settings = self.overlay.get_settings()
-            if not save_settings(self.settings_folder, settings):
-                logger.warning("Failed to save timer overlay settings")
-            # Mirror into the profile document so the boss_timer section stays
-            # current while the panel lives — the profile no longer gathers
-            # from live widgets at save time.
-            if self._profile_hook:
-                self._profile_hook(self.get_profile_data())
+        """Push current overlay settings into the profile document — the
+        store's own debounced autosave persists them (no disk write here)."""
+        if self.overlay and self._profile_hook:
+            self._profile_hook(self.get_profile_data())
 
     def _on_overlay_settings_changed(self):
         """Persist settings and resync the lock button when state changes from the overlay."""

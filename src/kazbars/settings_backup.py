@@ -3,7 +3,7 @@ KazBars — Game settings backup & restore.
 
 Backs up the Age of Conan config tree (``%LOCALAPPDATA%\\Funcom\\Conan\\Prefs``
 — keybinds, HUD layouts, chat, graphics/audio, waypoints) plus KazBars's own
-user data from ``userdata/`` — an allowlist of ``profiles/``, ``settings/``, and
+user data from ``userdata/`` — an allowlist of ``profiles/`` and
 ``database_user.json`` (custom buffs), plus the machine-local ``prefs.json`` —
 into a single portable zip, and restores it later. It is the recovery path after
 a Windows reformat or profile corruption, neither of which AoC guards itself.
@@ -112,16 +112,15 @@ def write_backup_zip(
     *,
     funcom_dir,
     profiles_dir,
-    settings_dir,
     database_user=None,
     prefs_file=None,
     app_version,
 ):
     """Build a backup zip at `zip_path` from whichever sources exist: the Funcom
     prefs tree under ``funcom/``, and the KazBars ``userdata/`` allowlist under
-    ``kazbars/`` — ``profiles/``, the whole ``settings/`` dir (Deeps + Live
-    Tracker + Damage Numbers), ``database_user.json`` (custom buffs), and the
-    machine-local ``prefs.json``. The OTA ``content/`` cache is intentionally
+    ``kazbars/`` — ``profiles/`` (Deeps, Live Tracker, and Damage Numbers travel
+    inside the profile document now), ``database_user.json`` (custom buffs), and
+    the machine-local ``prefs.json``. The OTA ``content/`` cache is intentionally
     NOT a parameter, so it never lands in a backup. Writes ``manifest.json``
     last. Returns the `sections` dict."""
     sections = {}
@@ -136,9 +135,6 @@ def write_backup_zip(
             added, _ = _add_tree(zf, Path(profiles_dir), f"{KAZBARS_ARC}/profiles",
                                  skip_suffixes=(".bak",), skip_dirs=("trash",))
             kz["profiles"] = added
-        if settings_dir and Path(settings_dir).is_dir():
-            added, _ = _add_tree(zf, Path(settings_dir), f"{KAZBARS_ARC}/settings")
-            kz["settings"] = added
         if database_user:
             kz["database_user"] = _add_file(
                 zf, database_user, f"{KAZBARS_ARC}/{DATABASE_USER_FILENAME}"
@@ -178,11 +174,13 @@ def read_manifest(zip_path):
 def restore_zip(zip_path, *, funcom_dest, userdata_dest, include_prefs=False):
     """Extract a backup's sections to their destinations (created as needed — a
     fresh machine has no Funcom folder yet). `funcom_dest` is the AoC prefs dir;
-    `userdata_dest` is the ``userdata/`` root (``profiles/``, ``settings/``,
+    `userdata_dest` is the ``userdata/`` root (``profiles/`` and
     ``database_user.json`` land directly under it). The machine-local
     ``prefs.json`` is restored only when `include_prefs` is True (default off, so
-    a cross-PC restore doesn't drag a dead game path / window geometry along).
-    Guards against zip-slip. Returns a per-section count."""
+    a cross-PC restore doesn't drag a dead game path / window geometry along). A
+    pre-P8 backup's ``settings/`` entries (Deeps/Live Tracker/Damage Numbers
+    disk files, since retired) are skipped rather than resurrecting the
+    directory. Guards against zip-slip. Returns a per-section count."""
     roots = {FUNCOM_ARC: Path(funcom_dest).resolve(), KAZBARS_ARC: Path(userdata_dest).resolve()}
     restored = {FUNCOM_ARC: 0, KAZBARS_ARC: 0}
     with zipfile.ZipFile(zip_path) as zf:
@@ -193,6 +191,8 @@ def restore_zip(zip_path, *, funcom_dest, userdata_dest, include_prefs=False):
             if section not in roots or not rel:
                 continue
             if section == KAZBARS_ARC and rel == PREFS_FILENAME and not include_prefs:
+                continue
+            if section == KAZBARS_ARC and rel.startswith("settings/"):
                 continue
             dest_root = roots[section]
             target = (dest_root / rel).resolve()
@@ -294,7 +294,7 @@ def open_backup_dialog(app):
         ).pack(anchor="w", pady=(0, PAD_XS))
     ttk.Label(
         content,
-        text=f"•  KazBars data — {n_profiles} profile(s) + settings + custom buffs",
+        text=f"•  KazBars data — {n_profiles} profile(s) + custom buffs",
         font=FONT_BODY,
         foreground=THEME_COLORS["body"],
         wraplength=width - PAD_TAB * 4,
@@ -367,7 +367,6 @@ def backup_settings(app, dialog):
             path,
             funcom_dir=locate_funcom_prefs(),
             profiles_dir=app.profiles_path,
-            settings_dir=app.settings_path,
             database_user=database_user_path(),
             prefs_file=prefs_path(),
             app_version=app.app_version,
@@ -428,7 +427,6 @@ def restore_settings(app, dialog, include_prefs=False):
             snapshot,
             funcom_dir=locate_funcom_prefs(),
             profiles_dir=app.profiles_path,
-            settings_dir=app.settings_path,
             database_user=database_user_path(),
             prefs_file=prefs_path(),
             app_version=app.app_version,

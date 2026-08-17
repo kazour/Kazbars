@@ -4,11 +4,10 @@ KazBars — Extras shortcuts row.
 Four toggle cards pinned above the grid list — one per SWF-build extra, in
 Extras-menu order (Damage numbers, Stopwatch, Inspect panel, Cast timer) so
 the row and the menu read as the same list. Each card shows whether its
-feature ships in the next Build & Install and flips the same store its
-Extras dialog writes: the profile document for stopwatch/inspect/cast timer
-(autosaved by the profile store; `apply_document` resyncs the cards on every
-profile switch), `damageinfo_settings.json` for damage numbers.
-Configuration stays in the dialogs, which push `refresh()` back through
+feature ships in the next Build & Install and flips the same profile-document
+section its Extras dialog writes (autosaved by the profile store;
+`apply_document` resyncs the cards on every profile switch). Configuration
+stays in the dialogs, which push `refresh()` back through
 `GridsPanel.refresh_extras_shortcuts()` on Apply.
 
 Semantic color only: "in the next build" lights the card border, status line
@@ -19,7 +18,6 @@ Identity comes from the label — the cards rest neutral when off.
 import tkinter as tk
 from tkinter import ttk
 
-from . import damageinfo_settings as dis
 from .ui_helpers import (
     FONT_SECTION,
     FONT_SMALL,
@@ -35,16 +33,6 @@ from .ui_widgets import add_tooltip, app_toast, bind_card_events
 # ============================================================================
 # PER-FEATURE STORE ACCESS (the same writes the Extras dialogs make)
 # ============================================================================
-def _read_damage_numbers(app):
-    return bool(dis.load_settings(app.settings_path)['enabled'])
-
-
-def _set_damage_numbers(app, on):
-    settings = dis.load_settings(app.settings_path)
-    settings['enabled'] = on
-    dis.save_settings(app.settings_path, settings)
-
-
 def _read_section(app, key):
     # The row is built with GridsPanel, before startup_profile installs the
     # store; apply_document resyncs the cards right after, so rest off here.
@@ -67,7 +55,8 @@ def _make_section_setter(key, side_flags=()):
 _FEATURES = (
     ('damage_numbers', 'Damage numbers', 'next build restores stock',
      "Re-tunes AoC's floating combat numbers. Configure in Extras ▸ Damage number mod…",
-     _read_damage_numbers, _set_damage_numbers),
+     lambda app: _read_section(app, 'damage_numbers'),
+     _make_section_setter('damage_numbers')),
     ('stopwatch', 'Stopwatch', 'next build removes it',
      'In-game Start / Pause / Reset timer panel. Configure in Extras ▸ Stopwatch…',
      lambda app: _read_section(app, 'stopwatch'),

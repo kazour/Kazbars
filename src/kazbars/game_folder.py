@@ -218,12 +218,11 @@ def _restore_damageinfo(app):
     caller says so, but Repair still counts as done: the declarations are what
     it exists for, and a rebuild fixes the rest.
     """
-    from . import damageinfo_settings as dis
     from .build_executor import commit_damageinfo
     from .build_utils import find_compiler
     from .damageinfo_generator import build_damageinfo
 
-    settings = dis.load_settings(app.settings_path)
+    settings = dict(app.profile_store.get_section('damage_numbers'))
     if not settings.get('enabled'):
         return True
 

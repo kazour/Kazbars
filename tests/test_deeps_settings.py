@@ -1,30 +1,27 @@
 """Smoke tests for kazbars.deeps_settings.
 
 Covers defaults, per-key validation (clamping, type coercion, bool
-canonicalisation, layout enum), unknown-key drop, file-missing fallback,
-load/save round-trip, and corrupt-file fallback. Uses pytest's `tmp_path`
-fixture so the tests never touch the real settings folder.
+canonicalisation, layout enum), unknown-key drop, and the `PROFILE_SECTION`
+contract app.py registers (LIVE lane, flat config-as-section — the whole
+module travels with the profile document; see test_cast_timer.py for the
+sibling BUILD-lane contract).
 
 Run: `pytest tests/test_deeps_settings.py` (from repo root).
 """
-
-from pathlib import Path
 
 import pytest
 
 from kazbars.deeps_settings import (
     DEEPS_DEFAULTS,
     FONT_FAMILY_CHOICES,
-    SETTINGS_FILENAME,
+    PROFILE_SECTION,
     get_default_settings,
-    get_settings_path,
-    load_settings,
     normalize_readout_preset,
     normalize_survival_preset,
-    save_settings,
     validate_all_settings,
     validate_setting,
 )
+from kazbars.profile_document import LANE_LIVE
 
 # =========================================================================== #
 # Defaults                                                                    #
@@ -304,70 +301,19 @@ class TestValidateAll:
 
 
 # =========================================================================== #
-# File I/O                                                                    #
+# PROFILE_SECTION contract                                                    #
 # =========================================================================== #
 
-class TestFileIO:
-    def test_settings_path_appends_filename(self, tmp_path: Path) -> None:
-        assert get_settings_path(tmp_path) == str(tmp_path / SETTINGS_FILENAME)
-
-    def test_load_missing_file_returns_defaults(self, tmp_path: Path) -> None:
-        """First-run path: no file yet → caller gets sensible defaults."""
-        assert load_settings(tmp_path) == get_default_settings()
-
-    def test_save_creates_folder_if_missing(self, tmp_path: Path) -> None:
-        nested = tmp_path / "does" / "not" / "exist"
-        assert save_settings(nested, get_default_settings()) is True
-        assert (nested / SETTINGS_FILENAME).exists()
-
-    def test_round_trip_preserves_known_keys(self, tmp_path: Path) -> None:
-        original = get_default_settings()
-        original["alarm_threshold"] = 3500.0
-        original["hpis_green_threshold"] = 75.0
-        original["dpis_tint_start"] = 250.0
-        original["dpis_tint_full"] = 400.0
-        original["dpis_flash"] = 650.0
-        original["include_pet_damage"] = True
-        original["layout"] = "vertical"
-        original["overlay_font_family"] = "Consolas"
-        original["overlay_font_size"] = 32
-        original["overlay_bg_opacity"] = 0.5
-        original["overlay_x"] = 1234
-        original["overlay_y"] = 567
-        original["overlay_locked"] = True
-        original["overlay_positioned"] = True
-
-        assert save_settings(tmp_path, original) is True
-        loaded = load_settings(tmp_path)
-        assert loaded == original
-
-    def test_load_corrupt_file_returns_defaults(self, tmp_path: Path) -> None:
-        """A truncated/invalid JSON shouldn't crash startup — fall back."""
-        (tmp_path / SETTINGS_FILENAME).write_text("{not valid json", encoding="utf-8")
-        assert load_settings(tmp_path) == get_default_settings()
-
-    def test_load_partial_file_fills_missing_with_defaults(
-        self, tmp_path: Path
-    ) -> None:
-        """An older settings file with fewer keys gets filled out cleanly."""
-        (tmp_path / SETTINGS_FILENAME).write_text(
-            '{"alarm_threshold": 1234.0}', encoding="utf-8"
-        )
-        loaded = load_settings(tmp_path)
-        assert loaded["alarm_threshold"] == 1234.0
-        # All other fields default.
-        for key, default in DEEPS_DEFAULTS.items():
-            if key == "alarm_threshold":
-                continue
-            assert loaded[key] == default
-
-    def test_save_validates_before_writing(self, tmp_path: Path) -> None:
-        """Out-of-range values are clamped on disk, not just on load."""
-        bad = get_default_settings()
-        bad["alarm_threshold"] = 99_999_999.0  # well over the max
-        save_settings(tmp_path, bad)
-        loaded = load_settings(tmp_path)
-        assert loaded["alarm_threshold"] == 999_999.0
+def test_profile_section_contract() -> None:
+    # Flat section: the config dict itself. LIVE lane (Deeps has no build-time
+    # output — every field retunes the open overlay immediately), dense
+    # (validate_all fills), no buff refs to harvest.
+    assert PROFILE_SECTION.key == "deeps"
+    assert PROFILE_SECTION.lane == LANE_LIVE
+    assert PROFILE_SECTION.sparse is False
+    assert PROFILE_SECTION.harvest_refs is None
+    assert PROFILE_SECTION.defaults() == DEEPS_DEFAULTS
+    assert PROFILE_SECTION.validate({"alarm_threshold": 1234.0})["alarm_threshold"] == 1234.0
 
 
 # =========================================================================== #

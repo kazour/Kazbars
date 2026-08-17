@@ -15,7 +15,6 @@ Layout::
     userdata/
       prefs.json                     ← machine-local prefs (schema in prefs.py)
       prefs3_snapshot.xml            ← Prefs_3.xml copy, insurance for Repair
-      settings/                      ← deeps / live_tracker / damageinfo settings
       profiles/*.json                ← profile documents (identity = in-doc id)
         *.json.bak                   ← per-profile session-start snapshots
         trash/                       ← deleted profiles, pruned to the 10 newest
@@ -49,10 +48,6 @@ def userdata_root() -> Path:
 
 def prefs_path() -> Path:
     return userdata_root() / PREFS_FILENAME
-
-
-def settings_dir() -> Path:
-    return userdata_root() / "settings"
 
 
 def profiles_dir() -> Path:
@@ -102,7 +97,6 @@ def ensure_layout() -> None:
     try:
         for d in (
             userdata_root(),
-            settings_dir(),
             profiles_dir(),
             profiles_trash_dir(),
             content_dir(),

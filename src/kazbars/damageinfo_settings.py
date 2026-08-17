@@ -14,19 +14,21 @@ A few keys are *absolute*, not offsets — they have no ``GAME_DEFAULTS`` entry,
 
 ``enabled`` is the master gate (not baked — it decides whether the modded SWF is
 built and installed at all). Pure data; no Tk. Mirrors ``deeps_settings.py``.
+
+Lives in the profile document as the ``damage_numbers`` section (BUILD lane —
+baked into the SWF by Build & Install); registered by app.py.
 """
 
 import logging
 import re
-from pathlib import Path
 from typing import Any
 
 from . import settings_core
+from .profile_document import LANE_BUILD
+from .profile_document import SectionSpec as ProfileSectionSpec
 from .settings_core import Field, Schema
 
 logger = logging.getLogger(__name__)
-
-SETTINGS_FILENAME = 'damageinfo_settings.json'
 
 # ============================================================
 # BAKE-MAP / SCHEMA
@@ -391,7 +393,12 @@ def _build_schema_fields() -> dict[str, Field]:
     return fields
 
 
-_SCHEMA = Schema(SETTINGS_FILENAME, 1, _build_schema_fields())
+_SCHEMA = Schema('', 1, _build_schema_fields())
+
+# The Damage Numbers dialog's slice of the profile document — flat: the
+# settings dict itself is the section, like the baked extras
+# (cast_timer/stopwatch/inspect). Registered by app.py at startup.
+PROFILE_SECTION = ProfileSectionSpec('damage_numbers', _SCHEMA, LANE_BUILD)
 
 
 def get_default_settings() -> dict[str, Any]:
@@ -462,21 +469,3 @@ def spread_spacing_option(settings: dict) -> str:
         if all(settings.get(k) == v for k, v in values.items()):
             return name
     return 'Default'
-
-
-# ============================================================
-# FILE I/O  (mirrors deeps_settings)
-# ============================================================
-def get_settings_path(settings_folder: str | Path) -> str:
-    """Full path to damageinfo_settings.json inside ``settings_folder``."""
-    return str(Path(settings_folder) / SETTINGS_FILENAME)
-
-
-def load_settings(settings_folder: str | Path) -> dict[str, Any]:
-    """Load + validate settings; return defaults if missing or unparseable. Never raises."""
-    return settings_core.load(_SCHEMA, settings_folder)
-
-
-def save_settings(settings_folder: str | Path, settings: dict) -> bool:
-    """Validate and write atomically (temp + rename). Creates the folder if missing."""
-    return settings_core.save(_SCHEMA, settings_folder, settings)

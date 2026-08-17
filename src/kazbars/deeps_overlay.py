@@ -537,6 +537,25 @@ class DeepsOverlay:
     def is_locked(self) -> bool:
         return self._hud.is_locked()
 
+    def apply_settings(self, settings: dict) -> None:
+        """Bulk apply (used by profile switch) — mirrors
+        `TimerOverlay.apply_settings`. Quiet: none of this fires the
+        position/lock change callbacks (the panel is the caller, already
+        holding the incoming settings as truth)."""
+        self.set_layout(settings.get("layout", "horizontal"))
+        self.set_font(
+            settings.get("overlay_font_family", self._config.font_family),
+            settings.get("overlay_font_size", self._config.font_size),
+        )
+        self.set_bg_opacity(settings.get("overlay_bg_opacity", self._config.bg_opacity))
+        self.set_visible_cells(settings.get("visible_cells", ALL_CELL_IDS))
+        self._hud.set_locked(bool(settings.get("overlay_locked", False)))
+        x = settings.get("overlay_x")
+        y = settings.get("overlay_y")
+        if x is not None and y is not None:
+            self._hud.set_position(int(x), int(y))
+        self._hud.resize()
+
     def update_thresholds(
         self,
         alarm: float,
