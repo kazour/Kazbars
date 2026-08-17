@@ -3,20 +3,23 @@ KazBars — Cast Timer config (pure data layer).
 
 Defaults + validation for the cast-timer overlay: a timer-only Flash overlay
 (no bar) showing cast time for the player and/or target. Configured via the
-Extras-menu dialog (`cast_timer_panel.py`); persisted machine-local in
-prefs.json under `cast_timer` (like `stopwatch` and `inspect` — not per-profile,
-since screen position depends on the machine's resolution). No Tk — importable
-by the codegen, prefs schema, and tests.
+Extras-menu dialog (`cast_timer_panel.py`); lives in the profile document as
+the `cast_timer` section (BUILD lane, like `stopwatch` and `inspect`), so the
+overlay travels with the profile. No Tk — importable by the codegen, the
+section registry, and tests.
 
-Positioning mirrors grids: `playerX/Y` and `targetX/Y` are baked into the
-generated SWF as the first-session seed and the preview-drag starting point.
-From then on the game itself persists drag positions in the module config
-archive, for every user (`game_persistence`).
+Positioning mirrors grids: the player/target positions are stored as fractions
+of the game resolution (full floats 0..1 — pixels exist only at dialog display
+and AS2 emit via `grid_model.project_px`/`unproject_px`) and are baked into
+the generated SWF as the first-session seed and the preview-drag starting
+point. From then on the game itself persists drag positions in the module
+config archive, for every user (`game_persistence`).
 """
 
 import logging
 
-from .grid_model import SCREEN_MAX_X, SCREEN_MAX_Y
+from .profile_document import LANE_BUILD
+from .profile_document import SectionSpec as ProfileSectionSpec
 from .settings_core import Field, Schema, get_defaults, validate_all
 
 logger = logging.getLogger(__name__)
@@ -48,14 +51,14 @@ def validate_color(hex_str):
 # its one master toggle — but the generator reads them per side, so they stay in the
 # schema as its contract and as the hook a per-side option would use. Off by
 # default — nothing compiles until the user turns it on.
-_SCHEMA = Schema('cast_timer', 1, {
+_SCHEMA = Schema('', 1, {
     "enabled": Field(False, kind='bool'),
     "enableP": Field(False, kind='bool'),
     "enableT": Field(False, kind='bool'),
-    "playerX": Field(910, kind='int', min=0, max=SCREEN_MAX_X),
-    "playerY": Field(620, kind='int', min=0, max=SCREEN_MAX_Y),
-    "targetX": Field(910, kind='int', min=0, max=SCREEN_MAX_X),
-    "targetY": Field(560, kind='int', min=0, max=SCREEN_MAX_Y),
+    "playerFx": Field(910 / 1920, kind='float', min=0.0, max=1.0),
+    "playerFy": Field(620 / 1080, kind='float', min=0.0, max=1.0),
+    "targetFx": Field(910 / 1920, kind='float', min=0.0, max=1.0),
+    "targetFy": Field(560 / 1080, kind='float', min=0.0, max=1.0),
     "bold": Field(True, kind='bool'),
     "fontSize": Field(12, kind='int', min=8, max=48),
     "display": Field("elapsed", choices=DISPLAY_MODES),
@@ -74,20 +77,17 @@ def validate_config(config):
     """Validate/clamp a cast-timer config on load. Returns a sanitized dict
     containing exactly the default keys (unknown keys dropped, missing keys
     filled with defaults)."""
-    result = validate_all(_SCHEMA, config)
-    # Migrate profiles that predate the master enable: derive it from the sides
-    # so an existing player/target-on config keeps rendering after the upgrade.
-    if isinstance(config, dict) and "enabled" not in config:
-        result["enabled"] = result["enableP"] or result["enableT"]
-    return result
+    return validate_all(_SCHEMA, config)
 
 
 def is_enabled(config):
     """True iff the overlay would emit any timer: the master enable is on AND at
-    least one side is on. Legacy configs that predate the master enable (no
-    `enabled` key) fall back to "any side on". Drives the build-time
-    `include_cast_timer` gate — when False, no cast-timer code is compiled."""
-    sides = bool(config.get("enableP")) or bool(config.get("enableT"))
-    if "enabled" not in config:
-        return sides
-    return bool(config.get("enabled")) and sides
+    least one side is on. Drives the build-time `include_cast_timer` gate — when
+    False, no cast-timer code is compiled."""
+    return bool(config.get("enabled")) and (
+        bool(config.get("enableP")) or bool(config.get("enableT")))
+
+
+# The Extras dialog's slice of the profile document — flat: the config dict
+# itself is the section. Registered by app.py at startup.
+PROFILE_SECTION = ProfileSectionSpec('cast_timer', _SCHEMA, LANE_BUILD)

@@ -97,7 +97,7 @@ class CodeGenerator:
         self._assets_path = assets_path
         self._stack_labels = {}
         self.include_console = include_console
-        # Grid positions are stored as fractions; bake-time is the projection
+        # Grid and extras positions are stored as fractions; bake-time is the projection
         # boundary — the emitted AS2 carries px at this resolution.
         game_w, game_h = game_resolution or DEFAULT_GAME_RESOLUTION
         self.game_w = int(game_w)
@@ -371,9 +371,10 @@ class CodeGenerator:
         return f"\n        d.PF = {{fontSize: {self.panel_font_size}}};"
 
     def _cast_data_block(self):
-        """AS2 `d.CAST = {...}` literal for the cast-timer overlay. Color is
-        emitted as a numeric hex literal (0xRRGGBB) so the stub's Number(...)
-        coercion yields a real color, not NaN."""
+        """AS2 `d.CAST = {...}` literal for the cast-timer overlay. Positions
+        are stored as fractions and projected to px here (the AS2 side keys
+        stay playerX/…). Color is emitted as a numeric hex literal (0xRRGGBB)
+        so the stub's Number(...) coercion yields a real color, not NaN."""
         c = self.cast_config
         bp = "true" if c["enableP"] else "false"
         bt = "true" if c["enableT"] else "false"
@@ -381,30 +382,36 @@ class CodeGenerator:
         return (
             "\n        d.CAST = {"
             f"enableP: {bp}, enableT: {bt}, "
-            f"playerX: {int(c['playerX'])}, playerY: {int(c['playerY'])}, "
-            f"targetX: {int(c['targetX'])}, targetY: {int(c['targetY'])}, "
+            f"playerX: {project_px(c['playerFx'], self.game_w)}, "
+            f"playerY: {project_px(c['playerFy'], self.game_h)}, "
+            f"targetX: {project_px(c['targetFx'], self.game_w)}, "
+            f"targetY: {project_px(c['targetFy'], self.game_h)}, "
             f"bold: {bd}, fontSize: {int(c['fontSize'])}, "
             f'display: "{c["display"]}", color: 0x{c["color"]}'
             "};"
         )
 
     def _stopwatch_data_block(self):
-        """AS2 `d.SW = {...}` literal for the in-game stopwatch panel."""
+        """AS2 `d.SW = {...}` literal for the in-game stopwatch panel. The
+        stored fraction position projects to px here."""
         c = self.stopwatch_config
         collapsed = "true" if c["startCollapsed"] else "false"
         return (
-            f"\n        d.SW = {{x: {int(c['x'])}, y: {int(c['y'])}, "
+            f"\n        d.SW = {{x: {project_px(c['fx'], self.game_w)}, "
+            f"y: {project_px(c['fy'], self.game_h)}, "
             f"fontSize: {self._resolved_font_size(c)}, collapsed: {collapsed}}};"
         )
 
     def _inspect_data_block(self):
-        """AS2 `d.INS = {...}` literal for the target inspect panel."""
+        """AS2 `d.INS = {...}` literal for the target inspect panel. The
+        stored fraction position projects to px here."""
         c = self.inspect_config
         collapsed = "true" if c["startCollapsed"] else "false"
         show_pvp = "true" if c["showPvp"] else "false"
         show_perks = "true" if c["showPerks"] else "false"
         return (
-            f"\n        d.INS = {{x: {int(c['x'])}, y: {int(c['y'])}, "
+            f"\n        d.INS = {{x: {project_px(c['fx'], self.game_w)}, "
+            f"y: {project_px(c['fy'], self.game_h)}, "
             f"fontSize: {self._resolved_font_size(c)}, collapsed: {collapsed}, "
             f"showPvp: {show_pvp}, showPerks: {show_perks}}};"
         )

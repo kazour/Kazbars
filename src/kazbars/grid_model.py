@@ -15,8 +15,6 @@ from .settings_core import Field, Schema
 MAX_TOTAL_SLOTS = 64
 MAX_ROWS = 64
 MAX_COLS = 64
-SCREEN_MAX_X = 7680
-SCREEN_MAX_Y = 4320
 
 DEFAULT_GAME_RESOLUTION = (1920, 1080)
 

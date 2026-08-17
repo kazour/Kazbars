@@ -8,8 +8,13 @@ panel's own, for the same "these belong together" reason: the buff-discovery
 console's build gate (flat prefs key `build_console`), and the text size the
 four in-game panels share (flat prefs key `panel_font_size`) — the console and
 the preview control panel have no dialog of their own to host either.
-Persists machine-local in prefs.json under `inspect` (data layer:
-`inspect.py`); the build bakes the values into the generated SWF.
+The panel's own settings read/write the profile document's `inspect` section
+(data layer: `inspect.py`; the store autosaves); the two ride-along settings
+stay machine-local prefs keys, so Apply is a two-store write. Positions are
+stored as fractions of the game resolution; the X/Y fields display projected
+px at the current resolution (the grid editor convention) so the
+drag-in-game → copy-the-coordinates workflow keeps working. The build bakes
+the values into the generated SWF.
 Functions take the KazBarsApp instance as first arg.
 
 Layout follows the Damage Numbers panel conventions: tip bar under the header,
@@ -21,7 +26,7 @@ they are independent settings that only ride along on this dialog's Apply.
 import tkinter as tk
 from tkinter import ttk
 
-from .grid_model import SCREEN_MAX_X, SCREEN_MAX_Y
+from .grid_model import get_game_resolution_or_default, project_px, unproject_px
 from .inspect import validate_config
 from .ui_forms import create_card, labeled_spinbox
 from .ui_headers import create_dialog_header, create_tip_bar
@@ -58,7 +63,8 @@ def open_inspect_dialog(app):
         except tk.TclError:
             pass
 
-    cfg = validate_config(app.settings.get('inspect'))
+    cfg = validate_config(app.profile_store.get_section('inspect'))
+    game_w, game_h = get_game_resolution_or_default()
 
     dialog = tk.Toplevel(app)
     app.inspect_dialog = dialog
@@ -115,13 +121,14 @@ def open_inspect_dialog(app):
     pos_blurb.pack(anchor='w', pady=(0, PAD_XS))
     _register_dim(pos_blurb)
 
-    x_var = tk.IntVar(value=cfg['x'])
-    y_var = tk.IntVar(value=cfg['y'])
+    # Fractions display as projected px at the current game resolution.
+    x_var = tk.IntVar(value=project_px(cfg['fx'], game_w))
+    y_var = tk.IntVar(value=project_px(cfg['fy'], game_h))
     pos_row = ttk.Frame(pos_card)
     pos_row.pack(anchor='w')
-    gated.append(labeled_spinbox(pos_row, "X ", x_var, from_=0, to=SCREEN_MAX_X,
+    gated.append(labeled_spinbox(pos_row, "X ", x_var, from_=0, to=game_w,
                                  width=6, padx=(0, PAD_SMALL * 2), label_sink=sink))
-    gated.append(labeled_spinbox(pos_row, "Y ", y_var, from_=0, to=SCREEN_MAX_Y,
+    gated.append(labeled_spinbox(pos_row, "Y ", y_var, from_=0, to=game_h,
                                  width=6, label_sink=sink))
 
     size_card = create_card(content, "Text size")
@@ -235,12 +242,22 @@ def open_inspect_dialog(app):
         except tk.TclError:
             return default
 
+    def _read_frac(var, frac, extent):
+        # Position fields carry projected px; typed overshoot clamps to the
+        # screen edge (the grid editor convention), then unprojects back to
+        # the stored fraction. An emptied spinbox keeps the loaded fraction.
+        try:
+            px = max(0, min(int(var.get()), extent))
+        except (ValueError, tk.TclError):
+            return frac
+        return unproject_px(px, extent)
+
     def _apply():
         shared = _read(shared_var, shared_before)
         new_cfg = validate_config({
             'enabled': enabled_var.get(),
-            'x': _read(x_var, cfg['x']),
-            'y': _read(y_var, cfg['y']),
+            'fx': _read_frac(x_var, cfg['fx'], game_w),
+            'fy': _read_frac(y_var, cfg['fy'], game_h),
             # Checked means "no opinion" — never the number left in the disabled
             # spinbox, or unticking once would freeze the panel off the shared value.
             'fontSize': None if follow_var.get() else _read(size_var, shared),
@@ -248,12 +265,12 @@ def open_inspect_dialog(app):
             'showPvp': pvp_var.get(),
             'showPerks': perks_var.get(),
         })
-        # The shared size and the console gate ride along on the same Apply —
-        # one save() covers all three keys.
+        # Two stores on one Apply: the ride-along settings are machine-local
+        # prefs, the panel's own config is a profile section (autosaved).
         app.settings.set('panel_font_size', shared)
         app.settings.set('build_console', console_var.get())
-        app.settings.set('inspect', new_cfg)
         app.settings.save()
+        app.profile_store.set_section('inspect', new_cfg)
         app.grids_panel.refresh_extras_shortcuts()
         # Three separate settings live in this dialog, so name whichever moved
         # rather than reporting an inspect save that isn't one.

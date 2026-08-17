@@ -3,8 +3,12 @@ KazBars — Cast timer dialog.
 
 Extras-menu settings for the cast-timer overlay (the timer-only Flash overlay
 showing player/target cast time): the build gate, the two baked positions, and
-the shared text style. Persists machine-local in prefs.json under `cast_timer`
-(data layer: `cast_timer.py`); the build bakes the values into the generated SWF.
+the shared text style. Reads/writes the profile document's `cast_timer`
+section (data layer: `cast_timer.py`; the store autosaves). Positions are
+stored as fractions of the game resolution; the X/Y fields display projected
+px at the current resolution (the grid editor convention) so the
+drag-in-game → copy-the-coordinates workflow keeps working. The build bakes
+the values into the generated SWF.
 Functions take the KazBarsApp instance as first arg.
 
 Font is fixed to Arial — the only face embedded in base.swf (see cast_timer.py) —
@@ -22,7 +26,7 @@ import tkinter.font as tkfont
 from tkinter import ttk
 
 from .cast_timer import validate_config
-from .grid_model import SCREEN_MAX_X, SCREEN_MAX_Y
+from .grid_model import get_game_resolution_or_default, project_px, unproject_px
 from .ui_forms import ColorSwatch, create_card, labeled_spinbox
 from .ui_headers import create_dialog_header, create_tip_bar
 from .ui_helpers import (
@@ -69,7 +73,8 @@ def open_cast_timer_dialog(app):
         except tk.TclError:
             pass
 
-    cfg = validate_config(app.settings.get('cast_timer'))
+    cfg = validate_config(app.profile_store.get_section('cast_timer'))
+    game_w, game_h = get_game_resolution_or_default()
 
     dialog = tk.Toplevel(app)
     app.cast_timer_dialog = dialog
@@ -123,10 +128,11 @@ def open_cast_timer_dialog(app):
     pos_blurb.pack(anchor='w', pady=(0, PAD_XS))
     _register_dim(pos_blurb)
 
-    px_var = tk.IntVar(value=cfg['playerX'])
-    py_var = tk.IntVar(value=cfg['playerY'])
-    tx_var = tk.IntVar(value=cfg['targetX'])
-    ty_var = tk.IntVar(value=cfg['targetY'])
+    # Fractions display as projected px at the current game resolution.
+    px_var = tk.IntVar(value=project_px(cfg['playerFx'], game_w))
+    py_var = tk.IntVar(value=project_px(cfg['playerFy'], game_h))
+    tx_var = tk.IntVar(value=project_px(cfg['targetFx'], game_w))
+    ty_var = tk.IntVar(value=project_px(cfg['targetFy'], game_h))
     for title, x_var, y_var in (("Player", px_var, py_var),
                                 ("Target", tx_var, ty_var)):
         row = ttk.Frame(pos_card)
@@ -136,10 +142,10 @@ def open_cast_timer_dialog(app):
                             width=_POS_LABEL_W, anchor='w')
         row_lbl.pack(side='left')
         sink.append(row_lbl)
-        gated.append(labeled_spinbox(row, "X ", x_var, from_=0, to=SCREEN_MAX_X,
+        gated.append(labeled_spinbox(row, "X ", x_var, from_=0, to=game_w,
                                      width=6, padx=(0, PAD_SMALL * 2),
                                      label_sink=sink))
-        gated.append(labeled_spinbox(row, "Y ", y_var, from_=0, to=SCREEN_MAX_Y,
+        gated.append(labeled_spinbox(row, "Y ", y_var, from_=0, to=game_h,
                                      width=6, label_sink=sink))
 
     text_card = create_card(content, "Text")
@@ -244,6 +250,16 @@ def open_cast_timer_dialog(app):
         except tk.TclError:
             return default
 
+    def _read_frac(var, frac, extent):
+        # Position fields carry projected px; typed overshoot clamps to the
+        # screen edge (the grid editor convention), then unprojects back to
+        # the stored fraction. An emptied spinbox keeps the loaded fraction.
+        try:
+            px = max(0, min(int(var.get()), extent))
+        except (ValueError, tk.TclError):
+            return frac
+        return unproject_px(px, extent)
+
     def _apply():
         # One master gate drives both sides: enableP/enableT stay in the schema
         # for the generator contract, but the dialog has never split them.
@@ -252,17 +268,16 @@ def open_cast_timer_dialog(app):
             'enabled': enabled,
             'enableP': enabled,
             'enableT': enabled,
-            'playerX': _read(px_var, cfg['playerX']),
-            'playerY': _read(py_var, cfg['playerY']),
-            'targetX': _read(tx_var, cfg['targetX']),
-            'targetY': _read(ty_var, cfg['targetY']),
+            'playerFx': _read_frac(px_var, cfg['playerFx'], game_w),
+            'playerFy': _read_frac(py_var, cfg['playerFy'], game_h),
+            'targetFx': _read_frac(tx_var, cfg['targetFx'], game_w),
+            'targetFy': _read_frac(ty_var, cfg['targetFy'], game_h),
             'bold': bold_var.get(),
             'fontSize': _read(size_var, cfg['fontSize']),
             'display': _LABEL_TO_DISPLAY.get(display_var.get(), "both"),
             'color': color[0],
         })
-        app.settings.set('cast_timer', new_cfg)
-        app.settings.save()
+        app.profile_store.set_section('cast_timer', new_cfg)
         app.grids_panel.refresh_extras_shortcuts()
         if new_cfg['enabled']:
             app_toast(app, "Cast timer saved — Build & Install to apply", 'success')

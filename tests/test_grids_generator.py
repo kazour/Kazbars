@@ -162,13 +162,16 @@ def test_console_default_is_off():
 
 
 def _cast_cfg():
+    # Fraction positions chosen to project to 900/600/560 px at the default
+    # 1920×1080 build resolution.
     return {
+        "enabled": True,
         "enableP": True,
         "enableT": True,
-        "playerX": 900,
-        "playerY": 600,
-        "targetX": 900,
-        "targetY": 560,
+        "playerFx": 900 / 1920,
+        "playerFy": 600 / 1080,
+        "targetFx": 900 / 1920,
+        "targetFy": 560 / 1080,
         "bold": True,
         "fontSize": 18,
         "display": "both",
@@ -189,13 +192,20 @@ def test_cast_off_emits_no_cast_refs():
 
 
 def test_cast_disabled_config_is_off():
-    """A cast_config with both timers off must not switch the feature on."""
+    """Master off (or both sides off) must not switch the feature on."""
     gen = CodeGenerator(
-        [_minimal_grid()], _load_db(), "0.0.0", cast_config={"enableP": False, "enableT": False}
+        [_minimal_grid()], _load_db(), "0.0.0",
+        cast_config={"enabled": False, "enableP": True, "enableT": True},
     )
     main_code, _ = gen.generate()
     assert not gen.include_cast_timer
     assert "KazBarsCastTimer" not in main_code
+
+    gen = CodeGenerator(
+        [_minimal_grid()], _load_db(), "0.0.0",
+        cast_config={"enabled": True, "enableP": False, "enableT": False},
+    )
+    assert not gen.include_cast_timer
 
 
 def test_cast_on_emits_hooks_and_data():
@@ -216,9 +226,11 @@ def test_cast_on_emits_hooks_and_data():
     assert "castTimer.savePositions(config);" in main_code
     assert "castTimer.cleanup();" in main_code
 
-    # Data block — color must be a numeric hex literal (Number() else NaN);
-    # font is fixed to Arial in the stub, so only bold is emitted.
+    # Data block — fractions project to px at the default build resolution;
+    # color must be a numeric hex literal (Number() else NaN); font is fixed
+    # to Arial in the stub, so only bold is emitted.
     assert "d.CAST = {" in data_code
+    assert "playerX: 900, playerY: 600, targetX: 900, targetY: 560" in data_code
     assert "color: 0xFF8800" in data_code
     assert "bold: true" in data_code
     assert 'display: "both"' in data_code
@@ -248,7 +260,7 @@ def test_stopwatch_off_emits_no_refs():
 def test_stopwatch_disabled_config_is_off():
     gen = CodeGenerator(
         [_minimal_grid()], _load_db(), "0.0.0",
-        stopwatch_config={"enabled": False, "x": 100, "y": 100},
+        stopwatch_config={"enabled": False, "fx": 0.1, "fy": 0.1},
     )
     main_code, _ = gen.generate()
     assert not gen.include_stopwatch
@@ -258,8 +270,8 @@ def test_stopwatch_disabled_config_is_off():
 def test_stopwatch_on_emits_hooks_and_data():
     gen = CodeGenerator(
         [_minimal_grid()], _load_db(), "0.0.0",
-        stopwatch_config={"enabled": True, "x": 750, "y": 410, "fontSize": 16,
-                          "startCollapsed": True},
+        stopwatch_config={"enabled": True, "fx": 750 / 1920, "fy": 410 / 1080,
+                          "fontSize": 16, "startCollapsed": True},
     )
     main_code, data_code = gen.generate()
     assert gen.include_stopwatch
@@ -275,7 +287,8 @@ def test_stopwatch_on_emits_hooks_and_data():
     assert "stopwatch.saveState(config);" in main_code
     assert "stopwatch.cleanup();" in main_code
 
-    # Data block — a number of its own overrides the shared panel size
+    # Data block — the fraction position projects to px at the default build
+    # resolution; a fontSize of its own overrides the shared panel size
     assert "d.SW = {x: 750, y: 410, fontSize: 16, collapsed: true};" in data_code
 
     # No leftover tokens
@@ -285,11 +298,24 @@ def test_stopwatch_on_emits_hooks_and_data():
 def test_stopwatch_without_its_own_size_follows_the_shared_one():
     gen = CodeGenerator(
         [_minimal_grid()], _load_db(), "0.0.0",
-        stopwatch_config={"enabled": True, "x": 750, "y": 410, "fontSize": None},
+        stopwatch_config={"enabled": True, "fx": 750 / 1920, "fy": 410 / 1080,
+                          "fontSize": None},
         panel_font_size=20,
     )
     _, data_code = gen.generate()
     assert "d.SW = {x: 750, y: 410, fontSize: 20, collapsed: false};" in data_code
+
+
+def test_extras_positions_project_to_the_build_resolution():
+    """Same section, different target resolution → proportionally moved px
+    (the whole point of storing extras positions as fractions)."""
+    gen = CodeGenerator(
+        [_minimal_grid()], _load_db(), "0.0.0",
+        stopwatch_config={"enabled": True, "fx": 0.5, "fy": 0.5},
+        game_resolution=(2560, 1440),
+    )
+    _, data_code = gen.generate()
+    assert "d.SW = {x: 1280, y: 720," in data_code
 
 
 # --------------------------------------------------------------------------
@@ -312,7 +338,7 @@ def test_inspect_off_emits_no_refs():
 def test_inspect_disabled_config_is_off():
     gen = CodeGenerator(
         [_minimal_grid()], _load_db(), "0.0.0",
-        inspect_config={"enabled": False, "x": 100, "y": 100},
+        inspect_config={"enabled": False, "fx": 0.1, "fy": 0.1},
     )
     main_code, _ = gen.generate()
     assert not gen.include_inspect
@@ -322,8 +348,8 @@ def test_inspect_disabled_config_is_off():
 def test_inspect_on_emits_hooks_and_data():
     gen = CodeGenerator(
         [_minimal_grid()], _load_db(), "0.0.0",
-        inspect_config={"enabled": True, "x": 40, "y": 240, "fontSize": 14,
-                        "startCollapsed": True, "showPvp": True,
+        inspect_config={"enabled": True, "fx": 40 / 1920, "fy": 240 / 1080,
+                        "fontSize": 14, "startCollapsed": True, "showPvp": True,
                         "showPerks": False},
     )
     main_code, data_code = gen.generate()
@@ -344,7 +370,8 @@ def test_inspect_on_emits_hooks_and_data():
     # Save fires from BOTH persist paths (exitPreview + OnModuleDeactivated)
     assert main_code.count("inspect.saveState(config);") == 2
 
-    # Data block — a number of its own overrides the shared panel size
+    # Data block — the fraction position projects to px at the default build
+    # resolution; a fontSize of its own overrides the shared panel size
     assert ("d.INS = {x: 40, y: 240, fontSize: 14, collapsed: true, "
             "showPvp: true, showPerks: false};" in data_code)
 
@@ -355,7 +382,8 @@ def test_inspect_on_emits_hooks_and_data():
 def test_inspect_without_its_own_size_follows_the_shared_one():
     gen = CodeGenerator(
         [_minimal_grid()], _load_db(), "0.0.0",
-        inspect_config={"enabled": True, "x": 40, "y": 240, "fontSize": None},
+        inspect_config={"enabled": True, "fx": 40 / 1920, "fy": 240 / 1080,
+                        "fontSize": None},
         panel_font_size=20,
     )
     _, data_code = gen.generate()
@@ -374,8 +402,8 @@ def _all_extras_gen():
         [_minimal_grid()], _load_db(), "0.0.0",
         include_console=True,
         cast_config=_cast_cfg(),
-        stopwatch_config={"enabled": True, "x": 750, "y": 410},
-        inspect_config={"enabled": True, "x": 40, "y": 240},
+        stopwatch_config={"enabled": True, "fx": 750 / 1920, "fy": 410 / 1080},
+        inspect_config={"enabled": True, "fx": 40 / 1920, "fy": 240 / 1080},
     )
 
 
@@ -474,7 +502,7 @@ def test_preview_panel_row_gated_per_extra():
     """A row only appears for an extra that is actually compiled in."""
     gen = CodeGenerator(
         [_minimal_grid()], _load_db(), "0.0.0",
-        stopwatch_config={"enabled": True, "x": 750, "y": 410},
+        stopwatch_config={"enabled": True, "fx": 750 / 1920, "fy": 410 / 1080},
     )
     main_code, _ = gen.generate()
     assert 'ppanel.addExtra("Stopwatch", "sw", stopwatch.isActive());' in main_code

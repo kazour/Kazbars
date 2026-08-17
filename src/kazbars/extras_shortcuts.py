@@ -5,8 +5,11 @@ Four toggle cards pinned above the grid list — one per SWF-build extra, in
 Extras-menu order (Damage numbers, Stopwatch, Inspect panel, Cast timer) so
 the row and the menu read as the same list. Each card shows whether its
 feature ships in the next Build & Install and flips the same store its
-Extras dialog writes; configuration stays in the dialogs, which push
-`refresh()` back through `GridsPanel.refresh_extras_shortcuts()` on Apply.
+Extras dialog writes: the profile document for stopwatch/inspect/cast timer
+(autosaved by the profile store; `apply_document` resyncs the cards on every
+profile switch), `damageinfo_settings.json` for damage numbers.
+Configuration stays in the dialogs, which push `refresh()` back through
+`GridsPanel.refresh_extras_shortcuts()` on Apply.
 
 Semantic color only: "in the next build" lights the card border, status line
 and toggle in the success green the tip bar and Build & Install already use.
@@ -17,9 +20,6 @@ import tkinter as tk
 from tkinter import ttk
 
 from . import damageinfo_settings as dis
-from .cast_timer import validate_config as validate_cast
-from .inspect import validate_config as validate_inspect
-from .stopwatch import validate_config as validate_stopwatch
 from .ui_helpers import (
     FONT_SECTION,
     FONT_SMALL,
@@ -45,20 +45,21 @@ def _set_damage_numbers(app, on):
     dis.save_settings(app.settings_path, settings)
 
 
-def _read_prefs_dict(app, key, validate):
-    return bool(validate(app.settings.get(key))['enabled'])
+def _read_section(app, key):
+    # The row is built with GridsPanel, before startup_profile installs the
+    # store; apply_document resyncs the cards right after, so rest off here.
+    store = app.profile_store
+    return store is not None and bool(store.get_section(key).get('enabled'))
 
 
-def _make_prefs_setter(key, validate, side_flags=()):
+def _make_section_setter(key, side_flags=()):
     def _set(app, on):
-        cfg = validate(app.settings.get(key))
-        cfg['enabled'] = on
+        patch = {'enabled': on}
         # The cast timer's per-side flags ride the master (is_enabled needs
         # master AND a side, and no UI has ever split them).
         for flag in side_flags:
-            cfg[flag] = on
-        app.settings.set(key, validate(cfg))
-        app.settings.save()
+            patch[flag] = on
+        app.profile_store.update_section(key, patch)
     return _set
 
 
@@ -69,16 +70,16 @@ _FEATURES = (
      _read_damage_numbers, _set_damage_numbers),
     ('stopwatch', 'Stopwatch', 'next build removes it',
      'In-game Start / Pause / Reset timer panel. Configure in Extras ▸ Stopwatch…',
-     lambda app: _read_prefs_dict(app, 'stopwatch', validate_stopwatch),
-     _make_prefs_setter('stopwatch', validate_stopwatch)),
+     lambda app: _read_section(app, 'stopwatch'),
+     _make_section_setter('stopwatch')),
     ('inspect', 'Inspect panel', 'next build removes it',
      'Combat sheet for your current target. Configure in Extras ▸ Inspect panel…',
-     lambda app: _read_prefs_dict(app, 'inspect', validate_inspect),
-     _make_prefs_setter('inspect', validate_inspect)),
+     lambda app: _read_section(app, 'inspect'),
+     _make_section_setter('inspect')),
     ('cast_timer', 'Cast timer', 'next build removes it',
      'Cast-time readout for you and your target. Configure in Extras ▸ Cast timer…',
-     lambda app: _read_prefs_dict(app, 'cast_timer', validate_cast),
-     _make_prefs_setter('cast_timer', validate_cast, side_flags=('enableP', 'enableT'))),
+     lambda app: _read_section(app, 'cast_timer'),
+     _make_section_setter('cast_timer', side_flags=('enableP', 'enableT'))),
 )
 
 
