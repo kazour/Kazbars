@@ -18,25 +18,23 @@ MAX_COLS = 64
 SCREEN_MAX_X = 7680
 SCREEN_MAX_Y = 4320
 
-# Anchor coefficients for resolution scaling. 0 = top-left anchored
-# (offset from origin stays constant), 0.5 = center anchored, 1.0 =
-# bottom-right anchored (offset from far edge stays constant). Tuned
-# to match AoC's fixed-pixel HUD: action bars don't grow with resolution,
-# so grids that flank them must hold a constant offset from screen
-# center (X) and screen bottom (Y).
-ANCHOR_COEFF_X = 0.5
-ANCHOR_COEFF_Y = 1.0
-
 DEFAULT_GAME_RESOLUTION = (1920, 1080)
 
 # Declarative validation specs: key → (default, min, max)
 CLAMP_SPECS = {
     'rows': (1, 1, MAX_ROWS), 'cols': (10, 1, MAX_COLS),
     'iconSize': (56, 8, 128), 'gap': (-1, -5, 10),
-    'x': (100, 0, SCREEN_MAX_X), 'y': (400, 0, SCREEN_MAX_Y),
     'timerFontSize': (18, 8, 48), 'timerFlashThreshold': (6, 0, 11),
     'timerYOffset': (-3, -10, 10),
     'stackFontSize': (16, 8, 24),
+}
+# Fraction position specs: key → default. Positions are stored as fractions of
+# the game resolution (full floats, clamped to [0.0, 1.0]); pixels exist only
+# at display/emit via project_px/unproject_px, so a document is never rewritten
+# by a resolution change. Sizes stay pixels — icon art has a native size.
+FRACTION_SPECS = {
+    'fx': 100 / 1920,
+    'fy': 400 / 1080,
 }
 # key → (default, valid_values)
 ENUM_SPECS = {
@@ -71,8 +69,8 @@ def create_default_grid(grid_type="player", rows=1, cols=10, mode="dynamic", gri
         'cols': cols,
         'iconSize': 56,
         'gap': -1,
-        'x': 100 if grid_type == "player" else 300,
-        'y': 400,
+        'fx': (100 if grid_type == "player" else 300) / 1920,
+        'fy': 400 / 1080,
         'slotMode': mode,
         'showTimers': True,
         'timerFontSize': 18,
@@ -115,6 +113,20 @@ def validate_grid(grid):
         except (TypeError, ValueError, OverflowError):
             value = default
         grid[key] = max(lo, min(value, hi))
+
+    # Fraction positions: full-float clamp to the unit range (NaN → default;
+    # inf lands on the clamp bound). Legacy pixel keys are popped — schema-2
+    # documents never carry them, and a hand-added one must not zombie along.
+    for key, frac_default in FRACTION_SPECS.items():
+        try:
+            frac = float(grid.get(key, frac_default))
+        except (TypeError, ValueError):
+            frac = frac_default
+        if frac != frac:
+            frac = frac_default
+        grid[key] = max(0.0, min(frac, 1.0))
+    grid.pop('x', None)
+    grid.pop('y', None)
 
     # Validate enums
     for key, (enum_default, valid) in ENUM_SPECS.items():
@@ -184,18 +196,6 @@ def get_game_resolution_or_default():
     if isinstance(res, list) and len(res) == 2 and all(isinstance(v, int) and v > 0 for v in res):
         return tuple(res)
     return DEFAULT_GAME_RESOLUTION
-
-
-def scale_grid_position(x, y, ref_w, ref_h, game_w, game_h):
-    """Apply anchor-based scaling to one (x, y): X anchored to horizontal
-    center, Y anchored to screen bottom. Clamps to SCREEN_MAX bounds and
-    floors at 0. Pure function — testable without Tk."""
-    dw = game_w - ref_w
-    dh = game_h - ref_h
-    return (
-        max(0, min(round(x + ANCHOR_COEFF_X * dw), SCREEN_MAX_X)),
-        max(0, min(round(y + ANCHOR_COEFF_Y * dh), SCREEN_MAX_Y)),
-    )
 
 
 def unproject_px(px, extent):

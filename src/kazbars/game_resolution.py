@@ -1,10 +1,10 @@
 """
 KazBars — Game resolution dialog.
 
-UI + persistence for the user's game resolution. Picking a new resolution
-re-anchors all currently loaded grids via `scale_to_resolution()` so the
-editor and the eventual in-game build follow the new screen size.
-Functions take the KazBarsApp instance as first arg.
+UI + persistence for the user's game resolution. Positions are stored as
+fractions, so picking a new resolution moves nothing in the document — the
+editor's pixel fields and the next build simply project against the new
+size. Functions take the KazBarsApp instance as first arg.
 """
 
 import tkinter as tk
@@ -62,7 +62,8 @@ def change_game_resolution(app):
               font=FONT_SECTION, foreground=THEME_COLORS['heading']
               ).pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
     ttk.Label(content,
-              text="Grid positions will re-anchor for the new screen size.",
+              text="Grids keep their screen-relative positions; the editor's\n"
+                   "pixel fields re-read for the new size.",
               font=FONT_SMALL, foreground=THEME_COLORS['muted']
               ).pack(anchor='w', pady=(0, PAD_XS))
 
@@ -80,22 +81,15 @@ def change_game_resolution(app):
             return
         new_w, new_h = new_res
         if (new_w, new_h) != (current_w, current_h):
-            old_res_str = f"{current_w}x{current_h}"
-            scaled = app.grids_panel.scale_to_resolution(
-                f"{new_w}x{new_h}", [current_w, current_h])
+            # Positions are fractions — nothing in the document moves. Flush
+            # the widgets at the OLD resolution first (their px unprojects
+            # against it), then persist and rebuild so every pixel field
+            # re-projects at the new one.
+            app.grids_panel.save_settings()
             app.settings.set('game_resolution', [new_w, new_h])
             app.settings.save()
-            if app.profile_store:
-                # Push the re-anchored grids into the document and re-base its
-                # provenance so the next load's auto-scale is a no-op.
-                app._on_grids_edited()
-                app.profile_store.set_authored_at((new_w, new_h))
-            if scaled:
-                app_toast(app,
-                          f"Scaled grids: {old_res_str} → {new_w}×{new_h}",
-                          'success')
-            else:
-                app_toast(app, f"Resolution set to {new_w}×{new_h}", 'info')
+            app.grids_panel.refresh_panels()
+            app_toast(app, f"Resolution set to {new_w}×{new_h}", 'info')
         dialog.destroy()
 
     ttk.Button(btns, text="Apply", bootstyle="success",

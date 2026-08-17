@@ -32,7 +32,7 @@ from typing import Any
 
 from .settings_core import Migration, Schema, get_defaults, validate_all, validate_patch
 
-DOC_SCHEMA_VERSION = 1
+DOC_SCHEMA_VERSION = 2
 
 # Apply lanes — how a section's settings reach the game. BUILD is baked into
 # the SWF by Build & Install; PATCH writes game XML only on an explicit Apply
@@ -143,11 +143,44 @@ def new_document(registry: SectionRegistry, name: str, authored_at: Iterable[int
 # MIGRATION LADDER                                                            #
 # =========================================================================== #
 
-# Document-level rungs, keyed off the envelope `schema` int. Ships empty; the
-# machinery is live for the first format bump (rungs run inside
+def _px_to_fractions(data: dict) -> dict:
+    """Schema 1 → 2: grid positions move from absolute pixels (anchored to
+    `authored_at`) to fractions of the game resolution. Deliberately inline —
+    a rung is frozen history and must not depend on live grid_model code
+    (which grid_model's own import of this module would also make circular).
+    Deep-copies before mutating: rungs run inside the gate, which promises
+    the caller's raw dict is never touched."""
+    data = copy.deepcopy(data)
+    authored = data.get('authored_at')
+    if (
+        isinstance(authored, list) and len(authored) == 2
+        and all(isinstance(v, int) and not isinstance(v, bool) and v > 0 for v in authored)
+    ):
+        aw, ah = authored
+    else:
+        aw, ah = _DEFAULT_AUTHORED_AT
+    grids = data.get('modules', {}).get('grids', {})
+    entries = grids.get('grids') if isinstance(grids, dict) else None
+    for g in entries if isinstance(entries, list) else []:
+        if not isinstance(g, dict):
+            continue
+        for px_key, frac_key, extent, fallback in (
+            ('x', 'fx', aw, 100), ('y', 'fy', ah, 400),
+        ):
+            try:
+                px = float(g.pop(px_key, fallback))
+            except (TypeError, ValueError):
+                px = float(fallback)
+            g[frac_key] = max(0.0, min(px / extent, 1.0))
+    return data
+
+
+# Document-level rungs, keyed off the envelope `schema` int. Rungs run inside
 # validate_document, before section validation, so load and import migrate
-# identically and never leave a stale document behind).
-MIGRATIONS: tuple[Migration, ...] = ()
+# identically and never leave a stale document behind.
+MIGRATIONS: tuple[Migration, ...] = (
+    Migration(2, _px_to_fractions),
+)
 
 
 def _migrate(raw: dict) -> dict:

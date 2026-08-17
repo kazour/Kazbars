@@ -68,7 +68,7 @@ def test_template_profile_buff_refs_resolve() -> None:
     # carries the same grids inside its `modules` map.
     doc = json.loads(
         (KAZBARS_ASSETS / "templates" / "Default.json").read_text(encoding="utf-8"))
-    assert doc["schema"] == 1 and doc["id"]
+    assert doc["schema"] == 2 and doc["id"]
     _assert_refs_resolve(doc["modules"]["grids"])
 
 

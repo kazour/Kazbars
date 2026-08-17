@@ -80,8 +80,9 @@ def apply_document(app):
     """Dispatch the store's document into the running app.
 
     Side effects: grids panel (missing-ref warning), live BossTimer (if open),
-    authored_at rescale (persisted via the store), `active_profile` pref,
-    window title, File menu profile rows.
+    `active_profile` pref, window title, File menu profile rows. Positions are
+    fractions — no resolution rescale exists; `authored_at` is display-only
+    provenance.
     """
     store = app.profile_store
     grids = copy.deepcopy(store.get_section('grids').get('grids', []))
@@ -91,13 +92,6 @@ def apply_document(app):
 
     if bt := app._boss_timer_if_alive():
         bt.load_profile_data(store.get_section('boss_timer'))
-
-    game_w, game_h = get_game_resolution_or_default()
-    authored = store.document.get('authored_at')
-    if authored and tuple(authored) != (game_w, game_h):
-        app.grids_panel.scale_to_resolution(f'{game_w}x{game_h}', list(authored))
-        store.set_section('grids', {'grids': copy.deepcopy(app.grids_panel.get_profile_data())})
-        store.set_authored_at((game_w, game_h))
 
     app.settings.set('active_profile', store.document['id'])
     app.settings.save()

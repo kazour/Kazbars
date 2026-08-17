@@ -17,6 +17,7 @@ Run: `pytest tests/test_grid_model.py` (from repo root).
 
 from kazbars.grid_model import (
     CLAMP_SPECS,
+    FRACTION_SPECS,
     create_default_grid,
     dedupe_grid_ids,
     project_px,
@@ -26,11 +27,18 @@ from kazbars.grid_model import (
 
 
 def test_junk_numeric_values_fall_back_to_defaults():
-    grid = validate_grid({"rows": None, "cols": "abc", "x": [], "iconSize": {}})
+    grid = validate_grid({"rows": None, "cols": "abc", "fx": [], "iconSize": {}})
     assert grid["rows"] == CLAMP_SPECS["rows"][0]
     assert grid["cols"] == CLAMP_SPECS["cols"][0]
-    assert grid["x"] == CLAMP_SPECS["x"][0]
+    assert grid["fx"] == FRACTION_SPECS["fx"]
     assert grid["iconSize"] == CLAMP_SPECS["iconSize"][0]
+
+
+def test_fractions_clamp_and_reject_nan_and_pop_legacy_px():
+    grid = validate_grid({"fx": 1.5, "fy": float("nan"), "x": 640, "y": 480})
+    assert grid["fx"] == 1.0
+    assert grid["fy"] == FRACTION_SPECS["fy"]
+    assert "x" not in grid and "y" not in grid  # legacy px keys never zombie
 
 
 def test_numeric_strings_still_coerce():
