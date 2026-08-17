@@ -45,7 +45,9 @@ userdata (userdata/ paths + ensure_layout)  ← prefs, settings_backup, app
   userdata/                       ← USER + MACHINE (created fresh by ensure_layout() on first launch)
     prefs.json                    ← machine-local (window positions, game path, resolution, last/default profile, build toggles, the baked-overlay dicts `stopwatch`/`inspect`/`cast_timer`, the flat `panel_font_size` those first two fall back to, UI state)
     settings/{deeps,live_tracker,damageinfo}_settings.json
-    profiles/*.json
+    profiles/*.json               ← profile documents (identity = in-doc id; `profile_library` is the sole reader/writer once the revamp cutover lands)
+    profiles/*.json.bak           ← per-profile session-start snapshots (revamp)
+    profiles/trash/               ← deleted profiles, pruned to the 10 newest (revamp)
     database_user.json            ← user buff deltas (seeded empty; Phase 3)
     prefs3_snapshot.xml           ← copy of the game's Prefs_3.xml, taken only while the install is healthy; Repair re-injects stripped archives from it (Flow 29)
     content/  content/.bak/       ← OTA reference content + rollback (Phase 4)
