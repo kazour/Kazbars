@@ -17,6 +17,8 @@ from .grid_model import (
     MAX_ROWS,
     MAX_TOTAL_SLOTS,
     get_game_resolution_or_default,
+    project_px,
+    unproject_px,
 )
 from .ui_collapsible import CollapsibleSection
 from .ui_forms import (
@@ -188,7 +190,7 @@ class GridEditorPanel(ttk.Frame):
         icon_row = ttk.Frame(parent)
         icon_row.pack(fill='x', pady=(0, PAD_ROW))
         self.icon_var = tk.IntVar()
-        labeled_spinbox(icon_row, "Icon:", self.icon_var, from_=24, to=64, width=2,
+        labeled_spinbox(icon_row, "Icon:", self.icon_var, from_=8, to=128, width=3,
             tooltip="Size of each buff icon in pixels (24-64)",
             padx=(PAD_BUTTON_GAP, PAD_TAB))
         self.gap_var = tk.IntVar()
@@ -291,10 +293,13 @@ class GridEditorPanel(ttk.Frame):
         cols = cfg.get('cols', 5)
         self._rows_var.set(str(rows))
         self._cols_var.set(str(cols))
-        max_x, max_y = get_game_resolution_or_default()
-        self.x_var.set(str(min(cfg.get('x', 100), max_x)))
-        self.y_var.set(str(min(cfg.get('y', 400), max_y)))
-        self.icon_var.set(min(cfg.get('iconSize', 56), 64))
+        # Positions are stored as fractions; the fields display projected px at
+        # the current game resolution. Display-only — never written back here
+        # (a clamp writeback would silently corrupt the stored value).
+        game_w, game_h = get_game_resolution_or_default()
+        self.x_var.set(str(project_px(cfg.get('fx', 100 / 1920), game_w)))
+        self.y_var.set(str(project_px(cfg.get('fy', 400 / 1080), game_h)))
+        self.icon_var.set(cfg.get('iconSize', 56))
         self.gap_var.set(max(-5, min(cfg.get('gap', -1), 10)))
         self.timers_var.set(cfg.get('showTimers', True))
         self.stack_font_var.set(cfg.get('stackFontSize', 14))
@@ -359,7 +364,6 @@ class GridEditorPanel(ttk.Frame):
         self.grid_config['enabled'] = self.enabled_var.get()
         var_map = {
             'rows': self._rows_var, 'cols': self._cols_var,
-            'x': self.x_var, 'y': self.y_var,
             'iconSize': self.icon_var, 'gap': self.gap_var,
             'stackFontSize': self.stack_font_var,
             'timerFontSize': self.timer_font_var,
@@ -374,6 +378,15 @@ class GridEditorPanel(ttk.Frame):
                 # Validator allows transient '' / '-' mid-edit; fall back to current value.
                 v = self.grid_config.get(key, lo)
             self.grid_config[key] = max(lo, min(v, hi))
+        # Position fields carry projected px; unproject back to fractions at
+        # the current game resolution (typed overshoot clamps to the screen).
+        game_w, game_h = get_game_resolution_or_default()
+        for key, var, extent in (('fx', self.x_var, game_w), ('fy', self.y_var, game_h)):
+            try:
+                px = max(0, min(int(var.get()), extent))
+            except (ValueError, tk.TclError):
+                px = project_px(self.grid_config.get(key, 0.0), extent)
+            self.grid_config[key] = unproject_px(px, extent)
         self.grid_config['showTimers'] = self.timers_var.get()
         self.grid_config['enableFlashing'] = self.flashing_var.get()
         self.grid_config['fillDirection'] = _FILL_CODE_BY_LABEL.get(

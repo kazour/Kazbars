@@ -21,8 +21,6 @@ from .grid_model import (
     create_default_grid,
     dedupe_grid_ids,
     default_grid_name,
-    parse_resolution,
-    scale_grid_position,
     validate_grid,
 )
 from .settings_manager import get_setting
@@ -511,27 +509,6 @@ class GridsPanel(ttk.Frame):
         """Persist all panel UI values back to grid configs."""
         for panel in self.grid_panels:
             panel.save_to_config()
-
-    def scale_to_resolution(self, resolution_str, reference_resolution):
-        """Scale grid x/y from reference_resolution to the given game resolution
-        using anchor-based positioning (X center-anchored, Y bottom-anchored)
-        to match AoC's fixed-pixel HUD behavior. Returns True if applied."""
-        game_res = parse_resolution(resolution_str)
-        if not game_res or not reference_resolution or len(reference_resolution) != 2:
-            return False
-        ref_w, ref_h = reference_resolution
-        game_w, game_h = game_res
-        if (ref_w, ref_h) == (game_w, game_h):
-            return False
-        # Flush before scaling: we mutate x/y on the configs below and then
-        # rebuild, so unsaved card edits must be persisted first — and we scale
-        # the just-flushed x/y, not a stale last-saved value.
-        self.save_settings()
-        for grid in self.grids:
-            grid['x'], grid['y'] = scale_grid_position(
-                grid['x'], grid['y'], ref_w, ref_h, game_w, game_h)
-        self.refresh_panels()
-        return True
 
     def add_grid(self):
         """Open AddGridWizard dialog."""

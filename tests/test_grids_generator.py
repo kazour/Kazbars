@@ -27,8 +27,8 @@ def _minimal_grid():
         "cols": 1,
         "iconSize": 32,
         "gap": 0,
-        "x": 0,
-        "y": 0,
+        "fx": 0.0,
+        "fy": 0.0,
         "slotMode": "dynamic",
         "showTimers": False,
         "timerFontSize": 12,
@@ -71,6 +71,24 @@ def test_grid_id_with_quote_is_escaped_in_output():
     assert 'My\\"Grid' in combined
     # ...and the raw, literal-breaking form never appears.
     assert 'My"Grid' not in combined
+
+
+def test_positions_project_to_the_build_resolution():
+    grid = _minimal_grid()
+    grid["fx"], grid["fy"] = 0.5, 0.85
+    _, data_1080 = CodeGenerator(
+        [grid], _load_db(), "0.0.0", game_resolution=(1920, 1080)).generate()
+    assert "x: 960," in data_1080 and "y: 918," in data_1080
+    _, data_4k = CodeGenerator(
+        [grid], _load_db(), "0.0.0", game_resolution=(3840, 2160)).generate()
+    assert "x: 1920," in data_4k and "y: 1836," in data_4k
+
+
+def test_positions_default_resolution_when_none_given():
+    grid = _minimal_grid()
+    grid["fx"], grid["fy"] = 1.0, 1.0
+    _, data = CodeGenerator([grid], _load_db(), "0.0.0").generate()
+    assert "x: 1920," in data and "y: 1080," in data  # DEFAULT_GAME_RESOLUTION
 
 
 def test_grid_id_with_newline_does_not_inject():

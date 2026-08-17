@@ -9,7 +9,7 @@ from tkinter import filedialog, ttk
 
 from ttkbootstrap.dialogs import Messagebox
 
-from . import content_update, game_folder, profile_io
+from . import content_update, game_folder
 from .app_popups import show_welcome_popup
 from .grid_model import parse_resolution
 from .ui_headers import create_dialog_header
@@ -300,18 +300,14 @@ def run_first_launch(app, app_name):
         game_folder.refresh_game_path_label(app)
 
     def on_load_default(resolution_str):
+        # Positions are fractions, so the seeded profile fits the chosen
+        # resolution with no rescale — just persist the choice and count.
         _save_resolution(resolution_str)
-        doc = app.profile_store.document
-        authored = doc.get('authored_at')
-        scaled = tuple(authored or ()) != parse_resolution(resolution_str)
-        # Re-dispatch the seeded profile: apply_document rescales its grids to
-        # the just-saved resolution and re-bases authored_at.
-        profile_io.apply_document(app)
         grids = app.grids_panel.grids
         welcome_data['grid_count'] = len(grids)
         welcome_data['enabled_count'] = sum(1 for g in grids if g.get('enabled', True))
-        welcome_data['resolution'] = resolution_str if scaled else None
-        welcome_data['profile_name'] = doc['name']
+        welcome_data['resolution'] = None
+        welcome_data['profile_name'] = app.profile_store.document['name']
 
     def on_start_empty():
         # The user asked for a clean slate — empty the seeded profile's grids

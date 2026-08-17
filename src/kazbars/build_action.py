@@ -23,6 +23,7 @@ from .build_loading import BuildLoadingScreen
 from .build_utils import find_compiler
 from .cast_timer import is_enabled as cast_is_enabled
 from .cast_timer import validate_config as validate_cast_config
+from .grid_model import get_game_resolution_or_default
 from .grids_generator import MAX_TOTAL_SLOTS
 from .ui_helpers import THEME_COLORS
 from .ui_widgets import app_toast, confirm, flash_status_bar
@@ -163,6 +164,7 @@ def build(app):
         'stopwatch_config': app.settings.get('stopwatch'),
         'inspect_config': app.settings.get('inspect'),
         'panel_font_size': app.settings.get('panel_font_size'),
+        'game_resolution': get_game_resolution_or_default(),
         'game_path': app.game_path,
         'di_enabled': di_enabled,
         'di_settings': di_settings,
@@ -207,6 +209,7 @@ def _build_worker(app, loading, ctx):
             stopwatch_config=ctx['stopwatch_config'],
             inspect_config=ctx['inspect_config'],
             panel_font_size=ctx['panel_font_size'],
+            game_resolution=ctx['game_resolution'],
         )
         if not compile_result[0]:
             _hold_phase(started)

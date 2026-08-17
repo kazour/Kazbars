@@ -11,6 +11,11 @@ the preview control panel have no dialog of their own to host either.
 Persists machine-local in prefs.json under `inspect` (data layer:
 `inspect.py`); the build bakes the values into the generated SWF.
 Functions take the KazBarsApp instance as first arg.
+
+Layout follows the Damage Numbers panel conventions: tip bar under the header,
+a master gate row above titled cards, and the inspect panel's own controls
+greying with the gate. The shared text size and the console gate stay live —
+they are independent settings that only ride along on this dialog's Apply.
 """
 
 import tkinter as tk
@@ -18,25 +23,25 @@ from tkinter import ttk
 
 from .grid_model import SCREEN_MAX_X, SCREEN_MAX_Y
 from .inspect import validate_config
-from .ui_forms import labeled_spinbox
-from .ui_headers import create_dialog_header
+from .ui_forms import create_card, labeled_spinbox
+from .ui_headers import create_dialog_header, create_tip_bar
 from .ui_helpers import (
-    BTN_SMALL,
-    FONT_SECTION,
+    BTN_DIALOG,
     FONT_SMALL,
     MODULE_COLORS,
-    PAD_LF,
+    PAD_ROW,
     PAD_SMALL,
     PAD_TAB,
     PAD_XS,
     THEME_COLORS,
+    TK_COLORS,
 )
 from .ui_tk_style import apply_dark_titlebar
 from .ui_widgets import add_tooltip, app_toast
 from .window_position import bind_window_position_save, restore_window_position
 
-_WIDTH = 400
-_HEIGHT = 680
+_WIDTH = 470
+_HEIGHT = 640
 
 
 def open_inspect_dialog(app):
@@ -65,126 +70,162 @@ def open_inspect_dialog(app):
 
     create_dialog_header(dialog, "Inspect Panel",
                          MODULE_COLORS['grids'], width=_WIDTH)
+    create_tip_bar(dialog, "Your target's combat sheet, in-game. "
+                           "Apply, then Build & Install to see it.")
 
-    content = ttk.Frame(dialog)
-    content.pack(fill='both', expand=True, padx=PAD_TAB * 2, pady=(PAD_TAB, PAD_LF))
-
+    # Master gate row above the cards; the inspect panel's own controls grey
+    # when it's off (the shared size + console are independent and stay live).
     enabled_var = tk.BooleanVar(value=cfg['enabled'])
-    enable_cb = ttk.Checkbutton(content, text="Include the inspect panel in builds",
+    master = ttk.Frame(dialog)
+    master.pack(fill='x', padx=PAD_TAB, pady=(0, PAD_XS))
+    enable_cb = ttk.Checkbutton(master, text="Include the inspect panel in builds",
                                 variable=enabled_var)
-    enable_cb.pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
+    enable_cb.pack(side='left')
     add_tooltip(enable_cb,
                 "Adds a target inspect panel to the in-game overlay: target "
                 "something and see its combat sheet — armor, protections, "
-                "crit, critigation and more. Takes effect on the next "
-                "Build & Install.")
+                "crit, critigation and more.")
 
-    ttk.Label(content, text="Position",
-              font=FONT_SECTION, foreground=THEME_COLORS['heading']
-              ).pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
-    ttk.Label(content,
-              text="Where the panel first appears in-game. Drag its name strip\n"
-                   "to move it — the game remembers, across relogs and restarts.\n"
-                   "X/Y here only seed a first-ever session.",
-              font=FONT_SMALL, foreground=THEME_COLORS['muted'], justify='left'
-              ).pack(anchor='w', pady=(0, PAD_XS))
+    # Footer first so it reserves height before the cards claim the rest.
+    footer = ttk.Frame(dialog, padding=(PAD_TAB, PAD_XS))
+    footer.pack(fill='x', side='bottom')
+
+    content = ttk.Frame(dialog, padding=(PAD_TAB, 0))
+    content.pack(fill='both', expand=True)
+
+    # Everything registered here greys in step with the master gate — controls
+    # by ttk state, static text by foreground — so a disabled panel reads
+    # fully-off, not half-on (the Damage Numbers convention).
+    gated: list = []
+    dim_labels: list[tuple[ttk.Label, str]] = []
+    sink: list = []  # descriptor labels collected from gated labeled_spinbox rows
+
+    def _register_dim(*labels):
+        for lbl in labels:
+            dim_labels.append((lbl, str(lbl.cget('foreground'))))
+
+    pos_card = create_card(content, "Position")
+    pos_card.pack(fill='x', pady=(0, PAD_ROW))
+    pos_blurb = ttk.Label(
+        pos_card,
+        text="Where the panel first appears in-game. Drag its name strip\n"
+             "to move it — the game remembers, across relogs and restarts.\n"
+             "X/Y here only seed a first-ever session.",
+        font=FONT_SMALL, foreground=THEME_COLORS['muted'], justify='left')
+    pos_blurb.pack(anchor='w', pady=(0, PAD_XS))
+    _register_dim(pos_blurb)
 
     x_var = tk.IntVar(value=cfg['x'])
     y_var = tk.IntVar(value=cfg['y'])
-    pos_row = ttk.Frame(content)
-    pos_row.pack(anchor='w', pady=(0, PAD_SMALL))
-    labeled_spinbox(pos_row, "X ", x_var, from_=0, to=SCREEN_MAX_X,
-                    width=6, padx=(0, PAD_SMALL * 2))
-    labeled_spinbox(pos_row, "Y ", y_var, from_=0, to=SCREEN_MAX_Y, width=6)
+    pos_row = ttk.Frame(pos_card)
+    pos_row.pack(anchor='w')
+    gated.append(labeled_spinbox(pos_row, "X ", x_var, from_=0, to=SCREEN_MAX_X,
+                                 width=6, padx=(0, PAD_SMALL * 2), label_sink=sink))
+    gated.append(labeled_spinbox(pos_row, "Y ", y_var, from_=0, to=SCREEN_MAX_Y,
+                                 width=6, label_sink=sink))
 
-    ttk.Label(content, text="Text size",
-              font=FONT_SECTION, foreground=THEME_COLORS['heading']
-              ).pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
-    ttk.Label(content,
-              text="One size for all four in-game panels — stopwatch, inspect panel,\n"
-                   "buff console and control panel. It's set here because the last two\n"
-                   "have no dialog of their own.",
-              font=FONT_SMALL, foreground=THEME_COLORS['muted'], justify='left'
-              ).pack(anchor='w', pady=(0, PAD_XS))
+    size_card = create_card(content, "Text size")
+    size_card.pack(fill='x', pady=(0, PAD_ROW))
+    ttk.Label(
+        size_card,
+        text="One size for all four in-game panels — stopwatch, inspect panel,\n"
+             "buff console and control panel. It's set here because the last two\n"
+             "have no dialog of their own.",
+        font=FONT_SMALL, foreground=THEME_COLORS['muted'], justify='left'
+    ).pack(anchor='w', pady=(0, PAD_XS))
 
     shared_before = app.settings.get('panel_font_size')
     shared_var = tk.IntVar(value=shared_before)
-    shared_row = ttk.Frame(content)
+    shared_row = ttk.Frame(size_card)
     shared_row.pack(anchor='w', pady=(0, PAD_XS))
     shared_spin = labeled_spinbox(shared_row, "All panels ", shared_var,
                                   from_=8, to=48, width=6)
     add_tooltip(shared_spin,
                 "Each panel scales as one piece, collapsed bars included, so they "
-                "keep matching at any size. Takes effect on the next "
-                "Build & Install.")
+                "keep matching at any size.")
 
     # fontSize is None when the panel follows the shared size. The spinbox still
     # shows a number so unticking the box has somewhere to start from.
     follow_var = tk.BooleanVar(value=cfg['fontSize'] is None)
-    follow_cb = ttk.Checkbutton(content, text="Use the shared size for this panel",
+    follow_cb = ttk.Checkbutton(size_card, text="Use the shared size for this panel",
                                 variable=follow_var)
     follow_cb.pack(anchor='w', pady=(0, PAD_XS))
     add_tooltip(follow_cb,
                 "Untick to make the inspect panel bigger or smaller than the rest.")
+    gated.append(follow_cb)
 
     size_var = tk.IntVar(value=shared_before if cfg['fontSize'] is None else cfg['fontSize'])
-    size_row = ttk.Frame(content)
-    size_row.pack(anchor='w', pady=(0, PAD_SMALL))
+    size_row = ttk.Frame(size_card)
+    size_row.pack(anchor='w')
     size_spin = labeled_spinbox(size_row, "Inspect panel only ", size_var,
-                                from_=8, to=48, width=6)
+                                from_=8, to=48, width=6, label_sink=sink)
     add_tooltip(size_spin,
-                "This panel's own size, used instead of the shared one. "
-                "Takes effect on the next Build & Install.")
+                "This panel's own size, used instead of the shared one.")
 
     def _sync_size_override(*_):
-        size_spin.configure(state='disabled' if follow_var.get() else 'normal')
+        on = enabled_var.get() and not follow_var.get()
+        size_spin.configure(state='normal' if on else 'disabled')
 
     follow_var.trace_add('write', _sync_size_override)
-    _sync_size_override()
 
+    behavior_card = create_card(content, "Behavior")
+    behavior_card.pack(fill='x', pady=(0, PAD_ROW))
     collapsed_var = tk.BooleanVar(value=cfg['startCollapsed'])
-    collapsed_cb = ttk.Checkbutton(content, text="Start collapsed (name strip only)",
+    collapsed_cb = ttk.Checkbutton(behavior_card, text="Start collapsed (name strip only)",
                                    variable=collapsed_var)
-    collapsed_cb.pack(anchor='w', pady=(PAD_SMALL, PAD_SMALL))
+    collapsed_cb.pack(anchor='w')
     add_tooltip(collapsed_cb,
                 "The panel loads folded to just its name strip — click its "
                 "+ button in-game to expand.")
+    gated.append(collapsed_cb)
 
-    ttk.Label(content, text="Sections",
-              font=FONT_SECTION, foreground=THEME_COLORS['heading']
-              ).pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
+    sections_card = create_card(content, "Sections")
+    sections_card.pack(fill='x', pady=(0, PAD_ROW))
     pvp_var = tk.BooleanVar(value=cfg['showPvp'])
-    pvp_cb = ttk.Checkbutton(content, text="Show the PvP section",
+    pvp_cb = ttk.Checkbutton(sections_card, text="Show the PvP section",
                              variable=pvp_var)
     pvp_cb.pack(anchor='w', pady=(0, PAD_XS))
     add_tooltip(pvp_cb,
                 "PvP armor, protections, spell damage, combat rating and "
-                "kills / deaths — shown on player targets only. Takes "
-                "effect on the next Build & Install.")
+                "kills / deaths — shown on player targets only.")
+    gated.append(pvp_cb)
     perks_var = tk.BooleanVar(value=cfg['showPerks'])
-    perks_cb = ttk.Checkbutton(content, text="Track slotted perks",
+    perks_cb = ttk.Checkbutton(sections_card, text="Track slotted perks",
                                variable=perks_var)
-    perks_cb.pack(anchor='w', pady=(0, PAD_SMALL))
+    perks_cb.pack(anchor='w')
     add_tooltip(perks_cb,
                 "Adds a row of buff icons at the bottom of the panel showing "
                 "the AA perks detected on a player target — each player can "
-                "slot up to six. Takes effect on the next Build & Install.")
+                "slot up to six.")
+    gated.append(perks_cb)
 
-    ttk.Label(content, text="Console",
-              font=FONT_SECTION, foreground=THEME_COLORS['heading']
-              ).pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
+    console_card = create_card(content, "Console")
+    console_card.pack(fill='x', pady=(0, PAD_ROW))
     console_var = tk.BooleanVar(value=bool(app.settings.get('build_console', False)))
-    console_cb = ttk.Checkbutton(content, text="Include the buff-discovery console in builds",
+    console_cb = ttk.Checkbutton(console_card,
+                                 text="Include the buff-discovery console in builds",
                                  variable=console_var)
-    console_cb.pack(anchor='w', pady=(0, PAD_SMALL))
+    console_cb.pack(anchor='w')
     add_tooltip(console_cb,
                 "Adds an in-game window that logs every buff and debuff on you "
                 "and your target with its buff ID — the ID you need to track "
                 "something the database doesn't carry. Opens in preview mode "
-                "(Shift+Ctrl+Alt). Takes effect on the next Build & Install.")
+                "(Shift+Ctrl+Alt).")
 
-    btns = ttk.Frame(content)
-    btns.pack(fill='x', side='bottom', pady=(PAD_SMALL, 0))
+    _register_dim(*sink)
+
+    def _sync_enabled(*_):
+        on = enabled_var.get()
+        for widget in gated:
+            widget.configure(state='normal' if on else 'disabled')
+        for lbl, normal_fg in dim_labels:
+            lbl.configure(foreground=normal_fg if on else TK_COLORS['dim_text'])
+        # The follow gate re-applies on top of the master (as the exemplar's
+        # shadow gate), covering the size spinbox in both directions.
+        _sync_size_override()
+
+    enable_cb.configure(command=_sync_enabled)
+    _sync_enabled()
 
     def _read(var, default):
         # An emptied spinbox makes IntVar.get() raise before validate_config
@@ -227,11 +268,11 @@ def open_inspect_dialog(app):
             app_toast(app, "Console saved — Build & Install to apply", 'success')
         dialog.destroy()
 
-    ttk.Button(btns, text="Apply", bootstyle="success",
-               command=_apply, width=BTN_SMALL).pack(side='right')
-    ttk.Button(btns, text="Cancel", bootstyle="secondary",
-               command=dialog.destroy, width=BTN_SMALL
-               ).pack(side='right', padx=(0, PAD_XS))
+    ttk.Button(footer, text="Apply", bootstyle="success",
+               command=_apply, width=BTN_DIALOG).pack(side='right')
+    ttk.Button(footer, text="Cancel", bootstyle="secondary",
+               command=dialog.destroy, width=BTN_DIALOG
+               ).pack(side='right', padx=(0, PAD_SMALL))
 
     # withdraw → build → restore → deiconify, then keep the drag: the dialog
     # reopens where the user left it (clamped to a live monitor), like the

@@ -24,7 +24,7 @@ from .ui_helpers import (
     THEME_COLORS,
     TK_COLORS,
 )
-from .ui_widgets import add_tooltip
+from .ui_widgets import add_tooltip, blend_alpha
 
 
 def labeled_spinbox(
@@ -40,17 +40,23 @@ def labeled_spinbox(
     label_font=FONT_FORM_LABEL,
     label_color=None,
     padx=0,
+    label_sink=None,
 ):
     """Labeled spinbox with key-validation and focus-out clamp.
 
     `var` is a caller-owned StringVar or IntVar; the helper reads its type
     to drive the clamp. `on_change`, if given, fires on spinbox arrows AND
     after focus-out clamp. Returns the Spinbox so callers can bind extras.
+
+    `label_sink`, when given a list, receives the descriptor label so a caller
+    can grey it in step with the control (as `create_slider_row`).
     """
     lbl = ttk.Label(parent, text=label, font=label_font)
     if label_color:
         lbl.configure(foreground=label_color)
     lbl.pack(side="left")
+    if label_sink is not None:
+        label_sink.append(lbl)
 
     def _validate(value):
         if value in ("", "-"):
@@ -241,6 +247,7 @@ class ColorSwatch(tk.Canvas):
         self._color_var = color_var
         self._on_change = on_change
         self._color = initial_color
+        self._enabled = True
 
         self.bind("<Enter>", lambda e: self._draw(self._border_hover))
         self.bind("<Leave>", lambda e: self._draw(self._border_idle))
@@ -258,6 +265,13 @@ class ColorSwatch(tk.Canvas):
     def set_color(self, hex_color):
         """Programmatically update the displayed color."""
         self._color = self._normalize(hex_color)
+        self._draw(self._border_idle)
+
+    def set_enabled(self, enabled):
+        """Grey the swatch and ignore clicks while disabled — the fill dims
+        toward the panel bg so the staged color reads as off, not live."""
+        self._enabled = bool(enabled)
+        self.configure(cursor="hand2" if self._enabled else "")
         self._draw(self._border_idle)
 
     def _sync_from_var(self):
@@ -278,6 +292,12 @@ class ColorSwatch(tk.Canvas):
 
     def _draw(self, border_color):
         self.delete("all")
+        if not self._enabled:
+            border_color = self._border_idle
+        fill = (
+            self._color if self._enabled
+            else blend_alpha(self._color, TK_COLORS["bg"], 35)
+        )
         create_rounded_rect(
             self,
             1,
@@ -285,11 +305,13 @@ class ColorSwatch(tk.Canvas):
             self.WIDTH - 1,
             self.HEIGHT - 1,
             self.RADIUS,
-            fill=self._color,
+            fill=fill,
             outline=border_color,
         )
 
     def _on_click(self, event):
+        if not self._enabled:
+            return
         from ttkbootstrap.dialogs import ColorChooserDialog
 
         cd = ColorChooserDialog(initialcolor=self._color, title="Timer Color")

@@ -10,6 +10,11 @@ Functions take the KazBarsApp instance as first arg.
 Font is fixed to Arial — the only face embedded in base.swf (see cast_timer.py) —
 so the dialog offers Bold rather than a family picker, and the sample preview
 draws in Arial to match what the overlay will render.
+
+Layout follows the Damage Numbers panel conventions: tip bar under the header,
+a master gate row above titled cards, and every control + static label greying
+with the gate (the preview sample dims too) so a disabled dialog reads
+fully-off, not half-on.
 """
 
 import tkinter as tk
@@ -18,15 +23,15 @@ from tkinter import ttk
 
 from .cast_timer import validate_config
 from .grid_model import SCREEN_MAX_X, SCREEN_MAX_Y
-from .ui_forms import ColorSwatch, labeled_spinbox
-from .ui_headers import create_dialog_header
+from .ui_forms import ColorSwatch, create_card, labeled_spinbox
+from .ui_headers import create_dialog_header, create_tip_bar
 from .ui_helpers import (
-    BTN_SMALL,
+    BTN_DIALOG,
     CAST_TIMER_ACCENT,
-    FONT_SECTION,
+    FONT_BODY,
     FONT_SMALL,
     GRID_PREVIEW_PX,
-    PAD_LF,
+    PAD_ROW,
     PAD_SMALL,
     PAD_TAB,
     PAD_XS,
@@ -37,13 +42,17 @@ from .ui_tk_style import apply_dark_titlebar
 from .ui_widgets import add_tooltip, app_toast
 from .window_position import bind_window_position_save, restore_window_position
 
-_WIDTH = 400
-_HEIGHT = 560
+_WIDTH = 470
+_HEIGHT = 450
 
 _DISPLAY_LABELS = (("Elapsed", "elapsed"), ("Total", "total"), ("Both", "both"))
 _DISPLAY_TO_LABEL = {v: k for k, v in _DISPLAY_LABELS}
 _LABEL_TO_DISPLAY = dict(_DISPLAY_LABELS)
 _SAMPLES = {"elapsed": "1.2", "total": "2.5", "both": "1.2 / 2.5"}
+
+# Fixed width (chars) of the Player/Target row descriptors so both position
+# rows start their spinboxes at the same x.
+_POS_LABEL_W = 7
 
 
 def open_cast_timer_dialog(app):
@@ -71,47 +80,74 @@ def open_cast_timer_dialog(app):
     dialog.grab_set()
 
     create_dialog_header(dialog, "Cast Timer", CAST_TIMER_ACCENT, width=_WIDTH)
+    create_tip_bar(dialog, "A cast-time readout for you and your target. "
+                           "Apply, then Build & Install to see it.")
 
-    content = ttk.Frame(dialog)
-    content.pack(fill='both', expand=True, padx=PAD_TAB * 2, pady=(PAD_TAB, PAD_LF))
-
+    # Master gate row above the cards; everything below greys when it's off.
     enabled_var = tk.BooleanVar(value=cfg['enabled'])
-    enable_cb = ttk.Checkbutton(content, text="Include the cast timer in builds",
+    master = ttk.Frame(dialog)
+    master.pack(fill='x', padx=PAD_TAB, pady=(0, PAD_XS))
+    enable_cb = ttk.Checkbutton(master, text="Include the cast timer in builds",
                                 variable=enabled_var)
-    enable_cb.pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
+    enable_cb.pack(side='left')
     add_tooltip(enable_cb,
                 "Adds a cast-time readout for you and your target to the in-game "
-                "overlay. Takes effect on the next Build & Install.")
+                "overlay.")
 
-    ttk.Label(content,
-              text="Where each timer first appears in-game. Shift+Ctrl+Alt\n"
-                   "toggles preview mode: drag a timer and the game remembers.\n"
-                   "X/Y here only seed a first-ever session.",
-              font=FONT_SMALL, foreground=THEME_COLORS['muted'], justify='left'
-              ).pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
+    # Footer first so it reserves height before the cards claim the rest.
+    footer = ttk.Frame(dialog, padding=(PAD_TAB, PAD_XS))
+    footer.pack(fill='x', side='bottom')
+
+    content = ttk.Frame(dialog, padding=(PAD_TAB, 0))
+    content.pack(fill='both', expand=True)
+
+    # Everything registered here greys in step with the master gate — controls
+    # by ttk state, static text by foreground — so a disabled dialog reads
+    # fully-off, not half-on (the Damage Numbers convention).
+    gated: list = []
+    dim_labels: list[tuple[ttk.Label, str]] = []
+    sink: list = []  # descriptor labels collected from labeled_spinbox rows
+
+    def _register_dim(*labels):
+        for lbl in labels:
+            dim_labels.append((lbl, str(lbl.cget('foreground'))))
+
+    pos_card = create_card(content, "Position")
+    pos_card.pack(fill='x', pady=(0, PAD_ROW))
+    pos_blurb = ttk.Label(
+        pos_card,
+        text="Where each timer first appears in-game. Shift+Ctrl+Alt\n"
+             "toggles preview mode: drag a timer and the game remembers.\n"
+             "X/Y here only seed a first-ever session.",
+        font=FONT_SMALL, foreground=THEME_COLORS['muted'], justify='left')
+    pos_blurb.pack(anchor='w', pady=(0, PAD_XS))
+    _register_dim(pos_blurb)
 
     px_var = tk.IntVar(value=cfg['playerX'])
     py_var = tk.IntVar(value=cfg['playerY'])
     tx_var = tk.IntVar(value=cfg['targetX'])
     ty_var = tk.IntVar(value=cfg['targetY'])
-    for title, x_var, y_var in (("Player position", px_var, py_var),
-                                ("Target position", tx_var, ty_var)):
-        ttk.Label(content, text=title,
-                  font=FONT_SECTION, foreground=THEME_COLORS['heading']
-                  ).pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
-        row = ttk.Frame(content)
-        row.pack(anchor='w', pady=(0, PAD_SMALL))
-        labeled_spinbox(row, "X ", x_var, from_=0, to=SCREEN_MAX_X,
-                        width=6, padx=(0, PAD_SMALL * 2))
-        labeled_spinbox(row, "Y ", y_var, from_=0, to=SCREEN_MAX_Y, width=6)
+    for title, x_var, y_var in (("Player", px_var, py_var),
+                                ("Target", tx_var, ty_var)):
+        row = ttk.Frame(pos_card)
+        row.pack(anchor='w', pady=(0, PAD_XS))
+        row_lbl = ttk.Label(row, text=title, font=FONT_BODY,
+                            foreground=THEME_COLORS['body'],
+                            width=_POS_LABEL_W, anchor='w')
+        row_lbl.pack(side='left')
+        sink.append(row_lbl)
+        gated.append(labeled_spinbox(row, "X ", x_var, from_=0, to=SCREEN_MAX_X,
+                                     width=6, padx=(0, PAD_SMALL * 2),
+                                     label_sink=sink))
+        gated.append(labeled_spinbox(row, "Y ", y_var, from_=0, to=SCREEN_MAX_Y,
+                                     width=6, label_sink=sink))
 
-    ttk.Label(content, text="Text",
-              font=FONT_SECTION, foreground=THEME_COLORS['heading']
-              ).pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
+    text_card = create_card(content, "Text")
+    text_card.pack(fill='x', pady=(0, PAD_ROW))
 
     # Style controls on the left, a live sample of what they produce on the right.
-    text_row = ttk.Frame(content)
-    text_row.pack(fill='x', pady=(0, PAD_SMALL))
+    text_row = ttk.Frame(text_card)
+    text_row.pack(fill='x')
     style_col = ttk.Frame(text_row)
     style_col.pack(side='left', fill='x', expand=True)
     preview = tk.Canvas(text_row, width=GRID_PREVIEW_PX, height=GRID_PREVIEW_PX,
@@ -126,7 +162,8 @@ def open_cast_timer_dialog(app):
     def _redraw_preview(*_args):
         """Draw the timer text as the overlay will render it — Arial, chosen
         colour/size/weight — shrinking to fit the square so a 48px sample still
-        reads as one line."""
+        reads as one line. Dims with the master gate so the sample never looks
+        live on a disabled dialog."""
         preview.delete("sample")
         sample = _SAMPLES.get(_LABEL_TO_DISPLAY.get(display_var.get(), "both"), "1.2 / 2.5")
         try:
@@ -138,21 +175,27 @@ def open_cast_timer_dialog(app):
         while size > 7 and font.measure(sample) > GRID_PREVIEW_PX - 8:
             size -= 1
             font.configure(size=size)
+        fill = f"#{color[0]}" if enabled_var.get() else TK_COLORS['dim_text']
         preview.create_text(GRID_PREVIEW_PX // 2, GRID_PREVIEW_PX // 2, text=sample,
-                            fill=f"#{color[0]}", font=font, anchor="center", tags="sample")
+                            fill=fill, font=font, anchor="center", tags="sample")
 
-    ttk.Checkbutton(style_col, text="Bold", variable=bold_var,
-                    command=_redraw_preview).pack(anchor='w', pady=(0, PAD_XS))
+    bold_cb = ttk.Checkbutton(style_col, text="Bold", variable=bold_var,
+                              command=_redraw_preview)
+    bold_cb.pack(anchor='w', pady=(0, PAD_XS))
+    gated.append(bold_cb)
 
     size_row = ttk.Frame(style_col)
     size_row.pack(anchor='w', pady=(0, PAD_XS))
-    labeled_spinbox(size_row, "Font size ", size_var, from_=8, to=48, width=6,
-                    tooltip="Timer text size in pixels, baked in at build time.",
-                    on_change=_redraw_preview)
+    gated.append(labeled_spinbox(
+        size_row, "Font size ", size_var, from_=8, to=48, width=6,
+        tooltip="Timer text size in pixels.",
+        on_change=_redraw_preview, label_sink=sink))
 
     show_row = ttk.Frame(style_col)
     show_row.pack(anchor='w', pady=(0, PAD_XS))
-    ttk.Label(show_row, text="Show ", font=FONT_SMALL).pack(side='left')
+    show_lbl = ttk.Label(show_row, text="Show ", font=FONT_SMALL)
+    show_lbl.pack(side='left')
+    sink.append(show_lbl)
     show_cb = ttk.Combobox(show_row, textvariable=display_var,
                            values=[lbl for lbl, _ in _DISPLAY_LABELS],
                            state="readonly", width=8)
@@ -164,7 +207,9 @@ def open_cast_timer_dialog(app):
 
     color_row = ttk.Frame(style_col)
     color_row.pack(anchor='w')
-    ttk.Label(color_row, text="Color ", font=FONT_SMALL).pack(side='left')
+    color_lbl = ttk.Label(color_row, text="Color ", font=FONT_SMALL)
+    color_lbl.pack(side='left')
+    sink.append(color_lbl)
 
     def _on_color(hex_str):
         color[0] = hex_str.lstrip("#").upper()
@@ -174,10 +219,22 @@ def open_cast_timer_dialog(app):
     swatch.pack(side='left')
     add_tooltip(swatch, "Timer text color — the player and target timers share it.")
 
-    _redraw_preview()
+    _register_dim(*sink)
 
-    btns = ttk.Frame(content)
-    btns.pack(fill='x', side='bottom', pady=(PAD_SMALL, 0))
+    def _sync_enabled(*_):
+        on = enabled_var.get()
+        for widget in gated:
+            widget.configure(state='normal' if on else 'disabled')
+        # The combobox's live state is readonly, not normal — normal would
+        # make it editable.
+        show_cb.configure(state='readonly' if on else 'disabled')
+        swatch.set_enabled(on)
+        for lbl, normal_fg in dim_labels:
+            lbl.configure(foreground=normal_fg if on else TK_COLORS['dim_text'])
+        _redraw_preview()
+
+    enable_cb.configure(command=_sync_enabled)
+    _sync_enabled()
 
     def _read(var, default):
         # An emptied spinbox makes IntVar.get() raise before validate_config
@@ -213,11 +270,11 @@ def open_cast_timer_dialog(app):
             app_toast(app, "Cast timer off — next build removes it", 'info')
         dialog.destroy()
 
-    ttk.Button(btns, text="Apply", bootstyle="success",
-               command=_apply, width=BTN_SMALL).pack(side='right')
-    ttk.Button(btns, text="Cancel", bootstyle="secondary",
-               command=dialog.destroy, width=BTN_SMALL
-               ).pack(side='right', padx=(0, PAD_XS))
+    ttk.Button(footer, text="Apply", bootstyle="success",
+               command=_apply, width=BTN_DIALOG).pack(side='right')
+    ttk.Button(footer, text="Cancel", bootstyle="secondary",
+               command=dialog.destroy, width=BTN_DIALOG
+               ).pack(side='right', padx=(0, PAD_SMALL))
 
     # withdraw → build → restore → deiconify, then keep the drag: the dialog
     # reopens where the user left it (clamped to a live monitor), like its two

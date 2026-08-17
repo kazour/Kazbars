@@ -145,8 +145,7 @@ DEEPS_RANGES: dict[str, dict[str, Any]] = {
     # Overlay bg opacity — 0.0 fully transparent, 1.0 solid.
     "overlay_bg_opacity": {"min": 0.0, "max": 1.0, "kind": "float"},
 
-    # Overlay position: 8K-safe sanity caps (same approach as
-    # grids_panel.scale_to_resolution).
+    # Overlay position: 8K-safe sanity caps (grid_model.SCREEN_MAX_X/Y).
     "overlay_x": {"min": 0, "max": 7680, "kind": "int"},
     "overlay_y": {"min": 0, "max": 4320, "kind": "int"},
 }

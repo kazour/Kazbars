@@ -12,7 +12,7 @@ from pathlib import Path
 from .build_utils import compile_as2, resolve_assets_path
 from .cast_timer import is_enabled as cast_is_enabled
 from .cast_timer import validate_config as validate_cast_config
-from .grid_model import MAX_TOTAL_SLOTS
+from .grid_model import DEFAULT_GAME_RESOLUTION, MAX_TOTAL_SLOTS, project_px
 from .inspect import validate_config as validate_inspect_config
 from .prefs import validate_panel_font_size
 from .stopwatch import validate_config as validate_stopwatch_config
@@ -87,6 +87,7 @@ class CodeGenerator:
         stopwatch_config=None,
         inspect_config=None,
         panel_font_size=None,
+        game_resolution=None,
     ):
         """Initialize the code generator with grid configs and the buff database."""
         # Filter out disabled grids
@@ -96,6 +97,11 @@ class CodeGenerator:
         self._assets_path = assets_path
         self._stack_labels = {}
         self.include_console = include_console
+        # Grid positions are stored as fractions; bake-time is the projection
+        # boundary — the emitted AS2 carries px at this resolution.
+        game_w, game_h = game_resolution or DEFAULT_GAME_RESOLUTION
+        self.game_w = int(game_w)
+        self.game_h = int(game_h)
         # Cast-timer overlay: validated config + build gate. include_cast_timer is
         # False unless the player or target timer is enabled, so the SWF carries no
         # cast-timer code when the feature is off (mirrors include_console).
@@ -473,8 +479,8 @@ class CodeGenerator:
             cols: {grid["cols"]},
             iconSize: {grid["iconSize"]},
             gap: {grid["gap"]},
-            x: {grid["x"]},
-            y: {grid["y"]},
+            x: {project_px(grid["fx"], self.game_w)},
+            y: {project_px(grid["fy"], self.game_h)},
             slotMode: "{grid["slotMode"]}",
             fillDir: "{grid["fillDirection"]}",
             sortOrder: "{grid["sortOrder"]}",
@@ -662,6 +668,7 @@ def build_grids(
     stopwatch_config: dict | None = None,
     inspect_config: dict | None = None,
     panel_font_size: int | None = None,
+    game_resolution: tuple[int, int] | None = None,
 ) -> tuple[bool, str]:
     """
     Complete build process for KazBars.swf.
@@ -701,6 +708,7 @@ def build_grids(
             stopwatch_config=stopwatch_config,
             inspect_config=inspect_config,
             panel_font_size=panel_font_size,
+            game_resolution=game_resolution,
         )
         main_code, data_code = generator.generate()
 
