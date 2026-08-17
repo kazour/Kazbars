@@ -190,3 +190,19 @@ def scale_grid_position(x, y, ref_w, ref_h, game_w, game_h):
         max(0, min(round(x + ANCHOR_COEFF_X * dw), SCREEN_MAX_X)),
         max(0, min(round(y + ANCHOR_COEFF_Y * dh), SCREEN_MAX_Y)),
     )
+
+
+def unproject_px(px, extent):
+    """One pixel coordinate → fraction of `extent`, clamped to [0.0, 1.0].
+    Full float precision — the fraction model rounds only in `project_px`,
+    so repeated round-trips can't drift. Non-positive `extent` → 0.0."""
+    if extent <= 0:
+        return 0.0
+    return max(0.0, min(float(px) / extent, 1.0))
+
+
+def project_px(fraction, extent):
+    """One stored fraction → integer pixel at `extent`, rounded and clamped to
+    [0, extent] — the fraction model's single rounding point. For px already in
+    [0, extent], px → unproject_px → project_px returns px exactly."""
+    return max(0, min(round(float(fraction) * extent), extent))

@@ -50,7 +50,7 @@
 | `src/kazbars/game_resolution.py` | 105 |
 | `src/kazbars/grid_dialogs.py` | 865 |
 | `src/kazbars/grid_editor_panel.py` | 635 |
-| `src/kazbars/grid_model.py` | 192 |
+| `src/kazbars/grid_model.py` | 208 |
 | `src/kazbars/grids_generator.py` | 747 |
 | `src/kazbars/grids_panel.py` | 674 |
 | `src/kazbars/inspect.py` | 56 |
@@ -65,7 +65,7 @@
 | `src/kazbars/profile_manager.py` | 323 |
 | `src/kazbars/profile_share.py` | 137 |
 | `src/kazbars/settings_backup.py` | 465 |
-| `src/kazbars/settings_core.py` | 280 |
+| `src/kazbars/settings_core.py` | 298 |
 | `src/kazbars/settings_manager.py` | 56 |
 | `src/kazbars/stopwatch.py` | 54 |
 | `src/kazbars/stopwatch_panel.py` | 189 |
@@ -107,7 +107,7 @@
 | `tests/test_foreground.py` | 95 |
 | `tests/test_game_folder.py` | 93 |
 | `tests/test_game_persistence.py` | 723 |
-| `tests/test_grid_model.py` | 79 |
+| `tests/test_grid_model.py` | 127 |
 | `tests/test_grids_generator.py` | 507 |
 | `tests/test_hud_overlay.py` | 141 |
 | `tests/test_imports.py` | 33 |
@@ -124,7 +124,7 @@
 | `tests/test_profile_share.py` | 152 |
 | `tests/test_resolution_scaling.py` | 71 |
 | `tests/test_settings_backup.py` | 159 |
-| `tests/test_settings_core.py` | 343 |
+| `tests/test_settings_core.py` | 373 |
 | `tests/test_settings_manager.py` | 33 |
 | `tests/test_stopwatch.py` | 70 |
 | `tests/test_subprocess_flags.py` | 50 |

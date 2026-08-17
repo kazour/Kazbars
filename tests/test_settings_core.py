@@ -135,6 +135,36 @@ class TestValidateAll:
 
 
 # --------------------------------------------------------------------------- #
+# validate_patch (sparse: coerce present keys only, no fill-missing)
+# --------------------------------------------------------------------------- #
+
+class TestValidatePatch:
+    def test_absent_keys_stay_absent(self):
+        s = _schema()
+        out = settings_core.validate_patch(s, {"count": 42})
+        assert out == {"count": 42}
+
+    def test_present_keys_coerced_and_clamped(self):
+        s = _schema()
+        out = settings_core.validate_patch(s, {"count": 999, "mode": "z"})
+        assert out == {"count": 100, "mode": "a"}
+
+    def test_unknown_keys_dropped(self):
+        s = _schema()
+        assert settings_core.validate_patch(s, {"bogus": 1}) == {}
+
+    def test_non_dict_is_empty(self):
+        s = _schema()
+        assert settings_core.validate_patch(s, None) == {}
+        assert settings_core.validate_patch(s, [1, 2]) == {}
+
+    def test_empty_dict_is_empty(self):
+        # The "no overrides" state round-trips as {} — never inflated to defaults.
+        s = _schema()
+        assert settings_core.validate_patch(s, {}) == {}
+
+
+# --------------------------------------------------------------------------- #
 # nullable_int — "no opinion" stored distinctly from a number
 # --------------------------------------------------------------------------- #
 
