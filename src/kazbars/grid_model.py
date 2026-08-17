@@ -3,6 +3,12 @@ KazBars — Grid Model
 Constants, validation specs, and default grid configuration.
 """
 
+import copy
+
+from .profile_document import LANE_BUILD
+from .profile_document import SectionSpec as ProfileSectionSpec
+from .settings_core import Field, Schema
+
 # ============================================================================
 # CONSTANTS
 # ============================================================================
@@ -206,3 +212,24 @@ def project_px(fraction, extent):
     [0, extent] — the fraction model's single rounding point. For px already in
     [0, extent], px → unproject_px → project_px returns px exactly."""
     return max(0, min(round(float(fraction) * extent), extent))
+
+
+def _validate_grids_list(value):
+    """Section validator: each entry through `validate_grid`, non-dicts dropped,
+    duplicate ids renamed. Buff refs are NOT resolved here — the whitelist
+    passes through untouched (unresolved refs are preserved, not stripped);
+    DB-aware normalization happens in grids_panel at apply time."""
+    if not isinstance(value, list):
+        return []
+    grids = [validate_grid(copy.deepcopy(g)) for g in value if isinstance(g, dict)]
+    dedupe_grid_ids(grids)
+    return grids
+
+
+# The grid editor's slice of the profile document: `{'grids': [...]}`.
+# Registered by app.py at startup.
+PROFILE_SECTION = ProfileSectionSpec(
+    'grids',
+    Schema('', 1, {'grids': Field([], validate=_validate_grids_list)}),
+    LANE_BUILD,
+)

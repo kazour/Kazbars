@@ -1,181 +1,114 @@
 """
 KazBars — Profile I/O.
 
-Load, save, create, and open profile JSON files. Functions take the
-KazBarsApp instance as first arg and mutate its state (grids_panel,
-current_profile, modified, reference_resolution, settings, title). Kept out
-of app.py so the entry point file only carries root-window concerns.
+The app-facing satellite over `profile_library` (disk) and `profile_store`
+(runtime document + autosave). Functions take the KazBarsApp instance as
+first arg. There is no Save/Open/dirty machinery: the store autosaves, the
+library owns files, and the only pointers are the in-document id and the
+`active_profile` pref.
 
-Load is split into a pure read step (`read_profile_file`) and a dispatch
-step (`apply_profile_data`) so the boss-timer fan-out is visible at every
-call site. Save retains `do_save_profile` as orchestrator (error-handling
-boilerplate makes caller composition awkward); its body is factored into
-`build_profile_payload` / `write_profile_file` / `_commit_saved_profile`,
-and `build_profile_payload` names the boss-timer pull explicitly.
+`apply_document` is the dispatch step (grids panel, boss timer, authored_at
+rescale, pointer, title, File menu). It must run before `app.deiconify()`
+at startup so `warn_missing_buffs` correctly defers via `app.after()` while
+the main window is withdrawn.
 """
 
-import json
+import copy
 import logging
-from pathlib import Path
-from tkinter import filedialog
+import os
 
-from ttkbootstrap.dialogs import Messagebox
+from ttkbootstrap.dialogs import Messagebox, MessageDialog, Querybox
 
 from .grid_model import get_game_resolution_or_default
-from .settings_manager import safe_save_json
-from .ui_widgets import app_toast, flash_status_bar
+from .profile_store import ProfileStore
+from .ui_widgets import app_toast
 from .userdata import content_dir
 
 logger = logging.getLogger(__name__)
 
-# Profile-format version for the migration ladder — a separate integer from the
-# app-semver `version` field (which is stamped for display only and can't drive
-# a numeric ladder). The ladder ships empty (clean start); machinery is live for
-# the first post-publish profile-format bump.
-PROFILE_SCHEMA_VERSION = 1
 
-
-def _migrate_profile(data):
-    """Run the profile migration ladder keyed off the integer `profile_schema`.
-    Empty now — returns `data` unchanged; future format bumps add rungs here."""
-    return data
-
-
-def resolve_default_profile_path(app):
-    """The 'load default' / first-launch target: the user's set `default_profile`
-    when it exists, else the OTA-updated `content/Default.json`, else the shipped
-    stock `assets/kazbars/Default.json`."""
-    pref = app.settings.get('default_profile')
-    if pref and Path(pref).exists():
-        return Path(pref)
-    ota_default = content_dir() / "Default.json"
-    if ota_default.exists():
-        return ota_default
-    return app.assets_path / "kazbars" / "Default.json"
-
-
-def _shipped_default_paths(app):
-    """The shipped-template Default.json paths (stock + OTA) — loading one of
-    these forces Save As so a save can't overwrite the template/OTA cache."""
-    return {
-        (app.assets_path / "kazbars" / "Default.json").resolve(),
-        (content_dir() / "Default.json").resolve(),
-    }
-
-
-def set_default_profile(app, path):
-    """Mark `path` as the user's default profile (Profile Manager 'Set default').
-    Does not change which profile reopens on relaunch (that's `last_profile`)."""
-    app.settings.set('default_profile', str(path))
-    app.settings.save()
-
-
-def new_profile(app):
-    """Start a new empty profile."""
-    if not app._check_unsaved_changes():
-        return
-    app.grids_panel.load_profile_data([])
-    app.current_profile = None
-    app.reference_resolution = None
-    app.modified = False
-    app._update_title()
-
-
-def open_profile(app):
-    """Open a profile from file."""
-    if not app._check_unsaved_changes():
-        return
-    path = filedialog.askopenfilename(
-        title="Open Profile",
-        initialdir=str(app.profiles_path),
-        filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+def template_paths(app):
+    """The template chain, best first: OTA content (once it ships the new
+    format — old-format entries fail the gate and fall through), the interim
+    new-format template, the shipped stock Default.json (old format until the
+    release-day flip, so it currently falls through too)."""
+    return (
+        content_dir() / 'Default.json',
+        app.assets_path / 'kazbars' / 'templates' / 'Default.json',
+        app.assets_path / 'kazbars' / 'Default.json',
     )
-    if path:
-        data, corrupt = read_profile_file(Path(path))
-        apply_profile_data(app, Path(path), data, corrupt=corrupt)
 
 
-def load_default_profile(app):
-    """Load the default profile: the user's set `default_profile` if present,
-    else the OTA-updated `Default.json`, else the shipped stock."""
-    if not app._check_unsaved_changes():
-        return
-    default_path = resolve_default_profile_path(app)
-    if not default_path.exists():
-        Messagebox.show_warning("Default profile not found.", title="Default Profile Missing")
-        return
-    data, corrupt = read_profile_file(default_path)
-    apply_profile_data(app, default_path, data, corrupt=corrupt)
+def make_store(app, doc):
+    """A ProfileStore wired to this app: library writer, Tk scheduler, session
+    snapshot hook."""
+    return ProfileStore(
+        doc,
+        writer=app.library.write,
+        schedule=lambda ms, fn: app.after(ms, fn),
+        cancel=app.after_cancel,
+        write_bak=app.library.write_session_bak,
+    )
 
 
-def read_profile_file(path):
-    """Pure I/O: parse a profile JSON file. Returns `(data, is_corrupt)`.
-    On any decode/IO error or non-dict root, returns `({}, True)`."""
-    try:
-        raw = json.loads(Path(path).read_text(encoding='utf-8'))
-        if isinstance(raw, dict):
-            return raw, False
-        return {}, True
-    except (json.JSONDecodeError, UnicodeDecodeError, OSError):
-        return {}, True
+def startup_profile(app):
+    """Resolve and open the startup profile: seed the library if empty, then
+    `active_profile` pref → newest file → (already-guaranteed) seed."""
+    app.library.ensure_nonempty(get_game_resolution_or_default())
+    doc = None
+    active = app.settings.get('active_profile')
+    if active:
+        held = app.library.load(active)
+        if held:
+            doc = held[1]
+    if doc is None:
+        entries = app.library.list_profiles()
+        doc = max(entries, key=lambda e: e[0].stat().st_mtime)[1]
+    app.profile_store = make_store(app, doc)
+    apply_document(app)
 
 
-def apply_profile_data(app, path, data, *, corrupt=False):
-    """Dispatch parsed profile data into app state.
+def apply_document(app):
+    """Dispatch the store's document into the running app.
 
-    Side effects: grids panel, missing-buff warning, **live BossTimer
-    (if open)**, `reference_resolution`, `current_profile`, `modified`,
-    `last_profile` setting, window title.
-
-    Must run before `app.deiconify()` at startup so `warn_missing_buffs`
-    correctly defers via `app.after()` while the main window is withdrawn.
+    Side effects: grids panel (missing-ref warning), live BossTimer (if open),
+    authored_at rescale (persisted via the store), `active_profile` pref,
+    window title, File menu profile rows.
     """
-    if corrupt:
-        Messagebox.show_warning(
-            f"Profile appears corrupt — starting with empty grids.\n\n{Path(path).name}",
-            title="Profile Warning"
-        )
-
-    data = _migrate_profile(data)
-
-    # Don't anchor saves to a shipped Default.json (stock or OTA): a subsequent
-    # Save would overwrite the template / OTA cache. Force Save As instead.
-    profile_key = None if Path(path).resolve() in _shipped_default_paths(app) else str(path)
-
-    grids = data.get('grids', [])
+    store = app.profile_store
+    grids = copy.deepcopy(store.get_section('grids').get('grids', []))
     missing_by_grid = app.grids_panel.load_profile_data(grids)
     if missing_by_grid:
         warn_missing_buffs(app, missing_by_grid)
 
     if bt := app._boss_timer_if_alive():
-        bt.load_profile_data(data.get('boss_timer', {}))
-
-    ref = data.get('reference_resolution')
-    app.reference_resolution = list(ref) if isinstance(ref, list) and len(ref) == 2 else None
+        bt.load_profile_data(store.get_section('boss_timer'))
 
     game_w, game_h = get_game_resolution_or_default()
-    if app.reference_resolution and tuple(app.reference_resolution) != (game_w, game_h):
-        app.grids_panel.scale_to_resolution(f"{game_w}x{game_h}", app.reference_resolution)
-        app.reference_resolution = [game_w, game_h]
+    authored = store.document.get('authored_at')
+    if authored and tuple(authored) != (game_w, game_h):
+        app.grids_panel.scale_to_resolution(f'{game_w}x{game_h}', list(authored))
+        store.set_section('grids', {'grids': copy.deepcopy(app.grids_panel.get_profile_data())})
+        store.set_authored_at((game_w, game_h))
 
-    app.current_profile = profile_key
-    app.modified = False
-    app.settings.set('last_profile', str(path))
+    app.settings.set('active_profile', store.document['id'])
     app.settings.save()
     app._update_title()
+    app._refresh_file_menu()
 
 
 def warn_missing_buffs(app, missing_by_grid):
     """Show the missing-buff warning, deferring if the main window isn't viewable yet."""
-    lines = [f"• {name}: {', '.join(refs)}" for name, refs in missing_by_grid.items()]
+    lines = [f"• {name}: {', '.join(str(r) for r in refs)}" for name, refs in missing_by_grid.items()]
     message = (
-        "Some tracked buffs weren't found in the database and were removed:\n\n"
+        "Some tracked buffs weren't found in the database:\n\n"
         + "\n".join(lines) +
-        "\n\nRe-add them via Tracked Buffs or Slot Assignments if needed."
+        "\n\nThey stay in this profile but are skipped at build until the "
+        "buff exists again (a database update can bring them back)."
     )
     def _show():
         Messagebox.show_warning(message, title="Missing Buff References")
-    # During startup apply_profile_data runs while the main window is still
+    # During startup apply_document runs while the main window is still
     # withdrawn; show sync otherwise so the dialog blocks further code
     # (e.g. first-launch welcome popup) instead of stacking on top of it.
     if app.winfo_viewable():
@@ -184,83 +117,96 @@ def warn_missing_buffs(app, missing_by_grid):
         app.after(200, _show)
 
 
-def save_profile(app):
-    """Save current profile (or Save As if no path). Returns True if saved."""
-    if app.current_profile:
-        return do_save_profile(app, Path(app.current_profile))
-    return save_profile_as(app)
+def switch_profile(app, profile_id):
+    """Flush the outgoing profile (autosave — never a prompt) and open the
+    target. A vanished target refreshes the menu instead of erroring."""
+    if profile_id == app.profile_store.document['id']:
+        return
+    app.profile_store.flush()
+    held = app.library.load(profile_id)
+    if held is None:
+        app_toast(app, "That profile is gone — list refreshed.", 'warning')
+        app._refresh_file_menu()
+        return
+    app.profile_store = make_store(app, held[1])
+    apply_document(app)
 
 
-def save_profile_as(app):
-    """Save profile to a new file. Returns True if saved, False if cancelled."""
-    path = filedialog.asksaveasfilename(
-        title="Save Profile As",
-        defaultextension=".json",
-        initialdir=str(app.profiles_path),
-        filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
-    )
-    if path:
-        return do_save_profile(app, Path(path))
-    return False
+def new_blank_profile(app):
+    app.profile_store.flush()
+    doc = app.library.create_blank(
+        app.library.unique_name('New Profile'), get_game_resolution_or_default())
+    if doc is None:
+        Messagebox.show_error("Could not create the profile file.", title="New Profile")
+        return
+    app.profile_store = make_store(app, doc)
+    apply_document(app)
 
 
-def build_profile_payload(app):
-    """Assemble the profile dict for serialization: `version`, `grids`,
-    optional `reference_resolution`, **and `boss_timer` pulled from the
-    live BossTimer if one is open**. Pure data assembly — no I/O."""
-    data = {
-        'version': app.app_version,
-        'profile_schema': PROFILE_SCHEMA_VERSION,
-        'grids': app.grids_panel.get_profile_data(),
-    }
-    if app.reference_resolution:
-        data['reference_resolution'] = app.reference_resolution
-    if bt := app._boss_timer_if_alive():
-        data['boss_timer'] = bt.get_profile_data()
-    return data
+def new_from_template(app):
+    app.profile_store.flush()
+    doc = app.library.create_from_template(app.library.unique_name('Default'))
+    if doc is None:
+        Messagebox.show_warning("No profile template is available.", title="New Profile")
+        return
+    app.profile_store = make_store(app, doc)
+    apply_document(app)
 
 
-def write_profile_file(path, data):
-    """Pure I/O: serialize `data` and write to `path` via safe_save_json.
-    Raises `OSError` (incl. `IOError`, `PermissionError`) on failure."""
-    safe_save_json(path, data)
+def duplicate_current(app):
+    """A safety copy of the current profile; stays on the current one."""
+    app.profile_store.flush()
+    doc = app.library.duplicate(app.profile_store.document['id'])
+    if doc is None:
+        Messagebox.show_error("Could not duplicate the profile.", title="Duplicate Profile")
+        return
+    app_toast(app, f"Duplicated as “{doc['name']}”", 'success')
+    app._refresh_file_menu()
 
 
-def _commit_saved_profile(app, path, silent=False):
-    """Post-save state updates: anchor `current_profile`, clear `modified`,
-    persist `last_profile`, refresh title, toast, status flash. `silent=True`
-    suppresses the toast + status flash for piggyback saves whose surrounding
-    flow has its own success feedback (e.g. the auto-save before a build)."""
-    app.current_profile = str(path)
-    app.modified = False
-    app.settings.set('last_profile', str(path))
-    app.settings.save()
+def rename_current(app):
+    store = app.profile_store
+    new_name = Querybox.get_string(
+        prompt="New profile name:", title="Rename Profile",
+        initialvalue=store.document['name'], parent=app)
+    if not new_name or not new_name.strip():
+        return
+    if app.library.rename(store.document['id'], new_name) is None:
+        Messagebox.show_error("Could not rename the profile.", title="Rename Profile")
+        return
+    # The library already persisted the rename; sync the in-memory envelope
+    # without arming a redundant autosave.
+    store.document['name'] = new_name.strip()
     app._update_title()
-    if not silent:
-        app_toast(app, f"Saved: {path.name}", 'success')
-        flash_status_bar(app.bottom_bar)
+    app._refresh_file_menu()
 
 
-def do_save_profile(app, path, silent=False):
-    """Save profile to disk: build payload → write → commit. Returns True
-    on success, False on error. Composition wrapper kept (rather than
-    pushed to callers) because the error-handling Messagebox + bool return
-    would otherwise repeat at every save site."""
-    try:
-        data = build_profile_payload(app)
-        write_profile_file(path, data)
-    except OSError as e:
-        Messagebox.show_error(
-            f"Failed to save profile.\n\nCheck that the file isn't read-only or in use by another program.\n\n({e})",
-            title="Save Error"
-        )
-        return False
-    _commit_saved_profile(app, path, silent=silent)
-    return True
+def delete_current(app):
+    store = app.profile_store
+    name = store.document['name']
+    dialog = MessageDialog(
+        f"Delete “{name}”?\n\nIt moves to the profile trash "
+        "(userdata/profiles/trash).",
+        title="Delete Profile", parent=app,
+        buttons=['Cancel:secondary', 'Delete:danger'])
+    dialog.show()
+    if dialog.result != 'Delete':
+        return
+    app.library.delete(store.document['id'])
+    app.library.ensure_nonempty(get_game_resolution_or_default())
+    entries = app.library.list_profiles()
+    doc = max(entries, key=lambda e: e[0].stat().st_mtime)[1]
+    app.profile_store = make_store(app, doc)
+    apply_document(app)
 
 
-def get_profile_name(app):
-    """Return the current profile display name."""
-    if app.current_profile:
-        return Path(app.current_profile).stem
-    return "Untitled"
+def revert_session(app):
+    """File ▸ Revert to session start — restore the session-open snapshot and
+    re-dispatch it (the revert autosaves like any edit)."""
+    app.profile_store.revert_to_session_start()
+    apply_document(app)
+    app_toast(app, "Reverted to session start", 'info')
+
+
+def open_profiles_folder(app):
+    os.startfile(str(app.library.profiles_dir))

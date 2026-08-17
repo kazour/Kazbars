@@ -101,6 +101,9 @@ class LiveTrackerPanel(tk.Toplevel):
         self.overlay = None
         self._game_loop_id = None
         self._focus_watcher = getattr(parent, "focus_watcher", None)
+        # Same duck-reach as the focus watcher: present on the real app, absent
+        # under a bare-Tk test parent.
+        self._profile_hook = getattr(parent, "on_boss_timer_profile_data", None)
         self._monitoring = False
         self._test_fix_id = None
         self._test_reset_id = None
@@ -452,6 +455,11 @@ class LiveTrackerPanel(tk.Toplevel):
             settings = self.overlay.get_settings()
             if not save_settings(self.settings_folder, settings):
                 logger.warning("Failed to save timer overlay settings")
+            # Mirror into the profile document so the boss_timer section stays
+            # current while the panel lives — the profile no longer gathers
+            # from live widgets at save time.
+            if self._profile_hook:
+                self._profile_hook(self.get_profile_data())
 
     def _on_overlay_settings_changed(self):
         """Persist settings and resync the lock button when state changes from the overlay."""

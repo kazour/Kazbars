@@ -33,13 +33,14 @@ from .window_position import restore_window_position
 
 def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
                              on_resolution_set=None, default_profile_exists=True,
-                             on_dialog_closed=None):
+                             on_dialog_closed=None, on_start_empty=None):
     """Modal first-launch setup. Returns when dialog closes.
 
     Callbacks:
       on_game_set(path)           — user picked a game folder
       on_load_default(res_str)    — user chose "Load Defaults" (after on_game_set)
       on_resolution_set(res_str)  — user picked a resolution (Start Empty path)
+      on_start_empty()            — user chose "Start Empty" (after on_game_set)
       on_dialog_closed()          — dialog destroyed
     """
     dialog = tk.Toplevel(parent)
@@ -169,6 +170,8 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
 
     def start_empty():
         _set_game_if_provided()
+        if on_start_empty:
+            on_start_empty()
         _close()
 
     def skip():
@@ -278,10 +281,11 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
 
 
 def run_first_launch(app, app_name):
-    """Coordinate first-launch flow: show the dialog, then handle the chosen path
-    (default-profile load + scale + welcome popup, or empty start). Owns the
-    callbacks the dialog dispatches to."""
-    default_profile = profile_io.resolve_default_profile_path(app)
+    """Coordinate first-launch flow: show the dialog, then handle the chosen
+    path. Startup already seeded the library ('My Setup' from the template —
+    the never-empty invariant), so "Use Defaults" re-anchors that seed to the
+    chosen resolution, and "Start Empty" empties it. Owns the callbacks the
+    dialog dispatches to."""
     welcome_data = {}
 
     def _save_resolution(resolution_str):
@@ -296,31 +300,24 @@ def run_first_launch(app, app_name):
         game_folder.refresh_game_path_label(app)
 
     def on_load_default(resolution_str):
-        if not default_profile.exists():
-            Messagebox.show_warning(
-                "Default.json not found in assets/kazbars folder.",
-                title="Default Profile Missing"
-            )
-            return
         _save_resolution(resolution_str)
-        data, corrupt = profile_io.read_profile_file(default_profile)
-        json_ref = data.get('reference_resolution')
-        scaled = (
-            isinstance(json_ref, list) and len(json_ref) == 2
-            and tuple(json_ref) != parse_resolution(resolution_str)
-        )
-        profile_io.apply_profile_data(app, default_profile, data, corrupt=corrupt)
-        copy_path = app.profiles_path / "MyGrids.json"
-        n = 2
-        while copy_path.exists():
-            copy_path = app.profiles_path / f"MyGrids ({n}).json"
-            n += 1
-        profile_io.do_save_profile(app, copy_path)
+        doc = app.profile_store.document
+        authored = doc.get('authored_at')
+        scaled = tuple(authored or ()) != parse_resolution(resolution_str)
+        # Re-dispatch the seeded profile: apply_document rescales its grids to
+        # the just-saved resolution and re-bases authored_at.
+        profile_io.apply_document(app)
         grids = app.grids_panel.grids
         welcome_data['grid_count'] = len(grids)
         welcome_data['enabled_count'] = sum(1 for g in grids if g.get('enabled', True))
         welcome_data['resolution'] = resolution_str if scaled else None
-        welcome_data['profile_name'] = copy_path.name
+        welcome_data['profile_name'] = doc['name']
+
+    def on_start_empty():
+        # The user asked for a clean slate — empty the seeded profile's grids
+        # (autosaves through the store like any edit).
+        app.grids_panel.load_profile_data([])
+        app._on_grids_edited()
 
     def on_resolution_set(resolution_str):
         _save_resolution(resolution_str)
@@ -340,5 +337,5 @@ def run_first_launch(app, app_name):
 
     show_first_launch_dialog(
         app, app_name, on_game_set, on_load_default, on_resolution_set,
-        default_profile.exists(), on_dialog_closed,
+        app.library.has_template(), on_dialog_closed, on_start_empty,
     )

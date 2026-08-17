@@ -67,9 +67,9 @@ def app(tmp_path_factory):
     a.update()
     yield a
     try:
-        # _on_close runs _check_unsaved_changes, which raises a blocking
-        # Messagebox when dirty — force clean so teardown can never hang.
-        a.modified = False
+        # _on_close runs the DB-editor guard, which raises a blocking dialog
+        # when dirty — force clean so teardown can never hang. (The profile
+        # itself autosaves; no profile flag exists anymore.)
         a.db_panel.modified = False
         a._on_close()
     except tk.TclError:
@@ -116,7 +116,6 @@ OPENERS = [
     ('_open_deeps_panel', lambda a: a.deeps_panel),
     ('_open_damage_numbers', lambda a: a.damage_numbers_panel),
     ('_open_damage_number_colors', _find_damage_number_colors_panel),
-    ('_open_profile_manager', lambda a: a._profile_manager),
     ('_open_buff_display_editor', _find_buff_display_dialog),
     ('_open_stopwatch_settings', lambda a: a.stopwatch_dialog),
     ('_open_inspect_settings', lambda a: a.inspect_dialog),
@@ -128,7 +127,7 @@ OPENERS = [
 DEFERRED = {
     '_open_backup_dialog': 'settings_backup dialog — v2',
     '_open_game_in_explorer': 'os.startfile shell-out, not a panel',
-    '_open_profile': 'native file-open dialog — blocks, not a panel',
+    '_open_profiles_folder': 'os.startfile shell-out, not a panel',
     '_show_first_launch_dialog': 'blocking first-launch modal — v2',
     '_show_game_context_menu': 'tk.Menu popup, needs a real click event',
 }

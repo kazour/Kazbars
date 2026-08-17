@@ -83,12 +83,14 @@ def change_game_resolution(app):
             old_res_str = f"{current_w}x{current_h}"
             scaled = app.grids_panel.scale_to_resolution(
                 f"{new_w}x{new_h}", [current_w, current_h])
-            app.reference_resolution = [new_w, new_h]
             app.settings.set('game_resolution', [new_w, new_h])
             app.settings.save()
+            if app.profile_store:
+                # Push the re-anchored grids into the document and re-base its
+                # provenance so the next load's auto-scale is a no-op.
+                app._on_grids_edited()
+                app.profile_store.set_authored_at((new_w, new_h))
             if scaled:
-                app.modified = True
-                app._update_title()
                 app_toast(app,
                           f"Scaled grids: {old_res_str} → {new_w}×{new_h}",
                           'success')

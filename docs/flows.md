@@ -19,7 +19,7 @@ Steps:
 4. `save_settings()` — src/kazbars/grids_panel.py — iterates all `GridEditorPanel` instances, calling `save_to_config()` on each
 5. `save_to_config()` — src/kazbars/grid_editor_panel.py — reads every spinbox/combobox/toggle value and writes it into the grid config dict
 6. `find_compiler()` — src/kazbars/build_utils.py — checks three candidate paths for `mtasc.exe`; returns `Path` or `None`
-7. `profile_io.do_save_profile(silent=True)` — src/kazbars/profile_io.py — auto-saves the current profile (if one is loaded) before the build locks. `silent=True` suppresses the post-save "Saved: …" toast + status flash so they don't pile up against the "Built — …" toast a few steps later
+7. `ProfileStore.flush()` — src/kazbars/profile_store.py — flushes the pending autosave before the build locks, so the built SWF always equals the saved profile; the flushed profile's name feeds the summary's "Profile saved" line
 8. `_build_worker()` — src/kazbars/build_action.py — build locks (`app._building = True`, build button disabled, Ctrl+B unbound), snapshots the Tk-thread inputs into a `ctx` dict, and spawns this daemon worker so the compile + install run off the UI thread (mirrors `content_update`'s thread + `app.after(0, …)` marshalling — the loading animation never freezes). Steps 9–16 run on the worker; each phase label is posted back to the main loop and held at least `PHASE_MIN_MS` by `_hold_phase()` so it reads as a beat rather than a flash
 9. `compile_to_staging()` — src/kazbars/build_executor.py — creates a `tempfile.mkdtemp` staging dir and calls `build_grids()`; returns `(staging_dir, (success, message))`. Forwards `include_console` (read by `build_action` from `settings['build_console']`, default `False`), `cast_config` (read by `build_action` from `settings['cast_timer']` and validated up front via `cast_timer.validate_config`), `stopwatch_config` (read by `build_action` from `settings['stopwatch']`), `inspect_config` (read by `build_action` from `settings['inspect']`; both validated downstream), and `panel_font_size` (the flat prefs key the four in-game panels share) to `build_grids`
 10. `build_grids()` — src/kazbars/grids_generator.py — instantiates `CodeGenerator(..., include_console=include_console, cast_config=cast_config)`, writes `KazBars.as` and `KazBarsData.as` to a second temp dir, copies `base.swf`, calls `compile_as2()`
@@ -39,42 +39,43 @@ End state: `KazBars.swf` installed under the game folder; the module is declared
 
 ---
 
-## 2. load profile from file
+## 2. switch / load a profile
 
-Trigger: User selects File > Open profile... (or presses Ctrl+O) and confirms a `.json` path
+Trigger: User picks a profile row in the File menu (● marks the active one), or the app starts
 
 Steps:
-1. `KazBarsApp._open_profile()` — src/kazbars/app.py — one-line delegator to `profile_io.open_profile(self)`
-2. `profile_io.open_profile()` — src/kazbars/profile_io.py — runs the unsaved-changes guard via `_check_unsaved_changes()`; opens `filedialog.askopenfilename`; composes `read_profile_file()` + `apply_profile_data()`
-3. `profile_io.read_profile_file()` + `apply_profile_data()` — src/kazbars/profile_io.py — split as of 2026-04-27 to make the boss-timer fan-out visible at every call site. `read_profile_file` is pure I/O (returns `(data, is_corrupt)`); `apply_profile_data` dispatches grids, missing-buff warning, boss-timer (when alive), reference_resolution, current_profile, settings, title. See step 8 for the boss-timer dispatch detail.
-4. `load_profile_data(grids)` — src/kazbars/grids_panel.py — iterates raw grid dicts; migrates, validates, rebuilds panel list; clears `_build_done` (what was built isn't what was just loaded); returns `{grid_name: [missing_refs]}` for buffs that couldn't be resolved
-5. `_migrate_grid()` — src/kazbars/grids_panel.py — normalizes legacy `int` IDs and legacy name strings in `whitelist` and `slotAssignments` to current primary spell IDs via `database.by_id` and `database.get_entry_by_name`
-6. `validate_grid()` — src/kazbars/grid_model.py — fills missing keys from `create_default_grid()`; clamps every numeric field against `CLAMP_SPECS`; coerces enums in `ENUM_SPECS`; coerces booleans and lists/dicts
-7. `refresh_panels()` — src/kazbars/grids_panel.py — destroys existing `GridEditorPanel` widgets; creates new ones for the validated list; shows empty state if list is empty
-8. If a Boss Timer panel is alive, `LiveTrackerPanel.load_profile_data()` — src/kazbars/live_tracker_panel.py — applies the embedded `boss_timer.overlay` settings to the overlay (`apply_settings` then propagates opacity, font, transparent, lock, x/y/width/height, and visible state through `set_*(..., notify=False)` calls, with a single `_notify_settings_changed()` at the end so the parent saves once)
-9. `warn_missing_buffs()` — src/kazbars/profile_io.py — if migration dropped any references, displays them (deferred 200ms when called during startup so the dialog doesn't race the welcome popup)
-10. `app.settings.set('last_profile', ...)` then `app.settings.save()` — persists `last_profile` to `userdata/prefs.json` (`Store.save` → `settings_core.save` → atomic temp-rename in `safe_save_json`)
+1. `KazBarsApp._refresh_file_menu()` — src/kazbars/app.py — rebuilds the File `menu_def` in place (the custom menu bar re-reads it on every dropdown open): one row per `ProfileLibrary.list_profiles()` entry whose command calls `profile_io.switch_profile(self, id)`
+2. `profile_io.switch_profile()` — src/kazbars/profile_io.py — no-op if the target is already active; otherwise flushes the outgoing store (autosave — never a prompt), resolves the target via the library, builds a fresh store with `make_store()`, and dispatches `apply_document()`. Startup runs `startup_profile()` instead: `ensure_nonempty()` seed → `active_profile` pref → newest file by mtime
+3. `ProfileLibrary.load()` — src/kazbars/profile_library.py — scans `userdata/profiles/*.json`, deduped by in-document id (newest file wins); every file passes the gate — corrupt/old-format files are skipped and left untouched on disk
+4. `validate_document()` — src/kazbars/profile_document.py — the single boundary: rejects non-documents, old-format profiles ("older KazBars"), and schema-above-current ("update the app"); strict coerce/clamp/drop inside registered sections, unknown sections preserved verbatim
+5. `profile_io.apply_document()` — src/kazbars/profile_io.py — the dispatch step: grids into the panel, missing-ref warning, boss timer (when alive), authored_at rescale, `active_profile` pointer, title, File-menu refresh. At startup it must run before `deiconify()` (see step 9's deferral)
+6. `load_profile_data(grids)` — src/kazbars/grids_panel.py — iterates raw grid dicts; migrates, validates, rebuilds panel list; clears `_build_done` (what was built isn't what was just loaded); returns `{grid_name: [missing_refs]}` for buffs that couldn't be resolved
+7. `_migrate_grid()` — src/kazbars/grids_panel.py — normalizes legacy `int` IDs and legacy name strings in `whitelist` and `slotAssignments` to current primary spell IDs via `database.by_id` and `database.get_entry_by_name`; unresolved refs are **preserved in place** (the profile autosaves — a load-time drop would destroy them within seconds) and reported for the warning
+8. `validate_grid()` — src/kazbars/grid_model.py — fills missing keys from `create_default_grid()`; clamps every numeric field against `CLAMP_SPECS`; coerces enums in `ENUM_SPECS`; coerces booleans and lists/dicts; then `refresh_panels()` (src/kazbars/grids_panel.py) rebuilds the cards
+9. `warn_missing_buffs()` — src/kazbars/profile_io.py — lists unresolved refs (kept, skipped at build); deferred 200ms when the main window is still withdrawn so the dialog doesn't race the welcome popup
+10. If a Boss Timer panel is alive, `LiveTrackerPanel.load_profile_data()` — src/kazbars/live_tracker_panel.py — applies the section's `overlay` settings (`apply_settings` propagates opacity, font, lock, x/y through `set_*(..., notify=False)` calls, one `_notify_settings_changed()` at the end)
+11. If `authored_at` ≠ the game resolution: `scale_to_resolution()` — src/kazbars/grids_panel.py — re-anchors grid x/y, then the scaled grids and the new `authored_at` go back into the store (`ProfileStore.set_authored_at` — src/kazbars/profile_store.py), persisting via the normal autosave
+12. `app.settings.set('active_profile', ...)` then `app.settings.save()` — persists the id pointer to `userdata/prefs.json` (atomic temp-rename in `safe_save_json`)
 
-End state: `GridsPanel` displays validated grid cards; `app.modified` is `False`; `last_profile` updated in settings; window title reflects loaded name
+End state: panels show the target profile; `active_profile` holds its id; title and the File-menu ● moved; the outgoing profile was flushed to disk — no prompt existed to cancel
 
 ---
 
-## 3. save profile to file
+## 3. profile autosave
 
-Trigger: User selects File > Save profile (Ctrl+S) or File > Save profile as...
+Trigger: Any grid edit in the panel (add/delete/field change), a Boss Timer overlay change, or Ctrl+S (manual flush)
 
 Steps:
-1. `KazBarsApp._save_profile()` — src/kazbars/app.py — one-line delegator to `profile_io.save_profile(self)`
-2. `profile_io.save_profile()` — src/kazbars/profile_io.py — routes to `do_save_profile(app, current_path)` if a path exists, or to `save_profile_as()` otherwise
-3. `profile_io.do_save_profile(silent=False)` — src/kazbars/profile_io.py — orchestrator: `build_profile_payload()` → `write_profile_file()` → `_commit_saved_profile(silent=silent)`, with try/except for `OSError`. The `silent` flag (default `False` for direct save; `True` for the pre-build piggyback save in Flow 1) suppresses the post-commit toast + status flash. Note: the `boss_timer` key is pulled from the live tracker (when one is open) inside `build_profile_payload()` (src/kazbars/profile_io.py) — see step 7.
-4. `get_profile_data()` — src/kazbars/grids_panel.py — calls `save_settings()` then returns `self.grids`
-5. `save_settings()` — src/kazbars/grids_panel.py — iterates all `GridEditorPanel` instances calling `save_to_config()`
-6. `save_to_config()` — src/kazbars/grid_editor_panel.py — reads all widget values into the grid config dict
-7. If a Boss Timer panel is alive, `LiveTrackerPanel.get_profile_data()` — src/kazbars/live_tracker_panel.py — returns `{'overlay': {...}}` for embedding
-8. `safe_save_json()` — src/kazbars/settings_manager.py — writes JSON to `path.tmp` then `Path.replace`-renames it over the target atomically
-9. `app.settings.set('last_profile', ...)` then `app.settings.save()` — persists `last_profile` to `userdata/prefs.json`
+1. `GridsPanel._mark_modified()` — src/kazbars/grids_panel.py — panel-side dispatcher: un-ticks build step 4 of the tip guide and fires the app's `on_modified` callback
+2. `KazBarsApp._on_grids_edited()` — src/kazbars/app.py — deep-copies `get_profile_data()` (which flushes card widgets via `save_settings()` — src/kazbars/grids_panel.py) into the store's `grids` section, so later in-place panel edits can't bypass the store
+3. `ProfileStore.set_section()` — src/kazbars/profile_store.py — updates the in-memory document and arms the debounced write (`DEBOUNCE_MS`, re-armed not stacked); the first mutation of the session first hands the pre-mutation document to `ProfileLibrary.write_session_bak()` (src/kazbars/profile_library.py) — the snapshot behind File ▸ Revert to session start
+4. `ProfileStore.flush()` — src/kazbars/profile_store.py — the debounce firing (or Ctrl+S via `KazBarsApp._save_now()`, the pre-build flush in Flow 1, or app exit) cancels any pending timer and writes now
+5. `ProfileLibrary.write()` — src/kazbars/profile_library.py — the single writer: `validate_document()` → path resolved by in-document id (same id keeps its file) → `safe_save_json()` (src/kazbars/settings_manager.py) atomic temp-rename
+6. On write failure: `last_write_failed` is set, the store re-arms on the slower `RETRY_MS` cadence, and the exit path (`KazBarsApp._on_close()` — src/kazbars/app.py) shows a rescue dialog instead of silently dropping edits
 
-End state: profile `.json` written atomically; `app.modified` is `False`; title bar reflects saved name; toast `Saved: <filename>` shown and status bar pulses (both suppressed when `silent=True`, e.g. the pre-build auto-save path)
+Boss Timer variant: `LiveTrackerPanel.save_settings()` — src/kazbars/live_tracker_panel.py — mirrors every overlay change into the document via the app's `on_boss_timer_profile_data()` hook (src/kazbars/app.py), so the `boss_timer` section stays current and survives the panel closing.
+
+End state: the document on disk equals the in-memory state within ~1s of the last edit (exactly, after any flush); no dirty flag, no Save prompt anywhere
 
 ---
 
@@ -89,7 +90,7 @@ Steps:
 4. `create_default_grid()` — src/kazbars/grid_model.py — returns a complete grid config dict populated with caller-specified `grid_type`, `rows`, `cols`, `mode`, `grid_id`; auto-coerces `1×1` to static mode and picks a sensible `fillDirection`
 5. `refresh_panels()` — src/kazbars/grids_panel.py — destroys and recreates all `GridEditorPanel` cards; the newly added card is initially expanded
 
-End state: new grid config appended to `self.grids`; new `GridEditorPanel` card visible and expanded; slot count label updated; profile marked modified
+End state: new grid config appended to `self.grids`; new `GridEditorPanel` card visible and expanded; slot count label updated; the edit is mirrored into the document and autosaved (Flow 3)
 
 ---
 
@@ -116,16 +117,14 @@ Trigger: `KazBarsApp.__init__` has just created `userdata/` fresh via `ensure_la
 
 Steps:
 1. `_show_first_launch_dialog()` — src/kazbars/app.py — one-line delegator to `run_first_launch(self, APP_NAME)`
-2. `run_first_launch()` — src/kazbars/first_launch.py — defines the `on_game_set`, `on_load_default`, `on_resolution_set`, `on_dialog_closed` closures; calls `show_first_launch_dialog()`
+2. `run_first_launch()` — src/kazbars/first_launch.py — defines the `on_game_set`, `on_load_default`, `on_start_empty`, `on_resolution_set`, `on_dialog_closed` closures; calls `show_first_launch_dialog()`. Note: startup already seeded the library — `startup_profile()` (Flow 2) ran `ensure_nonempty()`, so the user is sitting on "My Setup" instantiated from the template before this dialog opens; the "Use Defaults" card is offered when `ProfileLibrary.has_template()` (src/kazbars/profile_library.py)
 3. `show_first_launch_dialog()` — src/kazbars/first_launch.py — builds modal dialog with game folder entry, common-paths shortcuts, resolution picker, and two option cards ("Use Defaults" / "Start Empty"). No launcher question — one install mode serves everyone (Flow 1)
 4. `_validate_path_hint()` — src/kazbars/first_launch.py — called whenever the path entry changes; warns inline when the typed folder has no `Data/Gui/Default/`
-5. `on_load_default()` — src/kazbars/first_launch.py — closure: persists game path and resolution **before** loading the profile so the auto-scale inside `apply_profile_data()` reads the just-saved `game_resolution`; composes `read_profile_file()` + `apply_profile_data()` against `Default.json`; saves a personal copy as `profiles/MyGrids.json` (auto-incremented on collision); stashes data for the welcome popup
-6. `profile_io.read_profile_file()` + `apply_profile_data()` — src/kazbars/profile_io.py — reads `Default.json` (pure I/O), then dispatches grids to `grids_panel.load_profile_data()`, populates `app.reference_resolution` from the JSON, **auto-scales via `grids_panel.scale_to_resolution()` if the profile's reference differs from `game_resolution`**, anchors `current_profile` to None for the bundled default
-7. `GridsPanel.scale_to_resolution()` — src/kazbars/grids_panel.py — anchor-based scaling (X center-anchored, Y bottom-anchored) via `grid_model.scale_grid_position()`; clamps to `SCREEN_MAX_X`/`SCREEN_MAX_Y` (8K sanity caps) and floors at 0; calls `refresh_panels()`
-8. `profile_io.do_save_profile()` — src/kazbars/profile_io.py — writes scaled profile to `profiles/MyGrids.json`
-9. `on_dialog_closed()` — src/kazbars/first_launch.py — closure called when the dialog is destroyed; if the user took the defaults path, schedules `show_welcome_popup()` 100ms later
+5. `on_load_default()` — src/kazbars/first_launch.py — closure: persists the chosen resolution **before** re-dispatching so the auto-scale reads the just-saved `game_resolution`; then `profile_io.apply_document()` re-applies the seeded profile — its `authored_at` differs from the chosen resolution, so the Flow 2 rescale re-anchors the grids and re-bases `authored_at` (persisting via autosave); stashes grid counts + the profile name for the welcome popup
+6. `GridsPanel.scale_to_resolution()` — src/kazbars/grids_panel.py — anchor-based scaling (X center-anchored, Y bottom-anchored) via `grid_model.scale_grid_position()`; clamps to `SCREEN_MAX_X`/`SCREEN_MAX_Y` (8K sanity caps) and floors at 0; calls `refresh_panels()`
+7. `on_dialog_closed()` — src/kazbars/first_launch.py — closure called when the dialog is destroyed; if the user took the defaults path, schedules `show_welcome_popup()` 100ms later
 
-End state: `game_path` and `game_resolution` persisted; default profile loaded, anchor-scaled to resolution, saved as `profiles/MyGrids.json`; welcome popup shown after the dialog closes
+End state: `game_path` and `game_resolution` persisted; the seeded "My Setup" re-anchored to the chosen resolution and autosaved; welcome popup shown after the dialog closes
 
 ---
 
@@ -228,11 +227,12 @@ Trigger: User completes the first-launch dialog by clicking "Start Empty" instea
 Steps 1–4 are identical to Flow 6 (delegator → `run_first_launch()` → `show_first_launch_dialog()` → `_validate_path_hint()`).
 
 Steps:
-5. `start_empty()` — src/kazbars/first_launch.py — closure: calls `_set_game_if_provided()`, then `_close()`. No `on_load_default` invocation, so no profile load and no scale.
+5. `start_empty()` — src/kazbars/first_launch.py — closure: calls `_set_game_if_provided()`, then the injected `on_start_empty` callback, then `_close()`.
 6. `_set_game_if_provided()` — src/kazbars/first_launch.py — same dispatcher used by Flow 6's `load_default()`; persists game path via `on_game_set` and resolution via `on_resolution_set`
-7. `on_dialog_closed()` — src/kazbars/first_launch.py — runs as in Flow 6 but `welcome_data` was never populated, so the welcome popup is suppressed
+7. `on_start_empty()` — src/kazbars/first_launch.py — closure: the user asked for a clean slate, so the startup-seeded "My Setup" is emptied — `load_profile_data([])` (src/kazbars/grids_panel.py) clears the panel and the app's grids-edited callback pushes the empty section into the store (autosaves)
+8. `on_dialog_closed()` — src/kazbars/first_launch.py — runs as in Flow 6 but `welcome_data` was never populated, so the welcome popup is suppressed
 
-End state: `game_path` and `game_resolution` persisted; no profile loaded; no welcome popup; user lands on the empty `GridsPanel` empty-state
+End state: `game_path` and `game_resolution` persisted; "My Setup" exists but holds zero grids (the library is never empty); no welcome popup; user lands on the `GridsPanel` empty-state
 
 ---
 
@@ -289,11 +289,10 @@ Steps:
 4. `parse_resolution()` — src/kazbars/grid_model.py — converts the chosen `"WxH"` string into `(w, h)`; on parse failure the dialog just closes
 5. **No-op short-circuit**: if `(new_w, new_h) == (current_w, current_h)`, dialog closes without scaling or persisting
 6. `GridsPanel.scale_to_resolution()` — src/kazbars/grids_panel.py — anchor-scales every loaded grid's `x`/`y` from the previous game_resolution to the new one via `scale_grid_position()`; clamps to sanity caps; calls `refresh_panels()` so editor cards rebuild with the new spinbox max as well
-7. `app.reference_resolution = [new_w, new_h]` and `app.settings.set('game_resolution', [new_w, new_h])` + save — establishes the new identity so the next profile load auto-scale is a no-op
-8. `app.modified = True` + `app._update_title()` — the unsaved-changes guard now treats the in-memory profile as dirty so the user is prompted to save before closing
-9. `app_toast()` — src/kazbars/ui_widgets.py — success toast `"Scaled grids: {old_res} → {new_w}×{new_h}"` (or `"Resolution set to {...}"` if the scaler short-circuited)
+7. `app.settings.set('game_resolution', [new_w, new_h])` + save, then the store sync: `KazBarsApp._on_grids_edited()` (src/kazbars/app.py) pushes the re-anchored grids into the document and `ProfileStore.set_authored_at()` (src/kazbars/profile_store.py) re-bases its provenance — the next profile load's auto-scale is a no-op, and both persist via the normal autosave
+8. `app_toast()` — src/kazbars/ui_widgets.py — success toast `"Scaled grids: {old_res} → {new_w}×{new_h}"` (or `"Resolution set to {...}"` if the scaler short-circuited)
 
-End state: `game_resolution` persisted; all loaded grids re-anchored to the new screen size; editor X/Y spinbox max picks up the new bounds on next panel rebuild; profile marked modified so the user is prompted on close
+End state: `game_resolution` persisted; all loaded grids re-anchored to the new screen size and autosaved into the document; editor X/Y spinbox max picks up the new bounds on next panel rebuild
 
 ---
 
@@ -349,7 +348,7 @@ Trigger: User selects Game > Backup & restore game settings... from the menu, th
 Steps:
 1. `KazBarsApp._open_backup_dialog()` — src/kazbars/app.py — one-line delegator to `open_backup_dialog(self)`. Mirrors `_open_deeps_panel`.
 2. `open_backup_dialog(app)` — src/kazbars/settings_backup.py — builds a modal `Toplevel`; `locate_funcom_prefs()` resolves `%LOCALAPPDATA%\Funcom\Conan\Prefs`; `_funcom_summary()` returns the account names (the prefs dir's immediate subfolders), the character count (`Char*` subfolders across all accounts), and total size; counts `*.json` under `app.profiles_path`; renders the "What's included" lines (account names listed, KazBars data noted as profiles + settings + custom buffs), the "Close AoC first" warning, an **off-by-default "also bring back this PC's settings" checkbox** (`include_prefs_var`), and Back up… / Restore… / Close buttons.
-3a. **Back up** → `backup_settings(app, dialog)` — `filedialog.asksaveasfilename` (default `KazBars_Backup_{date}.zip`) → `write_backup_zip()` archives the Funcom prefs tree under `funcom/` + the `userdata/` allowlist under `kazbars/`: `app.profiles_path` → `kazbars/profiles/`, the whole `app.settings_path` dir (`deeps`/`live_tracker`/`damageinfo` settings) → `kazbars/settings/`, `database_user_path()` → `kazbars/database_user.json`, and `prefs_path()` → `kazbars/prefs.json`. The OTA `content/` cache is not a parameter, so it never enters the zip. Skips `*.tmp`, writes `manifest.json` last → dialog closes → `app_toast()` success with the file counts.
+3a. **Back up** → `backup_settings(app, dialog)` — `filedialog.asksaveasfilename` (default `KazBars_Backup_{date}.zip`) → `write_backup_zip()` archives the Funcom prefs tree under `funcom/` + the `userdata/` allowlist under `kazbars/`: `app.profiles_path` → `kazbars/profiles/` (session `*.json.bak` snapshots and the `trash/` subdir are excluded — local recovery state, not the user's data), the whole `app.settings_path` dir (`deeps`/`live_tracker`/`damageinfo` settings) → `kazbars/settings/`, `database_user_path()` → `kazbars/database_user.json`, and `prefs_path()` → `kazbars/prefs.json`. The OTA `content/` cache is not a parameter, so it never enters the zip. Skips `*.tmp`, writes `manifest.json` last → dialog closes → `app_toast()` success with the file counts.
 3b. **Restore** → `restore_settings(app, dialog, include_prefs)` — `filedialog.askopenfilename` → `read_manifest()` rejects anything that isn't a KazBars backup → `confirm()` — src/kazbars/ui_widgets.py — verb-labeled Restore settings / Cancel confirm (+ AoC-closed warning, + an unsaved-DB-edits-will-be-discarded line when `db_panel.modified`) → best-effort pre-restore snapshot via `write_backup_zip()` to `app.app_path/KazBars_PreRestore_{timestamp}.zip` (outside `userdata/`, so restore can't recurse into it) → `restore_zip(funcom_dest=funcom_prefs_path(), userdata_dest=userdata_root(), include_prefs=include_prefs)` extracts each section, creating dirs and skipping zip-slip entries; the machine-local `kazbars/prefs.json` is skipped unless the checkbox opted in → `app.settings.reload()` (`Prefs.reload`) resyncs prefs from disk so a freshly-restored `prefs.json` isn't clobbered on exit → `app.database.reload()` re-merges the buff DB from the restored `database_user.json` and the DB editor refreshes (`refresh_from_database()` — src/kazbars/database_editor.py, `modified=False`) so a later Save Database can't recompute deltas from pre-restore memory and clobber the restored custom buffs → `Messagebox.show_info` reports the restored counts + snapshot path.
 
 End state: backup writes a single portable zip (AoC prefs + the KazBars `userdata/` allowlist); restore replaces them in place after snapshotting the prior state, re-merges the buff DB from the restored `database_user.json` so custom buffs survive a later Save Database, leaving machine-local `prefs.json` untouched unless opted in, with a KazBars restart recommended to fully apply restored window/game-folder settings.
@@ -413,20 +412,20 @@ End state: content reverted to the previous applied version (or the shipped stoc
 
 ---
 
-## 24. manage / export / import profiles
+## 24. manage profiles (File menu lifecycle)
 
-Trigger: File ▸ "Manage profiles…".
+Trigger: File ▸ New profile (Ctrl+N) / New from template / Duplicate profile / Rename profile… / Delete profile… / Revert to session start / Open profiles folder. (Switching is Flow 2; sharing lands with the export/import revamp phase.)
 
 Steps:
-1. `KazBarsApp._open_profile_manager()` — src/kazbars/app.py — delegator to `profile_manager.open_profile_manager(self)` (single-instance gate on `app._profile_manager`).
-2. `ProfileManagerDialog` — src/kazbars/profile_manager.py — modal Toplevel listing `userdata/profiles/*.json` in a Treeview (★ marks `prefs.default_profile`); buttons Load / Rename / Duplicate / Delete / Set Default + Export / Import.
-   - **Load** → `profile_io.read_profile_file` + `apply_profile_data` (the Flow 2 path) and closes.
-   - **Rename / Duplicate / Delete** → file ops under `userdata/profiles/`; `_rebind_path` keeps the `current_profile` + `default_profile` pointers valid.
-   - **Set Default** → `profile_io.set_default_profile` writes `prefs.default_profile` (does **not** change which profile reopens on relaunch — that stays `last_profile`).
-3. **Export** → reads the selected profile; `profile_share.collect_referenced_user_buffs(data, by_id, by_name, provenance)` gathers the user-provenance buffs it references; `profile_share.encode_profile` packs `{profile, buffs}` → `KZBARS1:<gzip+base64>` onto the clipboard; one toast notes the embedded-buff count.
-4. **Import** → paste a `KZBARS1:` string → `profile_share.decode_profile` (rejects corrupt/truncated) → one confirmation ("includes N custom buffs") → `write_profile_file` to `userdata/profiles/Imported Profile.json` (auto-incremented) + `profile_share.merge_imported_buffs` into `database_user.json` (skip on an ID collision, rename on a name-only collision) → if any buff was added, `BuffDatabase.reload()` + DB-view refresh → one summary toast ("Imported '…' — N added, M already existed").
+- **New profile** → `KazBarsApp._new_profile()` — src/kazbars/app.py — delegator to `profile_io.new_blank_profile()` (src/kazbars/profile_io.py): flush the current store, `ProfileLibrary.create_blank()` (src/kazbars/profile_library.py) with a collision-free name from `unique_name()`, then the Flow 2 switch path onto the new document.
+- **New from template** → `profile_io.new_from_template()` — src/kazbars/profile_io.py — `ProfileLibrary.create_from_template()` instantiates the first template on the chain that passes the gate (`template_paths()` — src/kazbars/profile_io.py: OTA `content/Default.json` → `assets/kazbars/templates/Default.json` → shipped stock) with a **fresh id** and the template's own `authored_at` — templates are instantiate-only and can never become library entries themselves.
+- **Duplicate profile** → `profile_io.duplicate_current()` — src/kazbars/profile_io.py — `ProfileLibrary.duplicate()`: deep copy, fresh id, name "X (copy)" deduped; stays on the current profile (it's the safety copy before experimenting).
+- **Rename profile…** → `profile_io.rename_current()` — src/kazbars/profile_io.py — Querybox prompt → `ProfileLibrary.rename()`: display name updated in-document, file re-slugged; the id never changes so the `active_profile` pointer survives even a failed old-file cleanup (listing dedupe heals it, newest wins).
+- **Delete profile…** → `profile_io.delete_current()` — src/kazbars/profile_io.py — danger confirm → `ProfileLibrary.delete()` moves the file to `userdata/profiles/trash/` (pruned to the 10 newest; the session `.bak` dies with it) → `ensure_nonempty()` reseeds "My Setup" from the template if that was the last profile (the library is never empty) → switch to the most recently modified remaining profile.
+- **Revert to session start** → `profile_io.revert_session()` — src/kazbars/profile_io.py — `ProfileStore.revert_to_session_start()` (src/kazbars/profile_store.py) restores the lazy session snapshot, then `apply_document()` re-dispatches it; the revert autosaves like any edit.
+- **Open profiles folder** → `profile_io.open_profiles_folder()` — src/kazbars/profile_io.py — `os.startfile` on `userdata/profiles/` — the escape hatch that keeps the managed library from being a walled garden.
 
-End state: profiles managed in place; an export string is self-contained (custom buffs travel with it); an import writes the profile + merges any new custom buffs without clobbering existing ones. ("Load default profile" and first-launch resolve their target via `profile_io.resolve_default_profile_path`: the user's `default_profile` if set, else the OTA `content/Default.json`, else shipped stock.)
+End state: every operation is a library operation keyed on the stable in-document id — no OS file dialogs, no pointer rebinding, no template protection hack (`active_profile` is the only pointer and ids never change); the File menu's profile rows rebuild via `KazBarsApp._refresh_file_menu()` after each operation
 
 ---
 

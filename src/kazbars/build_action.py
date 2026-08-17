@@ -17,7 +17,7 @@ from pathlib import Path
 from ttkbootstrap.dialogs import Messagebox
 
 from . import damageinfo_settings as dis
-from . import game_folder, profile_io
+from . import game_folder
 from .app_popups import show_close_game_required_dialog
 from .build_loading import BuildLoadingScreen
 from .build_utils import find_compiler
@@ -117,8 +117,11 @@ def build(app):
         for g in grids:
             if g['id'] in empty:
                 g['enabled'] = False
-        app._mark_modified()
+        # Rebuild the cards from the mutated dicts BEFORE pushing to the store:
+        # _on_grids_edited flushes widget values over the dicts, so pushing
+        # first would let the stale enabled-toggles clobber the disable.
         app.grids_panel.refresh_panels(expand_index=-1)
+        app._on_grids_edited()
 
     # Block while any engine process is running, but only on the first build: the
     # client has to start with our declarations in place for the archive to
@@ -131,12 +134,13 @@ def build(app):
             show_close_game_required_dialog(app, process_name=running)
             return
 
-    # Auto-save profile before building
+    # Flush the pending autosave so built == saved; the summary line names the
+    # profile that was persisted.
     profile_name = None
-    if app.current_profile:
+    if app.profile_store is not None:
         try:
-            profile_io.do_save_profile(app, Path(app.current_profile), silent=True)
-            profile_name = Path(app.current_profile).stem
+            if app.profile_store.flush():
+                profile_name = app.profile_store.document['name']
         except Exception as e:
             logger.warning("Could not save profile before build: %s", e)
 

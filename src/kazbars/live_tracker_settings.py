@@ -10,6 +10,8 @@ from typing import Any
 
 from . import settings_core
 from .overlay_engine import FONT_FAMILY_CHOICES, OverlayConfig
+from .profile_document import LANE_LIVE
+from .profile_document import SectionSpec as ProfileSectionSpec
 from .settings_core import Field, Schema
 
 logger = logging.getLogger(__name__)
@@ -81,6 +83,19 @@ def _build_fields() -> dict[str, Field]:
 
 
 _SCHEMA = Schema(SETTINGS_FILENAME, 1, _build_fields())
+
+# The Boss Timer's slice of the profile document: `{'overlay': {…}}`, same
+# shape LiveTrackerPanel.get_profile_data emits. Registered by app.py (the
+# sanctioned wiring seam); profile_document is shared infrastructure, so this
+# import keeps cluster isolation intact.
+PROFILE_SECTION = ProfileSectionSpec(
+    'boss_timer',
+    Schema('', 1, {'overlay': Field(
+        settings_core.get_defaults(_SCHEMA),
+        validate=lambda v: settings_core.validate_all(_SCHEMA, v),
+    )}),
+    LANE_LIVE,
+)
 
 
 # =============================================================================

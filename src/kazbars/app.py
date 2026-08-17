@@ -3,6 +3,7 @@ KazBars — Standalone Grid Editor for Age of Conan.
 Main application class.
 """
 
+import copy
 import logging
 import os
 import tkinter as tk
@@ -18,8 +19,9 @@ from kazbars import (
     build_action,
     content_update,
     game_folder,
+    grid_model,
+    live_tracker_settings,
     profile_io,
-    profile_manager,
     update_check,
 )
 from kazbars import __version__ as APP_VERSION
@@ -36,6 +38,8 @@ from kazbars.instructions_panel import InstructionsPanel
 from kazbars.live_tracker_panel import LiveTrackerPanel
 from kazbars.paths import ASSETS, KAZBARS_ASSETS, app_path
 from kazbars.prefs import PREFS_SCHEMA
+from kazbars.profile_document import SectionRegistry
+from kazbars.profile_library import ProfileLibrary
 from kazbars.settings_core import Store
 from kazbars.settings_manager import init_settings
 from kazbars.ui_components import (
@@ -113,11 +117,18 @@ class KazBarsApp(ttkb.Window):
             stock_fallback_path=KAZBARS_ASSETS / "Database.json.default",
         )
 
+        # Profile system: the section registry is the wiring seam that keeps
+        # cluster isolation intact — modules export their PROFILE_SECTION,
+        # only app.py collects them.
+        self.registry = SectionRegistry()
+        self.registry.register(grid_model.PROFILE_SECTION)
+        self.registry.register(live_tracker_settings.PROFILE_SECTION)
+        self.library = ProfileLibrary(
+            self.profiles_path, self.registry, profile_io.template_paths(self))
+
         # State
         self.app_version = APP_VERSION
-        self.current_profile = None
-        self.reference_resolution = None
-        self.modified = False
+        self.profile_store = None
         self.current_view = 'grids'
         self._building = False
         self._ota_app_update_notified = False
@@ -127,7 +138,6 @@ class KazBarsApp(ttkb.Window):
         self.stopwatch_dialog = None
         self.inspect_dialog = None
         self.cast_timer_dialog = None
-        self._profile_manager = None
 
         # One shared focus gate for every overlay: hides them whenever neither
         # KazBars nor AoC owns the foreground window. Overlays register on
@@ -155,13 +165,9 @@ class KazBarsApp(ttkb.Window):
         # Protocol
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
-        # Load last profile
-        last_profile = self.settings.get('last_profile')
-        if last_profile and Path(last_profile).exists():
-            data, corrupt = profile_io.read_profile_file(Path(last_profile))
-            profile_io.apply_profile_data(self, Path(last_profile), data, corrupt=corrupt)
-        else:
-            self._update_title()
+        # Open the startup profile (active_profile pref → newest → seed).
+        # Must precede deiconify() — see profile_io.apply_document.
+        profile_io.startup_profile(self)
 
         self.deiconify()
 
@@ -258,7 +264,7 @@ class KazBarsApp(ttkb.Window):
         self.grids_panel = GridsPanel(
             self.content_frame,
             database=self.database,
-            on_modified=self._mark_modified,
+            on_modified=self._on_grids_edited,
             app=self,
         )
 
@@ -355,24 +361,11 @@ class KazBarsApp(ttkb.Window):
 
         self._auto_update_var = tk.BooleanVar(value=bool(self.settings.get('auto_update_content', True)))
 
-        self._menubar.add_cascade(label="File", menu_def=[
-            {'type': 'command', 'label': 'New profile', 'accelerator': 'Ctrl+N',
-             'command': self._new_profile},
-            {'type': 'command', 'label': 'Open profile…', 'accelerator': 'Ctrl+O',
-             'command': self._open_profile},
-            {'type': 'command', 'label': 'Load default profile',
-             'command': self._load_default_profile},
-            {'type': 'command', 'label': 'Save profile', 'accelerator': 'Ctrl+S',
-             'command': self._save_profile},
-            {'type': 'command', 'label': 'Save profile as…',
-             'command': self._save_profile_as},
-            {'type': 'separator'},
-            {'type': 'command', 'label': 'Manage profiles…',
-             'command': self._open_profile_manager},
-            {'type': 'separator'},
-            {'type': 'command', 'label': 'Exit',
-             'command': self._on_close},
-        ])
+        # The File menu is rebuilt in place by _refresh_file_menu — the menu bar
+        # re-reads the list on every dropdown open, so the profile rows stay
+        # current without menu-widget surgery.
+        self._file_menu_def = self._menubar.add_cascade(label="File", menu_def=[])
+        self._refresh_file_menu()
         self._menubar.add_cascade(label="Game", menu_def=[
             {'type': 'command', 'label': 'Change game folder…',
              'command': self._change_game_folder},
@@ -422,11 +415,45 @@ class KazBarsApp(ttkb.Window):
         ])
         self._menubar.add_command(label="About", command=self._show_about)
 
-        # Keyboard shortcuts
+        # Keyboard shortcuts. Ctrl+S is muscle memory — under autosave it just
+        # flushes the pending write and confirms.
         self.bind_all('<Control-n>', self._hotkey(self._new_profile))
-        self.bind_all('<Control-o>', self._hotkey(self._open_profile))
-        self.bind_all('<Control-s>', self._hotkey(self._save_profile))
+        self.bind_all('<Control-s>', self._hotkey(self._save_now))
         self.bind_all('<Control-b>', self._hotkey(self._build))
+
+    def _refresh_file_menu(self):
+        """Rebuild the File menu_def in place: one row per library profile
+        (● marks the active one), then the lifecycle commands."""
+        d = self._file_menu_def
+        d.clear()
+        active = self.profile_store.document['id'] if self.profile_store else None
+        d.append({'type': 'header', 'label': 'Profiles'})
+        for _path, doc in self.library.list_profiles():
+            marker = '●  ' if doc['id'] == active else '    '
+            d.append({'type': 'command', 'label': f"{marker}{doc['name']}",
+                      'command': lambda pid=doc['id']: profile_io.switch_profile(self, pid)})
+        d.extend([
+            {'type': 'separator'},
+            {'type': 'command', 'label': 'New profile', 'accelerator': 'Ctrl+N',
+             'command': self._new_profile},
+            {'type': 'command', 'label': 'New from template',
+             'command': self._new_from_template},
+            {'type': 'command', 'label': 'Duplicate profile',
+             'command': self._duplicate_profile},
+            {'type': 'separator'},
+            {'type': 'command', 'label': 'Rename profile…',
+             'command': self._rename_profile},
+            {'type': 'command', 'label': 'Delete profile…',
+             'command': self._delete_profile},
+            {'type': 'command', 'label': 'Revert to session start',
+             'command': self._revert_profile},
+            {'type': 'separator'},
+            {'type': 'command', 'label': 'Open profiles folder',
+             'command': self._open_profiles_folder},
+            {'type': 'separator'},
+            {'type': 'command', 'label': 'Exit',
+             'command': self._on_close},
+        ])
 
     def _hotkey(self, fn):
         """Wrap a bind_all shortcut handler: shortcuts bypass the build modal's
@@ -618,69 +645,65 @@ class KazBarsApp(ttkb.Window):
     # ========================================================================
     # PROFILE SYSTEM
     # ========================================================================
-    def _check_unsaved_changes(self):
-        """Returns True if safe to proceed (saved or discarded). False = user cancelled."""
-        profile_dirty = self.modified
-        db_dirty = self.db_panel.modified
-        if not profile_dirty and not db_dirty:
+    def _check_unsaved_db_changes(self):
+        """Exit guard for the buff-DB editor's own dirty state (the profile
+        autosaves and has no dirty state). True = safe to proceed."""
+        if not self.db_panel.modified:
             return True
-        if profile_dirty and db_dirty:
-            message = "Save unsaved changes to the profile and database?"
-        elif profile_dirty:
-            message = (
-                f"Save changes to \"{self._get_profile_name()}\"?\n\n"
-                "Your grid layout has changed since the last save."
-            )
-        else:
-            message = "Save unsaved changes to the buff database?"
-        dialog = MessageDialog(message, title="Unsaved Changes", parent=self,
-                               buttons=['Cancel:secondary', "Don't save:secondary",
-                                        'Save:primary'])
+        dialog = MessageDialog(
+            "Save unsaved changes to the buff database?",
+            title="Unsaved Changes", parent=self,
+            buttons=['Cancel:secondary', "Don't save:secondary", 'Save:primary'])
         dialog.show()
         if dialog.result == "Save":
-            ok = True
-            if profile_dirty:
-                ok = self._save_profile() and ok
-            if db_dirty:
-                self.db_panel.save()
-                ok = (not self.db_panel.modified) and ok
-            return ok
+            self.db_panel.save()
+            return not self.db_panel.modified
         return dialog.result == "Don't save"
 
-    def _mark_modified(self):
-        """Mark profile as having unsaved changes."""
-        self.modified = True
-        self._update_title()
+    def _on_grids_edited(self):
+        """Grid state changed in the panel — mirror it into the profile
+        document (deep-copied so later in-place panel edits can't bypass the
+        store's autosave arming)."""
+        if self.profile_store:
+            self.profile_store.set_section(
+                'grids', {'grids': copy.deepcopy(self.grids_panel.get_profile_data())})
+
+    def on_boss_timer_profile_data(self, data):
+        """Live Tracker pushes its profile slice on every settings change."""
+        if self.profile_store:
+            self.profile_store.set_section('boss_timer', data)
 
     def _update_title(self):
-        """Update the window title bar with profile name and modified indicator."""
-        if self.current_profile:
-            name = Path(self.current_profile).stem
-        else:
-            name = "Untitled"
-        suffix = " *" if self.modified else ""
-        self.title(f"{APP_NAME} — {name}{suffix}")
+        """Window title = app + active profile name (no dirty marker — the
+        profile autosaves)."""
+        name = self.profile_store.document['name'] if self.profile_store else "…"
+        self.title(f"{APP_NAME} — {name}")
+
+    def _save_now(self):
+        """Ctrl+S: flush the pending autosave and confirm."""
+        if self.profile_store and self.profile_store.flush():
+            self.toast.show("Profile saved", style='success', duration=2)
 
     def _new_profile(self):
-        return profile_io.new_profile(self)
+        return profile_io.new_blank_profile(self)
 
-    def _open_profile(self):
-        return profile_io.open_profile(self)
+    def _new_from_template(self):
+        return profile_io.new_from_template(self)
 
-    def _load_default_profile(self):
-        return profile_io.load_default_profile(self)
+    def _duplicate_profile(self):
+        return profile_io.duplicate_current(self)
 
-    def _save_profile(self):
-        return profile_io.save_profile(self)
+    def _rename_profile(self):
+        return profile_io.rename_current(self)
 
-    def _save_profile_as(self):
-        return profile_io.save_profile_as(self)
+    def _delete_profile(self):
+        return profile_io.delete_current(self)
 
-    def _open_profile_manager(self):
-        return profile_manager.open_profile_manager(self)
+    def _revert_profile(self):
+        return profile_io.revert_session(self)
 
-    def _get_profile_name(self):
-        return profile_io.get_profile_name(self)
+    def _open_profiles_folder(self):
+        return profile_io.open_profiles_folder(self)
 
     # ========================================================================
     # BUILD PIPELINE
@@ -712,9 +735,19 @@ class KazBarsApp(ttkb.Window):
     # WINDOW LIFECYCLE
     # ========================================================================
     def _on_close(self):
-        """Handle window close with unsaved changes check."""
-        if not self._check_unsaved_changes():
+        """Handle window close: DB-editor guard, then flush the profile (with
+        a rescue prompt if the disk has been refusing writes)."""
+        if not self._check_unsaved_db_changes():
             return
+        if self.profile_store and not self.profile_store.flush():
+            dialog = MessageDialog(
+                "Your profile couldn't be saved to disk — the last edits may "
+                "be lost.\n\nCheck free space and permissions, then try again.",
+                title="Profile Not Saved", parent=self,
+                buttons=['Cancel:secondary', 'Exit anyway:danger'])
+            dialog.show()
+            if dialog.result != 'Exit anyway':
+                return
         self.focus_watcher.stop()
         if bt := self._boss_timer_if_alive():
             bt.cleanup()

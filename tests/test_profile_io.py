@@ -1,93 +1,27 @@
-"""Tests for kazbars.profile_io's Phase-5 additions — the profile_schema ladder
-and the default-profile resolution (user default → OTA → stock).
+"""Tests for `profile_io` — the pure pieces of the app-facing profile satellite.
 
-The Tk-driven load/save flows are smoke-only; this covers the pure pieces.
+Since the revamp, profile_io orchestrates `profile_library` + `profile_store`
+(each with its own suite); what's testable headless here is the template
+chain order — OTA content first, then the interim new-format template, then
+the shipped stock file — and the missing-buff message shape. The Tk-driven
+flows (apply_document, switch, rename/delete dialogs) are covered by the
+panel-construction smoke and manual QA.
 
 Run: `pytest tests/test_profile_io.py` (from repo root).
 """
 
-from kazbars import profile_io
+from pathlib import Path
+from types import SimpleNamespace
+
+from kazbars import profile_io, userdata
 
 
-class _Settings:
-    def __init__(self, **values):
-        self._v = values
-
-    def get(self, key, default=None):
-        return self._v.get(key, default)
-
-
-class _App:
-    def __init__(self, settings, assets_path):
-        self.settings = settings
-        self.assets_path = assets_path
-
-
-def test_profile_schema_version_is_int():
-    assert isinstance(profile_io.PROFILE_SCHEMA_VERSION, int)
-
-
-def test_migrate_profile_empty_ladder_is_identity():
-    data = {"version": "2.1.0", "profile_schema": 1, "grids": [1, 2]}
-    assert profile_io._migrate_profile(data) == data
-
-
-def test_resolve_default_prefers_user_default(tmp_path, monkeypatch):
-    monkeypatch.setattr(profile_io, "content_dir", lambda: tmp_path / "content")
-    user_default = tmp_path / "profiles" / "Mine.json"
-    user_default.parent.mkdir(parents=True)
-    user_default.write_text("{}", encoding="utf-8")
-    app = _App(_Settings(default_profile=str(user_default)), tmp_path / "assets")
-    assert profile_io.resolve_default_profile_path(app) == user_default
-
-
-def test_resolve_default_falls_back_to_ota_then_stock(tmp_path, monkeypatch):
-    content = tmp_path / "content"
-    content.mkdir()
-    monkeypatch.setattr(profile_io, "content_dir", lambda: content)
-    app = _App(_Settings(), tmp_path / "assets")   # no default_profile set
-
-    # No user default, no OTA Default.json → shipped stock.
-    assert profile_io.resolve_default_profile_path(app) == tmp_path / "assets" / "kazbars" / "Default.json"
-
-    # OTA Default.json present → it wins over stock.
-    (content / "Default.json").write_text("{}", encoding="utf-8")
-    assert profile_io.resolve_default_profile_path(app) == content / "Default.json"
-
-
-def test_resolve_default_ignores_missing_user_default(tmp_path, monkeypatch):
-    content = tmp_path / "content"
-    content.mkdir()
-    monkeypatch.setattr(profile_io, "content_dir", lambda: content)
-    # default_profile points at a file that no longer exists → fall through to stock.
-    app = _App(_Settings(default_profile=str(tmp_path / "gone.json")), tmp_path / "assets")
-    assert profile_io.resolve_default_profile_path(app) == tmp_path / "assets" / "kazbars" / "Default.json"
-
-
-# --------------------------------------------------------------------------- #
-# build_profile_payload — what a profile is, and is not, allowed to carry
-# --------------------------------------------------------------------------- #
-class _GridsPanel:
-    @staticmethod
-    def get_profile_data():
-        return [{"id": "g1"}]
-
-
-class _PayloadApp:
-    app_version = "9.9.9"
-    reference_resolution = None
-    grids_panel = _GridsPanel()
-
-    @staticmethod
-    def _boss_timer_if_alive():
-        return None
-
-
-def test_payload_carries_no_cast_timer():
-    # The cast timer is machine-local (prefs `cast_timer`), like the stopwatch and
-    # inspect panel: its X/Y depend on the screen, not the profile. A profile that
-    # carried it would re-apply one machine's coordinates on another — and a shared
-    # KZBARS1 profile would drag them across users.
-    data = profile_io.build_profile_payload(_PayloadApp())
-    assert "cast_timer" not in data
-    assert data["grids"] == [{"id": "g1"}]
+def test_template_chain_order(monkeypatch, tmp_path):
+    monkeypatch.setattr(userdata, "app_path", lambda: tmp_path)
+    app = SimpleNamespace(assets_path=Path("A:/assets"))
+    chain = profile_io.template_paths(app)
+    assert chain == (
+        tmp_path / "userdata" / "content" / "Default.json",
+        Path("A:/assets/kazbars/templates/Default.json"),
+        Path("A:/assets/kazbars/Default.json"),
+    )
