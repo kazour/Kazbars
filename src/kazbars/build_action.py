@@ -61,14 +61,18 @@ def build(app):
 
     # Extras stand on their own: nothing downstream needs a grid, so an
     # extras-only build is legitimate. Mirrors the generator's include gates —
-    # cast through is_enabled on the validated config (legacy configs derive the
-    # master enable from the sides), stopwatch/inspect off their own flag.
-    cast_config = validate_cast_config(app.settings.get('cast_timer'))
+    # cast through is_enabled on the validated config, stopwatch/inspect off
+    # their own flag. The three configs are profile sections; snapshot-copy
+    # them off the live store dicts here so the worker thread never reads a
+    # dict the main thread could mutate.
+    cast_config = validate_cast_config(dict(app.profile_store.get_section('cast_timer')))
+    stopwatch_config = dict(app.profile_store.get_section('stopwatch'))
+    inspect_config = dict(app.profile_store.get_section('inspect'))
     any_extra = (
         bool(app.settings.get('build_console', False))
         or cast_is_enabled(cast_config)
-        or bool((app.settings.get('stopwatch') or {}).get('enabled'))
-        or bool((app.settings.get('inspect') or {}).get('enabled'))
+        or bool(stopwatch_config.get('enabled'))
+        or bool(inspect_config.get('enabled'))
         or di_enabled
     )
 
@@ -161,8 +165,8 @@ def build(app):
         'app_version': app.app_version,
         'include_console': bool(app.settings.get('build_console', False)),
         'cast_config': cast_config,
-        'stopwatch_config': app.settings.get('stopwatch'),
-        'inspect_config': app.settings.get('inspect'),
+        'stopwatch_config': stopwatch_config,
+        'inspect_config': inspect_config,
         'panel_font_size': app.settings.get('panel_font_size'),
         'game_resolution': get_game_resolution_or_default(),
         'game_path': app.game_path,

@@ -1,9 +1,9 @@
 """KazBars — machine-local preferences: the PREFS_SCHEMA contract.
 
 ``prefs.json`` holds the machine-local settings — window positions, game folder,
-resolution, last/default profile, build state, and a few UI-state keys. It is
-backed by a ``settings_core.Schema`` like every other settings file, which means
-it is **strict**: every key the app reads/writes through the
+resolution, the active-profile pointer, build state, and a few UI-state keys.
+It is backed by a ``settings_core.Schema`` like every other settings file, which
+means it is **strict**: every key the app reads/writes through the
 ``get_setting``/``set_setting`` proxy (or ``app.settings``) MUST be a declared
 ``Field`` here, or it is erased on the next save.
 ``tests/test_prefs_schema_covers_all_proxy_keys.py`` greps the tree and fails CI
@@ -19,10 +19,7 @@ import logging
 from typing import Any
 
 from . import CONTENT_BASELINE_VERSION
-from .cast_timer import validate_config as _validate_cast_timer
-from .inspect import validate_config as _validate_inspect
 from .settings_core import Field, Migration, Schema, nullable_int
-from .stopwatch import validate_config as _validate_stopwatch
 from .userdata import PREFS_FILENAME
 
 logger = logging.getLogger(__name__)
@@ -107,7 +104,10 @@ def _upgrade_panel_font(data: dict) -> dict:
     related panel. Inspect defined the shared value, so it follows it from here;
     a stopwatch that disagreed keeps its number as a deliberate override.
 
-    Runs on the raw dict before `validate_all`, so the sub-dicts are untouched.
+    Runs on the raw dict before `validate_all`. The stopwatch/inspect configs
+    later moved into the profile document, so the sub-dicts this rung rewrites
+    are dropped as undeclared keys — its surviving effect is the lifted
+    `panel_font_size`. Frozen history; the body stays as written.
     """
     sizes = {name: _stored_font_size(data.get(name)) for name in ("inspect", "stopwatch")}
     shared = _PANEL_FONT_DEFAULT if sizes["inspect"] is None else sizes["inspect"]
@@ -137,16 +137,11 @@ PREFS_SCHEMA = Schema(
         "build_console": Field(False, kind="bool"),
         # Shared text size for the four in-game panels (see _upgrade_panel_font).
         # Stopwatch/inspect fall back to it whenever their own fontSize is None.
+        # Machine-local on purpose: it tracks the monitor, not the loadout —
+        # the three extras configs themselves live in the profile document.
         "panel_font_size": Field(
             _PANEL_FONT_DEFAULT, kind="int", min=_PANEL_FONT_MIN, max=_PANEL_FONT_MAX
         ),
-        # In-game stopwatch — ONE structured dict (defaults/clamps in stopwatch.py).
-        "stopwatch": Field({}, validate=_validate_stopwatch),
-        # Target inspect panel — ONE structured dict (defaults/clamps in inspect.py).
-        "inspect": Field({}, validate=_validate_inspect),
-        # Cast timer — ONE structured dict (defaults/clamps in cast_timer.py). Machine-local
-        # like the other two baked overlays: its X/Y depend on the screen, not the profile.
-        "cast_timer": Field({}, validate=_validate_cast_timer),
         # OTA reference content (Phase 4). content_version is the authoritative
         # comparison key (vs the server manifest); it defaults to the shipped
         # baseline so a fresh install knows it's current and fires no first-run OTA.

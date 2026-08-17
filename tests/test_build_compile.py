@@ -99,12 +99,13 @@ def test_console_feature_compiles():
 
 def test_cast_timer_feature_compiles():
     cast = {
+        "enabled": True,
         "enableP": True,
         "enableT": True,
-        "playerX": 900,
-        "playerY": 600,
-        "targetX": 900,
-        "targetY": 560,
+        "playerFx": 900 / 1920,
+        "playerFy": 600 / 1080,
+        "targetFx": 900 / 1920,
+        "targetFy": 560 / 1080,
         "bold": True,
         "fontSize": 18,
         "display": "both",
@@ -115,7 +116,7 @@ def test_cast_timer_feature_compiles():
 
 
 def test_stopwatch_feature_compiles():
-    sw = {"enabled": True, "x": 850, "y": 300, "startCollapsed": True}
+    sw = {"enabled": True, "fx": 850 / 1920, "fy": 300 / 1080, "startCollapsed": True}
     ok, msg, _ = _compile([_grid()], stopwatch_config=sw)
     assert ok, msg
 
@@ -123,7 +124,8 @@ def test_stopwatch_feature_compiles():
 def test_inspect_feature_compiles():
     # Doubles as the 32 KB-bytecode canary for the single-class stub: MTASC
     # hard-fails a class over the limit, so exit-0 here proves headroom.
-    ins = {"enabled": True, "x": 40, "y": 240, "fontSize": 12, "startCollapsed": True}
+    ins = {"enabled": True, "fx": 40 / 1920, "fy": 240 / 1080, "fontSize": 12,
+           "startCollapsed": True}
     ok, msg, _ = _compile([_grid()], inspect_config=ins)
     assert ok, msg
 
@@ -143,7 +145,8 @@ def test_shared_panel_font_at_a_non_default_size_compiles():
 
 
 def test_all_features_together_compile():
-    cast = {"enableP": True, "enableT": False, "playerX": 900, "playerY": 600}
+    cast = {"enabled": True, "enableP": True, "enableT": False,
+            "playerFx": 900 / 1920, "playerFy": 600 / 1080}
     sw = {"enabled": True}
     ins = {"enabled": True}
     ok, msg, _ = _compile([_grid()], include_console=True, cast_config=cast,

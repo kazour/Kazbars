@@ -17,11 +17,14 @@ from kazbars import (
     APP_NAME,
     buff_display_editor,
     build_action,
+    cast_timer,
     content_update,
     game_folder,
     grid_model,
+    inspect,
     live_tracker_settings,
     profile_io,
+    stopwatch,
     update_check,
 )
 from kazbars import __version__ as APP_VERSION
@@ -123,6 +126,11 @@ class KazBarsApp(ttkb.Window):
         self.registry = SectionRegistry()
         self.registry.register(grid_model.PROFILE_SECTION)
         self.registry.register(live_tracker_settings.PROFILE_SECTION)
+        # The three baked extras, in Extras-menu order (fixes their order in
+        # written documents).
+        self.registry.register(stopwatch.PROFILE_SECTION)
+        self.registry.register(inspect.PROFILE_SECTION)
+        self.registry.register(cast_timer.PROFILE_SECTION)
         self.library = ProfileLibrary(
             self.profiles_path, self.registry, profile_io.template_paths(self))
 
