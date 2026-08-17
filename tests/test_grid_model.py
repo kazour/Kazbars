@@ -1,11 +1,16 @@
 """Tests for `grid_model` load-time sanitation — `validate_grid` and
-`dedupe_grid_ids`.
+`dedupe_grid_ids` — plus the fraction↔pixel projection primitives
+(`unproject_px`/`project_px`).
 
 Profiles are hand-editable JSON (and arrive via share-string import), so
 validate_grid must coerce junk values to defaults instead of raising — a bad
 value in `last_profile` would otherwise crash the app at launch — and
 duplicate grid names (which key the generated AS2 whitelist tables) must be
 renamed, not trusted.
+
+Projection is the fraction coordinate model's boundary: fractions store full
+floats and rounding happens only in `project_px`, so px → fraction → px must
+round-trip exactly at the same resolution.
 
 Run: `pytest tests/test_grid_model.py` (from repo root).
 """
@@ -14,6 +19,8 @@ from kazbars.grid_model import (
     CLAMP_SPECS,
     create_default_grid,
     dedupe_grid_ids,
+    project_px,
+    unproject_px,
     validate_grid,
 )
 
@@ -77,3 +84,44 @@ def test_dedupe_grid_ids_no_duplicates_is_a_no_op():
     grids = [{"id": "A"}, {"id": "B"}]
     assert dedupe_grid_ids(grids) == []
     assert [g["id"] for g in grids] == ["A", "B"]
+
+
+# --------------------------------------------------------------------------- #
+# Fraction ↔ pixel projection
+# --------------------------------------------------------------------------- #
+
+RESOLUTIONS = [(1920, 1080), (2560, 1440), (3840, 2160)]
+
+
+def test_projection_round_trips_every_pixel_at_common_resolutions():
+    for w, h in RESOLUTIONS:
+        for extent in (w, h):
+            for px in range(extent + 1):
+                assert project_px(unproject_px(px, extent), extent) == px
+
+
+def test_unproject_clamps_to_unit_range():
+    assert unproject_px(-50, 1920) == 0.0
+    assert unproject_px(5000, 1920) == 1.0
+    assert unproject_px(0, 1920) == 0.0
+    assert unproject_px(1920, 1920) == 1.0
+
+
+def test_unproject_non_positive_extent_is_zero():
+    assert unproject_px(100, 0) == 0.0
+    assert unproject_px(100, -1) == 0.0
+
+
+def test_project_clamps_fraction_overshoot():
+    assert project_px(-0.25, 1920) == 0
+    assert project_px(1.25, 1920) == 1920
+
+
+def test_projection_is_proportional_across_resolutions():
+    # A 1440p-authored point lands at the same screen spot proportionally
+    # on other resolutions — the whole point of storing fractions.
+    f = unproject_px(1280, 2560)
+    assert f == 0.5
+    assert project_px(f, 1920) == 960
+    assert project_px(f, 3840) == 1920
+    assert project_px(unproject_px(1224, 1440), 1080) == 918

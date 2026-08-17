@@ -13,6 +13,10 @@ not a `Field` is erased on the next save. A dynamic key namespace (e.g. per-wind
 positions) must therefore be modelled as a single structured-dict `Field` with a
 custom `validate=`, not as N top-level keys.
 
+A `Schema` may also validate a document *slice* that never owns a file of its own
+(profile-document sections): declare it with `filename=''` and skip the file I/O
+helpers — validation, defaults, and `validate_patch` work the same either way.
+
 Imports only stdlib + `settings_manager.safe_save_json` — safe on the mypy gate
 and importable from CI without the UI extra.
 """
@@ -178,6 +182,20 @@ def validate_all(schema: Schema, raw: Any) -> dict[str, Any]:
         if key in schema.fields:
             result[key] = _coerce_field(schema.fields[key], value)
     return result
+
+
+def validate_patch(schema: Schema, raw: Any) -> dict[str, Any]:
+    """Coerce only the declared keys *present* in `raw` — no fill-missing. The
+    sparse-override primitive: an absent key means "no opinion" (defer to a
+    baseline held elsewhere), which `validate_all` cannot express because it
+    fills every declared field. Unknown keys drop; non-dict → `{}`."""
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        key: _coerce_field(schema.fields[key], value)
+        for key, value in raw.items()
+        if key in schema.fields
+    }
 
 
 # =========================================================================== #
