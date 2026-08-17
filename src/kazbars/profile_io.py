@@ -14,15 +14,23 @@ the main window is withdrawn.
 """
 
 import copy
+import json
 import logging
 import os
+from pathlib import Path
+from tkinter import filedialog
 
 from ttkbootstrap.dialogs import Messagebox, MessageDialog, Querybox
 
+from . import profile_share
+from .buff_db_layers import DeltaStore
 from .grid_model import get_game_resolution_or_default
+from .profile_document import DocumentError, mint_id, validate_document
+from .profile_library import slugify
 from .profile_store import ProfileStore
+from .settings_manager import safe_save_json
 from .ui_widgets import app_toast
-from .userdata import content_dir
+from .userdata import content_dir, database_user_path
 
 logger = logging.getLogger(__name__)
 
@@ -210,3 +218,84 @@ def revert_session(app):
 
 def open_profiles_folder(app):
     os.startfile(str(app.library.profiles_dir))
+
+
+def export_profile(app):
+    """File ▸ Export profile… — one self-contained `.kazbars.json` envelope:
+    the flushed document plus every referenced custom buff."""
+    store = app.profile_store
+    store.flush()
+    doc = store.document
+    path = filedialog.asksaveasfilename(
+        title="Export Profile",
+        defaultextension=".kazbars.json",
+        initialfile=f"{slugify(doc['name'])}.kazbars.json",
+        filetypes=[("KazBars profile", "*.kazbars.json"), ("JSON files", "*.json")],
+    )
+    if not path:
+        return
+    envelope = profile_share.build_export(
+        app.registry, doc, app.database.by_id, app.database.by_name,
+        app.database.provenance)
+    try:
+        safe_save_json(Path(path), envelope)
+    except OSError as e:
+        Messagebox.show_error(f"Could not write the export file.\n\n({e})",
+                              title="Export Failed")
+        return
+    n = len(envelope['buffs'])
+    suffix = f" (+{n} custom buff{'s' if n != 1 else ''})" if n else ""
+    app_toast(app, f"Exported “{doc['name']}”{suffix}", 'success')
+
+
+def import_profile(app):
+    """File ▸ Import profile… — read an export envelope (or a bare document
+    file), run it through the gate, mint a fresh id, merge embedded custom
+    buffs, and switch to it."""
+    path = filedialog.askopenfilename(
+        title="Import Profile",
+        initialdir=str(app.library.profiles_dir),
+        filetypes=[("KazBars profile", "*.json *.kazbars.json"), ("All files", "*.*")],
+    )
+    if not path:
+        return
+    try:
+        raw = json.loads(Path(path).read_text(encoding='utf-8'))
+        profile_raw, embedded = profile_share.parse_export(raw)
+        doc = validate_document(app.registry, profile_raw)
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        Messagebox.show_error("That file couldn't be read as a KazBars profile.",
+                              title="Import Failed")
+        return
+    except (ValueError, DocumentError) as e:
+        # DocumentError is a ValueError; both carry user-presentable messages
+        # (incl. the old-format "older KazBars" rejection).
+        Messagebox.show_error(str(e), title="Import Failed")
+        return
+
+    app.profile_store.flush()
+    doc['id'] = mint_id()
+    doc['name'] = app.library.unique_name(doc['name'])
+    if app.library.write(doc) is None:
+        Messagebox.show_error("Could not save the imported profile.",
+                              title="Import Failed")
+        return
+
+    added = skipped = 0
+    if embedded:
+        existing_names = {b.get('name') for b in app.database.buffs if b.get('name')}
+        added, skipped = profile_share.merge_imported_buffs(
+            DeltaStore(database_user_path()), embedded,
+            existing_ids=set(app.database.by_id), existing_names=existing_names)
+        if added:
+            app.database.reload()
+            app.db_panel.refresh_from_database()
+
+    app.profile_store = make_store(app, doc)
+    apply_document(app)
+    parts = [f"Imported “{doc['name']}”"]
+    if added:
+        parts.append(f"{added} custom buff{'s' if added != 1 else ''} added")
+    if skipped:
+        parts.append(f"{skipped} already existed")
+    app_toast(app, " — ".join(parts), 'success')

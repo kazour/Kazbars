@@ -1,93 +1,96 @@
-"""KazBars — self-contained profile share strings (pure codec, no Tk).
+"""KazBars — self-contained profile export files (pure data layer, no Tk).
 
-A profile export is a portable ``KZBARS1:<base64(gzip(json))>`` string that
-embeds not just the profile but **any user-DB buffs it references** — so a
-profile built around custom buffs survives a paste into a fresh install whose
-shipped database has never heard of them.
+A profile export is one JSON file — the envelope ``{format, export_schema,
+profile, buffs}`` — that embeds not just the document but **any user-DB buffs
+it references**, so a profile built around custom buffs survives import into
+a fresh install whose shipped database has never heard of them.
 
-  - ``encode_profile(profile, embedded_buffs)`` → the string.
-  - ``decode_profile(string)`` → ``(profile, embedded_buffs)``; raises
-    ``ValueError`` on anything malformed/truncated.
-  - ``collect_referenced_user_buffs(profile, by_id, by_name, provenance)`` →
-    exactly the referenced buffs whose provenance is ``user`` (resolving both
-    int-ID and legacy name refs to ``ids[0]``), so the export is self-contained.
+  - ``build_export(registry, doc, by_id, by_name, provenance)`` → envelope.
+  - ``parse_export(raw)`` → ``(profile_raw, embedded_buffs)``; accepts the
+    envelope or a bare document (a file copied straight out of ``profiles/``
+    — no buffs ride along); raises ``ValueError`` otherwise. The profile
+    itself is validated downstream by ``profile_document.validate_document``
+    (which is also what gives an old-format profile its "older KazBars"
+    rejection).
+  - ``collect_embedded_buffs(...)`` → exactly the referenced buffs whose
+    provenance is ``user``, sourced from each registered section's
+    ``harvest_refs`` hook (int-ID and legacy name refs both resolve to
+    ``ids[0]``).
   - ``merge_imported_buffs(delta_store, embedded_buffs, existing_ids,
-    existing_names)`` → merge of embedded buffs into ``database_user.json``:
-    skip on an ID collision, rename on a name-only collision.
+    existing_names)`` → merge into ``database_user.json``: skip on an ID
+    collision, rename on a name-only collision.
 
 Pure — stdlib + ``buff_db_layers`` (the ``ids[0]`` identity helper) only.
 """
 
-import base64
-import binascii
-import gzip
-import json
+import copy
 
 from . import buff_db_layers
 
-PREFIX = "KZBARS1:"
+EXPORT_FORMAT = 'kazbars-profile-export'
+EXPORT_SCHEMA = 1
 
 
-def encode_profile(profile, embedded_buffs):
-    """Pack ``{profile, buffs}`` → ``KZBARS1:<base64(gzip(json))>``."""
-    payload = {"profile": profile, "buffs": embedded_buffs}
-    raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
-    return PREFIX + base64.b64encode(gzip.compress(raw)).decode("ascii")
+def build_export(registry, doc, by_id, by_name, provenance):
+    """The export envelope for `doc`: full document (deep-copied) plus every
+    referenced user-provenance buff."""
+    return {
+        'format': EXPORT_FORMAT,
+        'export_schema': EXPORT_SCHEMA,
+        'profile': copy.deepcopy(doc),
+        'buffs': collect_embedded_buffs(registry, doc, by_id, by_name, provenance),
+    }
 
 
-def decode_profile(string):
-    """``KZBARS1:…`` → ``(profile, embedded_buffs)``. Raises ``ValueError`` on a
-    wrong prefix or corrupt/truncated payload."""
-    s = (string or "").strip()
-    if not s.startswith(PREFIX):
-        raise ValueError("That doesn't look like a KazBars profile string.")
-    try:
-        packed = base64.b64decode(s[len(PREFIX):], validate=True)
-        raw = gzip.decompress(packed)
-        payload = json.loads(raw.decode("utf-8"))
-    except (binascii.Error, OSError, EOFError, ValueError, UnicodeDecodeError) as e:
-        raise ValueError("This profile string is corrupt or incomplete.") from e
-    if not isinstance(payload, dict) or not isinstance(payload.get("profile"), dict):
-        raise ValueError("This profile string is missing its profile data.")
-    buffs = payload.get("buffs", [])
-    return payload["profile"], buffs if isinstance(buffs, list) else []
+def parse_export(raw):
+    """A loaded JSON object → ``(profile_raw, embedded_buffs)``.
+
+    Accepts the export envelope or a bare profile document; anything else
+    raises ``ValueError`` with a user-presentable message. Old-format bare
+    profiles pass through so the document gate downstream rejects them with
+    its own "older KazBars" message."""
+    if not isinstance(raw, dict):
+        raise ValueError("That file isn't a KazBars profile.")
+    if raw.get('format') == EXPORT_FORMAT:
+        schema = raw.get('export_schema', 1)
+        if isinstance(schema, int) and schema > EXPORT_SCHEMA:
+            raise ValueError('This export needs a newer KazBars — update the app first.')
+        profile = raw.get('profile')
+        if not isinstance(profile, dict):
+            raise ValueError('This export file is missing its profile data.')
+        buffs = raw.get('buffs', [])
+        return profile, buffs if isinstance(buffs, list) else []
+    if any(key in raw for key in ('modules', 'schema', 'profile_schema', 'grids')):
+        return raw, []
+    raise ValueError("That file isn't a KazBars profile.")
 
 
-def collect_referenced_user_buffs(profile, by_id, by_name, provenance):
-    """The user-provenance buffs a profile references — the ones an importer
-    wouldn't already have. Walks whitelist + slotAssignments, resolving both int
-    IDs and legacy name strings to ``ids[0]``, then keeps only ``user`` buffs."""
+def collect_embedded_buffs(registry, doc, by_id, by_name, provenance):
+    """The user-provenance buffs `doc` references — the ones an importer
+    wouldn't already have. Refs come from each registered section's
+    ``harvest_refs`` hook; int IDs and legacy name strings both resolve to
+    ``ids[0]``; only ``user`` buffs embed (stock/OTA the importer has).
+    Deterministic order (sorted by primary id)."""
     referenced = set()
-
-    def _add(ref):
-        if isinstance(ref, bool):
-            return
-        if isinstance(ref, int):
-            entry = by_id.get(ref)
-        elif isinstance(ref, str):
-            entry = by_name.get(ref)
-        else:
-            return
-        if entry and entry.get("ids"):
-            referenced.add(entry["ids"][0])
-
-    for grid in profile.get("grids", []):
-        for ref in grid.get("whitelist", []):
-            _add(ref)
-        for val in grid.get("slotAssignments", {}).values():
-            if isinstance(val, list):
-                for ref in val:
-                    _add(ref)
+    modules = doc.get('modules', {})
+    for spec in registry.specs():
+        if spec.harvest_refs is None:
+            continue
+        for ref in spec.harvest_refs(modules.get(spec.key, {})):
+            if isinstance(ref, bool):
+                continue
+            if isinstance(ref, int):
+                entry = by_id.get(ref)
+            elif isinstance(ref, str):
+                entry = by_name.get(ref)
             else:
-                _add(val)
-
-    out = []
-    seen = set()
-    for rid in referenced:
-        if provenance.get(rid) == "user" and rid in by_id and rid not in seen:
-            out.append(by_id[rid])
-            seen.add(rid)
-    return out
+                continue
+            if entry and entry.get('ids'):
+                referenced.add(entry['ids'][0])
+    return [
+        by_id[rid] for rid in sorted(referenced)
+        if provenance.get(rid) == 'user' and rid in by_id
+    ]
 
 
 def _unique_name(name, taken):
@@ -109,7 +112,7 @@ def merge_imported_buffs(delta_store, embedded_buffs, existing_ids, existing_nam
     A buff whose *name* collides (but whose ids are all new) is kept and renamed
     unique (``"X (imported)"``): the profile's grids reference ids, not names, so
     the buff still resolves while the DB editor stays unambiguous. Structurally
-    malformed embedded entries (a crafted/corrupt share string) are dropped.
+    malformed embedded entries (a crafted/corrupt export file) are dropped.
     Returns ``(added, skipped)`` — renamed buffs count as added; writes only if
     something was added."""
     delta = delta_store.load()

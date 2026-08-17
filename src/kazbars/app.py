@@ -448,6 +448,10 @@ class KazBarsApp(ttkb.Window):
             {'type': 'command', 'label': 'Revert to session start',
              'command': self._revert_profile},
             {'type': 'separator'},
+            {'type': 'command', 'label': 'Export profile…',
+             'command': self._export_profile},
+            {'type': 'command', 'label': 'Import profile…',
+             'command': self._import_profile},
             {'type': 'command', 'label': 'Open profiles folder',
              'command': self._open_profiles_folder},
             {'type': 'separator'},
@@ -704,6 +708,12 @@ class KazBarsApp(ttkb.Window):
 
     def _open_profiles_folder(self):
         return profile_io.open_profiles_folder(self)
+
+    def _export_profile(self):
+        return profile_io.export_profile(self)
+
+    def _import_profile(self):
+        return profile_io.import_profile(self)
 
     # ========================================================================
     # BUILD PIPELINE
