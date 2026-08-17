@@ -333,7 +333,15 @@ class AddGridWizard(tk.Toplevel):
 # BUFF SELECTOR DIALOG
 # ============================================================================
 class BuffSelectorDialog(tk.Toplevel):
-    """Dual-list dialog for selecting buff names from the database."""
+    """Dual-list dialog for selecting buff names from the database.
+
+    Refs the database can't resolve (a shared profile's custom buff that never
+    arrived, a removed catalog entry) are *inert, not lost*: they render as
+    greyed "unknown buff" rows at the bottom of the Selected list, survive OK
+    untouched, and can be removed like any other row — the one place a stored
+    ref may be dropped is this explicit act. They revive on their own once a
+    database update or import supplies the buff again.
+    """
 
     def __init__(self, parent, database, title="Select Buffs", initial_ids=None, layout='mixed'):
         super().__init__(parent)
@@ -346,10 +354,16 @@ class BuffSelectorDialog(tk.Toplevel):
         self.database = database
         self.layout = layout
         self.selected_names = set()
+        self.unknown_refs = []  # unresolvable refs (int id / legacy name), kept inert
         for bid in (initial_ids or []):
-            entry = database.by_id.get(bid)
+            if isinstance(bid, str):
+                entry = database.get_entry_by_name(bid)
+            else:
+                entry = database.by_id.get(bid)
             if entry:
                 self.selected_names.add(entry['name'])
+            else:
+                self.unknown_refs.append(bid)
         self.result = None
         self._search_cache_key = None
         self._search_cache_value = None
@@ -504,14 +518,24 @@ class BuffSelectorDialog(tk.Toplevel):
                 self.sel_list.itemconfig(idx, foreground=fg)
             self.sel_data.append({'name': entry['name'], 'ids': entry['ids']})
 
+        # Inert refs cluster at the bottom, greyed — present so they can be
+        # removed on purpose, dim so they read as not-in-the-next-build.
+        for ref in self.unknown_refs:
+            idx = self.sel_list.size()
+            label = f"unknown buff (#{ref})" if isinstance(ref, int) else f"unknown buff ({ref})"
+            self.sel_list.insert(tk.END, label)
+            self.sel_list.itemconfig(idx, foreground=TK_COLORS['dim_text'])
+            self.sel_data.append({'unknown': ref})
+
         count = len(self.selected_names)
-        if count == 0:
+        unresolved = f" + {len(self.unknown_refs)} unresolved" if self.unknown_refs else ""
+        if count == 0 and not self.unknown_refs:
             if self.avail_data:
                 self.status_var.set("0 buffs selected. Add from the left list.")
             else:
                 self.status_var.set("0 buffs selected. No buffs match the current filters.")
         else:
-            self.status_var.set(f"{count} buffs selected")
+            self.status_var.set(f"{count} buffs selected{unresolved}")
 
     def add_selected(self):
         for i in self.avail_list.curselection():
@@ -520,7 +544,11 @@ class BuffSelectorDialog(tk.Toplevel):
 
     def remove_selected(self):
         for i in self.sel_list.curselection():
-            self.selected_names.discard(self.sel_data[i]['name'])
+            entry = self.sel_data[i]
+            if 'unknown' in entry:
+                self.unknown_refs.remove(entry['unknown'])
+            else:
+                self.selected_names.discard(entry['name'])
         self.refresh_lists()
 
     def add_all(self):
@@ -530,6 +558,7 @@ class BuffSelectorDialog(tk.Toplevel):
 
     def clear_all(self):
         self.selected_names.clear()
+        self.unknown_refs.clear()
         self.refresh_lists()
 
     def on_ok(self):
@@ -539,6 +568,8 @@ class BuffSelectorDialog(tk.Toplevel):
             entry = self.database.get_entry_by_name(name)
             if entry and entry.get('ids'):
                 self.result.append(entry['ids'][0])
+        # Inert refs the user didn't explicitly remove ride along unchanged.
+        self.result.extend(self.unknown_refs)
         self.destroy()
 
     def on_cancel(self):

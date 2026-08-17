@@ -23,7 +23,7 @@ from .build_utils import find_compiler
 from .cast_timer import is_enabled as cast_is_enabled
 from .cast_timer import validate_config as validate_cast_config
 from .grid_model import get_game_resolution_or_default
-from .grids_generator import MAX_TOTAL_SLOTS
+from .grids_generator import MAX_TOTAL_SLOTS, unresolved_refs
 from .ui_helpers import THEME_COLORS
 from .ui_widgets import app_toast, confirm, flash_status_bar
 
@@ -172,6 +172,9 @@ def build(app):
         'di_enabled': di_enabled,
         'di_settings': di_settings,
         'profile_name': profile_name,
+        # Inert refs the generator will skip — the summary reports the count
+        # (the old load-time missing-buff warning retired into this line).
+        'unresolved': len(unresolved_refs(grids, app.database)),
     }
 
     loading = BuildLoadingScreen(app)
@@ -285,7 +288,8 @@ def _finish_success(app, loading, staging_dir, ctx, compile_result, ok, err,
         client_results = [(game_folder.format_game_path(ctx['game_path']), ok, err)]
         loading.show_summary(
             client_results, compile_result, profile_name=ctx['profile_name'],
-            game_running=game_running, flag_supported=flag_supported)
+            game_running=game_running, flag_supported=flag_supported,
+            unresolved=ctx['unresolved'])
     finally:
         _unlock(app, staging_dir)
 

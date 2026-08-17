@@ -7,10 +7,11 @@ first arg. There is no Save/Open/dirty machinery: the store autosaves, the
 library owns files, and the only pointers are the in-document id and the
 `active_profile` pref.
 
-`apply_document` is the dispatch step (grids panel, boss timer, authored_at
-rescale, pointer, title, File menu). It must run before `app.deiconify()`
-at startup so `warn_missing_buffs` correctly defers via `app.after()` while
-the main window is withdrawn.
+`apply_document` is the dispatch step (grids panel, live overlays, extras
+cards, pointer, title, File menu). It runs before `app.deiconify()` at
+startup so panels are populated before the window shows. Unresolved buff
+refs raise no dialog — they surface as greyed rows in the buff selector and
+as the build summary's skipped-count line.
 """
 
 import copy
@@ -79,16 +80,18 @@ def startup_profile(app):
 def apply_document(app):
     """Dispatch the store's document into the running app.
 
-    Side effects: grids panel (missing-ref warning), live BossTimer + Deeps
-    overlays (if open), extras shortcut cards, `active_profile` pref, window
-    title, File menu profile rows. Positions are fractions — no resolution
-    rescale exists; `authored_at` is display-only provenance.
+    Side effects: grids panel, live BossTimer + Deeps overlays (if open),
+    extras shortcut cards, `active_profile` pref, window title, File menu
+    profile rows. Positions are fractions — no resolution rescale exists;
+    `authored_at` is display-only provenance.
     """
     store = app.profile_store
     grids = copy.deepcopy(store.get_section('grids').get('grids', []))
     missing_by_grid = app.grids_panel.load_profile_data(grids)
     if missing_by_grid:
-        warn_missing_buffs(app, missing_by_grid)
+        # No dialog: inert refs are visible as greyed rows in the buff
+        # selector, and the build summary reports the skipped count.
+        logger.info("Unresolved buff refs (kept, skipped at build): %s", missing_by_grid)
 
     if bt := app._boss_timer_if_alive():
         bt.load_profile_data(store.get_section('boss_timer'))
@@ -103,26 +106,6 @@ def apply_document(app):
     app.settings.save()
     app._update_title()
     app._refresh_file_menu()
-
-
-def warn_missing_buffs(app, missing_by_grid):
-    """Show the missing-buff warning, deferring if the main window isn't viewable yet."""
-    lines = [f"• {name}: {', '.join(str(r) for r in refs)}" for name, refs in missing_by_grid.items()]
-    message = (
-        "Some tracked buffs weren't found in the database:\n\n"
-        + "\n".join(lines) +
-        "\n\nThey stay in this profile but are skipped at build until the "
-        "buff exists again (a database update can bring them back)."
-    )
-    def _show():
-        Messagebox.show_warning(message, title="Missing Buff References")
-    # During startup apply_document runs while the main window is still
-    # withdrawn; show sync otherwise so the dialog blocks further code
-    # (e.g. first-launch welcome popup) instead of stacking on top of it.
-    if app.winfo_viewable():
-        _show()
-    else:
-        app.after(200, _show)
 
 
 def switch_profile(app, profile_id):
