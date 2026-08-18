@@ -105,17 +105,17 @@ class KazBarsConsole extends KazBarsPanel {
     }
 
     // Master switch: the console's active state IS the clip's existence.
-    // createConsole/removeConsole already carry logs, position and fold across
+    // create()/removeConsole() already carry logs, position and fold across
     // the flip, so no second flag can drift from the truth.
     public function setActive(shown:Boolean):Void {
         if (shown) {
-            if (panelClip == null) createConsole();
+            if (panelClip == null) create();
         } else {
             removeConsole();
         }
     }
 
-    public function createConsole():Void {
+    public function create():Void {
         if (panelClip != null) panelClip.removeMovieClip();
         panelClip = rootClip.createEmptyMovieClip("buffConsole", rootClip.getNextHighestDepth());
 
@@ -208,7 +208,7 @@ class KazBarsConsole extends KazBarsPanel {
     // and re-clamped, so nothing is lost.
     private function rebuild():Void {
         capturePos();
-        createConsole();
+        create();
     }
 
     // Two plates, not one at two heights: the 500x320 sheet, and the labelled
@@ -350,7 +350,7 @@ class KazBarsConsole extends KazBarsPanel {
         // master switch was saved off.
         var v:Object = config.FindEntry("cnv");
         if (v !== undefined && v == 0) removeConsole();
-        else createConsole();
+        else create();
     }
 
     public function saveState(config:Object):Void {

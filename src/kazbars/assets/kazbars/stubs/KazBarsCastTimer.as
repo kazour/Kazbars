@@ -9,9 +9,9 @@
 // control panel's master switch (ctv) — inactive renders nothing, live
 // casts included.
 //
-// Driven from KazBars: createFields() in onLoad, connectPlayer()/setTarget()
+// Driven from KazBars: create() in onLoad, connectPlayer()/setTarget()
 // from the existing player/target lifecycle, previewOn()/previewOff() from the
-// shared Shift+Ctrl+Alt preview, load/savePositions() from the module archive.
+// shared Shift+Ctrl+Alt preview, loadState()/saveState() from the module archive.
 class KazBarsCastTimer {
     private var rootClip:MovieClip;
 
@@ -73,7 +73,7 @@ class KazBarsCastTimer {
         COLOR = Number(cfg.color);
     }
 
-    public function createFields():Void {
+    public function create():Void {
         if (ENABLE_P) m_PlayerClip = makeClip("kbCastP", PLAYER_X, PLAYER_Y);
         if (ENABLE_T) m_TargetClip = makeClip("kbCastT", TARGET_X, TARGET_Y);
         // Frame-coherent update driver. Its own onEnterFrame reads getTimer() and
@@ -385,7 +385,7 @@ class KazBarsCastTimer {
     // Persistence (module config archive — permanent for every user)
     // =========================================================================
 
-    public function loadPositions(config:Object):Void {
+    public function loadState(config:Object):Void {
         if (config == null) return;
         applyPos(m_PlayerClip, config.FindEntry("ctpx"), config.FindEntry("ctpy"));
         applyPos(m_TargetClip, config.FindEntry("cttx"), config.FindEntry("ctty"));
@@ -398,7 +398,7 @@ class KazBarsCastTimer {
         if (x !== undefined && y !== undefined) { clip._x = Number(x); clip._y = Number(y); }
     }
 
-    public function savePositions(config:Object):Void {
+    public function saveState(config:Object):Void {
         if (config == null) return;
         if (m_PlayerClip != null) { config.ReplaceEntry("ctpx", m_PlayerClip._x); config.ReplaceEntry("ctpy", m_PlayerClip._y); }
         if (m_TargetClip != null) { config.ReplaceEntry("cttx", m_TargetClip._x); config.ReplaceEntry("ctty", m_TargetClip._y); }

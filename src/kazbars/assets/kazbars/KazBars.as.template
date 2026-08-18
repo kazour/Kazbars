@@ -839,7 +839,7 @@ class KazBars {
             console.saveState(config);
 //#end
 //#if CAST
-            castTimer.savePositions(config);
+            castTimer.saveState(config);
 //#end
 //#if SW
             stopwatch.saveState(config);
@@ -927,16 +927,16 @@ class KazBars {
         Key.addListener(keyListener);
         createAllGrids();
 //#if CAST
-        castTimer.createFields();
+        castTimer.create();
 //#end
 //#if SW
-        stopwatch.createPanel();
+        stopwatch.create();
 //#end
 //#if INS
-        inspect.createPanel();
+        inspect.create();
 //#end
 //#if CONSOLE  // open at login is the default a first-ever session gets, before any archived state exists to say otherwise
-        console.createConsole();
+        console.create();
 //#end
         try {
             com.GameInterface.Game.CharacterBase.SignalClientCharacterAlive.Connect(SlotAlive, this);
@@ -971,7 +971,7 @@ class KazBars {
             console.loadState(config);
 //#end
 //#if CAST
-            castTimer.loadPositions(config);
+            castTimer.loadState(config);
 //#end
 //#if SW
             stopwatch.loadState(config);
@@ -996,7 +996,7 @@ class KazBars {
             console.saveState(config);
 //#end
 //#if CAST
-            castTimer.savePositions(config);
+            castTimer.saveState(config);
 //#end
 //#if SW
             stopwatch.saveState(config);

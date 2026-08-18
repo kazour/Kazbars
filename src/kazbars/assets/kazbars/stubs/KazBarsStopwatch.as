@@ -16,7 +16,7 @@
 // state persist for every user via the module config archive (swx/swy/swc,
 // and the control-panel master switch swv).
 //
-// Driven from KazBars: createPanel() in onLoad, loadState()/saveState() from
+// Driven from KazBars: create() in onLoad, loadState()/saveState() from
 // the module archive, cleanup() on deactivate.
 class KazBarsStopwatch extends KazBarsPanel {
 
@@ -89,7 +89,7 @@ class KazBarsStopwatch extends KazBarsPanel {
         BTN_W = Math.floor((W - BTN_PAD * 2 - BTN_GAP * 2) / 3);
     }
 
-    public function createPanel():Void {
+    public function create():Void {
         panelClip = rootClip.createEmptyMovieClip("kbStopwatch", rootClip.getNextHighestDepth());
         panelClip._x = START_X;
         panelClip._y = START_Y;

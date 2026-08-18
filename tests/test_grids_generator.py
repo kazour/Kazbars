@@ -131,7 +131,7 @@ def test_console_on_emits_console_hooks():
     # The five inline call sites
     assert "console.logPlayer(buff.m_Name, bid)" in main_code
     assert "console.logTarget(buff.m_Name, bid)" in main_code
-    assert "console.createConsole();" in main_code
+    assert "console.create();" in main_code
     assert "console.removeConsole();" in main_code
 
     # Persistence lives wholly inside the stub — the core drives the two
@@ -216,11 +216,11 @@ def test_cast_on_emits_hooks_and_data():
     assert "castTimer.configure(d.CAST);" in main_code
 
     # Lifecycle hooks
-    assert "castTimer.createFields();" in main_code
+    assert "castTimer.create();" in main_code
     assert "castTimer.connectPlayer(m_Player);" in main_code
     assert "castTimer.setTarget(m_Target);" in main_code
     assert "castTimer.previewOn();" in main_code
-    assert "castTimer.savePositions(config);" in main_code
+    assert "castTimer.saveState(config);" in main_code
     assert "castTimer.cleanup();" in main_code
 
     # Data block — fractions project to px at the default build resolution;
@@ -279,7 +279,7 @@ def test_stopwatch_on_emits_hooks_and_data():
     assert "stopwatch.configure(d.SW);" in main_code
 
     # Lifecycle hooks
-    assert "stopwatch.createPanel();" in main_code
+    assert "stopwatch.create();" in main_code
     assert "stopwatch.loadState(config);" in main_code
     assert "stopwatch.saveState(config);" in main_code
     assert "stopwatch.cleanup();" in main_code
@@ -358,7 +358,7 @@ def test_inspect_on_emits_hooks_and_data():
     assert "inspect.configure(d.INS);" in main_code
 
     # Lifecycle hooks
-    assert "inspect.createPanel();" in main_code
+    assert "inspect.create();" in main_code
     assert "inspect.setSubject(tid);" in main_code
     assert "inspect.previewOn();" in main_code
     assert "inspect.previewOff();" in main_code
@@ -529,9 +529,9 @@ def test_console_master_switch_defaults_active():
     (cnv) is honoured inside the stub's loadState on activation."""
     main_code, _ = _all_extras_gen().generate()
 
-    assert main_code.index("console.createConsole();") < main_code.index(
+    assert main_code.index("console.create();") < main_code.index(
         "SignalClientCharacterAlive")
-    assert main_code.index("console.createConsole();") < main_code.index(
+    assert main_code.index("console.create();") < main_code.index(
         "console.loadState(config);")
     assert "console_pin" not in main_code
 

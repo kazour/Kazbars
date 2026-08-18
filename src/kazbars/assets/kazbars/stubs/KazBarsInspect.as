@@ -26,7 +26,7 @@
 // inv). All geometry
 // derives from fontSize.
 //
-// Driven from KazBars: createPanel() in onLoad, setSubject() from
+// Driven from KazBars: create() in onLoad, setSubject() from
 // SlotTargetChanged (first statement, so clears and raw tids both arrive),
 // loadState()/saveState() from the module archive, previewOn()/previewOff()
 // from the shared preview, cleanup() on deactivate.
@@ -213,7 +213,7 @@ class KazBarsInspect extends KazBarsPanel {
         return tf;
     }
 
-    public function createPanel():Void {
+    public function create():Void {
         // The host re-runs onLoad on this same instance; without this the old
         // interval and clip both leak.
         if (pollIv != null) {
@@ -1174,7 +1174,7 @@ class KazBarsInspect extends KazBarsPanel {
     }
 
     // Hover -> perk name. Driven by mouse movement rather than rollover
-    // handlers so the row stays click-through (createPanel), and hit-tested
+    // handlers so the row stays click-through (create()), and hit-tested
     // arithmetically in panel space: the boxes are a known pitch from PAD, so
     // no hitTest call and no dependence on where rootClip sits.
     public function hoverTick():Void {
