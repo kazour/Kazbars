@@ -144,6 +144,9 @@ class ExtrasShortcutsRow(ttk.Frame):
         on = bool(tile['var'].get())
         tile['write'](self.app, on)
         self.refresh()
+        # The row's parent is GridsPanel; a flipped gate changes what the next
+        # build bakes, so its status row re-checks.
+        self.master.refresh_build_status()
         if on:
             msg = f"{tile['title']} on — Build & Install to apply"
             app_toast(self, msg, 'success', key=f'extras_{key}')

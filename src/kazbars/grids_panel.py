@@ -21,8 +21,10 @@ from .grid_model import (
     create_default_grid,
     dedupe_grid_ids,
     default_grid_name,
+    get_game_resolution_or_default,
     validate_grid,
 )
+from .profile_document import build_signature
 from .settings_manager import get_setting
 from .ui_components import DragReorderManager, create_scrollable_frame
 from .ui_forms import draw_grid_cells
@@ -104,9 +106,14 @@ class GridsPanel(ttk.Frame):
         # too. The state widgets pack after it and land below; the tip bar
         # anchors `before` it.
         self.extras_row = None
+        self._build_status_lbl = None
         if self.app is not None:
             self.extras_row = ExtrasShortcutsRow(self, self.app)
             self.extras_row.pack(fill='x', padx=PAD_TAB, pady=(PAD_XS, 0))
+            # In-game status line under the cards — packed by
+            # refresh_build_status() once a build has been recorded.
+            self._build_status_lbl = ttk.Label(self, font=FONT_SMALL,
+                                               foreground=THEME_COLORS['muted'])
 
         content = ttk.Frame(self._normal_view)
         content.pack(fill='both', expand=True, padx=PAD_SMALL, pady=PAD_SMALL)
@@ -338,15 +345,50 @@ class GridsPanel(ttk.Frame):
         went on to run is no reason to put it back in front of them."""
         self._build_done = True
         self._update_tip()
+        # build_action recorded last_build just before this call.
+        self.refresh_build_status()
 
     def notify_game_path_changed(self):
         """Called when the active game folder changes."""
         self._update_tip()
 
     def refresh_extras_shortcuts(self):
-        """Resync the extras shortcut cards after an Extras dialog Apply."""
+        """Resync the extras shortcut cards after an Extras dialog Apply (and,
+        via apply_document, on every profile switch). The status row rides
+        along — every path that changes a BUILD section goes through here or
+        `_mark_modified`."""
         if self.extras_row is not None:
             self.extras_row.refresh()
+        self.refresh_build_status()
+
+    def refresh_build_status(self):
+        """Sync the in-game status line: which profile the installed SWF was
+        built from, and whether the live document (BUILD sections + target
+        resolution) still matches it. No modal anywhere — staleness is a quiet
+        row, not an interruption. Hidden until a build is recorded."""
+        if self._build_status_lbl is None:
+            return
+        last = self.app.settings.get('last_build') or {}
+        store = self.app.profile_store
+        if not last or store is None:
+            self._build_status_lbl.pack_forget()
+            return
+        name = last.get('profile_name') or 'another profile'
+        if last.get('profile_id') != store.document['id']:
+            text = f"In game: {name} — not the loaded profile"
+            fg = THEME_COLORS['warning']
+        elif (
+            build_signature(self.app.registry, store.document) != last.get('hash')
+            or list(get_game_resolution_or_default()) != last.get('target_resolution')
+        ):
+            text = f"In game: {name} — differs from the current setup"
+            fg = THEME_COLORS['warning']
+        else:
+            text = f"In game: {name}"
+            fg = THEME_COLORS['muted']
+        self._build_status_lbl.configure(text=text, foreground=fg)
+        self._build_status_lbl.pack(fill='x', padx=PAD_TAB, pady=(PAD_XS, 0),
+                                    after=self.extras_row)
 
     def _update_tip(self):
         """Update step guide state and show/hide the tip panel."""
@@ -654,3 +696,6 @@ class GridsPanel(ttk.Frame):
             self._update_tip()
         if self.on_modified:
             self.on_modified()
+        # on_modified pushed the edit into the profile store — the status row
+        # re-hashes the document it just changed.
+        self.refresh_build_status()
