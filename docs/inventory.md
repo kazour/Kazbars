@@ -118,7 +118,7 @@
 | `tests/test_manifest.py` | 59 |
 | `tests/test_mypy_gate.py` | 74 |
 | `tests/test_overlay_config.py` | 102 |
-| `tests/test_panel_ratios.py` | 151 |
+| `tests/test_panel_ratios.py` | 162 |
 | `tests/test_panels_construct.py` | 309 |
 | `tests/test_prefs.py` | 58 |
 | `tests/test_prefs_migration.py` | 99 |
