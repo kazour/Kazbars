@@ -124,7 +124,7 @@ def test_console_on_emits_console_hooks():
 
     # Instantiation
     assert "private var console:KazBarsConsole;" in main_code
-    assert "console = new KazBarsConsole(this, rootClip);" in main_code
+    assert "console = new KazBarsConsole(rootClip);" in main_code
     # The pin is gone — the control panel is the master switch now.
     assert "consolePinned" not in main_code
 
@@ -134,16 +134,13 @@ def test_console_on_emits_console_hooks():
     assert "console.createConsole();" in main_code
     assert "console.removeConsole();" in main_code
 
-    # Persistence keys — master switch + the two log toggles here, position
-    # inside the stub. cnv saves from both persist paths.
+    # Persistence lives wholly inside the stub — the core drives the two
+    # lifecycle calls, the same shape as the stopwatch and inspect blocks.
+    # saveState fires from both persist paths (preview exit + deactivate).
     assert 'config.ReplaceEntry("console_pin"' not in main_code
-    assert main_code.count('config.ReplaceEntry("cnv"') == 2
-    assert 'config.ReplaceEntry("log_p"' in main_code
-    assert 'config.ReplaceEntry("log_t"' in main_code
-    assert "console.saveState(config);" in main_code
-    # Loaded before the re-create, so the console rebuilds where it was left.
-    assert main_code.index("console.loadState(config);") < main_code.index(
-        "else console.createConsole();")
+    assert 'config.ReplaceEntry("cnv"' not in main_code
+    assert main_code.count("console.saveState(config);") == 2
+    assert "console.loadState(config);" in main_code
 
     # No leftover tokens
     assert "{{CONSOLE_" not in main_code
@@ -215,7 +212,7 @@ def test_cast_on_emits_hooks_and_data():
 
     # Instantiation + configure
     assert "private var castTimer:KazBarsCastTimer;" in main_code
-    assert "castTimer = new KazBarsCastTimer(this, rootClip);" in main_code
+    assert "castTimer = new KazBarsCastTimer(rootClip);" in main_code
     assert "castTimer.configure(d.CAST);" in main_code
 
     # Lifecycle hooks
@@ -278,7 +275,7 @@ def test_stopwatch_on_emits_hooks_and_data():
 
     # Instantiation + configure
     assert "private var stopwatch:KazBarsStopwatch;" in main_code
-    assert "stopwatch = new KazBarsStopwatch(this, rootClip);" in main_code
+    assert "stopwatch = new KazBarsStopwatch(rootClip);" in main_code
     assert "stopwatch.configure(d.SW);" in main_code
 
     # Lifecycle hooks
@@ -357,7 +354,7 @@ def test_inspect_on_emits_hooks_and_data():
 
     # Instantiation + configure
     assert "private var inspect:KazBarsInspect;" in main_code
-    assert "inspect = new KazBarsInspect(this, rootClip);" in main_code
+    assert "inspect = new KazBarsInspect(rootClip);" in main_code
     assert "inspect.configure(d.INS);" in main_code
 
     # Lifecycle hooks
@@ -528,13 +525,14 @@ def test_grid_shown_is_master_switch():
 
 
 def test_console_master_switch_defaults_active():
-    """A fresh archive opens the console at login; an archived cnv == 0
-    closes it again on activation."""
+    """A fresh archive opens the console at login; the archived master switch
+    (cnv) is honoured inside the stub's loadState on activation."""
     main_code, _ = _all_extras_gen().generate()
 
     assert main_code.index("console.createConsole();") < main_code.index(
         "SignalClientCharacterAlive")
-    assert 'if (cnv !== undefined && cnv == 0) console.removeConsole();' in main_code
+    assert main_code.index("console.createConsole();") < main_code.index(
+        "console.loadState(config);")
     assert "console_pin" not in main_code
 
 
@@ -546,6 +544,7 @@ def test_stub_archive_keys_present():
         ("KazBarsStopwatch.as", "swv"),
         ("KazBarsInspect.as", "inv"),
         ("KazBarsCastTimer.as", "ctv"),
+        ("KazBarsConsole.as", "cnv"),
     )
     for name, key in pairs:
         src = (stubs / name).read_text(encoding="utf-8")

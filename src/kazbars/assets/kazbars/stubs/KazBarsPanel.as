@@ -51,8 +51,6 @@ class KazBarsPanel {
                                   // inspect panel set one (0.15), and makeTF
                                   // applies it only when set — the console and
                                   // control panel never carried leading
-    private var TF_MULTILINE:Boolean; // inspect's makeTF flavour (multiline,
-                                      // no wrap); everyone else stays plain
 
     public function KazBarsPanel(root:MovieClip) {
         rootClip = root;
@@ -64,7 +62,6 @@ class KazBarsPanel {
         curW = 0;
         curH = 0;
         LEAD = 0;
-        TF_MULTILINE = false;
     }
 
     // =========================================================================
@@ -72,6 +69,9 @@ class KazBarsPanel {
     // =========================================================================
 
     private function applyBaseSize(size:Number):Void {
+        // The family floor and default: a missing or sub-8 size seeds every
+        // ratio NaN or illegibly small, so the invariant lives here, once.
+        if (isNaN(size) || size < 8) size = 12;
         FS = size;
         PAD = Math.round(FS * 0.85);
         TITLE_H = Math.round(FS * 1.85);
@@ -96,10 +96,6 @@ class KazBarsPanel {
         var tf:TextField = parent.createTextField(id, parent.getNextHighestDepth(), x, y, w, h);
         tf.selectable = false;
         tf.embedFonts = false;
-        if (TF_MULTILINE) {
-            tf.multiline = true;
-            tf.wordWrap = false;
-        }
         var fmt:TextFormat = new TextFormat();
         fmt.font = "Arial";
         fmt.size = size;
@@ -187,6 +183,15 @@ class KazBarsPanel {
         mc.lineTo(x, y);
     }
 
+    // 1px bronze rule — the family's section hairline (title separators,
+    // column and section-header rules). Sets its own style so panels can mix
+    // it freely with their other chrome drawing.
+    private function hairline(x1:Number, y1:Number, x2:Number, y2:Number):Void {
+        chrome.lineStyle(1, 0x6B5324, 100);
+        chrome.moveTo(x1, y1);
+        chrome.lineTo(x2, y2);
+    }
+
     // =========================================================================
     // Collapse (panels position/redraw in their own applyCollapsed override)
     // =========================================================================
@@ -212,9 +217,30 @@ class KazBarsPanel {
         collapseBtn.onRollOut = function() { this.label.textColor = 0xC8C0B0; };
     }
 
+    // The family's collapsed-bar label: base font size, Conan orange, inset
+    // COLL_PAD, stopping short of the glyph, centred in the bar. Returned, not
+    // stored — the swap-on-_visible field is each panel's own.
+    private function makeCollapsedLabel(text:String):TextField {
+        var tf:TextField = makeTF(panelClip, "coll", COLL_PAD,
+                                  Math.floor((COLL_H - LINE) / 2),
+                                  COLL_W - COLL_PAD * 2 - BTN, LINE,
+                                  FS, true, 0xF7A22B, "left");
+        tf.text = text;
+        return tf;
+    }
+
     // =========================================================================
     // Drag + position
     // =========================================================================
+
+    // The grey drag readout in the family style, created hidden — beginDrag
+    // shows it, endDrag hides it, updateCoords writes it. Geometry is the
+    // panel's (and re-seated per fold state by its applyCollapsed).
+    private function makeCoordReadout(y:Number, w:Number, h:Number):Void {
+        coordTF = makeTF(panelClip, "coords", PAD, y, w, h,
+                         Math.max(9, Math.round(FS * 0.8)), false, 0x999999, "right");
+        coordTF._visible = false;
+    }
 
     // Invisible handle whose shape each panel draws for its own band (redrawn
     // per fold state); the name is the panel's historical instance name.
@@ -266,8 +292,10 @@ class KazBarsPanel {
         posY = panelClip._y;
     }
 
+    // A plate wider or taller than the Stage inverts max; pinned to 0 like the
+    // drag floor in beginDrag, rather than seated partly off-screen.
     private function clampPos(v:Number, max:Number):Number {
-        if (isNaN(v) || v < 0) return 0;
+        if (isNaN(v) || v < 0 || max < 0) return 0;
         if (v > max) return max;
         return v;
     }

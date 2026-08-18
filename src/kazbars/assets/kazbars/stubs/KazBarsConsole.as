@@ -28,8 +28,8 @@ class KazBarsConsole extends KazBarsPanel {
     private var playerCount:Number;
     private var targetCount:Number;
     private var MAX_ENTRIES:Number;
-    public var logPlayerEnabled:Boolean;
-    public var logTargetEnabled:Boolean;
+    private var logPlayerEnabled:Boolean;
+    private var logTargetEnabled:Boolean;
 
     // Layout beyond the base set. CW/CH are the current build's expanded
     // footprint, picked per checked sides.
@@ -55,7 +55,7 @@ class KazBarsConsole extends KazBarsPanel {
     // untagged run — it would fall back to the default serif device font.
     private var ENTRY_FONT:String;
 
-    public function KazBarsConsole(owner:KazBars, root:MovieClip) {
+    public function KazBarsConsole(root:MovieClip) {
         super(root);
         playerLog = "";
         targetLog = "";
@@ -80,9 +80,7 @@ class KazBarsConsole extends KazBarsPanel {
     // two are always configured before they build, this one is not.
     public function configure(cfg:Object):Void {
         if (cfg == null) cfg = {};
-        var fs:Number = Number(cfg.fontSize);
-        if (isNaN(fs) || fs < 8) fs = 12;
-        applyBaseSize(fs);
+        applyBaseSize(Number(cfg.fontSize));
         HDR_Y = Math.round(FS * 2.75);
         BODY_Y = Math.round(FS * 4.67);
         COL_W = Math.round(FS * 19.17);
@@ -182,15 +180,9 @@ class KazBarsConsole extends KazBarsPanel {
                          CW - PAD * 2 - BTN, LINE + 4,
                          NAME_FS, true, 0xF7A22B, "left");
         titleTF.text = "Buff Console";
-        collTF = makeTF(panelClip, "coll", COLL_PAD, Math.floor((COLL_H - LINE) / 2),
-                        COLL_W - COLL_PAD * 2 - BTN, LINE, FS, true, 0xF7A22B, "left");
-        collTF.text = "Console";
+        collTF = makeCollapsedLabel("Console");
 
-        // Live position readout — visible only while dragging, the panel's
-        // convention. Shares the title line, right-aligned.
-        coordTF = makeTF(panelClip, "coords", PAD, 0, CW - PAD * 2 - BTN, LINE,
-                         Math.max(9, Math.round(FS * 0.8)), false, 0x999999, "right");
-        coordTF._visible = false;
+        makeCoordReadout(0, CW - PAD * 2 - BTN, LINE);
 
         // Drag handle over the title line, stopping short of the collapse glyph
         // so it keeps its own press. Redrawn per fold state.
@@ -254,18 +246,13 @@ class KazBarsConsole extends KazBarsPanel {
         // so there is nothing to divide.
         if (h > COLL_H) {
             var both:Boolean = logPlayerEnabled && logTargetEnabled;
-            chrome.lineStyle(1, 0x6B5324, 100);
-            chrome.moveTo(PAD, TITLE_H);
-            chrome.lineTo(CW - PAD, TITLE_H);
+            hairline(PAD, TITLE_H, CW - PAD, TITLE_H);
             if (logPlayerEnabled || logTargetEnabled) {
-                chrome.moveTo(PAD, BODY_Y - 5);
-                chrome.lineTo(PAD + (both ? COL_W : CW - PAD * 2), BODY_Y - 5);
+                hairline(PAD, BODY_Y - 5, PAD + (both ? COL_W : CW - PAD * 2), BODY_Y - 5);
             }
             if (both) {
-                chrome.moveTo(CW / 2 + PAD, BODY_Y - 5);
-                chrome.lineTo(CW / 2 + PAD + COL_W, BODY_Y - 5);
-                chrome.moveTo(CW / 2, TITLE_H);
-                chrome.lineTo(CW / 2, CH - RULE_BOT);
+                hairline(CW / 2 + PAD, BODY_Y - 5, CW / 2 + PAD + COL_W, BODY_Y - 5);
+                hairline(CW / 2, TITLE_H, CW / 2, CH - RULE_BOT);
             }
         }
     }
@@ -346,6 +333,10 @@ class KazBarsConsole extends KazBarsPanel {
 
     public function loadState(config:Object):Void {
         if (config == null) return;
+        var p:Object = config.FindEntry("log_p");
+        if (p !== undefined) logPlayerEnabled = (p == 1);
+        var t:Object = config.FindEntry("log_t");
+        if (t !== undefined) logTargetEnabled = (t == 1);
         var c:Object = config.FindEntry("cnc");
         if (c !== undefined) collapsed = (c == 1);
         var x:Object = config.FindEntry("cnx");
@@ -354,10 +345,19 @@ class KazBarsConsole extends KazBarsPanel {
             posX = Number(x);
             posY = Number(y);
         }
+        // The onLoad build ran before the archive arrived: rebuild on the
+        // archived spot, fold and sides — or take the panel down when the
+        // master switch was saved off.
+        var v:Object = config.FindEntry("cnv");
+        if (v !== undefined && v == 0) removeConsole();
+        else createConsole();
     }
 
     public function saveState(config:Object):Void {
         if (config == null) return;
+        config.ReplaceEntry("cnv", isActive() ? 1 : 0);
+        config.ReplaceEntry("log_p", logPlayerEnabled ? 1 : 0);
+        config.ReplaceEntry("log_t", logTargetEnabled ? 1 : 0);
         config.ReplaceEntry("cnc", collapsed ? 1 : 0);
         capturePos();
         if (isNaN(posX) || isNaN(posY)) return;

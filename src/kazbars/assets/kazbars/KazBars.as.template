@@ -93,20 +93,20 @@ class KazBars {
         _tempMisc = new Array();
 
         // HELPER CLASSES: Initialize preview and slot managers (console added if enabled at build time)
-        preview = new KazBarsPreview(this, rootClip);
+        preview = new KazBarsPreview(rootClip);
 //#if CONSOLE
-        console = new KazBarsConsole(this, rootClip);
+        console = new KazBarsConsole(rootClip);
 //#end
-        slot = new KazBarsSlot(this, rootClip);
+        slot = new KazBarsSlot(rootClip);
         ppanel = new KazBarsPreviewPanel(this, rootClip);
 //#if CAST
-        castTimer = new KazBarsCastTimer(this, rootClip);
+        castTimer = new KazBarsCastTimer(rootClip);
 //#end
 //#if SW
-        stopwatch = new KazBarsStopwatch(this, rootClip);
+        stopwatch = new KazBarsStopwatch(rootClip);
 //#end
 //#if INS
-        inspect = new KazBarsInspect(this, rootClip);
+        inspect = new KazBarsInspect(rootClip);
 //#end
 
         initConfig();
@@ -836,9 +836,6 @@ class KazBars {
             }
             ppanel.saveState(config);
 //#if CONSOLE
-            config.ReplaceEntry("cnv", console.isActive() ? 1 : 0);
-            config.ReplaceEntry("log_p", console.logPlayerEnabled ? 1 : 0);
-            config.ReplaceEntry("log_t", console.logTargetEnabled ? 1 : 0);
             console.saveState(config);
 //#end
 //#if CAST
@@ -970,15 +967,8 @@ class KazBars {
                 i++;
             }
             ppanel.loadState(config);
-//#if CONSOLE  // loadState before the re-create so the console rebuilds on the archived spot and fold, not back in the middle of the screen
-            var cnv:Object = config.FindEntry("cnv");
-            var clp:Object = config.FindEntry("log_p");
-            if (clp !== undefined) console.logPlayerEnabled = (clp == 1);
-            var clt:Object = config.FindEntry("log_t");
-            if (clt !== undefined) console.logTargetEnabled = (clt == 1);
+//#if CONSOLE  // loadState owns the whole archive dance: keys, then the rebuild on the archived spot and fold (or removal when the master switch saved off)
             console.loadState(config);
-            if (cnv !== undefined && cnv == 0) console.removeConsole();
-            else console.createConsole();
 //#end
 //#if CAST
             castTimer.loadPositions(config);
@@ -1003,9 +993,6 @@ class KazBars {
             }
             ppanel.saveState(config);
 //#if CONSOLE
-            config.ReplaceEntry("cnv", console.isActive() ? 1 : 0);
-            config.ReplaceEntry("log_p", console.logPlayerEnabled ? 1 : 0);
-            config.ReplaceEntry("log_t", console.logTargetEnabled ? 1 : 0);
             console.saveState(config);
 //#end
 //#if CAST

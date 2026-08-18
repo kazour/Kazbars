@@ -17,12 +17,10 @@
 // cnv). Its own drag position rides in the module config archive as ppx/ppy,
 // beside the other panels' keys.
 class KazBarsPreviewPanel extends KazBarsPanel {
-    // The panel<->core contract: the core drives every stub through its typed
-    // lifecycle calls (configure / create* / loadState / saveState / cleanup /
-    // isActive / setActive / previewOn / previewOff and the per-stub feeds);
-    // the ONE call that flows back is owner.previewToggle(key, shown), routed
-    // from an extra row's checkbox. Typed, not an interface: KazBars is
-    // generated into the same compile unit, so MTASC checks the call for free.
+    // The one call that flows back to the core (the contract note atop
+    // KazBarsPanel): owner.previewToggle(key, shown), routed from an extra
+    // row's checkbox. Typed, not an interface — KazBars is generated into the
+    // same compile unit, so MTASC checks the call for free.
     private var owner:KazBars;
     private var titleTF:TextField;
     // {obj, key, label, checked, cb} — obj set for grids, key for extras.
@@ -56,9 +54,8 @@ class KazBarsPreviewPanel extends KazBarsPanel {
     // two are always configured before they build, this one is not.
     public function configure(cfg:Object):Void {
         if (cfg == null) cfg = {};
-        FS_REQ = Number(cfg.fontSize);
-        if (isNaN(FS_REQ) || FS_REQ < 8) FS_REQ = 12;
-        applySize(FS_REQ);
+        applySize(Number(cfg.fontSize));
+        FS_REQ = FS;   // the clamped request — show()'s fit loop restarts from it
     }
 
     // Split out of configure() because show() re-runs it a notch smaller when the
@@ -137,12 +134,8 @@ class KazBarsPreviewPanel extends KazBarsPanel {
                          curW - PAD * 2, LINE + 4, NAME_FS, true, 0xF7A22B, "left");
         titleTF.text = "Control Panel";
 
-        // Live position readout — visible only while dragging, the panel's
-        // convention. Shares the title line, right-aligned.
-        coordTF = makeTF(panelClip, "coords", PAD, Math.floor((TITLE_H - LINE) / 2),
-                         curW - PAD * 2, LINE,
-                         Math.max(9, Math.round(FS * 0.8)), false, 0x999999, "right");
-        coordTF._visible = false;
+        // Full title width — there is no collapse glyph to stop short of.
+        makeCoordReadout(Math.floor((TITLE_H - LINE) / 2), curW - PAD * 2, LINE);
 
         var btnAll:MovieClip = makeButton(panelClip, "btnAll", "All", PAD, BTN_Y,
                                           Math.max(9, Math.round(FS * 0.9)));
@@ -214,13 +207,10 @@ class KazBarsPreviewPanel extends KazBarsPanel {
 
     private function drawChrome(w:Number, h:Number):Void {
         drawPlate(w, h);
-        // Bronze hairlines under the title and under the All/None pair — the
-        // panel's section rules separating the header, the masters, the rows.
-        chrome.lineStyle(1, 0x6B5324, 100);
-        chrome.moveTo(PAD, TITLE_H);
-        chrome.lineTo(w - PAD, TITLE_H);
-        chrome.moveTo(PAD, ROWS_Y - 5);
-        chrome.lineTo(w - PAD, ROWS_Y - 5);
+        // Under the title and under the All/None pair — the panel's section
+        // rules separating the header, the masters, the rows.
+        hairline(PAD, TITLE_H, w - PAD, TITLE_H);
+        hairline(PAD, ROWS_Y - 5, w - PAD, ROWS_Y - 5);
     }
 
     // Base box/tick/hit plus this panel's label: its width is a parameter, not

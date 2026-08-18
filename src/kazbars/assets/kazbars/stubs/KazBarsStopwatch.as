@@ -54,7 +54,7 @@ class KazBarsStopwatch extends KazBarsPanel {
     private var lastText:String;
     private var active:Boolean;
 
-    public function KazBarsStopwatch(owner:KazBars, root:MovieClip) {
+    public function KazBarsStopwatch(root:MovieClip) {
         super(root);
         active = true;
         running = false;
@@ -74,9 +74,7 @@ class KazBarsStopwatch extends KazBarsPanel {
         START_X = Number(cfg.x);
         START_Y = Number(cfg.y);
         START_COLLAPSED = (cfg.collapsed == true);
-        var fs:Number = Number(cfg.fontSize);
-        if (isNaN(fs) || fs < 8) fs = 12;
-        applyBaseSize(fs);
+        applyBaseSize(Number(cfg.fontSize));
         LEAD = Math.round(FS * 0.15);
         W = Math.round(FS * 15.8);
         H = Math.round(FS * 8);
@@ -105,22 +103,17 @@ class KazBarsStopwatch extends KazBarsPanel {
 
         // Separate collapsed label at the base font size, swapped on _visible —
         // the inspect/console convention, so the three collapsed bars match.
-        collTF = makeTF(panelClip, "coll", COLL_PAD, 0, W - COLL_PAD * 2 - BTN,
-                        LINE, FS, true, 0xF7A22B, "left");
+        collTF = makeCollapsedLabel("Stopwatch");
 
-        // Live position readout — visible only while dragging (a copyable
-        // value for pinning a default spot in the app). Shares
-        // the title band, right-aligned, so the two never sit on each other.
-        coordTF = makeTF(panelClip, "coords", PAD, 0, W - PAD * 2 - BTN, LINE,
-                         Math.max(9, Math.round(FS * 0.8)), false, 0x999999, "right");
-        coordTF._visible = false;
+        // The readout doubles as a copyable value for pinning a default spot
+        // in the app.
+        makeCoordReadout(0, W - PAD * 2 - BTN, LINE);
 
         // Invisible drag handle over the title band (stops short of the
         // collapse button so it keeps its own press). Redrawn per fold state.
         makeDragStrip("drag");
 
         makeCollapseBtn();
-        collapseBtn._x = W - PAD - BTN;
 
         m_Body = panelClip.createEmptyMovieClip("body", panelClip.getNextHighestDepth());
 
@@ -154,12 +147,9 @@ class KazBarsStopwatch extends KazBarsPanel {
 
     private function drawChrome(h:Number):Void {
         drawPlate(W, h);
-        // Title separator — the same hairline the inspect panel rules its
-        // section headers with. Collapsed there is no body to divide.
+        // Title separator. Collapsed there is no body to divide.
         if (h > H_COLLAPSED) {
-            chrome.lineStyle(1, 0x6B5324, 100);
-            chrome.moveTo(PAD, TITLE_H);
-            chrome.lineTo(W - PAD, TITLE_H);
+            hairline(PAD, TITLE_H, W - PAD, TITLE_H);
         }
     }
 

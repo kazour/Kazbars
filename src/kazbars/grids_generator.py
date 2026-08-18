@@ -65,7 +65,7 @@ def _apply_feature_gates(template, flags):
                 raise ValueError(f"unknown feature flag {flag!r} at template line {i}")
             active = flag
             keep = flags[flag]
-        elif stripped == "//#end":
+        elif stripped.startswith("//#end"):
             if active is None:
                 raise ValueError(f"stray //#end at template line {i}")
             active = None

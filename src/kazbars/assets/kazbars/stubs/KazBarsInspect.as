@@ -36,7 +36,6 @@ class KazBarsInspect extends KazBarsPanel {
     private var START_X:Number;
     private var START_Y:Number;
     private var START_COLLAPSED:Boolean;
-    private var FS:Number;
     private var SHOW_PVP:Boolean;
     private var SHOW_PERKS:Boolean;
 
@@ -126,9 +125,8 @@ class KazBarsInspect extends KazBarsPanel {
     private var PERK_FILL:Array;      // per-slot-pair plate colour
     private var DASH:String;
 
-    public function KazBarsInspect(owner:KazBars, root:MovieClip) {
+    public function KazBarsInspect(root:MovieClip) {
         super(root);
-        TF_MULTILINE = true;   // the sheet's fields are multiline, no wrap
         m_Subject = null;
         subjName = "";
         subjKey = "";
@@ -186,12 +184,10 @@ class KazBarsInspect extends KazBarsPanel {
         START_COLLAPSED = (cfg.collapsed == true);
         SHOW_PVP = (cfg.showPvp != false);
         SHOW_PERKS = (cfg.showPerks != false);
-        var fs:Number = Number(cfg.fontSize);
-        if (isNaN(fs) || fs < 8) fs = 12;
         // COLL_* from the base put the collapsed bar — a labelled bar, not a
         // folded sheet — beside the stopwatch's own at any size (190x24 at
         // the default FS 12).
-        applyBaseSize(fs);
+        applyBaseSize(Number(cfg.fontSize));
         LEAD = Math.round(FS * 0.15);
         LABEL_W = Math.round(FS * 8.6);
         COL_GAP = Math.round(FS * 0.85);
@@ -204,6 +200,17 @@ class KazBarsInspect extends KazBarsPanel {
         ICO_GAP = Math.round(FS * 0.35);
         TIP_PAD = Math.round(FS * 0.3);
         W = PAD * 2 + LABEL_W + COL_GAP + VALUE_W;
+    }
+
+    // The sheet's fields are multiline, no wrap — set here once so every field
+    // the panel (or a base widget) builds carries the flavour.
+    private function makeTF(parent:MovieClip, id:String, x:Number, y:Number, w:Number,
+                            h:Number, size:Number, bold:Boolean, col:Number,
+                            align:String):TextField {
+        var tf:TextField = super.makeTF(parent, id, x, y, w, h, size, bold, col, align);
+        tf.multiline = true;
+        tf.wordWrap = false;
+        return tf;
     }
 
     public function createPanel():Void {
@@ -238,10 +245,7 @@ class KazBarsInspect extends KazBarsPanel {
         // target name, so no reason for a pass to read one. Its own field
         // rather than a re-formatted name strip: a TextFormat swap per fold
         // would have to be re-applied to the text every time.
-        collTF = makeTF(panelClip, "coll", COLL_PAD, 0, COLL_W - COLL_PAD * 2 - BTN,
-                        Math.round(FS * 1.4), FS, true, 0xF7A22B, "left");
-        collTF.text = "Inspect";
-        collTF._y = Math.floor((COLL_H - collTF._height) / 2);
+        collTF = makeCollapsedLabel("Inspect");
         collTF._visible = false;
         pveHdrTF = makeTF(body, "pveHdr", PAD, 0, LABEL_W, Math.round(FS * 1.4),
                           FS, true, 0xF7A22B, "left");
@@ -316,19 +320,13 @@ class KazBarsInspect extends KazBarsPanel {
         pveValTF.text = lastPve;
         pvpValTF.text = lastPvp;
 
-        // Shown only while dragging — a copyable readout for pinning a spot
-        // in the app. Right-aligned against the collapse glyph, the family
-        // convention (stopwatch, console), so it stays clear of the name.
-        coordTF = makeTF(panelClip, "coords", PAD, PAD, W - PAD * 2 - BTN, Math.round(FS * 1.3),
-                         Math.max(9, Math.round(FS * 0.8)), false, 0x999999, "right");
-        coordTF._visible = false;
+        // The readout doubles as a copyable value for pinning a spot in the app.
+        makeCoordReadout(PAD, W - PAD * 2 - BTN, Math.round(FS * 1.3));
 
         // Name strip only: a whole-plate drag would eat combat clicks.
         makeDragStrip("drag");
 
         makeCollapseBtn();
-        collapseBtn._x = W - PAD - BTN;
-        collapseBtn._y = Math.floor((TITLE_H - BTN) / 2);
 
         // Perk-name chip, drawn last so it sits over the row it names. Opaque
         // where the plate is 90 — it lands on top of icons and a rule.
@@ -456,22 +454,17 @@ class KazBarsInspect extends KazBarsPanel {
         // Title separator (expanded only — collapsed the bar IS the title
         // line), then the section-header rules; a negative offset means that
         // section is off screen (collapsed, or a target with no PvP block).
-        chrome.lineStyle(1, 0x6B5324, 100);
         if (h > COLL_H) {
-            chrome.moveTo(PAD, TITLE_H);
-            chrome.lineTo(W - PAD, TITLE_H);
+            hairline(PAD, TITLE_H, W - PAD, TITLE_H);
         }
         if (rule1 >= 0) {
-            chrome.moveTo(PAD, rule1);
-            chrome.lineTo(W - PAD, rule1);
+            hairline(PAD, rule1, W - PAD, rule1);
         }
         if (rule2 >= 0) {
-            chrome.moveTo(PAD, rule2);
-            chrome.lineTo(W - PAD, rule2);
+            hairline(PAD, rule2, W - PAD, rule2);
         }
         if (rule3 >= 0) {
-            chrome.moveTo(PAD, rule3);
-            chrome.lineTo(W - PAD, rule3);
+            hairline(PAD, rule3, W - PAD, rule3);
         }
     }
 

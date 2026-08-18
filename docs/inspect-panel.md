@@ -296,18 +296,18 @@ The mitigation curve and the 36.6 / 73.7 / 219.6 divisors originate in community
 
 ## 5. Visual contract
 
-The panel mirrors the game's default inspect window: near-black warm plate, 1px black-over-bronze frame, Conan-orange headers with hairline rules, parchment-grey labels, sheet-green values. Arial only — `embedFonts = false`, resolving against the faces already embedded in `base.swf`, so the panel needs no new symbols.
+The panel mirrors the game's default inspect window: near-black warm plate, 1px black-over-bronze frame, Conan-orange headers with hairline rules, parchment-grey labels, sheet-green values. Arial only — `embedFonts = false`, resolving against the faces already embedded in `base.swf`, so the panel needs no new symbols. Colours are written inline at their draw sites — the family base's `drawChrome()`, `hairline()` and `makeTF()` in `KazBarsPanel.as` plus the stub's own fields — not held in named constants:
 
-| Constant | Value | Role |
+| Color | Value | Role |
 |---|---|---|
-| `COL_HEADER` | `0xF7A22B` | name strip + PvE/PvP section headers (bold) |
-| `COL_LABEL` | `0xC8C0B0` | stat labels |
-| `COL_VALUE` | `0x7AC142` | stat values, including the em-dash fallback |
-| `COL_RULE` | `0x6B5324` | 1px rule under each section header |
-| `COL_BG` | `0x0C0A07` @ alpha 90 | plate fill |
-| `COL_FRAME_IN` | `0x4A3B22` | 1px inner frame |
-| `COL_FRAME_OUT` | `0x000000` | 1px outer frame |
-| `COL_COORD` | `0x999999` | drag coordinate readout |
+| header | `0xF7A22B` | name strip + PvE/PvP section headers (bold) |
+| label | `0xC8C0B0` | stat labels |
+| value | `0x7AC142` | stat values, including the em-dash fallback |
+| rule | `0x6B5324` | 1px rule under each section header — the family's `hairline()`, that colour's sole owner |
+| plate | `0x0C0A07` @ alpha 90 | plate fill |
+| inner frame | `0x4A3B22` | 1px inner frame |
+| outer frame | `0x000000` | 1px outer frame |
+| coord | `0x999999` | drag coordinate readout |
 
 The perk row is the one place the panel departs from that palette, mirroring the game's perk bar instead — each slot pair carries its own border and plate, and the pairing *is* the category legend:
 
@@ -341,9 +341,9 @@ Every dimension is `Math.round(FS × ratio)`, so the whole panel scales as one p
 | `COLL_PAD` | 0.55 | 7 | collapsed bar padding |
 | `W` | 2·`PAD` + `LABEL_W` + `COL_GAP` + `VALUE_W` | 277 | total footprint — derived, never fixed |
 
-`W` measures the outer black frame; both 1px frames sit inside it. Rules run from `x = PAD` to `W − PAD` — one under the title band (expanded only; collapsed the bar *is* the title line) plus one per visible section header, so up to four (title / PvE / PvP / Perks), the section three replayed on collapse from the last layout pass. Both columns are single left-aligned multiline `TextField`s sharing one `TextFormat`, so rows stay baseline-aligned; headers are their own bold fields. The perk boxes are 1px `COL_RULE` outlines drawn once at create.
+`W` measures the outer black frame; both 1px frames sit inside it. Rules run from `x = PAD` to `W − PAD` — one under the title band (expanded only; collapsed the bar *is* the title line) plus one per visible section header, so up to four (title / PvE / PvP / Perks), the section three replayed on collapse from the last layout pass. Both columns are single left-aligned multiline `TextField`s sharing one `TextFormat`, so rows stay baseline-aligned; headers are their own bold fields. The perk boxes are 1px outlines in their pair's `PERK_EDGE` colour over its `PERK_FILL` plate, drawn once at create.
 
-Hovering a filled perk box names it: a chip in `COL_LABEL` on a `COL_BG` plate at **alpha 100** — the one opaque surface in the panel, since it lands on top of the icons and the Perks rule — with the usual 1px `COL_FRAME_IN` border, drawn at the top depth of `m_Panel`, centred over its icon and clamped inside `[PAD, W − PAD]` so the end slots don't hang off the frame. The name comes from `PERK_NAMES`, a rank-indexed baked table (the icon instance doesn't identify the perk, and no name field is confirmed on a buff-list entry), so `placePerks` returns `{inst, rank}` and the ranks join the `renderPerks` cache key — two perks can share an icon, and the chip must not name the one that left.
+Hovering a filled perk box names it: a chip in label grey (`0xC8C0B0`) on the plate colour at **alpha 100** — the one opaque surface in the panel, since it lands on top of the icons and the Perks rule — with the usual 1px inner-frame (`0x4A3B22`) border, drawn at the top depth of `m_Panel`, centred over its icon and clamped inside `[PAD, W − PAD]` so the end slots don't hang off the frame. The name comes from `PERK_NAMES`, a rank-indexed baked table (the icon instance doesn't identify the perk, and no name field is confirmed on a buff-list entry), so `placePerks` returns `{inst, rank}` and the ranks join the `renderPerks` cache key — two perks can share an icon, and the chip must not name the one that left.
 
 **The hover source is a `Mouse` listener, not `onRollOver` on the slots.** Rollover handlers put a clip in button mode, and the perk row — 6·`ICO` + 5·`ICO_GAP`, 194px at FS 12 — would then swallow left clicks, the same reason the drag hitbox is the name strip only. `hoverTick` instead hit-tests arithmetically in panel space (`m_Panel._xmouse/_ymouse` against the known `PAD` + `i`·(`ICO` + `ICO_GAP`) pitch, rejecting the gaps between boxes), so nothing in the row is interactive and the test holds wherever `rootClip` sits. The chip redraws only on a slot change, and hides on collapse, on hide, on a row change, and on `clearPerkSlots`.
 

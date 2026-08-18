@@ -42,7 +42,7 @@ class KazBarsCastTimer {
     private var previewMode:Boolean;
     private var active:Boolean;
 
-    public function KazBarsCastTimer(owner:KazBars, root:MovieClip) {
+    public function KazBarsCastTimer(root:MovieClip) {
         rootClip = root;
         previewMode = false;
         active = true;
