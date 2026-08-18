@@ -67,6 +67,30 @@ def _validate_section_open(value: Any) -> dict:
     return {k: bool(v) for k, v in value.items() if isinstance(k, str)}
 
 
+def _validate_last_build(value: Any) -> dict:
+    """Keep ``{profile_id, hash, target_resolution[, profile_name]}`` — what the
+    last successful Build & Install baked. `{}` (never built through this pref)
+    hides the status row. `profile_name` is display-only (the built profile may
+    have been renamed or deleted since); identity is the id + hash."""
+    if not isinstance(value, dict):
+        return {}
+    pid = value.get("profile_id")
+    build_hash = value.get("hash")
+    if not (isinstance(pid, str) and isinstance(build_hash, str) and pid and build_hash):
+        return {}
+    out: dict = {"profile_id": pid, "hash": build_hash}
+    name = value.get("profile_name")
+    if isinstance(name, str) and name:
+        out["profile_name"] = name
+    res = value.get("target_resolution")
+    if (
+        isinstance(res, list) and len(res) == 2
+        and all(isinstance(v, int) and not isinstance(v, bool) and v > 0 for v in res)
+    ):
+        out["target_resolution"] = res
+    return out
+
+
 def _validate_last_patch(value: Any) -> dict:
     """Keep ``{game_path: {section_key: {...last-applied section value...}}}``
     entries; drop anything malformed. Machine-local mirror of what a PATCH-lane
@@ -176,6 +200,9 @@ PREFS_SCHEMA = Schema(
         # Machine-local record of what a PATCH-lane section last wrote into a
         # given game folder's XML (see _validate_last_patch).
         "last_patch": Field({}, validate=_validate_last_patch),
+        # What the last successful Build & Install baked (see
+        # _validate_last_build) — drives the grids panel's status row.
+        "last_build": Field({}, validate=_validate_last_build),
     },
     migrations=(Migration(2, _upgrade_panel_font),),
 )

@@ -46,6 +46,7 @@ from .ui_headers import create_dialog_header, create_tip_bar
 from .ui_helpers import (
     BTN_DIALOG,
     FONT_BODY,
+    FONT_SMALL,
     MODULE_COLORS,
     PAD_ROW,
     PAD_SMALL,
@@ -266,6 +267,13 @@ class DamageNumberColorsPanel(tk.Toplevel):
             self,
             "Set each number's color and direction, then Apply and type /reloadui in-game.",
         )
+        self._divergence_lbl = ttk.Label(
+            self,
+            text="⚠ This profile's overrides haven't been applied to this game "
+                 "folder yet — Apply to sync.",
+            font=FONT_SMALL, foreground=THEME_COLORS['warning'],
+            wraplength=_W - 2 * PAD_TAB, justify="left")
+        self._refresh_divergence()
 
         # Footer first so it reserves height before the scrollable body claims the rest.
         footer = ttk.Frame(self, padding=(PAD_TAB, PAD_XS))
@@ -371,6 +379,24 @@ class DamageNumberColorsPanel(tk.Toplevel):
     # ------------------------------------------------------------------ #
     # Override state                                                     #
     # ------------------------------------------------------------------ #
+
+    def _refresh_divergence(self) -> None:
+        """Show the sync hint when this profile carries overrides this game
+        folder's XML hasn't received — `last_patch` is the machine-local record
+        of what Apply last wrote here, and PATCH never fires on a profile
+        switch, so a switched-to profile can sit un-applied indefinitely. A
+        profile with no overrides has no opinion: hidden. Only called at open
+        and after Apply (which syncs), so it only ever hides in-session —
+        pack order at open puts it right under the tip bar."""
+        profile_state = {'colors': self._baseline_override_colors,
+                         'directions': self._baseline_override_dirs}
+        has_overrides = any(profile_state.values())
+        applied = (self.master.settings.get('last_patch') or {}).get(  # type: ignore[attr-defined]
+            self.game_path, {}).get('damage_colors')
+        if self._source_path is not None and has_overrides and applied != profile_state:
+            self._divergence_lbl.pack(fill='x', padx=PAD_TAB, pady=(PAD_XS, 0))
+        else:
+            self._divergence_lbl.pack_forget()
 
     def _refresh_reset_button(self, name: str) -> None:
         """↺ (stage the game default, creating an override) on an inherited
@@ -512,6 +538,7 @@ class DamageNumberColorsPanel(tk.Toplevel):
         self._baseline_override_colors = dict(colors_to_write)
         self._baseline_override_dirs = dict(dirs_to_write)
         self._refresh_apply_state()
+        self._refresh_divergence()
         app_toast(self, "Saved. Type /reloadui in-game to see it.", "success")
 
 

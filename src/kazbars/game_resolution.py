@@ -89,6 +89,9 @@ def change_game_resolution(app):
             app.settings.set('game_resolution', [new_w, new_h])
             app.settings.save()
             app.grids_panel.refresh_panels()
+            # The installed SWF was baked at the old resolution — flip the
+            # status row stale without touching the document.
+            app.grids_panel.refresh_build_status()
             app_toast(app, f"Resolution set to {new_w}×{new_h}", 'info')
         dialog.destroy()
 

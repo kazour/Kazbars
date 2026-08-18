@@ -548,6 +548,17 @@ class BuffDisplayDialog(tk.Toplevel):
             text="Edit Age of Conan's built-in buff bars. KazBars isn't affected.",
         ).pack(anchor='w', padx=PAD_INNER, pady=(PAD_LF, 0))
 
+        # Sync hint — packed by _refresh_divergence (after the sections load)
+        # when this profile carries overrides this game folder hasn't received.
+        # Anchored `after=` the subtitle: by refresh time the body and footer
+        # are already packed, so a plain pack would land between them.
+        self._divergence_anchor = subtitle
+        self._divergence_lbl = ttk.Label(
+            self,
+            text="⚠ This profile's overrides haven't been applied to this game "
+                 "folder yet — Apply to sync.",
+            font=FONT_SMALL, foreground=THEME_COLORS['warning'], justify='left')
+
         if _detect_custom_ui(self.app.game_path):
             banner = tk.Frame(self, bg=TK_COLORS['status_bg'])
             banner.pack(fill='x')
@@ -590,9 +601,29 @@ class BuffDisplayDialog(tk.Toplevel):
             # (header bar + indented content) so PAD_SECTION_GAP would feel cavernous.
             sf.pack(fill='x', pady=(0 if i == 0 else PAD_LF, 0))
 
+        self._refresh_divergence()
+
     # ------------------------------------------------------------------
     # Apply / Cancel
     # ------------------------------------------------------------------
+    def _refresh_divergence(self):
+        """Show the sync hint when this profile carries `buff_bars` overrides
+        this game folder's XML hasn't received — `last_patch` records what
+        Apply last wrote here, and PATCH never fires on a profile switch.
+        Empty sub-dicts count as no opinion on both sides. Only called after
+        the sections load and after Apply (which syncs), so it only ever hides
+        in-session; pack order at open puts it under the subtitle."""
+        profile_state = {s.label: s._baseline_override
+                         for s in self.sections if s._baseline_override}
+        applied_raw = (self.app.settings.get('last_patch') or {}).get(
+            self.app.game_path, {}).get('buff_bars') or {}
+        applied = {k: v for k, v in applied_raw.items() if v}
+        if profile_state and applied != profile_state:
+            self._divergence_lbl.pack(fill='x', padx=PAD_INNER, pady=(PAD_LF, 0),
+                                      after=self._divergence_anchor)
+        else:
+            self._divergence_lbl.pack_forget()
+
     def _refresh_apply_state(self):
         any_dirty = any(s.dirty() for s in self.sections)
         if self._apply_btn is None or any_dirty == self._apply_enabled:
@@ -622,6 +653,7 @@ class BuffDisplayDialog(tk.Toplevel):
             self.app.profile_store.set_section('buff_bars', buff_bars)
             record_last_patch(self.app.settings, self.app.game_path, 'buff_bars', buff_bars)
         self._refresh_apply_state()
+        self._refresh_divergence()
         if failures:
             # Failure toast uses key= so retries coalesce. The OS-level reason
             # (permission denied, disk full) lives in the log; the toast names

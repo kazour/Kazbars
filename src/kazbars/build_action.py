@@ -24,6 +24,7 @@ from .cast_timer import is_enabled as cast_is_enabled
 from .cast_timer import validate_config as validate_cast_config
 from .grid_model import get_game_resolution_or_default
 from .grids_generator import MAX_TOTAL_SLOTS, unresolved_refs
+from .profile_document import build_signature
 from .ui_helpers import THEME_COLORS
 from .ui_widgets import app_toast, confirm, flash_status_bar
 
@@ -175,6 +176,11 @@ def build(app):
         # Inert refs the generator will skip — the summary reports the count
         # (the old load-time missing-buff warning retired into this line).
         'unresolved': len(unresolved_refs(grids, app.database)),
+        # Identity of what this build bakes, for the last_build pref (written
+        # only on a successful install) and the grids panel's status row.
+        'build_profile_id': app.profile_store.document['id'],
+        'build_profile_name': app.profile_store.document['name'],
+        'build_signature': build_signature(app.registry, app.profile_store.document),
     }
 
     loading = BuildLoadingScreen(app)
@@ -271,10 +277,19 @@ def _finish_success(app, loading, staging_dir, ctx, compile_result, ok, err,
             else:
                 app_toast(app, "launch the game", 'success', 8)
             flash_status_bar(app.bottom_bar)
-            app.grids_panel.notify_build_done()
+            # Record what this install baked — the status row compares the live
+            # document against it. Written only on success: a failed install
+            # leaves the previous build (and its record) in place.
+            app.settings.set('last_build', {
+                'profile_id': ctx['build_profile_id'],
+                'profile_name': ctx['build_profile_name'],
+                'hash': ctx['build_signature'],
+                'target_resolution': list(ctx['game_resolution']),
+            })
             if not app.settings.get('has_built_before'):
                 app.settings.set('has_built_before', True)
-                app.settings.save()
+            app.settings.save()
+            app.grids_panel.notify_build_done()
         else:
             app_toast(app, "Build failed", 'error', 10)
             flash_status_bar(app.bottom_bar, THEME_COLORS['danger'])

@@ -25,6 +25,8 @@ whose absent keys mean "defer to a baseline held elsewhere").
 """
 
 import copy
+import hashlib
+import json
 import re
 import secrets
 from collections.abc import Callable, Iterable
@@ -137,6 +139,23 @@ def new_document(registry: SectionRegistry, name: str, authored_at: Iterable[int
         'authored_at': _coerce_authored_at(list(authored_at)),
         'modules': {spec.key: spec.defaults() for spec in registry.specs()},
     }
+
+
+def build_signature(registry: SectionRegistry, document: dict) -> str:
+    """sha256 hex of the BUILD-lane sections' canonical JSON — the identity of
+    "what Build & Install would bake" for this document. LIVE/PATCH sections
+    don't participate (they never reach the SWF), so a boss-timer tweak or an
+    XML override can't flag a build stale. A missing section hashes as its
+    defaults, matching what the gate would fill. Written into the `last_build`
+    pref after a successful install; the grids panel's status row compares it
+    against the live document."""
+    modules = document.get('modules', {})
+    payload = {
+        spec.key: modules.get(spec.key, spec.defaults())
+        for spec in registry.for_lane(LANE_BUILD)
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(',', ':'))
+    return hashlib.sha256(canonical.encode('utf-8')).hexdigest()
 
 
 # =========================================================================== #

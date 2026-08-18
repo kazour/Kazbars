@@ -191,3 +191,59 @@ def test_input_never_mutated():
     }
     validate_document(_registry(), raw)
     assert raw == snapshot
+
+
+# --------------------------------------------------------------------------- #
+# build_signature — the last_build identity
+# --------------------------------------------------------------------------- #
+def _sig_registry():
+    from kazbars import grid_model, live_tracker_settings, stopwatch
+    from kazbars.profile_document import SectionRegistry
+    reg = SectionRegistry()
+    reg.register(grid_model.PROFILE_SECTION)          # BUILD
+    reg.register(live_tracker_settings.PROFILE_SECTION)  # LIVE
+    reg.register(stopwatch.PROFILE_SECTION)           # BUILD
+    return reg
+
+
+def _sig_doc(reg):
+    from kazbars.profile_document import new_document
+    return new_document(reg, 'Sig', [1920, 1080])
+
+
+def test_build_signature_is_stable_and_key_order_free():
+    from kazbars.profile_document import build_signature
+    reg = _sig_registry()
+    doc = _sig_doc(reg)
+    first = build_signature(reg, doc)
+    assert first == build_signature(reg, doc)  # deterministic
+    # Same content, different key insertion order → same canonical hash.
+    sw = doc['modules']['stopwatch']
+    doc['modules']['stopwatch'] = dict(reversed(list(sw.items())))
+    assert build_signature(reg, doc) == first
+
+
+def test_build_signature_changes_on_build_edits_only():
+    from kazbars.profile_document import build_signature
+    reg = _sig_registry()
+    doc = _sig_doc(reg)
+    base = build_signature(reg, doc)
+    # LIVE section change: invisible to the build → hash unchanged.
+    doc['modules']['boss_timer']['overlay']['font_size'] = 33
+    assert build_signature(reg, doc) == base
+    # BUILD section change flips it.
+    doc['modules']['stopwatch']['enabled'] = True
+    assert build_signature(reg, doc) != base
+    # Envelope-only changes (name/rename) don't count either.
+    doc['modules']['stopwatch']['enabled'] = False
+    doc['name'] = 'Renamed'
+    assert build_signature(reg, doc) == base
+
+
+def test_build_signature_missing_section_hashes_as_defaults():
+    from kazbars.profile_document import build_signature
+    reg = _sig_registry()
+    doc = _sig_doc(reg)
+    base = build_signature(reg, doc)
+    del doc['modules']['stopwatch']  # gate would refill with defaults
+    assert build_signature(reg, doc) == base
