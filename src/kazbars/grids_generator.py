@@ -35,10 +35,10 @@ CUSTOM_ICON_LINKAGE = {
 _template_cache: dict[str, str] = {}
 
 
-def _load_core_template(assets_path=None):
-    """Load AS2 core methods template from external file (cached)."""
+def _load_template(assets_path=None):
+    """Load the AS2 main-class template from external file (cached)."""
     base = resolve_assets_path(assets_path)
-    template_path = base / "kazbars" / "KazBars_core.as.template"
+    template_path = base / "kazbars" / "KazBars.as.template"
     key = str(template_path)
     if key not in _template_cache:
         with open(template_path, encoding="utf-8") as f:
@@ -133,15 +133,12 @@ class CodeGenerator:
 
     def generate(self):
         """Generate the main KazBars.as and separate KazBarsData.as source code."""
-        # Main class (no inline config — calls KazBarsData.init())
+        # Main class: the whole hand-written class lives in KazBars.as.template;
+        # the generator only fills feature tokens (no inline config — the class
+        # calls KazBarsData.init())
         main = []
         main.append(self._header())
-        main.append(self._class_start())
-        main.append(self._member_variables())
-        main.append(self._constructor())
-        main.append(self._init_config_stub())
-        main.append(self._core_methods())
-        main.append(self._class_end())
+        main.append(self._main_class())
 
         # Data class (all grid configs, whitelists, buff lookups)
         data = []
@@ -158,134 +155,6 @@ class CodeGenerator:
 // Generated: {timestamp}
 // Total slots: {total_slots} / {MAX_TOTAL_SLOTS}
 // ============================================================================
-"""
-
-    def _class_start(self):
-        return "class KazBars {\n"
-
-    def _class_end(self):
-        return "}\n"
-
-    def _member_variables(self):
-        console_decl = "\n    private var console:KazBarsConsole;" if self.include_console else ""
-        cast_decl = (
-            "\n    private var castTimer:KazBarsCastTimer;" if self.include_cast_timer else ""
-        )
-        sw_decl = (
-            "\n    private var stopwatch:KazBarsStopwatch;" if self.include_stopwatch else ""
-        )
-        ins_decl = (
-            "\n    private var inspect:KazBarsInspect;" if self.include_inspect else ""
-        )
-        return f"""
-    private var rootClip:MovieClip;
-    private var m_Player:Object;
-    private var m_Target:Object;
-    private var config:Object;
-    private var playerBuffs:Array;
-    private var targetBuffs:Array;
-    private var buffIndexCache:Object;
-    private var grids:Array;
-    private var timerInterval:Number;
-    private var frameActive:Boolean;
-    private var frameCount:Number;
-    private var TCACHE:Object;
-    private var previewMode:Boolean;
-    private var previewArmed:Boolean;
-    private var lastShiftDown:Number;
-    private var lastCtrlDown:Number;
-    private var lastAltDown:Number;
-    private var C_BUFF:Number;
-    private var C_DEBUFF:Number;
-    private var C_BG:Number;
-    private var CFG:Object;
-    private var WL:Object;
-    private var ISDEB:Object;
-    private var BUFFTYPE:Object;
-    private var STACK_LEVEL:Object;
-    private var CUSTOMICON:Object;
-
-    // OPTIMIZATION: Alpha flash lookup table (100 pre-calculated values)
-    private var AFLASH:Array;
-
-    // OPTIMIZATION: Reusable arrays to reduce GC
-    private var _tempBuffs:Array;
-    private var _tempDebuffs:Array;
-    private var _tempMisc:Array;
-
-    // HELPER CLASSES: Preview, Slot, PreviewPanel, and (optional) Console (32KB bytecode limit workaround)
-    private var preview:KazBarsPreview;{console_decl}
-    private var slot:KazBarsSlot;
-    private var ppanel:KazBarsPreviewPanel;{cast_decl}{sw_decl}{ins_decl}
-
-    // Key listener reference for proper cleanup
-    private var keyListener:Object;
-"""
-
-    def _constructor(self):
-        console_init = (
-            "\n        console = new KazBarsConsole(this, rootClip);"
-            if self.include_console
-            else ""
-        )
-        cast_init = (
-            "\n        castTimer = new KazBarsCastTimer(this, rootClip);"
-            if self.include_cast_timer
-            else ""
-        )
-        sw_init = (
-            "\n        stopwatch = new KazBarsStopwatch(this, rootClip);"
-            if self.include_stopwatch
-            else ""
-        )
-        ins_init = (
-            "\n        inspect = new KazBarsInspect(this, rootClip);"
-            if self.include_inspect
-            else ""
-        )
-        return f"""
-    public function KazBars(root:MovieClip) {{
-        rootClip = root;
-        playerBuffs = new Array();
-        targetBuffs = new Array();
-        grids = new Array();
-        buffIndexCache = {{player: {{}}, target: {{}}}};
-        frameActive = false;
-        frameCount = 0;
-        previewMode = false;
-        previewArmed = true;
-        lastShiftDown = 0;
-        lastCtrlDown = 0;
-        lastAltDown = 0;
-        C_BUFF = 0x666666;
-        C_DEBUFF = 0x8B0000;
-        C_BG = 0x000000;
-        TCACHE = {{}};
-        var i:Number = 0;
-        while (i <= 99) {{ TCACHE[i] = String(i); i++; }}
-
-        // OPTIMIZATION: Pre-calculate alpha flash values (100 entries)
-        // Replaces Math.sin() calls every frame with array lookup
-        AFLASH = new Array();
-        var j:Number = 0;
-        while (j < 100) {{
-            var phase:Number = (j / 100) * 6.28318;
-            AFLASH[j] = 33 + (Math.sin(phase) + 1) * 33.5;
-            j++;
-        }}
-
-        // OPTIMIZATION: Reusable arrays to reduce garbage collection
-        _tempBuffs = new Array();
-        _tempDebuffs = new Array();
-        _tempMisc = new Array();
-
-        // HELPER CLASSES: Initialize preview and slot managers (console added if enabled at build time)
-        preview = new KazBarsPreview(this, rootClip);{console_init}
-        slot = new KazBarsSlot(this, rootClip);
-        ppanel = new KazBarsPreviewPanel(this, rootClip);{cast_init}{sw_init}{ins_init}
-
-        initConfig();
-    }}
 """
 
     def _expand_primary_ids(self, primary_ids):
@@ -335,28 +204,6 @@ class CodeGenerator:
                     resolved_sa[k] = v
             resolved["slotAssignments"] = resolved_sa
         return resolved
-
-    def _init_config_stub(self):
-        cast_cfg = "\n        castTimer.configure(d.CAST);" if self.include_cast_timer else ""
-        sw_cfg = "\n        stopwatch.configure(d.SW);" if self.include_stopwatch else ""
-        ins_cfg = "\n        inspect.configure(d.INS);" if self.include_inspect else ""
-        # The control panel is never gated, so its configure is unconditional;
-        # the console's follows its build gate. Both re-run before anything is
-        # drawn — each stub already seeded itself at the default from its
-        # constructor, so a build that skips this still renders.
-        pf_cfg = "\n        ppanel.configure(d.PF);"
-        if self.include_console:
-            pf_cfg += "\n        console.configure(d.PF);"
-        return f"""
-    private function initConfig():Void {{
-        var d:Object = KazBarsData.init();
-        CFG = d.CFG;
-        WL = d.WL;
-        ISDEB = d.ISDEB;
-        BUFFTYPE = d.BUFFTYPE;
-        STACK_LEVEL = d.STACK_LEVEL;
-        CUSTOMICON = d.CUSTOMICON;{pf_cfg}{cast_cfg}{sw_cfg}{ins_cfg}
-    }}"""
 
     def _resolved_font_size(self, config):
         """The size actually baked for one panel: its own `fontSize` when it set
@@ -535,10 +382,18 @@ class CodeGenerator:
 
         return "\n".join(lines)
 
-    def _core_methods(self):
-        template = _load_core_template(self._assets_path)
+    def _main_class(self):
+        template = _load_template(self._assets_path)
         if self.include_console:
             tokens = {
+                "{{DECL_CONSOLE}}": "\n    private var console:KazBarsConsole;",
+                "{{INIT_CONSOLE}}": "\n        console = new KazBarsConsole(this, rootClip);",
+                # The control panel is never gated, so its configure sits
+                # unconditionally in the template; the console's follows its
+                # build gate. Both re-run before anything is drawn — each stub
+                # already seeded itself at the default from its constructor, so
+                # a build that skips this still renders.
+                "{{CFG_CONSOLE}}": "\n        console.configure(d.PF);",
                 "{{CONSOLE_LOG_PLAYER}}": "if (console.isActive() && buff.m_Name != null) console.logPlayer(buff.m_Name, bid);",
                 "{{CONSOLE_LOG_TARGET}}": "if (console.isActive() && buff.m_Name != null) console.logTarget(buff.m_Name, bid);",
                 # Open at login is the default a first-ever session gets, before
@@ -568,6 +423,9 @@ class CodeGenerator:
             }
         else:
             tokens = {
+                "{{DECL_CONSOLE}}": "",
+                "{{INIT_CONSOLE}}": "",
+                "{{CFG_CONSOLE}}": "",
                 "{{CONSOLE_LOG_PLAYER}}": "",
                 "{{CONSOLE_LOG_TARGET}}": "",
                 "{{CONSOLE_CREATE}}": "",
@@ -579,6 +437,9 @@ class CodeGenerator:
                 "{{PP_APPLY_CONSOLE}}": "",
             }
         cast_token_names = (
+            "{{DECL_CAST}}",
+            "{{INIT_CAST}}",
+            "{{CFG_CAST}}",
             "{{CAST_CREATE}}",
             "{{CAST_DISCONNECT_P}}",
             "{{CAST_CONNECT_P}}",
@@ -593,6 +454,9 @@ class CodeGenerator:
         )
         if self.include_cast_timer:
             cast_tokens = {
+                "{{DECL_CAST}}": "\n    private var castTimer:KazBarsCastTimer;",
+                "{{INIT_CAST}}": "\n        castTimer = new KazBarsCastTimer(this, rootClip);",
+                "{{CFG_CAST}}": "\n        castTimer.configure(d.CAST);",
                 "{{CAST_CREATE}}": "castTimer.createFields();",
                 "{{CAST_DISCONNECT_P}}": "castTimer.disconnectPlayer();",
                 "{{CAST_CONNECT_P}}": "castTimer.connectPlayer(m_Player);",
@@ -609,6 +473,9 @@ class CodeGenerator:
             cast_tokens = {name: "" for name in cast_token_names}
         tokens.update(cast_tokens)
         sw_token_names = (
+            "{{DECL_SW}}",
+            "{{INIT_SW}}",
+            "{{CFG_SW}}",
             "{{SW_CREATE}}",
             "{{SW_LOAD}}",
             "{{SW_SAVE}}",
@@ -618,6 +485,9 @@ class CodeGenerator:
         )
         if self.include_stopwatch:
             sw_tokens = {
+                "{{DECL_SW}}": "\n    private var stopwatch:KazBarsStopwatch;",
+                "{{INIT_SW}}": "\n        stopwatch = new KazBarsStopwatch(this, rootClip);",
+                "{{CFG_SW}}": "\n        stopwatch.configure(d.SW);",
                 "{{SW_CREATE}}": "stopwatch.createPanel();",
                 "{{SW_LOAD}}": "stopwatch.loadState(config);",
                 "{{SW_SAVE}}": "stopwatch.saveState(config);",
@@ -629,6 +499,9 @@ class CodeGenerator:
             sw_tokens = {name: "" for name in sw_token_names}
         tokens.update(sw_tokens)
         ins_token_names = (
+            "{{DECL_INS}}",
+            "{{INIT_INS}}",
+            "{{CFG_INS}}",
             "{{INS_CREATE}}",
             "{{INS_SET_TARGET}}",
             "{{INS_PREVIEW_ON}}",
@@ -641,6 +514,9 @@ class CodeGenerator:
         )
         if self.include_inspect:
             ins_tokens = {
+                "{{DECL_INS}}": "\n    private var inspect:KazBarsInspect;",
+                "{{INIT_INS}}": "\n        inspect = new KazBarsInspect(this, rootClip);",
+                "{{CFG_INS}}": "\n        inspect.configure(d.INS);",
                 "{{INS_CREATE}}": "inspect.createPanel();",
                 "{{INS_SET_TARGET}}": "inspect.setSubject(tid);",
                 "{{INS_PREVIEW_ON}}": "inspect.previewOn();",

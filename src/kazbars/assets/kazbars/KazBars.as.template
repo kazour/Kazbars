@@ -1,3 +1,104 @@
+class KazBars {
+
+
+    private var rootClip:MovieClip;
+    private var m_Player:Object;
+    private var m_Target:Object;
+    private var config:Object;
+    private var playerBuffs:Array;
+    private var targetBuffs:Array;
+    private var buffIndexCache:Object;
+    private var grids:Array;
+    private var timerInterval:Number;
+    private var frameActive:Boolean;
+    private var frameCount:Number;
+    private var TCACHE:Object;
+    private var previewMode:Boolean;
+    private var previewArmed:Boolean;
+    private var lastShiftDown:Number;
+    private var lastCtrlDown:Number;
+    private var lastAltDown:Number;
+    private var C_BUFF:Number;
+    private var C_DEBUFF:Number;
+    private var C_BG:Number;
+    private var CFG:Object;
+    private var WL:Object;
+    private var ISDEB:Object;
+    private var BUFFTYPE:Object;
+    private var STACK_LEVEL:Object;
+    private var CUSTOMICON:Object;
+
+    // OPTIMIZATION: Alpha flash lookup table (100 pre-calculated values)
+    private var AFLASH:Array;
+
+    // OPTIMIZATION: Reusable arrays to reduce GC
+    private var _tempBuffs:Array;
+    private var _tempDebuffs:Array;
+    private var _tempMisc:Array;
+
+    // HELPER CLASSES: Preview, Slot, PreviewPanel, and (optional) Console (32KB bytecode limit workaround)
+    private var preview:KazBarsPreview;{{DECL_CONSOLE}}
+    private var slot:KazBarsSlot;
+    private var ppanel:KazBarsPreviewPanel;{{DECL_CAST}}{{DECL_SW}}{{DECL_INS}}
+
+    // Key listener reference for proper cleanup
+    private var keyListener:Object;
+
+
+    public function KazBars(root:MovieClip) {
+        rootClip = root;
+        playerBuffs = new Array();
+        targetBuffs = new Array();
+        grids = new Array();
+        buffIndexCache = {player: {}, target: {}};
+        frameActive = false;
+        frameCount = 0;
+        previewMode = false;
+        previewArmed = true;
+        lastShiftDown = 0;
+        lastCtrlDown = 0;
+        lastAltDown = 0;
+        C_BUFF = 0x666666;
+        C_DEBUFF = 0x8B0000;
+        C_BG = 0x000000;
+        TCACHE = {};
+        var i:Number = 0;
+        while (i <= 99) { TCACHE[i] = String(i); i++; }
+
+        // OPTIMIZATION: Pre-calculate alpha flash values (100 entries)
+        // Replaces Math.sin() calls every frame with array lookup
+        AFLASH = new Array();
+        var j:Number = 0;
+        while (j < 100) {
+            var phase:Number = (j / 100) * 6.28318;
+            AFLASH[j] = 33 + (Math.sin(phase) + 1) * 33.5;
+            j++;
+        }
+
+        // OPTIMIZATION: Reusable arrays to reduce garbage collection
+        _tempBuffs = new Array();
+        _tempDebuffs = new Array();
+        _tempMisc = new Array();
+
+        // HELPER CLASSES: Initialize preview and slot managers (console added if enabled at build time)
+        preview = new KazBarsPreview(this, rootClip);{{INIT_CONSOLE}}
+        slot = new KazBarsSlot(this, rootClip);
+        ppanel = new KazBarsPreviewPanel(this, rootClip);{{INIT_CAST}}{{INIT_SW}}{{INIT_INS}}
+
+        initConfig();
+    }
+
+
+    private function initConfig():Void {
+        var d:Object = KazBarsData.init();
+        CFG = d.CFG;
+        WL = d.WL;
+        ISDEB = d.ISDEB;
+        BUFFTYPE = d.BUFFTYPE;
+        STACK_LEVEL = d.STACK_LEVEL;
+        CUSTOMICON = d.CUSTOMICON;
+        ppanel.configure(d.PF);{{CFG_CONSOLE}}{{CFG_CAST}}{{CFG_SW}}{{CFG_INS}}
+    }
 
     private function createAllGrids():Void {
         var i:Number = 0;
@@ -798,3 +899,5 @@
         if (m_Target != null) { disconnectT(m_Target); m_Target = null; }
         return config;
     }
+
+}
