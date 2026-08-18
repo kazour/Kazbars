@@ -139,10 +139,12 @@ def build(app):
             show_close_game_required_dialog(app, process_name=running)
             return
 
-    # Flush the pending autosave so built == saved; the summary line names the
-    # profile that was persisted.
+    # Mirror the grid cards into the store (a field mid-typing hasn't fired
+    # on_change yet), then flush, so built == saved and the build signature
+    # hashes what actually gets baked; the summary line names the profile.
     profile_name = None
     if app.profile_store is not None:
+        app._on_grids_edited()
         try:
             if app.profile_store.flush():
                 profile_name = app.profile_store.document['name']

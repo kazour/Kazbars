@@ -245,3 +245,65 @@ def test_hover_colors_preserves_existing_enter_bindings(app):
         assert _handler_count(lbl, '<Leave>') == 2
     finally:
         lbl.destroy()
+
+
+# ============================================================================
+# GRID-CARD AUTOSAVE SEAM (rides the same app instance)
+# ============================================================================
+# The profile revamp has no Save prompt: every card widget must arm the
+# store's debounced autosave via on_edit → _mark_modified. An unwired widget
+# is silent data loss (edit → close → relaunch → edit gone), so these pin the
+# two commit mechanisms — spinbox focus-out and combobox selection — plus the
+# flush-point gather that captures a field still being typed in.
+
+def _find_widget(root, cls, textvariable):
+    """Depth-first search for the `cls` widget bound to `textvariable`."""
+    for w in root.winfo_children():
+        if isinstance(w, cls) and str(w.cget('textvariable')) == str(textvariable):
+            return w
+        found = _find_widget(w, cls, textvariable)
+        if found is not None:
+            return found
+    return None
+
+
+def _add_seam_grid(app, name):
+    from kazbars.grid_model import create_default_grid
+    gp = app.grids_panel
+    gp.grids.append(create_default_grid(
+        grid_type='player', rows=1, cols=5, mode='dynamic', grid_id=name))
+    gp.refresh_panels()
+    app.update()
+    return gp.grid_panels[-1], len(gp.grids) - 1
+
+
+def _stored_grid(app, index):
+    return app.profile_store.get_section('grids')['grids'][index]
+
+
+def test_spinbox_commit_reaches_profile_store(app):
+    from tkinter import ttk
+    card, idx = _add_seam_grid(app, 'SeamSpin')
+    card.icon_var.set(77)
+    spin = _find_widget(card, ttk.Spinbox, card.icon_var)
+    assert spin is not None
+    spin.event_generate('<FocusOut>')  # the clamp + on_change commit path
+    assert _stored_grid(app, idx)['iconSize'] == 77
+
+
+def test_combobox_selection_reaches_profile_store(app):
+    card, idx = _add_seam_grid(app, 'SeamCombo')
+    rl_label = card.fill_combo['values'][1]  # 1×5 grid → (Left → Right, Right → Left)
+    card.fill_var.set(rl_label)
+    card.fill_combo.event_generate('<<ComboboxSelected>>')
+    assert _stored_grid(app, idx)['fillDirection'] == 'RL'
+
+
+def test_save_now_captures_mid_typing_edit(app):
+    """Ctrl+S (and close/build) gather the panel before flushing: a value
+    typed into a field with no focus-out has fired no on_change yet, and
+    flush() alone would persist the stale store."""
+    card, idx = _add_seam_grid(app, 'SeamType')
+    card.gap_var.set(7)  # typed value, no commit event fired
+    app._save_now()
+    assert _stored_grid(app, idx)['gap'] == 7

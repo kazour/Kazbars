@@ -380,20 +380,26 @@ class DamageNumberColorsPanel(tk.Toplevel):
     # Override state                                                     #
     # ------------------------------------------------------------------ #
 
-    def _refresh_divergence(self) -> None:
-        """Show the sync hint when this profile carries overrides this game
-        folder's XML hasn't received — `last_patch` is the machine-local record
-        of what Apply last wrote here, and PATCH never fires on a profile
-        switch, so a switched-to profile can sit un-applied indefinitely. A
-        profile with no overrides has no opinion: hidden. Only called at open
-        and after Apply (which syncs), so it only ever hides in-session —
-        pack order at open puts it right under the tip bar."""
+    def _diverged(self) -> bool:
+        """This profile carries overrides this game folder's XML hasn't
+        received — `last_patch` is the machine-local record of what Apply last
+        wrote here, and PATCH never fires on a profile switch, so a
+        switched-to profile can sit un-applied indefinitely. A profile with no
+        overrides has no opinion. Drives both the sync hint and the Apply
+        gate, so the hint's "Apply to sync" is always actionable."""
         profile_state = {'colors': self._baseline_override_colors,
                          'directions': self._baseline_override_dirs}
-        has_overrides = any(profile_state.values())
+        if self._source_path is None or not any(profile_state.values()):
+            return False
         applied = (self.master.settings.get('last_patch') or {}).get(  # type: ignore[attr-defined]
             self.game_path, {}).get('damage_colors')
-        if self._source_path is not None and has_overrides and applied != profile_state:
+        return applied != profile_state
+
+    def _refresh_divergence(self) -> None:
+        """Show/hide the sync hint. Only called at open and after Apply (which
+        syncs), so it only ever hides in-session — pack order at open puts it
+        right under the tip bar."""
+        if self._diverged():
             self._divergence_lbl.pack(fill='x', padx=PAD_TAB, pady=(PAD_XS, 0))
         else:
             self._divergence_lbl.pack_forget()
@@ -491,12 +497,13 @@ class DamageNumberColorsPanel(tk.Toplevel):
     def _refresh_apply_state(self) -> None:
         colors_now = {n: self._picks[n] for n in self._overridden}
         dirs_now = {n: self._dir_picks[n] for n in self._dir_overridden}
-        dirty = (colors_now != self._baseline_override_colors
-                 or dirs_now != self._baseline_override_dirs)
-        if self._apply_btn is None or dirty == self._apply_enabled:
+        enable = (colors_now != self._baseline_override_colors
+                  or dirs_now != self._baseline_override_dirs
+                  or self._diverged())
+        if self._apply_btn is None or enable == self._apply_enabled:
             return
-        self._apply_enabled = dirty
-        self._apply_btn.configure(state="normal" if dirty else "disabled")
+        self._apply_enabled = enable
+        self._apply_btn.configure(state="normal" if enable else "disabled")
 
     # ------------------------------------------------------------------ #
     # Apply                                                              #
@@ -509,7 +516,12 @@ class DamageNumberColorsPanel(tk.Toplevel):
             self._picks, self._overridden, self._baseline_override_colors)
         write_dirs, dirs_to_write = compute_apply(
             self._dir_picks, self._dir_overridden, self._baseline_override_dirs)
-        if colors_to_write == self._baseline_override_colors and dirs_to_write == self._baseline_override_dirs:
+        # No staged edit AND nothing to sync → nothing to write. A diverged
+        # profile passes through: the write set equals the baseline, but this
+        # folder's XML hasn't received it yet.
+        if (colors_to_write == self._baseline_override_colors
+                and dirs_to_write == self._baseline_override_dirs
+                and not self._diverged()):
             return
         try:
             apply_colors(self.game_path, write_colors, write_dirs)

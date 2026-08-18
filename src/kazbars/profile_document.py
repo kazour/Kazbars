@@ -178,7 +178,8 @@ def _px_to_fractions(data: dict) -> dict:
         aw, ah = authored
     else:
         aw, ah = _DEFAULT_AUTHORED_AT
-    grids = data.get('modules', {}).get('grids', {})
+    modules = data.get('modules')
+    grids = modules.get('grids') if isinstance(modules, dict) else None
     entries = grids.get('grids') if isinstance(grids, dict) else None
     for g in entries if isinstance(entries, list) else []:
         if not isinstance(g, dict):

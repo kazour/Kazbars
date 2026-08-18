@@ -99,12 +99,16 @@ def labeled_spinbox(
 
 
 def labeled_combobox(
-    parent, label, var, values, *, width=11, tooltip=None, padx=0, label_font=FONT_FORM_LABEL
+    parent, label, var, values, *, width=11, tooltip=None, padx=0, label_font=FONT_FORM_LABEL,
+    on_change=None,
 ):
-    """Labeled readonly combobox. Returns the Combobox widget."""
+    """Labeled readonly combobox. `on_change`, if given, fires on user
+    selection (never on a programmatic `var.set`). Returns the Combobox widget."""
     ttk.Label(parent, text=label, font=label_font).pack(side="left")
     combo = ttk.Combobox(parent, textvariable=var, values=values, width=width, state="readonly")
     combo.pack(side="left", padx=padx)
+    if on_change is not None:
+        combo.bind("<<ComboboxSelected>>", lambda _e: on_change())
     if tooltip:
         add_tooltip(combo, tooltip)
     return combo

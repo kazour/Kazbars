@@ -14,6 +14,9 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from kazbars import profile_io, userdata
+from kazbars.profile_document import SectionRegistry, validate_document
+from kazbars.profile_library import ProfileLibrary
+from kazbars.profile_store import ProfileStore
 
 
 def test_template_chain_order(monkeypatch, tmp_path):
@@ -25,3 +28,60 @@ def test_template_chain_order(monkeypatch, tmp_path):
         Path("A:/assets/kazbars/templates/Default.json"),
         Path("A:/assets/kazbars/Default.json"),
     )
+
+
+def test_newest_doc_empty_library_falls_back_to_in_memory_blank(monkeypatch):
+    # `ensure_nonempty` is best-effort: when the disk refused every seed write
+    # the library stays empty, and startup/delete must not die on max([]).
+    monkeypatch.setattr(profile_io, "get_game_resolution_or_default", lambda: (1920, 1080))
+    registry = SectionRegistry()
+    app = SimpleNamespace(library=SimpleNamespace(list_profiles=lambda: []),
+                          registry=registry)
+    doc = profile_io._newest_doc(app)
+    assert doc["name"] == "My Setup"
+    assert validate_document(registry, doc) == doc
+
+
+def test_delete_current_flushes_before_trash(monkeypatch, tmp_path):
+    """A pending debounced autosave must die with the delete — an orphaned
+    timer firing afterwards would re-write the trashed document under a
+    fresh slug, resurrecting the profile the user just deleted."""
+    registry = SectionRegistry()
+    lib = ProfileLibrary(tmp_path, registry)
+    doc = lib.create_blank("Doomed", (1920, 1080))
+    assert doc is not None
+    doomed_id = doc["id"]
+
+    pending = []  # scheduled debounce callbacks; None = cancelled
+    store = ProfileStore(
+        doc, writer=lib.write,
+        schedule=lambda ms, fn: pending.append(fn) or len(pending),
+        cancel=lambda token: pending.__setitem__(token - 1, None),
+    )
+    store.set_section("stopwatch", {"enabled": True})  # arms the debounce
+
+    class _ConfirmDelete:
+        def __init__(self, *a, **k):
+            self.result = "Delete"
+
+        def show(self):
+            pass
+
+    monkeypatch.setattr(profile_io, "MessageDialog", _ConfirmDelete)
+    monkeypatch.setattr(profile_io, "apply_document", lambda app: None)
+    monkeypatch.setattr(profile_io, "get_game_resolution_or_default", lambda: (1920, 1080))
+    app = SimpleNamespace(
+        library=lib, profile_store=store, registry=registry,
+        after=lambda ms, fn: 0, after_cancel=lambda token: None,
+    )
+
+    profile_io.delete_current(app)
+
+    # Fire whatever the outgoing store still had scheduled — the orphaned-timer
+    # scenario. The deleted profile must stay deleted.
+    for fn in pending:
+        if fn is not None:
+            fn()
+    assert lib.load(doomed_id) is None
+    names = [d["name"] for _, d in lib.list_profiles()]
+    assert names == ["My Setup"]  # the reseed, and nothing resurrected
