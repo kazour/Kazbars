@@ -1,7 +1,8 @@
 // KazBarsInspect.as - Target inspect panel: a combat sheet for the current
 // target in the visual language of the game's default inspect window.
 // Runtime-drawn chrome + dynamic text fields (Arial resolves against the faces
-// embedded in base.swf), so it needs no new symbols.
+// embedded in base.swf), so it needs no new symbols. Plate, drag, collapse and
+// readout primitives inherit from KazBarsPanel.
 //
 // Reading rules are measured engine behaviour, not style: gear and rating ids
 // never fire SignalStatChanged and signal-time reads race the server, so the
@@ -29,8 +30,7 @@
 // SlotTargetChanged (first statement, so clears and raw tids both arrive),
 // loadState()/saveState() from the module archive, previewOn()/previewOff()
 // from the shared preview, cleanup() on deactivate.
-class KazBarsInspect {
-    private var rootClip:MovieClip;
+class KazBarsInspect extends KazBarsPanel {
 
     // Config (set by configure())
     private var START_X:Number;
@@ -40,55 +40,35 @@ class KazBarsInspect {
     private var SHOW_PVP:Boolean;
     private var SHOW_PERKS:Boolean;
 
-    // Geometry — every value is Math.round(FS x ratio), so the panel scales
-    // as one piece.
-    private var PAD:Number;       // 0.85  plate padding
+    // Geometry beyond the base set — every value is Math.round(FS x ratio),
+    // so the panel scales as one piece.
     private var LABEL_W:Number;   // 8.6   label column
     private var COL_GAP:Number;   // 0.85  label -> value gap
     private var VALUE_W:Number;   // 12.0  value column
-    private var NAME_FS:Number;   // 1.15  name header font size
-    private var TITLE_H:Number;   // 1.85  title band — the stopwatch's, so the
-                                  //       family's expanded title bars match
     private var NAME_GAP:Number;  // 0.5   name -> first section header
     private var SECT_GAP:Number;  // 0.75  space above a section header
     private var RULE_GAP:Number;  // 0.2   header baseline -> 1px rule
     private var ROWS_GAP:Number;  // 0.4   rule -> first stat row
-    private var LEAD:Number;      // 0.15  TextFormat leading
-    private var BTN:Number;       // 1.1   collapse-button box
     private var ICO:Number;       // 2.4   perk icon box
     private var ICO_GAP:Number;   // 0.35  gap between perk icons
     private var TIP_PAD:Number;   // 0.3   perk-name chip padding, and its gap
                                   //       above the icon row
-    private var COLL_W:Number;    // 15.8  collapsed plate: the stopwatch's
-    private var COLL_H:Number;    // 2.0   190x24 at the default FS 12
-    private var COLL_PAD:Number;  // 0.55  collapsed plate padding
     private var W:Number;         // 2xPAD + LABEL_W + COL_GAP + VALUE_W
 
     // UI
-    private var m_Panel:MovieClip;
-    private var bg:MovieClip;
     private var body:MovieClip;
-    private var collapseBtn:MovieClip;
-    private var collapsed:Boolean;
-    private var panelVis:Boolean;     // mirrors m_Panel._visible; hoverTick
+    private var panelVis:Boolean;     // mirrors panelClip._visible; hoverTick
                                       // asks every mouse move
     private var titleH:Number;
     private var fullH:Number;
     private var nameTF:TextField;
     private var collTF:TextField;     // the collapsed bar's whole content
-    private var curW:Number;
-    private var dragX:Number;         // panel position at press, so a
-    private var dragY:Number;         // collapsed press that never moved
-                                      // reads as a click (endDrag)
     private var pveHdrTF:TextField;
     private var pvpHdrTF:TextField;
     private var pveLabTF:TextField;
     private var pveValTF:TextField;
     private var pvpLabTF:TextField;
     private var pvpValTF:TextField;
-    private var dragMC:MovieClip;
-    private var coordTF:TextField;
-    private var curH:Number;
     private var m_ruleA:Number;   // rule offsets from the last layout pass,
     private var m_ruleB:Number;   // replayed on collapse; -1 = not on screen
     private var m_ruleC:Number;   // perks-section rule, same replay contract
@@ -147,7 +127,8 @@ class KazBarsInspect {
     private var DASH:String;
 
     public function KazBarsInspect(owner:KazBars, root:MovieClip) {
-        rootClip = root;
+        super(root);
+        TF_MULTILINE = true;   // the sheet's fields are multiline, no wrap
         m_Subject = null;
         subjName = "";
         subjKey = "";
@@ -166,8 +147,6 @@ class KazBarsInspect {
         lastName = "";
         lastPve = "";
         lastPvp = "";
-        curW = 0;
-        curH = 0;
         aaOn = false;
         curPerks = new Array();
         curPerkRanks = new Array();
@@ -175,7 +154,6 @@ class KazBarsInspect {
         perksShown = false;
         tipSlot = -1;
         DASH = String.fromCharCode(8212);
-        collapsed = false;
         titleH = 0;
         fullH = 0;
         subjIsPlayer = -1;
@@ -319,30 +297,23 @@ class KazBarsInspect {
         START_COLLAPSED = (cfg.collapsed == true);
         SHOW_PVP = (cfg.showPvp != false);
         SHOW_PERKS = (cfg.showPerks != false);
-        FS = Number(cfg.fontSize);
-        if (isNaN(FS) || FS < 8) FS = 12;
-        PAD = Math.round(FS * 0.85);
+        var fs:Number = Number(cfg.fontSize);
+        if (isNaN(fs) || fs < 8) fs = 12;
+        // COLL_* from the base put the collapsed bar — a labelled bar, not a
+        // folded sheet — beside the stopwatch's own at any size (190x24 at
+        // the default FS 12).
+        applyBaseSize(fs);
+        LEAD = Math.round(FS * 0.15);
         LABEL_W = Math.round(FS * 8.6);
         COL_GAP = Math.round(FS * 0.85);
         VALUE_W = Math.round(FS * 12);
-        NAME_FS = Math.round(FS * 1.15);
-        TITLE_H = Math.round(FS * 1.85);
         NAME_GAP = Math.round(FS * 0.5);
         SECT_GAP = Math.round(FS * 0.75);
         RULE_GAP = Math.round(FS * 0.2);
         ROWS_GAP = Math.round(FS * 0.4);
-        LEAD = Math.round(FS * 0.15);
-        BTN = Math.round(FS * 1.1);
         ICO = Math.round(FS * 2.4);
         ICO_GAP = Math.round(FS * 0.35);
         TIP_PAD = Math.round(FS * 0.3);
-        // Collapsed the panel is a labelled bar, not a folded sheet, and it
-        // is sized to sit beside the stopwatch's own collapsed bar: these
-        // ratios land on its 190x24 at the default FS 12 and scale with the
-        // rest of the panel from there.
-        COLL_W = Math.round(FS * 15.8);
-        COLL_H = Math.round(FS * 2);
-        COLL_PAD = Math.round(FS * 0.55);
         W = PAD * 2 + LABEL_W + COL_GAP + VALUE_W;
     }
 
@@ -357,20 +328,20 @@ class KazBarsInspect {
             Mouse.removeListener(mouseLsnr);
             mouseLsnr = null;
         }
-        if (m_Panel != null) m_Panel.removeMovieClip();
-        m_Panel = rootClip.createEmptyMovieClip("kbInspect", rootClip.getNextHighestDepth());
-        m_Panel._x = START_X;
-        m_Panel._y = START_Y;
-        m_Panel._visible = false;
+        if (panelClip != null) panelClip.removeMovieClip();
+        panelClip = rootClip.createEmptyMovieClip("kbInspect", rootClip.getNextHighestDepth());
+        panelClip._x = START_X;
+        panelClip._y = START_Y;
+        panelClip._visible = false;
         panelVis = false;
 
         collapsed = START_COLLAPSED;
 
-        bg = m_Panel.createEmptyMovieClip("chrome", m_Panel.getNextHighestDepth());
+        chrome = panelClip.createEmptyMovieClip("chrome", panelClip.getNextHighestDepth());
         // Everything below the name strip, so collapsing is one _visible toggle.
-        body = m_Panel.createEmptyMovieClip("body", m_Panel.getNextHighestDepth());
+        body = panelClip.createEmptyMovieClip("body", panelClip.getNextHighestDepth());
 
-        nameTF = makeTF(m_Panel, "name", PAD,
+        nameTF = makeTF(panelClip, "name", PAD,
                         Math.floor((TITLE_H - Math.round(NAME_FS * 1.4)) / 2),
                         W - PAD * 2 - BTN, Math.round(NAME_FS * 1.4),
                         NAME_FS, true, 0xF7A22B, "left");
@@ -378,7 +349,7 @@ class KazBarsInspect {
         // target name, so no reason for a pass to read one. Its own field
         // rather than a re-formatted name strip: a TextFormat swap per fold
         // would have to be re-applied to the text every time.
-        collTF = makeTF(m_Panel, "coll", COLL_PAD, 0, COLL_W - COLL_PAD * 2 - BTN,
+        collTF = makeTF(panelClip, "coll", COLL_PAD, 0, COLL_W - COLL_PAD * 2 - BTN,
                         Math.round(FS * 1.4), FS, true, 0xF7A22B, "left");
         collTF.text = "Inspect";
         collTF._y = Math.floor((COLL_H - collTF._height) / 2);
@@ -459,31 +430,20 @@ class KazBarsInspect {
         // Shown only while dragging — a copyable readout for pinning a spot
         // in the app. Right-aligned against the collapse glyph, the family
         // convention (stopwatch, console), so it stays clear of the name.
-        coordTF = makeTF(m_Panel, "coords", PAD, PAD, W - PAD * 2 - BTN, Math.round(FS * 1.3),
+        coordTF = makeTF(panelClip, "coords", PAD, PAD, W - PAD * 2 - BTN, Math.round(FS * 1.3),
                          Math.max(9, Math.round(FS * 0.8)), false, 0x999999, "right");
         coordTF._visible = false;
 
         // Name strip only: a whole-plate drag would eat combat clicks.
-        dragMC = m_Panel.createEmptyMovieClip("drag", m_Panel.getNextHighestDepth());
-        dragMC._self = this;
-        dragMC.useHandCursor = true;
-        dragMC.onPress = function() { this._self.beginDrag(this); };
-        dragMC.onRelease = dragMC.onReleaseOutside = function() { this._self.endDrag(this); };
+        makeDragStrip("drag");
 
-        collapseBtn = m_Panel.createEmptyMovieClip("btnCollapse", m_Panel.getNextHighestDepth());
+        makeCollapseBtn();
         collapseBtn._x = W - PAD - BTN;
         collapseBtn._y = Math.floor((TITLE_H - BTN) / 2);
-        collapseBtn._self = this;
-        collapseBtn.useHandCursor = true;
-        var btf:TextField = makeTF(collapseBtn, "label", 0, 0, BTN, BTN + 2,
-                                   Math.max(9, Math.round(FS * 0.9)), true, 0xC8C0B0, "center");
-        collapseBtn.onRelease = function() { this._self.toggleCollapsed(); };
-        collapseBtn.onRollOver = function() { this.label.textColor = 0xF7A22B; };
-        collapseBtn.onRollOut = function() { this.label.textColor = 0xC8C0B0; };
 
         // Perk-name chip, drawn last so it sits over the row it names. Opaque
         // where the plate is 90 — it lands on top of icons and a rule.
-        tipMC = m_Panel.createEmptyMovieClip("perkTip", m_Panel.getNextHighestDepth());
+        tipMC = panelClip.createEmptyMovieClip("perkTip", panelClip.getNextHighestDepth());
         tipMC._visible = false;
         tipTF = makeTF(tipMC, "label", TIP_PAD, TIP_PAD, LABEL_W, Math.round(FS * 1.4),
                        FS, false, 0xC8C0B0, "left");
@@ -507,31 +467,12 @@ class KazBarsInspect {
         pollIv = setInterval(function() { self.pollTick(); }, 250);
     }
 
-    private function makeTF(parent:MovieClip, id:String, x:Number, y:Number, w:Number,
-                            h:Number, size:Number, bold:Boolean, col:Number,
-                            align:String):TextField {
-        var tf:TextField = parent.createTextField(id, parent.getNextHighestDepth(), x, y, w, h);
-        tf.selectable = false;
-        tf.embedFonts = false;
-        tf.multiline = true;
-        tf.wordWrap = false;
-        var fmt:TextFormat = new TextFormat();
-        fmt.font = "Arial";
-        fmt.size = size;
-        fmt.bold = bold;
-        fmt.align = align;
-        fmt.color = col;
-        fmt.leading = LEAD;
-        tf.setNewTextFormat(fmt);
-        return tf;
-    }
-
     // =========================================================================
     // Layout / collapse
     // =========================================================================
 
     private function layout():Void {
-        if (m_Panel == null) return;
+        if (panelClip == null) return;
         titleH = TITLE_H;
         var y:Number = TITLE_H + NAME_GAP;
 
@@ -582,8 +523,7 @@ class KazBarsInspect {
     }
 
     public function toggleCollapsed():Void {
-        collapsed = !collapsed;
-        applyCollapsed();
+        super.toggleCollapsed();
         // Collapsed passes read the title ids only, so an expand has nothing
         // to paint from — take the full pass now rather than show a quarter
         // second of the sheet the panel was folded on.
@@ -595,7 +535,7 @@ class KazBarsInspect {
     // that sits on the title line — button, drag strip, drag readout — moves
     // to whichever plate is on screen.
     private function applyCollapsed():Void {
-        if (m_Panel == null) return;
+        if (panelClip == null) return;
         hideTip();
         body._visible = !collapsed;
         nameTF._visible = !collapsed;
@@ -623,42 +563,27 @@ class KazBarsInspect {
 
     private function drawChrome(w:Number, h:Number, rule1:Number, rule2:Number,
                                 rule3:Number):Void {
-        bg.clear();
-        bg.beginFill(0x0C0A07, 90);
-        rectPath(bg, 0, 0, w, h);
-        bg.endFill();
-        bg.lineStyle(1, 0x000000, 100);
-        rectPath(bg, 0, 0, w, h);
-        bg.lineStyle(1, 0x4A3B22, 100);
-        rectPath(bg, 1, 1, w - 2, h - 2);
+        drawPlate(w, h);
         // Title separator (expanded only — collapsed the bar IS the title
         // line), then the section-header rules; a negative offset means that
         // section is off screen (collapsed, or a target with no PvP block).
-        bg.lineStyle(1, 0x6B5324, 100);
+        chrome.lineStyle(1, 0x6B5324, 100);
         if (h > COLL_H) {
-            bg.moveTo(PAD, TITLE_H);
-            bg.lineTo(W - PAD, TITLE_H);
+            chrome.moveTo(PAD, TITLE_H);
+            chrome.lineTo(W - PAD, TITLE_H);
         }
         if (rule1 >= 0) {
-            bg.moveTo(PAD, rule1);
-            bg.lineTo(W - PAD, rule1);
+            chrome.moveTo(PAD, rule1);
+            chrome.lineTo(W - PAD, rule1);
         }
         if (rule2 >= 0) {
-            bg.moveTo(PAD, rule2);
-            bg.lineTo(W - PAD, rule2);
+            chrome.moveTo(PAD, rule2);
+            chrome.lineTo(W - PAD, rule2);
         }
         if (rule3 >= 0) {
-            bg.moveTo(PAD, rule3);
-            bg.lineTo(W - PAD, rule3);
+            chrome.moveTo(PAD, rule3);
+            chrome.lineTo(W - PAD, rule3);
         }
-    }
-
-    private function rectPath(mc:MovieClip, x:Number, y:Number, w:Number, h:Number):Void {
-        mc.moveTo(x, y);
-        mc.lineTo(x + w, y);
-        mc.lineTo(x + w, y + h);
-        mc.lineTo(x, y + h);
-        mc.lineTo(x, y);
     }
 
     // =========================================================================
@@ -1151,7 +1076,7 @@ class KazBarsInspect {
     // =========================================================================
 
     private function render():Void {
-        if (m_Panel == null || m_Subject == null || !haveFull) {
+        if (panelClip == null || m_Subject == null || !haveFull) {
             updateVisibility();
             return;
         }
@@ -1379,15 +1304,15 @@ class KazBarsInspect {
             hideTip();
             return;
         }
-        if (m_Panel == null || tipMC == null || perkSlots == null) return;
+        if (panelClip == null || tipMC == null || perkSlots == null) return;
         var top:Number = perkRowY;
-        var my:Number = m_Panel._ymouse;
+        var my:Number = panelClip._ymouse;
         if (my < top || my > top + ICO) {
             hideTip();
             return;
         }
         var pitch:Number = ICO + ICO_GAP;
-        var mx:Number = m_Panel._xmouse - PAD;
+        var mx:Number = panelClip._xmouse - PAD;
         var i:Number = Math.floor(mx / pitch);
         // The gaps between the boxes are not the boxes.
         if (i < 0 || i > 5 || mx - i * pitch > ICO) {
@@ -1446,11 +1371,11 @@ class KazBarsInspect {
     }
 
     private function updateVisibility():Void {
-        if (m_Panel == null) return;
+        if (panelClip == null) return;
         var vis:Boolean = active && (previewMode || (m_Subject != null && haveFull));
         if (vis != panelVis) {
             panelVis = vis;
-            m_Panel._visible = vis;
+            panelClip._visible = vis;
         }
         if (!vis) hideTip();
     }
@@ -1459,7 +1384,7 @@ class KazBarsInspect {
     // Sections follow the baked gates; the perk boxes stay empty — there are
     // no canned RDB icons to fill them with.
     public function previewOn():Void {
-        if (m_Panel == null) return;
+        if (panelClip == null) return;
         previewMode = true;
         if (pvpShown != SHOW_PVP || perksShown != SHOW_PERKS) {
             pvpShown = SHOW_PVP;
@@ -1478,7 +1403,7 @@ class KazBarsInspect {
     }
 
     public function previewOff():Void {
-        if (m_Panel == null) return;
+        if (panelClip == null) return;
         previewMode = false;
         // Force a live reassign: the canned sheet bypassed the cache.
         lastName = "";
@@ -1498,42 +1423,11 @@ class KazBarsInspect {
     }
 
     // =========================================================================
-    // Drag + persistence (module config archive — permanent for every user)
+    // Persistence (module config archive — permanent for every user)
     // =========================================================================
 
-    public function beginDrag(da:MovieClip):Void {
-        // Bounds derive from fontSize, so a big enough panel inverts the rect
-        // and gets yanked off-screen; floored, it pins to the top-left.
-        m_Panel.startDrag(false, 0, 0, Math.max(0, Stage.width - curW),
-                          Math.max(0, Stage.height - curH));
-        dragX = m_Panel._x;
-        dragY = m_Panel._y;
-        coordTF._visible = true;
-        updateCoords();
-        var self:KazBarsInspect = this;
-        da.onMouseMove = function() { self.updateCoords(); };
-    }
-
-    public function endDrag(da:MovieClip):Void {
-        m_Panel.stopDrag();
-        delete da.onMouseMove;
-        coordTF._visible = false;
-        // Collapsed, the bar is small and labelled and reads as a button, so
-        // a press that never moved it opens the sheet; a real drag still
-        // just moves it. Expanded, the name strip only drags — a stray click
-        // beside the target's name must not fold the sheet away.
-        if (collapsed && Math.abs(m_Panel._x - dragX) < 2
-                      && Math.abs(m_Panel._y - dragY) < 2) {
-            toggleCollapsed();
-        }
-    }
-
-    public function updateCoords():Void {
-        coordTF.text = Math.round(m_Panel._x) + ", " + Math.round(m_Panel._y);
-    }
-
     public function loadState(config:Object):Void {
-        if (config == null || m_Panel == null) return;
+        if (config == null || panelClip == null) return;
         var v:Object = config.FindEntry("inv");
         if (v !== undefined) setActive(v == 1);
         // Fold state first: the clamp has to measure the plate actually on
@@ -1547,23 +1441,17 @@ class KazBarsInspect {
         var x:Object = config.FindEntry("inx");
         var y:Object = config.FindEntry("iny");
         if (x !== undefined && y !== undefined) {
-            m_Panel._x = clampPos(Number(x), Stage.width - curW);
-            m_Panel._y = clampPos(Number(y), Stage.height - curH);
+            panelClip._x = clampPos(Number(x), Stage.width - curW);
+            panelClip._y = clampPos(Number(y), Stage.height - curH);
         }
     }
 
     public function saveState(config:Object):Void {
-        if (config == null || m_Panel == null) return;
-        config.ReplaceEntry("inx", m_Panel._x);
-        config.ReplaceEntry("iny", m_Panel._y);
+        if (config == null || panelClip == null) return;
+        config.ReplaceEntry("inx", panelClip._x);
+        config.ReplaceEntry("iny", panelClip._y);
         config.ReplaceEntry("inc", collapsed ? 1 : 0);
         config.ReplaceEntry("inv", active ? 1 : 0);
-    }
-
-    private function clampPos(v:Number, max:Number):Number {
-        if (isNaN(v) || v < 0) return 0;
-        if (v > max) return max;
-        return v;
     }
 
     public function cleanup():Void {
@@ -1589,9 +1477,9 @@ class KazBarsInspect {
         }
         m_Subject = null;
         previewMode = false;
-        if (m_Panel != null) {
-            m_Panel.removeMovieClip();
-            m_Panel = null;
+        if (panelClip != null) {
+            panelClip.removeMovieClip();
+            panelClip = null;
         }
     }
 }

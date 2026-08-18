@@ -227,6 +227,8 @@ class KazBarsPanel {
     }
 
     public function beginDrag(dh:MovieClip):Void {
+        // Bounds derive from fontSize, so a big enough panel inverts the rect
+        // and gets yanked off-screen; floored, it pins to the top-left.
         panelClip.startDrag(false, 0, 0, Math.max(0, Stage.width - curW),
                             Math.max(0, Stage.height - curH));
         dragX = panelClip._x;
