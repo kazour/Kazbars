@@ -55,15 +55,8 @@ CONSOLE_RATIOS = {
 }
 
 PREVIEW_RATIOS = {
-    'PAD': (0.85, 10),
-    'TITLE_H': (1.85, 22),
-    'LINE': (1.4, 17),
-    'BOX': (1.0, 12),
     'ROW_H': (1.667, 20),
-    'BTN_W': (5.0, 60),
-    'BTN_H': (1.85, 22),
     'COL_W': (18.33, 220),
-    'NAME_FS': (1.15, 14),
 }
 
 # Text sizes are written inline at the makeTF call, the family's idiom, so they
