@@ -6,7 +6,8 @@ The panel is an optional in-game overlay (Extras ▸ Inspect panel…) that rend
 
 | Piece | Where |
 |---|---|
-| Runtime (AS2, the whole panel) | `src/kazbars/assets/kazbars/stubs/KazBarsInspect.as` |
+| Runtime (AS2, logic + chrome overrides) | `src/kazbars/assets/kazbars/stubs/KazBarsInspect.as` (chrome/drag/collapse primitives from `KazBarsPanel.as`) |
+| Baked tables (perk pool, names, class map, watch list) | `src/kazbars/assets/kazbars/stubs/KazBarsInspectData.as` — static `init()` |
 | Config layer (pure, no Tk) | `src/kazbars/inspect.py` — `validate_config()` |
 | Settings dialog | `src/kazbars/inspect_panel.py` — `open_inspect_dialog()` |
 | Build gate | `src/kazbars/grids_generator.py` — `include_inspect`, emits the `d.INS` block |
