@@ -46,6 +46,37 @@ def _load_template(assets_path=None):
     return _template_cache[key]
 
 
+def _apply_feature_gates(template, flags):
+    """Keep or strip the template's ``//#if FLAG ... //#end`` blocks: body lines
+    stay verbatim when the flag is on, the whole block disappears when it is
+    off, and marker lines (which may carry a trailing comment) never reach the
+    output. Deliberately capped: exactly the four build-gate flags, no nesting,
+    no else — a need for more is a design change, not a preprocessor patch."""
+    out = []
+    active = None
+    keep = True
+    for i, line in enumerate(template.split("\n"), start=1):
+        stripped = line.strip()
+        if stripped.startswith("//#if"):
+            if active is not None:
+                raise ValueError(f"nested //#if at template line {i}")
+            flag = stripped[5:].strip().split(" ", 1)[0]
+            if flag not in flags:
+                raise ValueError(f"unknown feature flag {flag!r} at template line {i}")
+            active = flag
+            keep = flags[flag]
+        elif stripped == "//#end":
+            if active is None:
+                raise ValueError(f"stray //#end at template line {i}")
+            active = None
+            keep = True
+        elif keep:
+            out.append(line)
+    if active is not None:
+        raise ValueError(f"unclosed //#if {active}")
+    return "\n".join(out)
+
+
 # ============================================================================
 # CODE GENERATOR
 # ============================================================================
@@ -384,156 +415,12 @@ class CodeGenerator:
 
     def _main_class(self):
         template = _load_template(self._assets_path)
-        if self.include_console:
-            tokens = {
-                "{{DECL_CONSOLE}}": "\n    private var console:KazBarsConsole;",
-                "{{INIT_CONSOLE}}": "\n        console = new KazBarsConsole(this, rootClip);",
-                # The control panel is never gated, so its configure sits
-                # unconditionally in the template; the console's follows its
-                # build gate. Both re-run before anything is drawn — each stub
-                # already seeded itself at the default from its constructor, so
-                # a build that skips this still renders.
-                "{{CFG_CONSOLE}}": "\n        console.configure(d.PF);",
-                "{{CONSOLE_LOG_PLAYER}}": "if (console.isActive() && buff.m_Name != null) console.logPlayer(buff.m_Name, bid);",
-                "{{CONSOLE_LOG_TARGET}}": "if (console.isActive() && buff.m_Name != null) console.logTarget(buff.m_Name, bid);",
-                # Open at login is the default a first-ever session gets, before
-                # any archived state exists to say otherwise.
-                "{{CONSOLE_CREATE}}": "console.createConsole();",
-                "{{CONSOLE_EXIT_PERSIST}}": 'config.ReplaceEntry("cnv", console.isActive() ? 1 : 0);\n'
-                '            config.ReplaceEntry("log_p", console.logPlayerEnabled ? 1 : 0);\n'
-                '            config.ReplaceEntry("log_t", console.logTargetEnabled ? 1 : 0);\n'
-                "            console.saveState(config);",
-                "{{CONSOLE_CLEANUP}}": "console.removeConsole();",
-                # loadState before the re-create so the console rebuilds on the
-                # archived spot and fold, not back in the middle of the screen.
-                "{{CONSOLE_LOAD_PERSIST}}": 'var cnv:Object = config.FindEntry("cnv");\n'
-                '            var clp:Object = config.FindEntry("log_p");\n'
-                "            if (clp !== undefined) console.logPlayerEnabled = (clp == 1);\n"
-                '            var clt:Object = config.FindEntry("log_t");\n'
-                "            if (clt !== undefined) console.logTargetEnabled = (clt == 1);\n"
-                "            console.loadState(config);\n"
-                "            if (cnv !== undefined && cnv == 0) console.removeConsole();\n"
-                "            else console.createConsole();",
-                "{{CONSOLE_DEACTIVATE_PERSIST}}": 'config.ReplaceEntry("cnv", console.isActive() ? 1 : 0);\n'
-                '            config.ReplaceEntry("log_p", console.logPlayerEnabled ? 1 : 0);\n'
-                '            config.ReplaceEntry("log_t", console.logTargetEnabled ? 1 : 0);\n'
-                "            console.saveState(config);",
-                "{{PP_ROW_CONSOLE}}": 'ppanel.addExtra("Console", "console", console.isActive());',
-                "{{PP_APPLY_CONSOLE}}": 'if (key == "console") console.setActive(shown);',
-            }
-        else:
-            tokens = {
-                "{{DECL_CONSOLE}}": "",
-                "{{INIT_CONSOLE}}": "",
-                "{{CFG_CONSOLE}}": "",
-                "{{CONSOLE_LOG_PLAYER}}": "",
-                "{{CONSOLE_LOG_TARGET}}": "",
-                "{{CONSOLE_CREATE}}": "",
-                "{{CONSOLE_EXIT_PERSIST}}": "",
-                "{{CONSOLE_CLEANUP}}": "",
-                "{{CONSOLE_LOAD_PERSIST}}": "",
-                "{{CONSOLE_DEACTIVATE_PERSIST}}": "",
-                "{{PP_ROW_CONSOLE}}": "",
-                "{{PP_APPLY_CONSOLE}}": "",
-            }
-        cast_token_names = (
-            "{{DECL_CAST}}",
-            "{{INIT_CAST}}",
-            "{{CFG_CAST}}",
-            "{{CAST_CREATE}}",
-            "{{CAST_DISCONNECT_P}}",
-            "{{CAST_CONNECT_P}}",
-            "{{CAST_SET_TARGET}}",
-            "{{CAST_PREVIEW_ON}}",
-            "{{CAST_PREVIEW_OFF}}",
-            "{{CAST_LOAD}}",
-            "{{CAST_SAVE}}",
-            "{{CAST_CLEANUP}}",
-            "{{PP_ROW_CAST}}",
-            "{{PP_APPLY_CAST}}",
-        )
-        if self.include_cast_timer:
-            cast_tokens = {
-                "{{DECL_CAST}}": "\n    private var castTimer:KazBarsCastTimer;",
-                "{{INIT_CAST}}": "\n        castTimer = new KazBarsCastTimer(this, rootClip);",
-                "{{CFG_CAST}}": "\n        castTimer.configure(d.CAST);",
-                "{{CAST_CREATE}}": "castTimer.createFields();",
-                "{{CAST_DISCONNECT_P}}": "castTimer.disconnectPlayer();",
-                "{{CAST_CONNECT_P}}": "castTimer.connectPlayer(m_Player);",
-                "{{CAST_SET_TARGET}}": "castTimer.setTarget(m_Target);",
-                "{{CAST_PREVIEW_ON}}": "castTimer.previewOn();",
-                "{{CAST_PREVIEW_OFF}}": "castTimer.previewOff();",
-                "{{CAST_LOAD}}": "castTimer.loadPositions(config);",
-                "{{CAST_SAVE}}": "castTimer.savePositions(config);",
-                "{{CAST_CLEANUP}}": "castTimer.cleanup();",
-                "{{PP_ROW_CAST}}": 'ppanel.addExtra("Cast timer", "cast", castTimer.isActive());',
-                "{{PP_APPLY_CAST}}": 'if (key == "cast") castTimer.setActive(shown);',
-            }
-        else:
-            cast_tokens = {name: "" for name in cast_token_names}
-        tokens.update(cast_tokens)
-        sw_token_names = (
-            "{{DECL_SW}}",
-            "{{INIT_SW}}",
-            "{{CFG_SW}}",
-            "{{SW_CREATE}}",
-            "{{SW_LOAD}}",
-            "{{SW_SAVE}}",
-            "{{SW_CLEANUP}}",
-            "{{PP_ROW_SW}}",
-            "{{PP_APPLY_SW}}",
-        )
-        if self.include_stopwatch:
-            sw_tokens = {
-                "{{DECL_SW}}": "\n    private var stopwatch:KazBarsStopwatch;",
-                "{{INIT_SW}}": "\n        stopwatch = new KazBarsStopwatch(this, rootClip);",
-                "{{CFG_SW}}": "\n        stopwatch.configure(d.SW);",
-                "{{SW_CREATE}}": "stopwatch.createPanel();",
-                "{{SW_LOAD}}": "stopwatch.loadState(config);",
-                "{{SW_SAVE}}": "stopwatch.saveState(config);",
-                "{{SW_CLEANUP}}": "stopwatch.cleanup();",
-                "{{PP_ROW_SW}}": 'ppanel.addExtra("Stopwatch", "sw", stopwatch.isActive());',
-                "{{PP_APPLY_SW}}": 'if (key == "sw") stopwatch.setActive(shown);',
-            }
-        else:
-            sw_tokens = {name: "" for name in sw_token_names}
-        tokens.update(sw_tokens)
-        ins_token_names = (
-            "{{DECL_INS}}",
-            "{{INIT_INS}}",
-            "{{CFG_INS}}",
-            "{{INS_CREATE}}",
-            "{{INS_SET_TARGET}}",
-            "{{INS_PREVIEW_ON}}",
-            "{{INS_PREVIEW_OFF}}",
-            "{{INS_LOAD}}",
-            "{{INS_SAVE}}",
-            "{{INS_CLEANUP}}",
-            "{{PP_ROW_INS}}",
-            "{{PP_APPLY_INS}}",
-        )
-        if self.include_inspect:
-            ins_tokens = {
-                "{{DECL_INS}}": "\n    private var inspect:KazBarsInspect;",
-                "{{INIT_INS}}": "\n        inspect = new KazBarsInspect(this, rootClip);",
-                "{{CFG_INS}}": "\n        inspect.configure(d.INS);",
-                "{{INS_CREATE}}": "inspect.createPanel();",
-                "{{INS_SET_TARGET}}": "inspect.setSubject(tid);",
-                "{{INS_PREVIEW_ON}}": "inspect.previewOn();",
-                "{{INS_PREVIEW_OFF}}": "inspect.previewOff();",
-                "{{INS_LOAD}}": "inspect.loadState(config);",
-                "{{INS_SAVE}}": "inspect.saveState(config);",
-                "{{INS_CLEANUP}}": "inspect.cleanup();",
-                "{{PP_ROW_INS}}": 'ppanel.addExtra("Inspect panel", "ins", inspect.isActive());',
-                "{{PP_APPLY_INS}}": 'if (key == "ins") inspect.setActive(shown);',
-            }
-        else:
-            ins_tokens = {name: "" for name in ins_token_names}
-        tokens.update(ins_tokens)
-
-        for token, replacement in tokens.items():
-            template = template.replace(token, replacement)
-        return template
+        return _apply_feature_gates(template, {
+            "CONSOLE": self.include_console,
+            "CAST": self.include_cast_timer,
+            "SW": self.include_stopwatch,
+            "INS": self.include_inspect,
+        })
 
 
 def unresolved_refs(grids, database) -> list:

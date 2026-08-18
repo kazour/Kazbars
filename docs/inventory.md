@@ -51,7 +51,7 @@
 | `src/kazbars/grid_dialogs.py` | 896 |
 | `src/kazbars/grid_editor_panel.py` | 683 |
 | `src/kazbars/grid_model.py` | 248 |
-| `src/kazbars/grids_generator.py` | 673 |
+| `src/kazbars/grids_generator.py` | 560 |
 | `src/kazbars/grids_panel.py` | 708 |
 | `src/kazbars/inspect.py` | 64 |
 | `src/kazbars/inspect_panel.py` | 315 |
