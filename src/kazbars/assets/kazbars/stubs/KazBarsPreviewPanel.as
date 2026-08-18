@@ -17,7 +17,13 @@
 // cnv). Its own drag position rides in the module config archive as ppx/ppy,
 // beside the other panels' keys.
 class KazBarsPreviewPanel {
-    private var owner:Object;
+    // The panel<->core contract: the core drives every stub through its typed
+    // lifecycle calls (configure / create* / loadState / saveState / cleanup /
+    // isActive / setActive / previewOn / previewOff and the per-stub feeds);
+    // the ONE call that flows back is owner.previewToggle(key, shown), routed
+    // from an extra row's checkbox. Typed, not an interface: KazBars is
+    // generated into the same compile unit, so MTASC checks the call for free.
+    private var owner:KazBars;
     private var rootClip:MovieClip;
     private var panelClip:MovieClip;
     private var chrome:MovieClip;
@@ -48,7 +54,7 @@ class KazBarsPreviewPanel {
     private var NAME_FS:Number;   // 1.15  title font size
     private var MAX_PER_COL:Number;   // a row count, not a size — never scaled
 
-    public function KazBarsPreviewPanel(kb:Object, root:MovieClip) {
+    public function KazBarsPreviewPanel(kb:KazBars, root:MovieClip) {
         owner = kb;
         rootClip = root;
         rows = new Array();

@@ -71,7 +71,7 @@ class KazBarsStopwatch {
     private var lastText:String;
     private var active:Boolean;
 
-    public function KazBarsStopwatch(kb:Object, root:MovieClip) {
+    public function KazBarsStopwatch(owner:KazBars, root:MovieClip) {
         rootClip = root;
         active = true;
         running = false;

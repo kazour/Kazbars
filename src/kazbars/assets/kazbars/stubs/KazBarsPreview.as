@@ -2,7 +2,7 @@
 class KazBarsPreview {
     private var rootClip:MovieClip;
 
-    public function KazBarsPreview(kb:Object, root:MovieClip) {
+    public function KazBarsPreview(owner:KazBars, root:MovieClip) {
         rootClip = root;
     }
 

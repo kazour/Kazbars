@@ -16,7 +16,6 @@
 // module config archive (cnx/cny/cnc) beside the master switch (cnv) and the
 // two log toggles.
 class KazBarsConsole {
-    private var owner:Object;
     private var rootClip:MovieClip;
     private var consoleClip:MovieClip;
     private var chrome:MovieClip;
@@ -81,8 +80,7 @@ class KazBarsConsole {
     // untagged run — it would fall back to the default serif device font.
     private var ENTRY_FONT:String;
 
-    public function KazBarsConsole(kb:Object, root:MovieClip) {
-        owner = kb;
+    public function KazBarsConsole(owner:KazBars, root:MovieClip) {
         rootClip = root;
         playerLog = "";
         targetLog = "";

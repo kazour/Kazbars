@@ -146,7 +146,7 @@ class KazBarsInspect {
     private var PERK_FILL:Array;      // per-slot-pair plate colour
     private var DASH:String;
 
-    public function KazBarsInspect(kb:Object, root:MovieClip) {
+    public function KazBarsInspect(owner:KazBars, root:MovieClip) {
         rootClip = root;
         m_Subject = null;
         subjName = "";
