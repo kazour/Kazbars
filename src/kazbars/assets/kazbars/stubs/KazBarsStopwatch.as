@@ -18,7 +18,7 @@
 //
 // Driven from KazBars: create() in onLoad, loadState()/saveState() from
 // the module archive, cleanup() on deactivate.
-class KazBarsStopwatch extends KazBarsPanel {
+class KazBarsStopwatch extends KazBarsPanel implements KazBarsModule {
 
     // Config (set by configure())
     private var START_X:Number;
@@ -278,6 +278,16 @@ class KazBarsStopwatch extends KazBarsPanel {
     private function syncTitle():Void {
         collTF.text = (running || paused) ? lastText : "Stopwatch";
     }
+
+    // The control panel's row for this module: the key routes the check back
+    // through KazBars.previewToggle into setActive below.
+    public function previewKey():String { return "sw"; }
+    public function previewLabel():String { return "Stopwatch"; }
+
+    // Tool class: already interactive in normal play, dragged by its own title
+    // strip, so preview has nothing to add or take away.
+    public function previewOn():Void {}
+    public function previewOff():Void {}
 
     // Master switch (preview control panel + archive): hidden is inactive, but
     // the timer keeps running underneath — re-activating shows the live count.

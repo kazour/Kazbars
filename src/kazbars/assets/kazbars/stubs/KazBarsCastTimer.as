@@ -12,7 +12,7 @@
 // Driven from KazBars: create() in onLoad, connectPlayer()/setTarget()
 // from the existing player/target lifecycle, previewOn()/previewOff() from the
 // shared Shift+Ctrl+Alt preview, loadState()/saveState() from the module archive.
-class KazBarsCastTimer {
+class KazBarsCastTimer implements KazBarsModule {
     private var rootClip:MovieClip;
 
     // Config (set by configure())
@@ -316,6 +316,11 @@ class KazBarsCastTimer {
         hidePreview(m_PlayerClip, playerData.casting && active);
         hidePreview(m_TargetClip, targetData.casting && active);
     }
+
+    // The control panel's row for this module: the key routes the check back
+    // through KazBars.previewToggle into setActive below.
+    public function previewKey():String { return "cast"; }
+    public function previewLabel():String { return "Cast timer"; }
 
     // Master switch (preview control panel + archive). Hiding is a hard hide of
     // both clips (the drag overlay is a child, so it follows); re-activating

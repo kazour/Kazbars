@@ -30,7 +30,7 @@
 // SlotTargetChanged (first statement, so clears and raw tids both arrive),
 // loadState()/saveState() from the module archive, previewOn()/previewOff()
 // from the shared preview, cleanup() on deactivate.
-class KazBarsInspect extends KazBarsPanel {
+class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
 
     // Config (set by configure())
     private var START_X:Number;
@@ -1240,6 +1240,11 @@ class KazBarsInspect extends KazBarsPanel {
         tipSlot = -1;
         tipMC._visible = false;
     }
+
+    // The control panel's row for this module: the key routes the check back
+    // through KazBars.previewToggle into setActive below.
+    public function previewKey():String { return "ins"; }
+    public function previewLabel():String { return "Inspect panel"; }
 
     // Master switch (preview control panel + archive): folds into the one
     // visibility gate, so live sheets and the canned preview sheet both obey it.

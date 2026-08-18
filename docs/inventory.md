@@ -83,7 +83,7 @@
 | `src/kazbars/userdata.py` | 110 |
 | `src/kazbars/window_position.py` | 116 |
 | `tests/test_app_contract.py` | 104 |
-| `tests/test_as2_class_names.py` | 61 |
+| `tests/test_as2_class_names.py` | 65 |
 | `tests/test_boss_timer.py` | 151 |
 | `tests/test_buff_db_layers.py` | 266 |
 | `tests/test_buff_xml.py` | 324 |
