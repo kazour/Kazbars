@@ -606,38 +606,51 @@ class BuffDisplayDialog(tk.Toplevel):
     # ------------------------------------------------------------------
     # Apply / Cancel
     # ------------------------------------------------------------------
-    def _refresh_divergence(self):
-        """Show the sync hint when this profile carries `buff_bars` overrides
-        this game folder's XML hasn't received — `last_patch` records what
-        Apply last wrote here, and PATCH never fires on a profile switch.
-        Empty sub-dicts count as no opinion on both sides. Only called after
-        the sections load and after Apply (which syncs), so it only ever hides
-        in-session; pack order at open puts it under the subtitle."""
+    def _diverged(self):
+        """This profile carries `buff_bars` overrides this game folder's XML
+        hasn't received — `last_patch` records what Apply last wrote here, and
+        PATCH never fires on a profile switch. Empty sub-dicts count as no
+        opinion on both sides. Drives both the sync hint and the Apply gate,
+        so the hint's "Apply to sync" is always actionable."""
         profile_state = {s.label: s._baseline_override
                          for s in self.sections if s._baseline_override}
+        if not profile_state:
+            return False
         applied_raw = (self.app.settings.get('last_patch') or {}).get(
             self.app.game_path, {}).get('buff_bars') or {}
         applied = {k: v for k, v in applied_raw.items() if v}
-        if profile_state and applied != profile_state:
+        return applied != profile_state
+
+    def _refresh_divergence(self):
+        """Show/hide the sync hint. Only called after the sections load and
+        after Apply (which syncs), so it only ever hides in-session; pack
+        order at open puts it under the subtitle."""
+        if self._diverged():
             self._divergence_lbl.pack(fill='x', padx=PAD_INNER, pady=(PAD_LF, 0),
                                       after=self._divergence_anchor)
         else:
             self._divergence_lbl.pack_forget()
 
     def _refresh_apply_state(self):
-        any_dirty = any(s.dirty() for s in self.sections)
-        if self._apply_btn is None or any_dirty == self._apply_enabled:
+        enable = any(s.dirty() for s in self.sections) or self._diverged()
+        if self._apply_btn is None or enable == self._apply_enabled:
             return
-        self._apply_enabled = any_dirty
-        self._apply_btn.configure(state='normal' if any_dirty else 'disabled')
+        self._apply_enabled = enable
+        self._apply_btn.configure(state='normal' if enable else 'disabled')
 
     def _on_apply(self):
-        dirty_sections = [s for s in self.sections if s.dirty()]
-        if not dirty_sections:
+        write_sections = [s for s in self.sections if s.dirty()]
+        if self._diverged():
+            # Sync path: the hint's "Apply to sync" must work with no staged
+            # edits — include every writable section this profile overrides.
+            write_sections += [s for s in self.sections
+                               if s not in write_sections
+                               and s.state == s.STATE_OK and s._compute_overrides()]
+        if not write_sections:
             return
         failures = []
         successes = []
-        for section in dirty_sections:
+        for section in write_sections:
             try:
                 section.write_to_disk()
                 section.load_after_write()

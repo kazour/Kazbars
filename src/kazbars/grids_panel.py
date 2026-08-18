@@ -640,8 +640,9 @@ class GridsPanel(ttk.Frame):
                 on_delete=self.delete_grid, initially_open=(i == expand_index),
                 get_total_slots=self.get_total_slots,
                 on_resize=self._on_grid_resized,
-                on_whitelist_changed=self._update_tip,
+                on_whitelist_changed=self._on_card_buffs_changed,
                 name_in_use=self._grid_name_in_use,
+                on_edit=self._mark_modified,
             )
             self.grid_panels.append(panel)
             self._attach_panel(panel, i)
@@ -686,6 +687,12 @@ class GridsPanel(ttk.Frame):
 
     def _on_grid_resized(self):
         self._update_slot_counter()
+        self._mark_modified()
+
+    def _on_card_buffs_changed(self):
+        """A card's whitelist / slot-assignment dialog committed — refresh the
+        step guide and mirror the change into the profile store."""
+        self._update_tip()
         self._mark_modified()
 
     def _mark_modified(self):

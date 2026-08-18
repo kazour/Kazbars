@@ -65,6 +65,16 @@ def test_rung_coerces_junk_px_to_grid_defaults():
     assert g1["fy"] == 400 / 1440
 
 
+def test_rung_survives_non_dict_modules():
+    # The boundary promises DocumentError or a valid doc — never a raw
+    # AttributeError (profile_library skips on DocumentError alone, so an
+    # escape here breaks list_profiles / startup / import).
+    for bad in (None, [], "hello", 42):
+        out = validate_document(_registry(), _schema1_doc(modules=bad))
+        assert out["schema"] == DOC_SCHEMA_VERSION
+        assert out["modules"]["grids"] == grid_model.PROFILE_SECTION.defaults()
+
+
 def test_rung_never_mutates_input():
     raw = _schema1_doc()
     snapshot = copy.deepcopy(raw)

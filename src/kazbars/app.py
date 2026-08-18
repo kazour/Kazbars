@@ -714,9 +714,12 @@ class KazBarsApp(ttkb.Window):
         self.title(f"{APP_NAME} — {name}")
 
     def _save_now(self):
-        """Ctrl+S: flush the pending autosave and confirm."""
-        if self.profile_store and self.profile_store.flush():
-            self.toast.show("Profile saved", style='success', duration=2)
+        """Ctrl+S: mirror the grid cards into the store (a field mid-typing
+        hasn't fired on_change yet — only arrows/focus-out do), flush, confirm."""
+        if self.profile_store:
+            self._on_grids_edited()
+            if self.profile_store.flush():
+                self.toast.show("Profile saved", style='success', duration=2)
 
     def _new_profile(self):
         return profile_io.new_blank_profile(self)
@@ -779,6 +782,9 @@ class KazBarsApp(ttkb.Window):
         a rescue prompt if the disk has been refusing writes)."""
         if not self._check_unsaved_db_changes():
             return
+        # Mirror grid-card fields the debounce hasn't seen (typed, no focus-out)
+        # so the final flush writes what's on screen.
+        self._on_grids_edited()
         if self.profile_store and not self.profile_store.flush():
             dialog = MessageDialog(
                 "Your profile couldn't be saved to disk — the last edits may "

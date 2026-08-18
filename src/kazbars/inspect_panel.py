@@ -208,7 +208,8 @@ def open_inspect_dialog(app):
 
     console_card = create_card(content, "Console")
     console_card.pack(fill='x', pady=(0, PAD_ROW))
-    console_var = tk.BooleanVar(value=bool(app.settings.get('build_console', False)))
+    console_before = bool(app.settings.get('build_console', False))
+    console_var = tk.BooleanVar(value=console_before)
     console_cb = ttk.Checkbutton(console_card,
                                  text="Include the buff-discovery console in builds",
                                  variable=console_var)
@@ -273,7 +274,8 @@ def open_inspect_dialog(app):
         app.profile_store.set_section('inspect', new_cfg)
         app.grids_panel.refresh_extras_shortcuts()
         # Three separate settings live in this dialog, so name whichever moved
-        # rather than reporting an inspect save that isn't one.
+        # rather than reporting an inspect save that isn't one — and a bare
+        # Apply with nothing moved says so instead of claiming a console save.
         if new_cfg != cfg:
             if new_cfg['enabled']:
                 app_toast(app, "Inspect panel saved — Build & Install to apply", 'success')
@@ -281,8 +283,10 @@ def open_inspect_dialog(app):
                 app_toast(app, "Inspect panel off — next build removes it", 'info')
         elif shared != shared_before:
             app_toast(app, "Panel text size saved — Build & Install to apply", 'success')
-        else:
+        elif console_var.get() != console_before:
             app_toast(app, "Console saved — Build & Install to apply", 'success')
+        else:
+            app_toast(app, "No changes to apply", 'info')
         dialog.destroy()
 
     ttk.Button(footer, text="Apply", bootstyle="success",

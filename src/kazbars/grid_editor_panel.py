@@ -59,7 +59,7 @@ class GridEditorPanel(ttk.Frame):
 
     def __init__(self, parent, database, grid_config, on_delete=None, initially_open=False,
                  get_total_slots=None, on_resize=None, on_whitelist_changed=None,
-                 name_in_use=None):
+                 name_in_use=None, on_edit=None):
         super().__init__(parent)
         self.database = database
         self.grid_config = grid_config
@@ -68,6 +68,7 @@ class GridEditorPanel(ttk.Frame):
         self._on_resize = on_resize
         self._on_whitelist_changed = on_whitelist_changed
         self._name_in_use = name_in_use
+        self._on_edit = on_edit
 
         grid_type = grid_config.get('type', 'player')
         self._accent_color = GRID_TYPE_COLORS.get(grid_type, GRID_TYPE_COLORS['player'])
@@ -143,10 +144,12 @@ class GridEditorPanel(ttk.Frame):
         self.x_var = tk.StringVar(value=str(cfg.get('x', 0)))
         position_entry(pos_frame, "X:", self.x_var, lo=0, hi=max_x,
                        tooltip="Horizontal position on screen (pixels from left edge)",
+                       on_change=self._notify_edit,
                        label_color=THEME_COLORS['muted'], padx=(PAD_MICRO, PAD_MID))
         self.y_var = tk.StringVar(value=str(cfg.get('y', 0)))
         position_entry(pos_frame, "Y:", self.y_var, lo=0, hi=max_y,
                        tooltip="Vertical position on screen (pixels from top edge)",
+                       on_change=self._notify_edit,
                        label_color=THEME_COLORS['muted'], padx=(PAD_MICRO, 0))
 
         ttk.Button(header, text="Tracked Buffs...",
@@ -191,17 +194,20 @@ class GridEditorPanel(ttk.Frame):
         icon_row.pack(fill='x', pady=(0, PAD_ROW))
         self.icon_var = tk.IntVar()
         labeled_spinbox(icon_row, "Icon:", self.icon_var, from_=8, to=128, width=3,
-            tooltip="Size of each buff icon in pixels (24-64)",
+            tooltip="Size of each buff icon in pixels (8-128)",
+            on_change=self._notify_edit,
             padx=(PAD_BUTTON_GAP, PAD_TAB))
         self.gap_var = tk.IntVar()
         labeled_spinbox(icon_row, "Gap:", self.gap_var, from_=-5, to=10, width=3,
             tooltip="Space between icons (-5 = overlapping, 0 = touching, 10 = spaced out)",
+            on_change=self._notify_edit,
             padx=(PAD_BUTTON_GAP, PAD_MID))
 
         ttk.Separator(icon_row, orient='vertical').pack(side='left', fill='y', padx=PAD_XS)
         self.stack_font_var = tk.IntVar()
         labeled_spinbox(icon_row, "Stack Font:", self.stack_font_var, from_=8, to=24, width=2,
             tooltip="Font size for stack counter at top-right of icons (8-24)",
+            on_change=self._notify_edit,
             padx=(PAD_BUTTON_GAP, PAD_MID))
 
         timer_group = ttk.Frame(icon_row)
@@ -211,7 +217,7 @@ class GridEditorPanel(ttk.Frame):
         timers_cb = ttk.Checkbutton(timer_group, text="Timers",
                                      variable=self.timers_var,
                                      bootstyle="success-round-toggle",  # type: ignore[call-arg]
-                                     command=self._on_timers_toggled)
+                                     command=self._on_timers_clicked)
         timers_cb.pack(side='left', padx=(0, PAD_MID))
         add_tooltip(timers_cb, "Display remaining duration below each buff icon")
 
@@ -221,11 +227,13 @@ class GridEditorPanel(ttk.Frame):
         labeled_spinbox(self._timer_options_frame, "Font:", self.timer_font_var,
             from_=8, to=24, width=2,
             tooltip="Font size for timer text below icons (8-24)",
+            on_change=self._notify_edit,
             padx=(PAD_BUTTON_GAP, PAD_TAB))
         self.timer_y_offset_var = tk.IntVar()
         labeled_spinbox(self._timer_options_frame, "Y Offset:", self.timer_y_offset_var,
             from_=-10, to=10, width=3,
             tooltip="Shift timer text up/down relative to the icon (-10 to 10)",
+            on_change=self._notify_edit,
             padx=(PAD_BUTTON_GAP, PAD_MID))
 
         flash_group = ttk.Frame(icon_row)
@@ -235,7 +243,7 @@ class GridEditorPanel(ttk.Frame):
         flash_cb = ttk.Checkbutton(flash_group, text="Flash",
                                     variable=self.flashing_var,
                                     bootstyle="success-round-toggle",  # type: ignore[call-arg]
-                                    command=self._on_flash_toggled)
+                                    command=self._on_flash_clicked)
         flash_cb.pack(side='left', padx=(0, PAD_MID))
         add_tooltip(flash_cb, "Icons flash when buff timer is about to expire")
 
@@ -245,6 +253,7 @@ class GridEditorPanel(ttk.Frame):
         labeled_spinbox(self._flash_threshold_frame, "Under:", self.flash_threshold_var,
             from_=0, to=11, width=2,
             tooltip="Icons flash when timer drops below this many seconds (0-11)",
+            on_change=self._notify_edit,
             padx=(PAD_BUTTON_GAP, 0))
         ttk.Label(self._flash_threshold_frame, text="s",
                   foreground=THEME_COLORS['muted'],
@@ -270,18 +279,21 @@ class GridEditorPanel(ttk.Frame):
         self.fill_var = tk.StringVar()
         self.fill_combo = labeled_combobox(dyn_row, "Fill:", self.fill_var, [], width=22,
             tooltip=lambda: _FILL_DESCRIPTIONS.get(self.fill_var.get(), "Direction buffs fill into the grid"),
+            on_change=self._notify_edit,
             padx=(PAD_BUTTON_GAP, PAD_TAB))
 
         self.sort_var = tk.StringVar()
         labeled_combobox(dyn_row, "Sort:", self.sort_var,
             [label for _, label, _ in _SORT_OPTIONS], width=16,
             tooltip=lambda: _SORT_DESCRIPTIONS.get(self.sort_var.get(), "How buffs are ordered"),
+            on_change=self._notify_edit,
             padx=(PAD_BUTTON_GAP, PAD_TAB))
 
         self.layout_var = tk.StringVar()
         labeled_combobox(dyn_row, "Order:", self.layout_var,
             [label for _, label in _LAYOUT_OPTIONS], width=11,
             tooltip="In Buffs First and Debuffs First, misc effects always lead. In Mixed, all buffs sort together by time.",
+            on_change=self._notify_edit,
             padx=(PAD_BUTTON_GAP, 0))
 
     def load_from_config(self):
@@ -354,7 +366,13 @@ class GridEditorPanel(ttk.Frame):
                               'warning', key='grid-name-dup')
                 return
             self._name_entry.configure(bootstyle='default')  # type: ignore[call-overload]
+            changed = self.grid_config.get('id') != name
             self.grid_config['id'] = name
+            # interactive only: the save_to_config flush calls this with
+            # interactive=False, and notifying from there would recurse
+            # (notify → store mirror → save_to_config → here).
+            if interactive and changed:
+                self._notify_edit()
         except tk.TclError:
             pass
 
@@ -475,8 +493,15 @@ class GridEditorPanel(ttk.Frame):
         if self.on_delete:
             self.on_delete(self)
 
+    def _notify_edit(self):
+        # Non-structural field edit → the container mirrors grids into the
+        # profile store (structural changes notify via _on_resize instead).
+        if self._on_edit:
+            self._on_edit()
+
     def _on_enabled_toggled(self):
         self._apply_enabled_styling(self.enabled_var.get())
+        self._notify_edit()
 
     def _apply_enabled_styling(self, enabled):
         """Drain the grid's identity colors when it's excluded from the build.
@@ -490,11 +515,21 @@ class GridEditorPanel(ttk.Frame):
                              highlightcolor=self._resting_border_color)
         self.section.set_dimmed(not enabled)
 
+    def _on_timers_clicked(self):
+        """Checkbutton handler — load_from_config calls _on_timers_toggled
+        directly so a profile load never arms the autosaver."""
+        self._on_timers_toggled()
+        self._notify_edit()
+
     def _on_timers_toggled(self):
         if self.timers_var.get():
             self._timer_options_frame.pack(side='left')
         else:
             self._timer_options_frame.pack_forget()
+
+    def _on_flash_clicked(self):
+        self._on_flash_toggled()
+        self._notify_edit()
 
     def _on_flash_toggled(self):
         if self.flashing_var.get():

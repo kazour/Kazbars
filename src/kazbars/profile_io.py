@@ -26,8 +26,8 @@ from ttkbootstrap.dialogs import Messagebox, MessageDialog, Querybox
 from . import profile_share
 from .buff_db_layers import DeltaStore
 from .grid_model import get_game_resolution_or_default
-from .profile_document import DocumentError, mint_id, validate_document
-from .profile_library import slugify
+from .profile_document import DocumentError, mint_id, new_document, validate_document
+from .profile_library import SEED_NAME, slugify
 from .profile_store import ProfileStore
 from .settings_manager import safe_save_json
 from .ui_widgets import app_toast
@@ -60,9 +60,21 @@ def make_store(app, doc):
     )
 
 
+def _newest_doc(app):
+    """Newest library entry. `ensure_nonempty` is best-effort — when the disk
+    refused every seed write the library is still empty, so fall back to an
+    in-memory blank: the app opens, the store's write-retry keeps trying, and
+    the exit rescue dialog surfaces the failure."""
+    entries = app.library.list_profiles()
+    if entries:
+        return max(entries, key=lambda e: e[0].stat().st_mtime)[1]
+    logger.warning("Profile library empty and unseedable — using an in-memory profile")
+    return new_document(app.registry, SEED_NAME, get_game_resolution_or_default())
+
+
 def startup_profile(app):
     """Resolve and open the startup profile: seed the library if empty, then
-    `active_profile` pref → newest file → (already-guaranteed) seed."""
+    `active_profile` pref → newest file → in-memory blank (unwritable disk)."""
     app.library.ensure_nonempty(get_game_resolution_or_default())
     doc = None
     active = app.settings.get('active_profile')
@@ -71,8 +83,7 @@ def startup_profile(app):
         if held:
             doc = held[1]
     if doc is None:
-        entries = app.library.list_profiles()
-        doc = max(entries, key=lambda e: e[0].stat().st_mtime)[1]
+        doc = _newest_doc(app)
     app.profile_store = make_store(app, doc)
     apply_document(app)
 
@@ -183,10 +194,12 @@ def delete_current(app):
     dialog.show()
     if dialog.result != 'Delete':
         return
+    # Flush before the file moves: an orphaned debounce timer firing after the
+    # delete would re-write the trashed document under a fresh slug.
+    store.flush()
     app.library.delete(store.document['id'])
     app.library.ensure_nonempty(get_game_resolution_or_default())
-    entries = app.library.list_profiles()
-    doc = max(entries, key=lambda e: e[0].stat().st_mtime)[1]
+    doc = _newest_doc(app)
     app.profile_store = make_store(app, doc)
     apply_document(app)
 
