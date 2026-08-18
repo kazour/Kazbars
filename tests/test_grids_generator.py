@@ -128,19 +128,18 @@ def test_console_on_emits_console_hooks():
     # The pin is gone — the control panel is the master switch now.
     assert "consolePinned" not in main_code
 
-    # The five inline call sites
+    # The two inline call sites left to the gate; every lifecycle call now
+    # runs off the ungated module registry, which never names a stub.
     assert "console.logPlayer(buff.m_Name, bid)" in main_code
     assert "console.logTarget(buff.m_Name, bid)" in main_code
-    assert "console.create();" in main_code
-    assert "console.removeConsole();" in main_code
+    assert "modules.push(console);" in main_code
 
-    # Persistence lives wholly inside the stub — the core drives the two
-    # lifecycle calls, the same shape as the stopwatch and inspect blocks.
-    # saveState fires from both persist paths (preview exit + deactivate).
+    # Persistence lives wholly inside the stub, reached through saveAll/loadAll
+    # (preview exit + deactivate, and activation for the load).
     assert 'config.ReplaceEntry("console_pin"' not in main_code
     assert 'config.ReplaceEntry("cnv"' not in main_code
-    assert main_code.count("console.saveState(config);") == 2
-    assert "console.loadState(config);" in main_code
+    assert main_code.count("saveAll(config);") == 2
+    assert "loadAll(config);" in main_code
 
     # No leftover tokens
     assert "{{CONSOLE_" not in main_code
@@ -215,13 +214,12 @@ def test_cast_on_emits_hooks_and_data():
     assert "castTimer = new KazBarsCastTimer(rootClip);" in main_code
     assert "castTimer.configure(d.CAST);" in main_code
 
-    # Lifecycle hooks
-    assert "castTimer.create();" in main_code
+    # Registration (the lifecycle itself runs off the ungated registry) plus
+    # the feeds, which are the cast timer's own and stay gated.
+    assert "modules.push(castTimer);" in main_code
     assert "castTimer.connectPlayer(m_Player);" in main_code
     assert "castTimer.setTarget(m_Target);" in main_code
-    assert "castTimer.previewOn();" in main_code
-    assert "castTimer.saveState(config);" in main_code
-    assert "castTimer.cleanup();" in main_code
+    assert "castTimer.disconnectPlayer();" in main_code
 
     # Data block — fractions project to px at the default build resolution;
     # color must be a numeric hex literal (Number() else NaN); font is fixed
@@ -278,11 +276,9 @@ def test_stopwatch_on_emits_hooks_and_data():
     assert "stopwatch = new KazBarsStopwatch(rootClip);" in main_code
     assert "stopwatch.configure(d.SW);" in main_code
 
-    # Lifecycle hooks
-    assert "stopwatch.create();" in main_code
-    assert "stopwatch.loadState(config);" in main_code
-    assert "stopwatch.saveState(config);" in main_code
-    assert "stopwatch.cleanup();" in main_code
+    # Registration is the whole hook: the stopwatch has no feed of its own,
+    # so the registry drives every lifecycle call.
+    assert "modules.push(stopwatch);" in main_code
 
     # Data block — the fraction position projects to px at the default build
     # resolution; a fontSize of its own overrides the shared panel size
@@ -357,15 +353,10 @@ def test_inspect_on_emits_hooks_and_data():
     assert "inspect = new KazBarsInspect(rootClip);" in main_code
     assert "inspect.configure(d.INS);" in main_code
 
-    # Lifecycle hooks
-    assert "inspect.create();" in main_code
+    # Registration (the lifecycle runs off the ungated registry) plus the
+    # target feed, which is the inspect panel's own and stays gated.
+    assert "modules.push(inspect);" in main_code
     assert "inspect.setSubject(tid);" in main_code
-    assert "inspect.previewOn();" in main_code
-    assert "inspect.previewOff();" in main_code
-    assert "inspect.loadState(config);" in main_code
-    assert "inspect.cleanup();" in main_code
-    # Save fires from BOTH persist paths (exitPreview + OnModuleDeactivated)
-    assert main_code.count("inspect.saveState(config);") == 2
 
     # Data block — the fraction position projects to px at the default build
     # resolution; a fontSize of its own overrides the shared panel size
@@ -418,10 +409,12 @@ def test_preview_panel_always_emitted():
     assert "ppanel.show();" in main_code
     assert "public function previewToggle(key:String, shown:Boolean):Void {" in main_code
 
-    # Teardown from both paths (exitPreview + cleanup), save from both
-    # persist paths (exitPreview + OnModuleDeactivated).
+    # Teardown from both paths (exitPreview + cleanup); the panel's own
+    # persistence is written once, inside saveAll, which both persist paths
+    # (exitPreview + OnModuleDeactivated) call.
     assert main_code.count("ppanel.destroy();") == 2
-    assert main_code.count("ppanel.saveState(config);") == 2
+    assert main_code.count("ppanel.saveState(config);") == 1
+    assert main_code.count("saveAll(config);") == 2
     assert "ppanel.loadState(config);" in main_code
 
     assert "{{PP_" not in main_code
@@ -456,35 +449,35 @@ def test_shared_panel_font_is_clamped():
 
 
 def test_preview_panel_no_extras_has_no_extra_rows():
-    """With nothing compiled in, the panel lists grids only and the dispatcher
-    body is empty — an addExtra or setActive here would name a missing class."""
+    """With nothing compiled in, the registry is empty, so the rows loop and the
+    dispatcher loop both run over nothing. They are ungated — the check that
+    nothing was left dangling is that no stub is registered or named."""
     main_code, _ = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0").generate()
-    assert "ppanel.addExtra(" not in main_code
-    assert "setActive" not in main_code
+    assert "modules.push(" not in main_code
+    for stub in ("KazBarsConsole", "KazBarsCastTimer", "KazBarsStopwatch",
+                 "KazBarsInspect"):
+        assert stub not in main_code
 
 
 def test_preview_panel_rows_and_dispatch_all_extras():
     main_code, _ = _all_extras_gen().generate()
 
-    # Each row seeds its check from the item's live state — the panel never
-    # caches a flag of its own.
-    assert 'ppanel.addExtra("Stopwatch", "sw", stopwatch.isActive());' in main_code
-    assert 'ppanel.addExtra("Inspect panel", "ins", inspect.isActive());' in main_code
-    assert 'ppanel.addExtra("Cast timer", "cast", castTimer.isActive());' in main_code
-    assert 'ppanel.addExtra("Console", "console", console.isActive());' in main_code
+    # One row per registered module, each seeded from that module's live state
+    # and labelled by it — the panel never caches a flag of its own, and the
+    # core never spells out a row.
+    assert ("ppanel.addExtra(m.previewLabel(), m.previewKey(), m.isActive());"
+            in main_code)
 
-    # Rows are added before the panel is built, in menu order.
-    assert (main_code.index('ppanel.addExtra("Stopwatch"')
-            < main_code.index('ppanel.addExtra("Inspect panel"')
-            < main_code.index('ppanel.addExtra("Cast timer"')
-            < main_code.index('ppanel.addExtra("Console"')
-            < main_code.index("ppanel.show();"))
+    # Registration order IS row order, and rows are added before the panel is
+    # built (which is what puts it topmost).
+    assert (main_code.index("modules.push(stopwatch);")
+            < main_code.index("modules.push(inspect);")
+            < main_code.index("modules.push(castTimer);")
+            < main_code.index("modules.push(console);"))
+    assert main_code.index("ppanel.addExtra(") < main_code.index("ppanel.show();")
 
-    # One dispatch arm per extra.
-    assert 'if (key == "sw") stopwatch.setActive(shown);' in main_code
-    assert 'if (key == "ins") inspect.setActive(shown);' in main_code
-    assert 'if (key == "cast") castTimer.setActive(shown);' in main_code
-    assert 'if (key == "console") console.setActive(shown);' in main_code
+    # One dispatcher for every row, matched on the module's own key.
+    assert 'if (m.previewKey() == key) m.setActive(shown);' in main_code
 
     # Nothing is restored on the way out of preview any more — a check is the
     # setting, and the pin it replaced is gone.
@@ -502,10 +495,8 @@ def test_preview_panel_row_gated_per_extra():
         stopwatch_config={"enabled": True, "fx": 750 / 1920, "fy": 410 / 1080},
     )
     main_code, _ = gen.generate()
-    assert 'ppanel.addExtra("Stopwatch", "sw", stopwatch.isActive());' in main_code
-    assert 'ppanel.addExtra("Inspect panel", "ins", inspect.isActive());' not in main_code
-    assert 'ppanel.addExtra("Cast timer", "cast", castTimer.isActive());' not in main_code
-    assert 'ppanel.addExtra("Console", "console", console.isActive());' not in main_code
+    assert main_code.count("modules.push(") == 1
+    assert "modules.push(stopwatch);" in main_code
 
 
 def test_grid_shown_is_master_switch():
@@ -515,9 +506,10 @@ def test_grid_shown_is_master_switch():
 
     assert "dirty: true, shown: true" in main_code
     assert 'config.FindEntry("g" + i + "_v")' in main_code
-    # Saved from both persist paths, keyed like the positions beside them.
-    assert 'config.ReplaceEntry("g" + j + "_v", grids[j].shown ? 1 : 0);' in main_code
-    assert 'config.ReplaceEntry("g" + i + "_v", grids[i].shown ? 1 : 0);' in main_code
+    # Written once, in saveAll, keyed like the positions beside it — both
+    # persist paths reach it from there.
+    assert main_code.count(
+        'config.ReplaceEntry("g" + i + "_v", grids[i].shown ? 1 : 0);') == 1
 
     assert "obj.mc._visible = obj.shown;" in main_code
     assert "obj.mc._visible = obj.shown && disp.length > 0;" in main_code
@@ -529,10 +521,9 @@ def test_console_master_switch_defaults_active():
     (cnv) is honoured inside the stub's loadState on activation."""
     main_code, _ = _all_extras_gen().generate()
 
-    assert main_code.index("console.create();") < main_code.index(
+    assert main_code.index("m.create();") < main_code.index(
         "SignalClientCharacterAlive")
-    assert main_code.index("console.create();") < main_code.index(
-        "console.loadState(config);")
+    assert main_code.index("m.create();") < main_code.index("loadAll(config);")
     assert "console_pin" not in main_code
 
 
