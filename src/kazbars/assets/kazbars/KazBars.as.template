@@ -1,3 +1,140 @@
+class KazBars {
+
+
+    private var rootClip:MovieClip;
+    private var m_Player:Object;
+    private var m_Target:Object;
+    private var config:Object;
+    private var playerBuffs:Array;
+    private var targetBuffs:Array;
+    private var buffIndexCache:Object;
+    private var grids:Array;
+    private var timerInterval:Number;
+    private var frameActive:Boolean;
+    private var frameCount:Number;
+    private var TCACHE:Object;
+    private var previewMode:Boolean;
+    private var previewArmed:Boolean;
+    private var lastShiftDown:Number;
+    private var lastCtrlDown:Number;
+    private var lastAltDown:Number;
+    private var C_BUFF:Number;
+    private var C_DEBUFF:Number;
+    private var C_BG:Number;
+    private var CFG:Object;
+    private var WL:Object;
+    private var ISDEB:Object;
+    private var BUFFTYPE:Object;
+    private var STACK_LEVEL:Object;
+    private var CUSTOMICON:Object;
+
+    // OPTIMIZATION: Alpha flash lookup table (100 pre-calculated values)
+    private var AFLASH:Array;
+
+    // OPTIMIZATION: Reusable arrays to reduce GC
+    private var _tempBuffs:Array;
+    private var _tempDebuffs:Array;
+    private var _tempMisc:Array;
+
+    // HELPER CLASSES: Preview, Slot, PreviewPanel, and (optional) Console (32KB bytecode limit workaround)
+    private var preview:KazBarsPreview;
+//#if CONSOLE
+    private var console:KazBarsConsole;
+//#end
+    private var slot:KazBarsSlot;
+    private var ppanel:KazBarsPreviewPanel;
+//#if CAST
+    private var castTimer:KazBarsCastTimer;
+//#end
+//#if SW
+    private var stopwatch:KazBarsStopwatch;
+//#end
+//#if INS
+    private var inspect:KazBarsInspect;
+//#end
+
+    // Key listener reference for proper cleanup
+    private var keyListener:Object;
+
+
+    public function KazBars(root:MovieClip) {
+        rootClip = root;
+        playerBuffs = new Array();
+        targetBuffs = new Array();
+        grids = new Array();
+        buffIndexCache = {player: {}, target: {}};
+        frameActive = false;
+        frameCount = 0;
+        previewMode = false;
+        previewArmed = true;
+        lastShiftDown = 0;
+        lastCtrlDown = 0;
+        lastAltDown = 0;
+        C_BUFF = 0x666666;
+        C_DEBUFF = 0x8B0000;
+        C_BG = 0x000000;
+        TCACHE = {};
+        var i:Number = 0;
+        while (i <= 99) { TCACHE[i] = String(i); i++; }
+
+        // OPTIMIZATION: Pre-calculate alpha flash values (100 entries)
+        // Replaces Math.sin() calls every frame with array lookup
+        AFLASH = new Array();
+        var j:Number = 0;
+        while (j < 100) {
+            var phase:Number = (j / 100) * 6.28318;
+            AFLASH[j] = 33 + (Math.sin(phase) + 1) * 33.5;
+            j++;
+        }
+
+        // OPTIMIZATION: Reusable arrays to reduce garbage collection
+        _tempBuffs = new Array();
+        _tempDebuffs = new Array();
+        _tempMisc = new Array();
+
+        // HELPER CLASSES: Initialize preview and slot managers (console added if enabled at build time)
+        preview = new KazBarsPreview(rootClip);
+//#if CONSOLE
+        console = new KazBarsConsole(rootClip);
+//#end
+        slot = new KazBarsSlot(rootClip);
+        ppanel = new KazBarsPreviewPanel(this, rootClip);
+//#if CAST
+        castTimer = new KazBarsCastTimer(rootClip);
+//#end
+//#if SW
+        stopwatch = new KazBarsStopwatch(rootClip);
+//#end
+//#if INS
+        inspect = new KazBarsInspect(rootClip);
+//#end
+
+        initConfig();
+    }
+
+
+    private function initConfig():Void {
+        var d:Object = KazBarsData.init();
+        CFG = d.CFG;
+        WL = d.WL;
+        ISDEB = d.ISDEB;
+        BUFFTYPE = d.BUFFTYPE;
+        STACK_LEVEL = d.STACK_LEVEL;
+        CUSTOMICON = d.CUSTOMICON;
+        ppanel.configure(d.PF);
+//#if CONSOLE  // the control panel's configure above is never gated; the console's follows its build gate
+        console.configure(d.PF);
+//#end
+//#if CAST
+        castTimer.configure(d.CAST);
+//#end
+//#if SW
+        stopwatch.configure(d.SW);
+//#end
+//#if INS
+        inspect.configure(d.INS);
+//#end
+    }
 
     private function createAllGrids():Void {
         var i:Number = 0;
@@ -522,13 +659,17 @@
     private function SlotAlive():Void {
         try {
             if (m_Player != null) disconnectP(m_Player);
-            {{CAST_DISCONNECT_P}}
+//#if CAST
+            castTimer.disconnectPlayer();
+//#end
             playerBuffs = new Array();
             buffIndexCache.player = {};
             m_Player = com.GameInterface.Game.Character.GetClientCharacter();
             if (m_Player != null) {
                 connectP(m_Player);
-                {{CAST_CONNECT_P}}
+//#if CAST
+                castTimer.connectPlayer(m_Player);
+//#end
                 var tgt:Object = m_Player.GetOffensiveTarget();
                 if (tgt != null && tgt.GetType() != _global.Enums.TypeID.e_Type_None) SlotTargetChanged(tgt);
             }
@@ -559,7 +700,9 @@
     }
 
     private function SlotTargetChanged(tid:Object):Void {
-        {{INS_SET_TARGET}}
+//#if INS
+        inspect.setSubject(tid);
+//#end
         if (tid == null || tid.GetType() == _global.Enums.TypeID.e_Type_None) setTarget(null);
         else setTarget(com.GameInterface.Game.Character.GetCharacter(tid));
     }
@@ -571,7 +714,9 @@
             buffIndexCache.target = {};
             m_Target = ch;
             if (m_Target != null) { connectT(m_Target); loadTBuffs(); }
-            {{CAST_SET_TARGET}}
+//#if CAST
+            castTimer.setTarget(m_Target);
+//#end
             markDirty("target");
             var i:Number = 0;
             while (i < grids.length) { if (grids[i].cfg.type == "target") updateGrid(grids[i]); i++; }
@@ -606,7 +751,9 @@
         if (m_Player != null && m_Player.m_BuffList != null && m_Player.m_BuffList[bid] != null) {
             var buff:Object = m_Player.m_BuffList[bid];
             addPBuff(buff);
-            {{CONSOLE_LOG_PLAYER}}
+//#if CONSOLE
+            if (console.isActive() && buff.m_Name != null) console.logPlayer(buff.m_Name, bid);
+//#end
         }
     }
 
@@ -614,7 +761,9 @@
         if (m_Target != null && m_Target.m_BuffList != null && m_Target.m_BuffList[bid] != null) {
             var buff:Object = m_Target.m_BuffList[bid];
             addTBuff(buff);
-            {{CONSOLE_LOG_TARGET}}
+//#if CONSOLE
+            if (console.isActive() && buff.m_Name != null) console.logTarget(buff.m_Name, bid);
+//#end
         }
     }
 
@@ -652,12 +801,24 @@
             ppanel.addGrid(obj);
             i++;
         }
-        {{CAST_PREVIEW_ON}}
-        {{INS_PREVIEW_ON}}
-        {{PP_ROW_SW}}
-        {{PP_ROW_INS}}
-        {{PP_ROW_CAST}}
-        {{PP_ROW_CONSOLE}}
+//#if CAST
+        castTimer.previewOn();
+//#end
+//#if INS
+        inspect.previewOn();
+//#end
+//#if SW
+        ppanel.addExtra("Stopwatch", "sw", stopwatch.isActive());
+//#end
+//#if INS
+        ppanel.addExtra("Inspect panel", "ins", inspect.isActive());
+//#end
+//#if CAST
+        ppanel.addExtra("Cast timer", "cast", castTimer.isActive());
+//#end
+//#if CONSOLE
+        ppanel.addExtra("Console", "console", console.isActive());
+//#end
         // Last, so the control panel sits on top of everything it controls.
         ppanel.show();
     }
@@ -674,17 +835,29 @@
                 j++;
             }
             ppanel.saveState(config);
-            {{CONSOLE_EXIT_PERSIST}}
-            {{CAST_SAVE}}
-            {{SW_SAVE}}
-            {{INS_SAVE}}
+//#if CONSOLE
+            console.saveState(config);
+//#end
+//#if CAST
+            castTimer.savePositions(config);
+//#end
+//#if SW
+            stopwatch.saveState(config);
+//#end
+//#if INS
+            inspect.saveState(config);
+//#end
         }
         // Panel first — its position is already captured. Nothing is restored on
         // the way out: the checks are the settings now, and the final loop
         // re-applies each grid's shown flag.
         ppanel.destroy();
-        {{CAST_PREVIEW_OFF}}
-        {{INS_PREVIEW_OFF}}
+//#if CAST
+        castTimer.previewOff();
+//#end
+//#if INS
+        inspect.previewOff();
+//#end
         var i:Number = 0;
         while (i < grids.length) { preview.removeOverlay(grids[i]); grids[i].dirty = true; updateGrid(grids[i]); i++; }
     }
@@ -692,10 +865,18 @@
     // Named dispatcher for the control panel's extra rows — the checkbox knows
     // a key, each stub has its own idea of what hiding means.
     public function previewToggle(key:String, shown:Boolean):Void {
-        {{PP_APPLY_SW}}
-        {{PP_APPLY_INS}}
-        {{PP_APPLY_CAST}}
-        {{PP_APPLY_CONSOLE}}
+//#if SW
+        if (key == "sw") stopwatch.setActive(shown);
+//#end
+//#if INS
+        if (key == "ins") inspect.setActive(shown);
+//#end
+//#if CAST
+        if (key == "cast") castTimer.setActive(shown);
+//#end
+//#if CONSOLE
+        if (key == "console") console.setActive(shown);
+//#end
     }
 
     private function cleanup():Void {
@@ -703,10 +884,18 @@
         previewMode = false;
         if (keyListener != null) { Key.removeListener(keyListener); keyListener = null; }
         ppanel.destroy();
-        {{CONSOLE_CLEANUP}}
-        {{CAST_CLEANUP}}
-        {{SW_CLEANUP}}
-        {{INS_CLEANUP}}
+//#if CONSOLE
+        console.removeConsole();
+//#end
+//#if CAST
+        castTimer.cleanup();
+//#end
+//#if SW
+        stopwatch.cleanup();
+//#end
+//#if INS
+        inspect.cleanup();
+//#end
         playerBuffs = new Array();
         targetBuffs = new Array();
         buffIndexCache = {player: {}, target: {}};
@@ -737,10 +926,18 @@
         keyListener.onKeyUp = function() { self.handleKeyUp(); };
         Key.addListener(keyListener);
         createAllGrids();
-        {{CAST_CREATE}}
-        {{SW_CREATE}}
-        {{INS_CREATE}}
-        {{CONSOLE_CREATE}}
+//#if CAST
+        castTimer.createFields();
+//#end
+//#if SW
+        stopwatch.createPanel();
+//#end
+//#if INS
+        inspect.createPanel();
+//#end
+//#if CONSOLE  // open at login is the default a first-ever session gets, before any archived state exists to say otherwise
+        console.createConsole();
+//#end
         try {
             com.GameInterface.Game.CharacterBase.SignalClientCharacterAlive.Connect(SlotAlive, this);
             m_Player = com.GameInterface.Game.Character.GetClientCharacter();
@@ -770,10 +967,18 @@
                 i++;
             }
             ppanel.loadState(config);
-            {{CONSOLE_LOAD_PERSIST}}
-            {{CAST_LOAD}}
-            {{SW_LOAD}}
-            {{INS_LOAD}}
+//#if CONSOLE  // loadState owns the whole archive dance: keys, then the rebuild on the archived spot and fold (or removal when the master switch saved off)
+            console.loadState(config);
+//#end
+//#if CAST
+            castTimer.loadPositions(config);
+//#end
+//#if SW
+            stopwatch.loadState(config);
+//#end
+//#if INS
+            inspect.loadState(config);
+//#end
         }
     }
 
@@ -787,10 +992,18 @@
                 i++;
             }
             ppanel.saveState(config);
-            {{CONSOLE_DEACTIVATE_PERSIST}}
-            {{CAST_SAVE}}
-            {{SW_SAVE}}
-            {{INS_SAVE}}
+//#if CONSOLE
+            console.saveState(config);
+//#end
+//#if CAST
+            castTimer.savePositions(config);
+//#end
+//#if SW
+            stopwatch.saveState(config);
+//#end
+//#if INS
+            inspect.saveState(config);
+//#end
         }
         cleanup();
         try { com.GameInterface.Game.CharacterBase.SignalClientCharacterAlive.Disconnect(SlotAlive, this); } catch (e:Object) {}
@@ -798,3 +1011,5 @@
         if (m_Target != null) { disconnectT(m_Target); m_Target = null; }
         return config;
     }
+
+}

@@ -1,10 +1,11 @@
-"""Pin the console / control panel layout ratios to their historical FS-12 values.
+"""Pin the panel-family layout ratios to their historical FS-12 values.
 
-Both stubs used to carry their dimensions as literals baked at font size 12.
-They are now ``Math.round(FS * ratio)`` like ``KazBarsStopwatch``/``KazBarsInspect``,
-so the four in-game panels fold to the same bar at *every* size rather than only
-at 12. This test is the proof that the rewrite changed nothing at 12: every
-ratio below, evaluated at FS 12, must equal the literal the stub used to ship.
+The stubs used to carry their dimensions as literals baked at font size 12;
+they are now ``Math.round(FS * ratio)``, so the four in-game panels fold to the
+same bar at *every* size rather than only at 12. The family-shared block lives
+in ``KazBarsPanel.applyBaseSize`` and each panel declares only its extras. This
+test is the proof the ratio-isation changed nothing at 12: every ratio below,
+evaluated at FS 12, must equal the literal the stub used to ship.
 
 Nothing else reads either stub's content -- ``test_build_compile.py`` proves only
 that the AS2 compiles -- so a mistyped ratio would otherwise reach a build
@@ -23,12 +24,11 @@ STUBS = (
 )
 
 # constant -> (ratio, the literal the stub shipped before ratio-isation)
-CONSOLE_RATIOS = {
+# The family-shared block lives in KazBarsPanel.applyBaseSize; panels declare
+# only their own extras on top of it.
+BASE_RATIOS = {
     'PAD': (0.85, 10),
     'TITLE_H': (1.85, 22),
-    'HDR_Y': (2.75, 33),
-    'BODY_Y': (4.67, 56),
-    'COL_W': (19.17, 230),
     'LINE': (1.4, 17),
     'BOX': (1.0, 12),
     'BTN': (1.1, 13),
@@ -38,6 +38,12 @@ CONSOLE_RATIOS = {
     'COLL_W': (15.8, 190),
     'COLL_H': (2.0, 24),
     'COLL_PAD': (0.55, 7),
+}
+
+CONSOLE_RATIOS = {
+    'HDR_Y': (2.75, 33),
+    'BODY_Y': (4.67, 56),
+    'COL_W': (19.17, 230),
     # Were inline `CH - 35` / `CH - BODY_Y - 40` -- the Clear button's band.
     'RULE_BOT': (2.92, 35),
     'LOG_BOT': (3.33, 40),
@@ -49,15 +55,8 @@ CONSOLE_RATIOS = {
 }
 
 PREVIEW_RATIOS = {
-    'PAD': (0.85, 10),
-    'TITLE_H': (1.85, 22),
-    'LINE': (1.4, 17),
-    'BOX': (1.0, 12),
     'ROW_H': (1.667, 20),
-    'BTN_W': (5.0, 60),
-    'BTN_H': (1.85, 22),
     'COL_W': (18.33, 220),
-    'NAME_FS': (1.15, 14),
 }
 
 # Text sizes are written inline at the makeTF call, the family's idiom, so they
@@ -65,9 +64,14 @@ PREVIEW_RATIOS = {
 TEXT_RATIOS = {0.9: 11, 0.8: 10}
 
 STUB_TABLES = {
+    'KazBarsPanel.as': BASE_RATIOS,
     'KazBarsConsole.as': CONSOLE_RATIOS,
     'KazBarsPreviewPanel.as': PREVIEW_RATIOS,
 }
+
+# The two stubs that build without ever being configured first (the stopwatch
+# and inspect panel are always configured before createPanel).
+SELF_INIT_STUBS = ('KazBarsConsole.as', 'KazBarsPreviewPanel.as')
 
 # `NAME = Math.round(FS * 0.85);` and the bare `BOX = Math.round(FS);`
 _ASSIGN = re.compile(r'^\s*([A-Z][A-Z0-9_]*) = Math\.round\(FS(?: \* ([0-9.]+))?\);$')
@@ -120,15 +124,15 @@ def test_preview_panel_row_offsets_land_on_their_historical_values_at_fs_12():
     assert (btn_y, rows_y) == (28, 60)
 
 
-@pytest.mark.parametrize('stub', sorted(STUB_TABLES))
-def test_checkmark_path_reproduces_the_12px_box_coordinates(stub):
+def test_checkmark_path_reproduces_the_12px_box_coordinates():
     # Was moveTo(2, 6) / lineTo(5, 10) / lineTo(10, 2) at lineStyle(2, ...).
+    # The drawing lives once, in the family base.
     box = 12
     assert max(1, _as2_round(box / 6)) == 2
     assert (_as2_round(box / 6), _as2_round(box / 2)) == (2, 6)
     assert (_as2_round(box * 5 / 12), _as2_round(box * 5 / 6)) == (5, 10)
     assert (_as2_round(box * 5 / 6), _as2_round(box / 6)) == (10, 2)
-    assert 'chk.lineStyle(Math.max(1, Math.round(BOX / 6))' in _source(stub)
+    assert 'chk.lineStyle(Math.max(1, Math.round(BOX / 6))' in _source('KazBarsPanel.as')
 
 
 def test_console_log_entry_font_keeps_its_face_and_reproduces_size_11():
@@ -140,7 +144,7 @@ def test_console_log_entry_font_keeps_its_face_and_reproduces_size_11():
     assert max(9, _as2_round(12 * 0.9)) == 11
 
 
-@pytest.mark.parametrize('stub', sorted(STUB_TABLES))
+@pytest.mark.parametrize('stub', sorted(SELF_INIT_STUBS))
 def test_stub_self_initialises_instead_of_bailing_on_a_null_config(stub):
     # Neither stub is configured before it builds today, so copying the
     # stopwatch's `if (cfg == null) return;` would leave every constant NaN --

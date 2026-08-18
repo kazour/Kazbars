@@ -1,7 +1,8 @@
 // KazBarsInspect.as - Target inspect panel: a combat sheet for the current
 // target in the visual language of the game's default inspect window.
 // Runtime-drawn chrome + dynamic text fields (Arial resolves against the faces
-// embedded in base.swf), so it needs no new symbols.
+// embedded in base.swf), so it needs no new symbols. Plate, drag, collapse and
+// readout primitives inherit from KazBarsPanel.
 //
 // Reading rules are measured engine behaviour, not style: gear and rating ids
 // never fire SignalStatChanged and signal-time reads race the server, so the
@@ -29,66 +30,44 @@
 // SlotTargetChanged (first statement, so clears and raw tids both arrive),
 // loadState()/saveState() from the module archive, previewOn()/previewOff()
 // from the shared preview, cleanup() on deactivate.
-class KazBarsInspect {
-    private var rootClip:MovieClip;
+class KazBarsInspect extends KazBarsPanel {
 
     // Config (set by configure())
     private var START_X:Number;
     private var START_Y:Number;
     private var START_COLLAPSED:Boolean;
-    private var FS:Number;
     private var SHOW_PVP:Boolean;
     private var SHOW_PERKS:Boolean;
 
-    // Geometry — every value is Math.round(FS x ratio), so the panel scales
-    // as one piece.
-    private var PAD:Number;       // 0.85  plate padding
+    // Geometry beyond the base set — every value is Math.round(FS x ratio),
+    // so the panel scales as one piece.
     private var LABEL_W:Number;   // 8.6   label column
     private var COL_GAP:Number;   // 0.85  label -> value gap
     private var VALUE_W:Number;   // 12.0  value column
-    private var NAME_FS:Number;   // 1.15  name header font size
-    private var TITLE_H:Number;   // 1.85  title band — the stopwatch's, so the
-                                  //       family's expanded title bars match
     private var NAME_GAP:Number;  // 0.5   name -> first section header
     private var SECT_GAP:Number;  // 0.75  space above a section header
     private var RULE_GAP:Number;  // 0.2   header baseline -> 1px rule
     private var ROWS_GAP:Number;  // 0.4   rule -> first stat row
-    private var LEAD:Number;      // 0.15  TextFormat leading
-    private var BTN:Number;       // 1.1   collapse-button box
     private var ICO:Number;       // 2.4   perk icon box
     private var ICO_GAP:Number;   // 0.35  gap between perk icons
     private var TIP_PAD:Number;   // 0.3   perk-name chip padding, and its gap
                                   //       above the icon row
-    private var COLL_W:Number;    // 15.8  collapsed plate: the stopwatch's
-    private var COLL_H:Number;    // 2.0   190x24 at the default FS 12
-    private var COLL_PAD:Number;  // 0.55  collapsed plate padding
     private var W:Number;         // 2xPAD + LABEL_W + COL_GAP + VALUE_W
 
     // UI
-    private var m_Panel:MovieClip;
-    private var bg:MovieClip;
     private var body:MovieClip;
-    private var collapseBtn:MovieClip;
-    private var collapsed:Boolean;
-    private var panelVis:Boolean;     // mirrors m_Panel._visible; hoverTick
+    private var panelVis:Boolean;     // mirrors panelClip._visible; hoverTick
                                       // asks every mouse move
     private var titleH:Number;
     private var fullH:Number;
     private var nameTF:TextField;
     private var collTF:TextField;     // the collapsed bar's whole content
-    private var curW:Number;
-    private var dragX:Number;         // panel position at press, so a
-    private var dragY:Number;         // collapsed press that never moved
-                                      // reads as a click (endDrag)
     private var pveHdrTF:TextField;
     private var pvpHdrTF:TextField;
     private var pveLabTF:TextField;
     private var pveValTF:TextField;
     private var pvpLabTF:TextField;
     private var pvpValTF:TextField;
-    private var dragMC:MovieClip;
-    private var coordTF:TextField;
-    private var curH:Number;
     private var m_ruleA:Number;   // rule offsets from the last layout pass,
     private var m_ruleB:Number;   // replayed on collapse; -1 = not on screen
     private var m_ruleC:Number;   // perks-section rule, same replay contract
@@ -146,8 +125,8 @@ class KazBarsInspect {
     private var PERK_FILL:Array;      // per-slot-pair plate colour
     private var DASH:String;
 
-    public function KazBarsInspect(kb:Object, root:MovieClip) {
-        rootClip = root;
+    public function KazBarsInspect(root:MovieClip) {
+        super(root);
         m_Subject = null;
         subjName = "";
         subjKey = "";
@@ -166,8 +145,6 @@ class KazBarsInspect {
         lastName = "";
         lastPve = "";
         lastPvp = "";
-        curW = 0;
-        curH = 0;
         aaOn = false;
         curPerks = new Array();
         curPerkRanks = new Array();
@@ -175,137 +152,25 @@ class KazBarsInspect {
         perksShown = false;
         tipSlot = -1;
         DASH = String.fromCharCode(8212);
-        collapsed = false;
         titleH = 0;
         fullH = 0;
         subjIsPlayer = -1;
-        // Magic damage per school: cold is the low-range outlier as in every
-        // school family (157 prot, 162 CR); the other four cluster at 876-879.
-        SPELL_IDS = [158, 876, 877, 878, 879];
-        // "Immeasurable Empowerment", the +100-all-attributes AA passive —
-        // the ubiquitous member of the attribute-buff layer the sheet's CDI
-        // excludes, and the one the panel can see and undo.
-        AA_BUFF_ID = 4279994;
-        // Slotted-perk buff id -> display rank: 113 perks, 114 ids, mostly in
-        // contiguous per-archetype and per-class blocks over 4279889-4282396.
-        // The pool shape is fixed and every block fills its quota exactly --
-        // 9 General, 5 per archetype, 7 per class -- which is what settles
-        // the one ambiguous pair (Guardian stops at 4281426; Void of Madness
-        // 4281429 is the Dark Templar's seventh). Rank is id order, so the
-        // row reads General -> archetype -> class and stays stable.
-        // Two entries break the block pattern and are NOT typos:
-        //   4279994 is also AA_BUFF_ID -- the bugged +100-all-attrs passive
-        //     IS a slotted General perk, so it is in both.
-        //   4483617 (Point Blank Shot) is the Ranger's seventh, added by a
-        //     later patch far outside the band. 4282385 shares its rank as
-        //     an alias, so whichever id the game applies renders one icon.
-        PERK_IDS = {i4279889: 0, i4279980: 1, i4279994: 2, i4279995: 3, i4279996: 4,
-                    i4279997: 5, i4280003: 6, i4280004: 7, i4280005: 8, i4280100: 9,
-                    i4280101: 10, i4280167: 11, i4280208: 12, i4280209: 13, i4280766: 14,
-                    i4280968: 15, i4280978: 16, i4280980: 17, i4280981: 18, i4281007: 19,
-                    i4281008: 20, i4281009: 21, i4281010: 22, i4281011: 23, i4281107: 24,
-                    i4281108: 25, i4281109: 26, i4281110: 27, i4281111: 28, i4281211: 29,
-                    i4281212: 30, i4281213: 31, i4281214: 32, i4281215: 33, i4281216: 34,
-                    i4281217: 35, i4281420: 36, i4281421: 37, i4281422: 38, i4281423: 39,
-                    i4281424: 40, i4281425: 41, i4281426: 42, i4281429: 43, i4281445: 44,
-                    i4281446: 45, i4281447: 46, i4281451: 47, i4281452: 48, i4281453: 49,
-                    i4281564: 50, i4281565: 51, i4281566: 52, i4281567: 53, i4281568: 54,
-                    i4281571: 55, i4281572: 56, i4281728: 57, i4281729: 58, i4281730: 59,
-                    i4281731: 60, i4281732: 61, i4281733: 62, i4281734: 63, i4281884: 64,
-                    i4281885: 65, i4281886: 66, i4281887: 67, i4281888: 68, i4281889: 69,
-                    i4281890: 70, i4281940: 71, i4281941: 72, i4281942: 73, i4281943: 74,
-                    i4281944: 75, i4281945: 76, i4281946: 77, i4282096: 78, i4282100: 79,
-                    i4282105: 80, i4282107: 81, i4282108: 82, i4282109: 83, i4282110: 84,
-                    i4282139: 85, i4282140: 86, i4282142: 87, i4282156: 88, i4282159: 89,
-                    i4282160: 90, i4282161: 91, i4282300: 92, i4282301: 93, i4282302: 94,
-                    i4282303: 95, i4282304: 96, i4282305: 97, i4282306: 98, i4282307: 99,
-                    i4282308: 100, i4282309: 101, i4282310: 102, i4282311: 103,
-                    i4282312: 104, i4282313: 105, i4282381: 106, i4282382: 107,
-                    i4282383: 108, i4282384: 109, i4282385: 112, i4282387: 110,
-                    i4282396: 111, i4483617: 112};
-        // The game's own perk bar has six FIXED slots in three colour-coded
-        // pairs -- General, Archetype, Class -- so a perk renders into its
-        // own pair rather than filling left to right. The table is ordered
-        // General, then the four archetypes, then the twelve classes, so two
-        // rank boundaries are the whole category test.
-        PERK_GEN_MAX = 8;
-        PERK_ARCH_MAX = 28;
-        // Three of every class's seven perks cost BOTH class slots (36 in
-        // all, maintainer-marked off the in-game perk UI). The game paints
-        // such a perk across both boxes, so the panel does too -- keyed by
-        // rank, since that is what placePerks already carries.
-        PERK_2SLOT = {r29: 1, r30: 1, r31: 1, r36: 1, r37: 1, r38: 1, r43: 1, r44: 1,
-                      r45: 1, r50: 1, r51: 1, r52: 1, r57: 1, r58: 1, r62: 1, r64: 1,
-                      r65: 1, r66: 1, r71: 1, r72: 1, r73: 1, r78: 1, r79: 1, r80: 1,
-                      r85: 1, r86: 1, r87: 1, r92: 1, r93: 1, r94: 1, r99: 1, r100: 1,
-                      r101: 1, r106: 1, r107: 1, r112: 1};
-        // Rank -> name for the hover chip, so an icon the player cannot place
-        // still reads. Baked rather than read off the buff (no name field is
-        // confirmed on a buff-list entry) and indexed by the same rank the row
-        // already carries. Rank 112 is the Ranger's aliased pair -- both ids
-        // are the one perk, and the name is the real one, Point Blank Shot.
-        PERK_NAMES = ["Pressing Strikes", "Chromatic Warding",
-                      "Immeasurable Empowerment", "Precise Strikes",
-                      "Fortifying Empowerment", "Field of War", "Quick Steps",
-                      "Decisive Strikes", "Elusive Nature", "Prelate at Arms",
-                      "Empowered Mending", "Steadfast Faith", "Deliverance",
-                      "Divine Luster", "Rear Guard", "Empowered Vitality", "Resolve",
-                      "Vindication", "Avoid Entanglements", "Flanking",
-                      "Tainted Weapons", "Liberation", "Avoid Entrapment",
-                      "Arcane Plunder", "Ethereal Escape", "Unbinding Charm",
-                      "Enchanter", "Will of the Sublime", "Transcendence",
-                      "Prince of Terror", "From the Beyond", "Red Shadows of Xotli",
-                      "Quickening Death", "Enslaving Fire", "Feeding the Pyre",
-                      "Hunger for More", "Stall the Advance", "Prime Initiative",
-                      "Sustaining Wrath", "Champion Spirit", "Deliberate Reprisal",
-                      "Counterweight", "Master at Arms", "Void of Madness",
-                      "Scarab Knight", "Blood Shroud", "Death Lord", "Crimson Succor",
-                      "Unwilling Sacrifice", "Sanguine Infusion", "Rally",
-                      "One Last Push", "Battlefield Commander", "Assail",
-                      "Break Through", "Rout", "Besiege", "Shimmering Invocation",
-                      "Emissary of Elysium", "Wandering Disciple",
-                      "Shield of Brilliance", "Inclusion", "Blessed Soul",
-                      "Light the Path", "Sleuth of Bears", "Spirit of Yggdrasil",
-                      "Vision of the Sky", "Feral Growl", "Maul", "Surge of Bile",
-                      "Ursine Bond", "Idol of Dark Rejuvenation",
-                      "Coils of the Serpent", "Eyes of Set", "Leviathan's Call",
-                      "Constriction", "Forked Lightning", "Lull", "Master Assassin",
-                      "Choking Powder", "Cover of Dusk", "Disfigure", "Dance of Death",
-                      "Castration", "Sins of the Flesh", "Tools at Hand",
-                      "At the Gates", "What it Takes", "Bone Shatter", "Upheaval",
-                      "Without Warning", "Determination", "Boil Blood",
-                      "Ruinous Power", "Unleash the Underworld", "Renegotiation",
-                      "Ring of Fire", "Cacodemon", "Bindings of the Skylord",
-                      "Unearthly Apprentice", "Supreme Lich", "Nightmare Companions",
-                      "Decays of Nature", "Chilling Breath", "Funeral Rites",
-                      "Withered Blasphemy", "Hunting Hawk", "Crossfire",
-                      "Jarring Shot", "Clout", "Deadly Draw", "Running Shot",
-                      "Point Blank Shot"];
-        PERK_EDGE = [0x4A7FA5, 0xA34A4A, 0x555555];
-        PERK_FILL = [0x0F1C26, 0x260F0F, 0x151515];
-        // Class id 67 -> sheet name; all twelve classes measured off live
-        // targets. An unmapped id (a future patch?) still just omits the
-        // class rather than guess one.
-        CLASS_NAMES = {c18: "Barbarian", c20: "Guardian", c22: "Conqueror",
-                       c24: "Priest of Mitra", c28: "Tempest of Set",
-                       c29: "Bear Shaman", c31: "Dark Templar",
-                       c34: "Assassin", c39: "Ranger", c41: "Necromancer",
-                       c43: "Herald of Xotli", c44: "Demonologist"};
-        watchIds = [
-            1, 27, 525, 54, 67, 70, 507,
-            448, 450, 451, 334, 157, 926, 927, 928, 929, 911,
-            902, 167, 905, 906, 907, 908,
-            312, 711, 713, 804, 808, 810, 814, 1403,
-            875, 866, 867, 868, 869, 870, 871, 872, 873,
-            162, 1007, 1008, 1009, 1010, 1095, 1096,
-            861, 158, 876, 877, 878, 879, 1041,
-            1000016, 1000017, 1000018,
-            454, 458, 225, 226, 656, 658
-        ];
-        // Collapsed, the only thing on screen is a static label, so the pass
-        // reads what the teardown gate needs to notice a dead subject and
-        // nothing else at all: 2 reads, not 65.
-        gateIds = [1, 54];
+        // The baked tables — perk pool, names, class map, watch list — live in
+        // KazBarsInspectData beside their measurement notes, the KazBarsData
+        // arrangement; docs/inspect-panel.md is their contract.
+        var d:Object = KazBarsInspectData.init();
+        SPELL_IDS = d.spellIds;
+        AA_BUFF_ID = Number(d.aaBuffId);
+        PERK_IDS = d.perkIds;
+        PERK_GEN_MAX = Number(d.perkGenMax);
+        PERK_ARCH_MAX = Number(d.perkArchMax);
+        PERK_2SLOT = d.perk2Slot;
+        PERK_NAMES = d.perkNames;
+        PERK_EDGE = d.perkEdge;
+        PERK_FILL = d.perkFill;
+        CLASS_NAMES = d.classNames;
+        watchIds = d.watchIds;
+        gateIds = d.gateIds;
     }
 
     // =========================================================================
@@ -319,31 +184,33 @@ class KazBarsInspect {
         START_COLLAPSED = (cfg.collapsed == true);
         SHOW_PVP = (cfg.showPvp != false);
         SHOW_PERKS = (cfg.showPerks != false);
-        FS = Number(cfg.fontSize);
-        if (isNaN(FS) || FS < 8) FS = 12;
-        PAD = Math.round(FS * 0.85);
+        // COLL_* from the base put the collapsed bar — a labelled bar, not a
+        // folded sheet — beside the stopwatch's own at any size (190x24 at
+        // the default FS 12).
+        applyBaseSize(Number(cfg.fontSize));
+        LEAD = Math.round(FS * 0.15);
         LABEL_W = Math.round(FS * 8.6);
         COL_GAP = Math.round(FS * 0.85);
         VALUE_W = Math.round(FS * 12);
-        NAME_FS = Math.round(FS * 1.15);
-        TITLE_H = Math.round(FS * 1.85);
         NAME_GAP = Math.round(FS * 0.5);
         SECT_GAP = Math.round(FS * 0.75);
         RULE_GAP = Math.round(FS * 0.2);
         ROWS_GAP = Math.round(FS * 0.4);
-        LEAD = Math.round(FS * 0.15);
-        BTN = Math.round(FS * 1.1);
         ICO = Math.round(FS * 2.4);
         ICO_GAP = Math.round(FS * 0.35);
         TIP_PAD = Math.round(FS * 0.3);
-        // Collapsed the panel is a labelled bar, not a folded sheet, and it
-        // is sized to sit beside the stopwatch's own collapsed bar: these
-        // ratios land on its 190x24 at the default FS 12 and scale with the
-        // rest of the panel from there.
-        COLL_W = Math.round(FS * 15.8);
-        COLL_H = Math.round(FS * 2);
-        COLL_PAD = Math.round(FS * 0.55);
         W = PAD * 2 + LABEL_W + COL_GAP + VALUE_W;
+    }
+
+    // The sheet's fields are multiline, no wrap — set here once so every field
+    // the panel (or a base widget) builds carries the flavour.
+    private function makeTF(parent:MovieClip, id:String, x:Number, y:Number, w:Number,
+                            h:Number, size:Number, bold:Boolean, col:Number,
+                            align:String):TextField {
+        var tf:TextField = super.makeTF(parent, id, x, y, w, h, size, bold, col, align);
+        tf.multiline = true;
+        tf.wordWrap = false;
+        return tf;
     }
 
     public function createPanel():Void {
@@ -357,20 +224,20 @@ class KazBarsInspect {
             Mouse.removeListener(mouseLsnr);
             mouseLsnr = null;
         }
-        if (m_Panel != null) m_Panel.removeMovieClip();
-        m_Panel = rootClip.createEmptyMovieClip("kbInspect", rootClip.getNextHighestDepth());
-        m_Panel._x = START_X;
-        m_Panel._y = START_Y;
-        m_Panel._visible = false;
+        if (panelClip != null) panelClip.removeMovieClip();
+        panelClip = rootClip.createEmptyMovieClip("kbInspect", rootClip.getNextHighestDepth());
+        panelClip._x = START_X;
+        panelClip._y = START_Y;
+        panelClip._visible = false;
         panelVis = false;
 
         collapsed = START_COLLAPSED;
 
-        bg = m_Panel.createEmptyMovieClip("chrome", m_Panel.getNextHighestDepth());
+        chrome = panelClip.createEmptyMovieClip("chrome", panelClip.getNextHighestDepth());
         // Everything below the name strip, so collapsing is one _visible toggle.
-        body = m_Panel.createEmptyMovieClip("body", m_Panel.getNextHighestDepth());
+        body = panelClip.createEmptyMovieClip("body", panelClip.getNextHighestDepth());
 
-        nameTF = makeTF(m_Panel, "name", PAD,
+        nameTF = makeTF(panelClip, "name", PAD,
                         Math.floor((TITLE_H - Math.round(NAME_FS * 1.4)) / 2),
                         W - PAD * 2 - BTN, Math.round(NAME_FS * 1.4),
                         NAME_FS, true, 0xF7A22B, "left");
@@ -378,10 +245,7 @@ class KazBarsInspect {
         // target name, so no reason for a pass to read one. Its own field
         // rather than a re-formatted name strip: a TextFormat swap per fold
         // would have to be re-applied to the text every time.
-        collTF = makeTF(m_Panel, "coll", COLL_PAD, 0, COLL_W - COLL_PAD * 2 - BTN,
-                        Math.round(FS * 1.4), FS, true, 0xF7A22B, "left");
-        collTF.text = "Inspect";
-        collTF._y = Math.floor((COLL_H - collTF._height) / 2);
+        collTF = makeCollapsedLabel("Inspect");
         collTF._visible = false;
         pveHdrTF = makeTF(body, "pveHdr", PAD, 0, LABEL_W, Math.round(FS * 1.4),
                           FS, true, 0xF7A22B, "left");
@@ -456,34 +320,17 @@ class KazBarsInspect {
         pveValTF.text = lastPve;
         pvpValTF.text = lastPvp;
 
-        // Shown only while dragging — a copyable readout for pinning a spot
-        // in the app. Right-aligned against the collapse glyph, the family
-        // convention (stopwatch, console), so it stays clear of the name.
-        coordTF = makeTF(m_Panel, "coords", PAD, PAD, W - PAD * 2 - BTN, Math.round(FS * 1.3),
-                         Math.max(9, Math.round(FS * 0.8)), false, 0x999999, "right");
-        coordTF._visible = false;
+        // The readout doubles as a copyable value for pinning a spot in the app.
+        makeCoordReadout(PAD, W - PAD * 2 - BTN, Math.round(FS * 1.3));
 
         // Name strip only: a whole-plate drag would eat combat clicks.
-        dragMC = m_Panel.createEmptyMovieClip("drag", m_Panel.getNextHighestDepth());
-        dragMC._self = this;
-        dragMC.useHandCursor = true;
-        dragMC.onPress = function() { this._self.beginDrag(this); };
-        dragMC.onRelease = dragMC.onReleaseOutside = function() { this._self.endDrag(this); };
+        makeDragStrip("drag");
 
-        collapseBtn = m_Panel.createEmptyMovieClip("btnCollapse", m_Panel.getNextHighestDepth());
-        collapseBtn._x = W - PAD - BTN;
-        collapseBtn._y = Math.floor((TITLE_H - BTN) / 2);
-        collapseBtn._self = this;
-        collapseBtn.useHandCursor = true;
-        var btf:TextField = makeTF(collapseBtn, "label", 0, 0, BTN, BTN + 2,
-                                   Math.max(9, Math.round(FS * 0.9)), true, 0xC8C0B0, "center");
-        collapseBtn.onRelease = function() { this._self.toggleCollapsed(); };
-        collapseBtn.onRollOver = function() { this.label.textColor = 0xF7A22B; };
-        collapseBtn.onRollOut = function() { this.label.textColor = 0xC8C0B0; };
+        makeCollapseBtn();
 
         // Perk-name chip, drawn last so it sits over the row it names. Opaque
         // where the plate is 90 — it lands on top of icons and a rule.
-        tipMC = m_Panel.createEmptyMovieClip("perkTip", m_Panel.getNextHighestDepth());
+        tipMC = panelClip.createEmptyMovieClip("perkTip", panelClip.getNextHighestDepth());
         tipMC._visible = false;
         tipTF = makeTF(tipMC, "label", TIP_PAD, TIP_PAD, LABEL_W, Math.round(FS * 1.4),
                        FS, false, 0xC8C0B0, "left");
@@ -507,31 +354,12 @@ class KazBarsInspect {
         pollIv = setInterval(function() { self.pollTick(); }, 250);
     }
 
-    private function makeTF(parent:MovieClip, id:String, x:Number, y:Number, w:Number,
-                            h:Number, size:Number, bold:Boolean, col:Number,
-                            align:String):TextField {
-        var tf:TextField = parent.createTextField(id, parent.getNextHighestDepth(), x, y, w, h);
-        tf.selectable = false;
-        tf.embedFonts = false;
-        tf.multiline = true;
-        tf.wordWrap = false;
-        var fmt:TextFormat = new TextFormat();
-        fmt.font = "Arial";
-        fmt.size = size;
-        fmt.bold = bold;
-        fmt.align = align;
-        fmt.color = col;
-        fmt.leading = LEAD;
-        tf.setNewTextFormat(fmt);
-        return tf;
-    }
-
     // =========================================================================
     // Layout / collapse
     // =========================================================================
 
     private function layout():Void {
-        if (m_Panel == null) return;
+        if (panelClip == null) return;
         titleH = TITLE_H;
         var y:Number = TITLE_H + NAME_GAP;
 
@@ -582,8 +410,7 @@ class KazBarsInspect {
     }
 
     public function toggleCollapsed():Void {
-        collapsed = !collapsed;
-        applyCollapsed();
+        super.toggleCollapsed();
         // Collapsed passes read the title ids only, so an expand has nothing
         // to paint from — take the full pass now rather than show a quarter
         // second of the sheet the panel was folded on.
@@ -595,7 +422,7 @@ class KazBarsInspect {
     // that sits on the title line — button, drag strip, drag readout — moves
     // to whichever plate is on screen.
     private function applyCollapsed():Void {
-        if (m_Panel == null) return;
+        if (panelClip == null) return;
         hideTip();
         body._visible = !collapsed;
         nameTF._visible = !collapsed;
@@ -623,42 +450,22 @@ class KazBarsInspect {
 
     private function drawChrome(w:Number, h:Number, rule1:Number, rule2:Number,
                                 rule3:Number):Void {
-        bg.clear();
-        bg.beginFill(0x0C0A07, 90);
-        rectPath(bg, 0, 0, w, h);
-        bg.endFill();
-        bg.lineStyle(1, 0x000000, 100);
-        rectPath(bg, 0, 0, w, h);
-        bg.lineStyle(1, 0x4A3B22, 100);
-        rectPath(bg, 1, 1, w - 2, h - 2);
+        drawPlate(w, h);
         // Title separator (expanded only — collapsed the bar IS the title
         // line), then the section-header rules; a negative offset means that
         // section is off screen (collapsed, or a target with no PvP block).
-        bg.lineStyle(1, 0x6B5324, 100);
         if (h > COLL_H) {
-            bg.moveTo(PAD, TITLE_H);
-            bg.lineTo(W - PAD, TITLE_H);
+            hairline(PAD, TITLE_H, W - PAD, TITLE_H);
         }
         if (rule1 >= 0) {
-            bg.moveTo(PAD, rule1);
-            bg.lineTo(W - PAD, rule1);
+            hairline(PAD, rule1, W - PAD, rule1);
         }
         if (rule2 >= 0) {
-            bg.moveTo(PAD, rule2);
-            bg.lineTo(W - PAD, rule2);
+            hairline(PAD, rule2, W - PAD, rule2);
         }
         if (rule3 >= 0) {
-            bg.moveTo(PAD, rule3);
-            bg.lineTo(W - PAD, rule3);
+            hairline(PAD, rule3, W - PAD, rule3);
         }
-    }
-
-    private function rectPath(mc:MovieClip, x:Number, y:Number, w:Number, h:Number):Void {
-        mc.moveTo(x, y);
-        mc.lineTo(x + w, y);
-        mc.lineTo(x + w, y + h);
-        mc.lineTo(x, y + h);
-        mc.lineTo(x, y);
     }
 
     // =========================================================================
@@ -1151,7 +958,7 @@ class KazBarsInspect {
     // =========================================================================
 
     private function render():Void {
-        if (m_Panel == null || m_Subject == null || !haveFull) {
+        if (panelClip == null || m_Subject == null || !haveFull) {
             updateVisibility();
             return;
         }
@@ -1379,15 +1186,15 @@ class KazBarsInspect {
             hideTip();
             return;
         }
-        if (m_Panel == null || tipMC == null || perkSlots == null) return;
+        if (panelClip == null || tipMC == null || perkSlots == null) return;
         var top:Number = perkRowY;
-        var my:Number = m_Panel._ymouse;
+        var my:Number = panelClip._ymouse;
         if (my < top || my > top + ICO) {
             hideTip();
             return;
         }
         var pitch:Number = ICO + ICO_GAP;
-        var mx:Number = m_Panel._xmouse - PAD;
+        var mx:Number = panelClip._xmouse - PAD;
         var i:Number = Math.floor(mx / pitch);
         // The gaps between the boxes are not the boxes.
         if (i < 0 || i > 5 || mx - i * pitch > ICO) {
@@ -1446,11 +1253,11 @@ class KazBarsInspect {
     }
 
     private function updateVisibility():Void {
-        if (m_Panel == null) return;
+        if (panelClip == null) return;
         var vis:Boolean = active && (previewMode || (m_Subject != null && haveFull));
         if (vis != panelVis) {
             panelVis = vis;
-            m_Panel._visible = vis;
+            panelClip._visible = vis;
         }
         if (!vis) hideTip();
     }
@@ -1459,7 +1266,7 @@ class KazBarsInspect {
     // Sections follow the baked gates; the perk boxes stay empty — there are
     // no canned RDB icons to fill them with.
     public function previewOn():Void {
-        if (m_Panel == null) return;
+        if (panelClip == null) return;
         previewMode = true;
         if (pvpShown != SHOW_PVP || perksShown != SHOW_PERKS) {
             pvpShown = SHOW_PVP;
@@ -1478,7 +1285,7 @@ class KazBarsInspect {
     }
 
     public function previewOff():Void {
-        if (m_Panel == null) return;
+        if (panelClip == null) return;
         previewMode = false;
         // Force a live reassign: the canned sheet bypassed the cache.
         lastName = "";
@@ -1498,42 +1305,11 @@ class KazBarsInspect {
     }
 
     // =========================================================================
-    // Drag + persistence (module config archive — permanent for every user)
+    // Persistence (module config archive — permanent for every user)
     // =========================================================================
 
-    public function beginDrag(da:MovieClip):Void {
-        // Bounds derive from fontSize, so a big enough panel inverts the rect
-        // and gets yanked off-screen; floored, it pins to the top-left.
-        m_Panel.startDrag(false, 0, 0, Math.max(0, Stage.width - curW),
-                          Math.max(0, Stage.height - curH));
-        dragX = m_Panel._x;
-        dragY = m_Panel._y;
-        coordTF._visible = true;
-        updateCoords();
-        var self:KazBarsInspect = this;
-        da.onMouseMove = function() { self.updateCoords(); };
-    }
-
-    public function endDrag(da:MovieClip):Void {
-        m_Panel.stopDrag();
-        delete da.onMouseMove;
-        coordTF._visible = false;
-        // Collapsed, the bar is small and labelled and reads as a button, so
-        // a press that never moved it opens the sheet; a real drag still
-        // just moves it. Expanded, the name strip only drags — a stray click
-        // beside the target's name must not fold the sheet away.
-        if (collapsed && Math.abs(m_Panel._x - dragX) < 2
-                      && Math.abs(m_Panel._y - dragY) < 2) {
-            toggleCollapsed();
-        }
-    }
-
-    public function updateCoords():Void {
-        coordTF.text = Math.round(m_Panel._x) + ", " + Math.round(m_Panel._y);
-    }
-
     public function loadState(config:Object):Void {
-        if (config == null || m_Panel == null) return;
+        if (config == null || panelClip == null) return;
         var v:Object = config.FindEntry("inv");
         if (v !== undefined) setActive(v == 1);
         // Fold state first: the clamp has to measure the plate actually on
@@ -1547,23 +1323,17 @@ class KazBarsInspect {
         var x:Object = config.FindEntry("inx");
         var y:Object = config.FindEntry("iny");
         if (x !== undefined && y !== undefined) {
-            m_Panel._x = clampPos(Number(x), Stage.width - curW);
-            m_Panel._y = clampPos(Number(y), Stage.height - curH);
+            panelClip._x = clampPos(Number(x), Stage.width - curW);
+            panelClip._y = clampPos(Number(y), Stage.height - curH);
         }
     }
 
     public function saveState(config:Object):Void {
-        if (config == null || m_Panel == null) return;
-        config.ReplaceEntry("inx", m_Panel._x);
-        config.ReplaceEntry("iny", m_Panel._y);
+        if (config == null || panelClip == null) return;
+        config.ReplaceEntry("inx", panelClip._x);
+        config.ReplaceEntry("iny", panelClip._y);
         config.ReplaceEntry("inc", collapsed ? 1 : 0);
         config.ReplaceEntry("inv", active ? 1 : 0);
-    }
-
-    private function clampPos(v:Number, max:Number):Number {
-        if (isNaN(v) || v < 0) return 0;
-        if (v > max) return max;
-        return v;
     }
 
     public function cleanup():Void {
@@ -1589,9 +1359,9 @@ class KazBarsInspect {
         }
         m_Subject = null;
         previewMode = false;
-        if (m_Panel != null) {
-            m_Panel.removeMovieClip();
-            m_Panel = null;
+        if (panelClip != null) {
+            panelClip.removeMovieClip();
+            panelClip = null;
         }
     }
 }

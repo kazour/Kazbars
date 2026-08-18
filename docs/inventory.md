@@ -51,7 +51,7 @@
 | `src/kazbars/grid_dialogs.py` | 896 |
 | `src/kazbars/grid_editor_panel.py` | 683 |
 | `src/kazbars/grid_model.py` | 248 |
-| `src/kazbars/grids_generator.py` | 797 |
+| `src/kazbars/grids_generator.py` | 560 |
 | `src/kazbars/grids_panel.py` | 708 |
 | `src/kazbars/inspect.py` | 64 |
 | `src/kazbars/inspect_panel.py` | 315 |
@@ -110,7 +110,7 @@
 | `tests/test_game_folder.py` | 99 |
 | `tests/test_game_persistence.py` | 723 |
 | `tests/test_grid_model.py` | 135 |
-| `tests/test_grids_generator.py` | 598 |
+| `tests/test_grids_generator.py` | 597 |
 | `tests/test_hud_overlay.py` | 141 |
 | `tests/test_imports.py` | 33 |
 | `tests/test_inspect.py` | 108 |
@@ -118,7 +118,7 @@
 | `tests/test_manifest.py` | 59 |
 | `tests/test_mypy_gate.py` | 74 |
 | `tests/test_overlay_config.py` | 102 |
-| `tests/test_panel_ratios.py` | 151 |
+| `tests/test_panel_ratios.py` | 155 |
 | `tests/test_panels_construct.py` | 309 |
 | `tests/test_prefs.py` | 58 |
 | `tests/test_prefs_migration.py` | 99 |

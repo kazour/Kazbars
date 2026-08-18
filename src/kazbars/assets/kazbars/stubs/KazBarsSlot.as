@@ -4,7 +4,7 @@ class KazBarsSlot {
     private var rootClip:MovieClip;
     private static var NATIVE_SIZE:Number = 64;
 
-    public function KazBarsSlot(kb:Object, root:MovieClip) {
+    public function KazBarsSlot(root:MovieClip) {
         rootClip = root;
     }
 

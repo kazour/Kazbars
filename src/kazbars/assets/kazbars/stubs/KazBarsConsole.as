@@ -1,6 +1,6 @@
 // KazBarsConsole.as - Buff ID Console for discovering and logging buff IDs.
 //
-// Chrome and palette are the inspect panel's (KazBarsInspect.as, and
+// Chrome and palette are the family's, inherited from KazBarsPanel (and
 // docs/inspect-panel.md section 5): warm near-black plate, 1px black-over-bronze
 // double frame, Conan-orange title, bronze hairline rules, square corners. The
 // two columns keep their player/target identity, retuned onto the panel's own
@@ -15,19 +15,12 @@
 // Drag is clamped to the Stage and the position and fold state persist in the
 // module config archive (cnx/cny/cnc) beside the master switch (cnv) and the
 // two log toggles.
-class KazBarsConsole {
-    private var owner:Object;
-    private var rootClip:MovieClip;
-    private var consoleClip:MovieClip;
-    private var chrome:MovieClip;
+class KazBarsConsole extends KazBarsPanel {
     private var m_Body:MovieClip;
-    private var dragMC:MovieClip;
-    private var collapseBtn:MovieClip;
     private var titleTF:TextField;
     private var collTF:TextField;
     private var playerText:TextField;
     private var targetText:TextField;
-    private var coordTF:TextField;
     private var playerLog:String;
     private var targetLog:String;
     private var seenPlayer:Object;
@@ -35,19 +28,11 @@ class KazBarsConsole {
     private var playerCount:Number;
     private var targetCount:Number;
     private var MAX_ENTRIES:Number;
-    private var collapsed:Boolean;
-    private var posX:Number;
-    private var posY:Number;
-    private var dragX:Number;
-    private var dragY:Number;
-    private var curW:Number;
-    private var curH:Number;
-    public var logPlayerEnabled:Boolean;
-    public var logTargetEnabled:Boolean;
+    private var logPlayerEnabled:Boolean;
+    private var logTargetEnabled:Boolean;
 
-    // Layout — the inspect panel's ratios off a shared base font size. CW/CH
-    // are the current build's expanded footprint, picked per checked sides.
-    private var FS:Number;        // base font size; everything below scales off it
+    // Layout beyond the base set. CW/CH are the current build's expanded
+    // footprint, picked per checked sides.
     private var CW:Number;
     private var CH:Number;
     private var CW_FULL:Number;   // 41.67 both columns
@@ -56,20 +41,9 @@ class KazBarsConsole {
     private var CH_NONE:Number;   // 8.33  no columns: title, toggles, bottom bar
     private var CB_OFF:Number;    // 9.17  header text -> its checkbox
     private var UNIT:Number;      // header + checkbox pair width
-    private var PAD:Number;       // 0.85
-    private var TITLE_H:Number;   // 1.85
     private var HDR_Y:Number;     // 2.75
     private var BODY_Y:Number;    // 4.67
     private var COL_W:Number;     // 19.17
-    private var LINE:Number;      // 1.4
-    private var BOX:Number;       // 1.0
-    private var BTN:Number;       // 1.1
-    private var BTN_W:Number;     // 5.0
-    private var BTN_H:Number;     // 1.85
-    private var NAME_FS:Number;   // 1.15  title font size
-    private var COLL_W:Number;    // 15.8
-    private var COLL_H:Number;    // 2.0
-    private var COLL_PAD:Number;  // 0.55
     // Bottom strip: the Clear button's band. The mid rule stops just above the
     // button, the logs a little higher still, so both are measured up from the
     // plate's bottom edge rather than baked as a gap.
@@ -81,9 +55,8 @@ class KazBarsConsole {
     // untagged run — it would fall back to the default serif device font.
     private var ENTRY_FONT:String;
 
-    public function KazBarsConsole(kb:Object, root:MovieClip) {
-        owner = kb;
-        rootClip = root;
+    public function KazBarsConsole(root:MovieClip) {
+        super(root);
         playerLog = "";
         targetLog = "";
         seenPlayer = {};
@@ -91,11 +64,6 @@ class KazBarsConsole {
         playerCount = 0;
         targetCount = 0;
         MAX_ENTRIES = 100;
-        collapsed = false;
-        posX = Number.NaN;   // unset until dragged or loaded from the archive
-        posY = Number.NaN;
-        dragX = 0;
-        dragY = 0;
         logPlayerEnabled = true;
         logTargetEnabled = true;
         // Nothing has to call configure() for the console to be usable, so it
@@ -112,22 +80,10 @@ class KazBarsConsole {
     // two are always configured before they build, this one is not.
     public function configure(cfg:Object):Void {
         if (cfg == null) cfg = {};
-        FS = Number(cfg.fontSize);
-        if (isNaN(FS) || FS < 8) FS = 12;
-        PAD = Math.round(FS * 0.85);
-        TITLE_H = Math.round(FS * 1.85);
+        applyBaseSize(Number(cfg.fontSize));
         HDR_Y = Math.round(FS * 2.75);
         BODY_Y = Math.round(FS * 4.67);
         COL_W = Math.round(FS * 19.17);
-        LINE = Math.round(FS * 1.4);
-        BOX = Math.round(FS);
-        BTN = Math.round(FS * 1.1);
-        BTN_W = Math.round(FS * 5);
-        BTN_H = Math.round(FS * 1.85);
-        NAME_FS = Math.round(FS * 1.15);
-        COLL_W = Math.round(FS * 15.8);
-        COLL_H = Math.round(FS * 2);
-        COLL_PAD = Math.round(FS * 0.55);
         RULE_BOT = Math.round(FS * 2.92);
         LOG_BOT = Math.round(FS * 3.33);
         CW_FULL = Math.round(FS * 41.67);
@@ -145,7 +101,7 @@ class KazBarsConsole {
     }
 
     public function isActive():Boolean {
-        return (consoleClip != null);
+        return (panelClip != null);
     }
 
     // Master switch: the console's active state IS the clip's existence.
@@ -153,15 +109,15 @@ class KazBarsConsole {
     // the flip, so no second flag can drift from the truth.
     public function setActive(shown:Boolean):Void {
         if (shown) {
-            if (consoleClip == null) createConsole();
+            if (panelClip == null) createConsole();
         } else {
             removeConsole();
         }
     }
 
     public function createConsole():Void {
-        if (consoleClip != null) consoleClip.removeMovieClip();
-        consoleClip = rootClip.createEmptyMovieClip("buffConsole", rootClip.getNextHighestDepth());
+        if (panelClip != null) panelClip.removeMovieClip();
+        panelClip = rootClip.createEmptyMovieClip("buffConsole", rootClip.getNextHighestDepth());
 
         var self:KazBarsConsole = this;
 
@@ -173,9 +129,9 @@ class KazBarsConsole {
 
         // Chrome is its own child clip, not the console's own graphics, so it
         // can be cleared and redrawn without taking the contents with it.
-        chrome = consoleClip.createEmptyMovieClip("chrome", consoleClip.getNextHighestDepth());
+        chrome = panelClip.createEmptyMovieClip("chrome", panelClip.getNextHighestDepth());
         // Everything below the title line, so folding is one _visible toggle.
-        m_Body = consoleClip.createEmptyMovieClip("body", consoleClip.getNextHighestDepth());
+        m_Body = panelClip.createEmptyMovieClip("body", panelClip.getNextHighestDepth());
 
         // Header + checkbox pairs survive an unchecked side — drop the pair
         // and there is no way to bring the column back. A checked side keeps
@@ -199,89 +155,53 @@ class KazBarsConsole {
         if (logTargetEnabled) targetText = makeLog("tt2", both ? CW / 2 + PAD : PAD,
                                                    logW, targetLog);
 
-        var pcb:MovieClip = makeCheckbox("pcb", px + CB_OFF, HDR_Y + 2, null,
+        var pcb:MovieClip = makeCheckbox(m_Body, "pcb", px + CB_OFF, HDR_Y + 2,
                                          logPlayerEnabled, BOX + 8);
         pcb.hit.onPress = function() {
             self.logPlayerEnabled = !self.logPlayerEnabled;
             self.rebuild();
         };
 
-        var tcb:MovieClip = makeCheckbox("tcb", tx + CB_OFF, HDR_Y + 2, null,
+        var tcb:MovieClip = makeCheckbox(m_Body, "tcb", tx + CB_OFF, HDR_Y + 2,
                                          logTargetEnabled, BOX + 8);
         tcb.hit.onPress = function() {
             self.logTargetEnabled = !self.logTargetEnabled;
             self.rebuild();
         };
 
-        var clr:MovieClip = m_Body.createEmptyMovieClip("clr", m_Body.getNextHighestDepth());
-        clr._x = CW - PAD * 2 - BTN_W;
-        clr._y = CH - PAD - BTN_H;
-        clr.lineStyle(1, 0x4A3B22, 100);
-        clr.beginFill(0x0C0A07, 90);
-        rectPath(clr, 0, 0, BTN_W, BTN_H);
-        clr.endFill();
-        var clbl:TextField = makeTF(clr, "label", 0, Math.floor((BTN_H - LINE) / 2),
-                                    BTN_W, LINE,
-                                    Math.max(9, Math.round(FS * 0.9)), true,
-                                    0xC8C0B0, "center");
-        clbl.text = "Clear";
-        clr.useHandCursor = true;
+        var clr:MovieClip = makeButton(m_Body, "clr", "Clear", CW - PAD * 2 - BTN_W,
+                                       CH - PAD - BTN_H, Math.max(9, Math.round(FS * 0.9)));
         clr.onRelease = function() { self.clearLog(); };
-        clr.onRollOver = function() { this.label.textColor = 0xF7A22B; };
-        clr.onRollOut = function() { this.label.textColor = 0xC8C0B0; };
 
         // Both title fields exist at once and swap on _visible: re-formatting one
         // field per fold would mean re-applying the TextFormat to its text every
         // time. Same reason the inspect panel carries a separate collapsed label.
-        titleTF = makeTF(consoleClip, "title", PAD, Math.floor((TITLE_H - (LINE + 4)) / 2),
+        titleTF = makeTF(panelClip, "title", PAD, Math.floor((TITLE_H - (LINE + 4)) / 2),
                          CW - PAD * 2 - BTN, LINE + 4,
                          NAME_FS, true, 0xF7A22B, "left");
         titleTF.text = "Buff Console";
-        collTF = makeTF(consoleClip, "coll", COLL_PAD, Math.floor((COLL_H - LINE) / 2),
-                        COLL_W - COLL_PAD * 2 - BTN, LINE, FS, true, 0xF7A22B, "left");
-        collTF.text = "Console";
+        collTF = makeCollapsedLabel("Console");
 
-        // Live position readout — visible only while dragging, the panel's
-        // convention. Shares the title line, right-aligned.
-        coordTF = makeTF(consoleClip, "coords", PAD, 0, CW - PAD * 2 - BTN, LINE,
-                         Math.max(9, Math.round(FS * 0.8)), false, 0x999999, "right");
-        coordTF._visible = false;
+        makeCoordReadout(0, CW - PAD * 2 - BTN, LINE);
 
         // Drag handle over the title line, stopping short of the collapse glyph
         // so it keeps its own press. Redrawn per fold state.
-        dragMC = consoleClip.createEmptyMovieClip("dh", consoleClip.getNextHighestDepth());
-        dragMC._self = this;
-        dragMC.useHandCursor = true;
-        dragMC.onPress = function() { this._self.beginDrag(this); };
-        dragMC.onRelease = dragMC.onReleaseOutside = function() { this._self.endDrag(this); };
+        makeDragStrip("dh");
 
-        // Bare glyph, no box — the family's collapse control.
-        collapseBtn = consoleClip.createEmptyMovieClip("btnCollapse", consoleClip.getNextHighestDepth());
-        collapseBtn._self = this;
-        collapseBtn.useHandCursor = true;
-        makeTF(collapseBtn, "label", 0, 0, BTN, BTN + 2,
-               Math.max(9, Math.round(FS * 0.9)), true, 0xC8C0B0, "center");
-        collapseBtn.onRelease = function() { this._self.toggleCollapsed(); };
-        collapseBtn.onRollOver = function() { this.label.textColor = 0xF7A22B; };
-        collapseBtn.onRollOut = function() { this.label.textColor = 0xC8C0B0; };
+        makeCollapseBtn();
 
         applyCollapsed();
 
         // Placed last: the clamp has to measure the plate actually on screen.
         // Centred on first open; after that wherever the user left it.
-        consoleClip._x = isNaN(posX) ? (Stage.width - curW) / 2
-                                     : clampPos(posX, Stage.width - curW);
-        consoleClip._y = isNaN(posY) ? 250 : clampPos(posY, Stage.height - curH);
+        panelClip._x = isNaN(posX) ? (Stage.width - curW) / 2
+                                   : clampPos(posX, Stage.width - curW);
+        panelClip._y = isNaN(posY) ? 250 : clampPos(posY, Stage.height - curH);
     }
 
     // =========================================================================
     // Collapse / chrome / widgets
     // =========================================================================
-
-    public function toggleCollapsed():Void {
-        collapsed = !collapsed;
-        applyCollapsed();
-    }
 
     // A side flip changes the whole footprint, so the console rebuilds in
     // place — logs live in the class strings and the position is captured
@@ -296,7 +216,7 @@ class KazBarsConsole {
     // title line — title, readout, glyph, drag strip — moves onto whichever
     // plate is on screen.
     private function applyCollapsed():Void {
-        if (consoleClip == null) return;
+        if (panelClip == null) return;
         curW = collapsed ? COLL_W : CW;
         curH = collapsed ? COLL_H : CH;
         var pad:Number = collapsed ? COLL_PAD : PAD;
@@ -318,14 +238,7 @@ class KazBarsConsole {
     }
 
     private function drawChrome(w:Number, h:Number):Void {
-        chrome.clear();
-        chrome.beginFill(0x0C0A07, 90);
-        rectPath(chrome, 0, 0, w, h);
-        chrome.endFill();
-        chrome.lineStyle(1, 0x000000, 100);
-        rectPath(chrome, 0, 0, w, h);
-        chrome.lineStyle(1, 0x4A3B22, 100);
-        rectPath(chrome, 1, 1, w - 2, h - 2);
+        drawPlate(w, h);
         // Bronze hairlines: under the title, under each column that is on
         // screen, and one down the middle when both are — the panel's section
         // rules doing column duty. An unchecked side's parked pair gets no
@@ -333,36 +246,15 @@ class KazBarsConsole {
         // so there is nothing to divide.
         if (h > COLL_H) {
             var both:Boolean = logPlayerEnabled && logTargetEnabled;
-            chrome.lineStyle(1, 0x6B5324, 100);
-            chrome.moveTo(PAD, TITLE_H);
-            chrome.lineTo(CW - PAD, TITLE_H);
+            hairline(PAD, TITLE_H, CW - PAD, TITLE_H);
             if (logPlayerEnabled || logTargetEnabled) {
-                chrome.moveTo(PAD, BODY_Y - 5);
-                chrome.lineTo(PAD + (both ? COL_W : CW - PAD * 2), BODY_Y - 5);
+                hairline(PAD, BODY_Y - 5, PAD + (both ? COL_W : CW - PAD * 2), BODY_Y - 5);
             }
             if (both) {
-                chrome.moveTo(CW / 2 + PAD, BODY_Y - 5);
-                chrome.lineTo(CW / 2 + PAD + COL_W, BODY_Y - 5);
-                chrome.moveTo(CW / 2, TITLE_H);
-                chrome.lineTo(CW / 2, CH - RULE_BOT);
+                hairline(CW / 2 + PAD, BODY_Y - 5, CW / 2 + PAD + COL_W, BODY_Y - 5);
+                hairline(CW / 2, TITLE_H, CW / 2, CH - RULE_BOT);
             }
         }
-    }
-
-    private function makeTF(parent:MovieClip, id:String, x:Number, y:Number, w:Number,
-                            h:Number, size:Number, bold:Boolean, col:Number,
-                            align:String):TextField {
-        var tf:TextField = parent.createTextField(id, parent.getNextHighestDepth(), x, y, w, h);
-        tf.selectable = false;
-        tf.embedFonts = false;
-        var fmt:TextFormat = new TextFormat();
-        fmt.font = "Arial";
-        fmt.size = size;
-        fmt.bold = bold;
-        fmt.align = align;
-        fmt.color = col;
-        tf.setNewTextFormat(fmt);
-        return tf;
     }
 
     // The one selectable field in the panel — the whole point is copying an id
@@ -381,124 +273,13 @@ class KazBarsConsole {
         return tf;
     }
 
-    // `on` would be a parse error here — AS2 reserves it for clip handlers.
-    private function makeCheckbox(name:String, x:Number, y:Number, label:String,
-                                  checked:Boolean, hitW:Number):MovieClip {
-        var c:MovieClip = m_Body.createEmptyMovieClip(name, m_Body.getNextHighestDepth());
-        c._x = x;
-        c._y = y;
-        var box:MovieClip = c.createEmptyMovieClip("box", 1);
-        box.lineStyle(1, 0x4A3B22, 100);
-        box.beginFill(0x0C0A07, 90);
-        rectPath(box, 0, 0, BOX, BOX);
-        box.endFill();
-        // Tick drawn to the box rather than to a 12px box's coordinates: three
-        // points at 1/6, 5/12 and 5/6 of the side, the shape it has always had.
-        var chk:MovieClip = c.createEmptyMovieClip("chk", 2);
-        chk.lineStyle(Math.max(1, Math.round(BOX / 6)), 0x7AC142, 100);
-        chk.moveTo(Math.round(BOX / 6), Math.round(BOX / 2));
-        chk.lineTo(Math.round(BOX * 5 / 12), Math.round(BOX * 5 / 6));
-        chk.lineTo(Math.round(BOX * 5 / 6), Math.round(BOX / 6));
-        chk._visible = checked;
-        if (label != null) {
-            var lbl:TextField = makeTF(c, "lbl", BOX + 4, -3, 80, LINE,
-                                       Math.max(9, Math.round(FS * 0.8)), false,
-                                       0xC8C0B0, "left");
-            lbl.text = label;
-        }
-        // Hit area is a child at depth 0 so it sits under the art but still
-        // takes the press across the whole label.
-        var hit:MovieClip = c.createEmptyMovieClip("hit", 0);
-        hit.beginFill(0, 0);
-        rectPath(hit, -4, -4, hitW, BOX + 8);
-        hit.endFill();
-        hit.useHandCursor = true;
-        return c;
-    }
-
-    private function rectPath(mc:MovieClip, x:Number, y:Number, w:Number, h:Number):Void {
-        mc.moveTo(x, y);
-        mc.lineTo(x + w, y);
-        mc.lineTo(x + w, y + h);
-        mc.lineTo(x, y + h);
-        mc.lineTo(x, y);
-    }
-
-    // =========================================================================
-    // Drag + persistence
-    // =========================================================================
-
-    public function beginDrag(dh:MovieClip):Void {
-        consoleClip.startDrag(false, 0, 0, Math.max(0, Stage.width - curW),
-                              Math.max(0, Stage.height - curH));
-        dragX = consoleClip._x;
-        dragY = consoleClip._y;
-        coordTF._visible = true;
-        updateCoords();
-        var self:KazBarsConsole = this;
-        dh.onMouseMove = function() { self.updateCoords(); };
-    }
-
-    public function endDrag(dh:MovieClip):Void {
-        consoleClip.stopDrag();
-        delete dh.onMouseMove;
-        coordTF._visible = false;
-        capturePos();
-        // Collapsed, the bar is small and labelled and reads as a button, so a
-        // press that never moved it opens the console again; a real drag still
-        // just moves it. Expanded, a stray click on the title must not fold it.
-        if (collapsed && Math.abs(consoleClip._x - dragX) < 2
-                      && Math.abs(consoleClip._y - dragY) < 2) {
-            toggleCollapsed();
-        }
-    }
-
-    public function updateCoords():Void {
-        coordTF.text = Math.round(consoleClip._x) + ", " + Math.round(consoleClip._y);
-    }
-
-    // The clip is destroyed every time the console closes, so its position has
-    // to be read back into the class before it goes.
-    private function capturePos():Void {
-        if (consoleClip == null) return;
-        posX = consoleClip._x;
-        posY = consoleClip._y;
-    }
-
-    public function loadState(config:Object):Void {
-        if (config == null) return;
-        var c:Object = config.FindEntry("cnc");
-        if (c !== undefined) collapsed = (c == 1);
-        var x:Object = config.FindEntry("cnx");
-        var y:Object = config.FindEntry("cny");
-        if (x !== undefined && y !== undefined) {
-            posX = Number(x);
-            posY = Number(y);
-        }
-    }
-
-    public function saveState(config:Object):Void {
-        if (config == null) return;
-        config.ReplaceEntry("cnc", collapsed ? 1 : 0);
-        capturePos();
-        if (isNaN(posX) || isNaN(posY)) return;
-        config.ReplaceEntry("cnx", posX);
-        config.ReplaceEntry("cny", posY);
-    }
-
-    private function clampPos(v:Number, max:Number):Number {
-        if (isNaN(v) || v < 0) return 0;
-        if (v > max) return max;
-        return v;
-    }
-
     // =========================================================================
     // Logging
     // =========================================================================
 
     public function removeConsole():Void {
         capturePos();
-        if (consoleClip != null) { consoleClip.removeMovieClip(); consoleClip = null; }
+        if (panelClip != null) { panelClip.removeMovieClip(); panelClip = null; }
         chrome = null; m_Body = null; dragMC = null; collapseBtn = null;
         titleTF = null; collTF = null; playerText = null; targetText = null; coordTF = null;
     }
@@ -544,5 +325,43 @@ class KazBarsConsole {
         playerCount = 0; targetCount = 0;
         if (playerText != null) playerText.htmlText = "";
         if (targetText != null) targetText.htmlText = "";
+    }
+
+    // =========================================================================
+    // Persistence (module config archive — permanent for every user)
+    // =========================================================================
+
+    public function loadState(config:Object):Void {
+        if (config == null) return;
+        var p:Object = config.FindEntry("log_p");
+        if (p !== undefined) logPlayerEnabled = (p == 1);
+        var t:Object = config.FindEntry("log_t");
+        if (t !== undefined) logTargetEnabled = (t == 1);
+        var c:Object = config.FindEntry("cnc");
+        if (c !== undefined) collapsed = (c == 1);
+        var x:Object = config.FindEntry("cnx");
+        var y:Object = config.FindEntry("cny");
+        if (x !== undefined && y !== undefined) {
+            posX = Number(x);
+            posY = Number(y);
+        }
+        // The onLoad build ran before the archive arrived: rebuild on the
+        // archived spot, fold and sides — or take the panel down when the
+        // master switch was saved off.
+        var v:Object = config.FindEntry("cnv");
+        if (v !== undefined && v == 0) removeConsole();
+        else createConsole();
+    }
+
+    public function saveState(config:Object):Void {
+        if (config == null) return;
+        config.ReplaceEntry("cnv", isActive() ? 1 : 0);
+        config.ReplaceEntry("log_p", logPlayerEnabled ? 1 : 0);
+        config.ReplaceEntry("log_t", logTargetEnabled ? 1 : 0);
+        config.ReplaceEntry("cnc", collapsed ? 1 : 0);
+        capturePos();
+        if (isNaN(posX) || isNaN(posY)) return;
+        config.ReplaceEntry("cnx", posX);
+        config.ReplaceEntry("cny", posY);
     }
 }
