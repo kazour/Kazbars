@@ -10,13 +10,22 @@
 // stay per panel because their archive keys AND their load orderings differ
 // on purpose (fold-before-clamp and friends).
 //
-// The panel<->core contract: the core drives every panel through its typed
-// lifecycle calls (configure / create* / loadState / saveState / cleanup /
-// isActive / setActive / previewOn / previewOff and the per-stub feeds); the
-// ONE call that flows back is KazBars.previewToggle(key, shown), routed from
-// the preview panel's extra rows. AS2 note: private members are visible to
-// subclasses (there is no protected), and all methods dispatch virtually —
-// toggleCollapsed() here lands on each panel's own applyCollapsed().
+// The drag half (makeDragStrip / makeCoordReadout / beginDrag / endDrag, and
+// the collapsed click-to-reopen that rides on it) belongs to the TOOL class —
+// the stopwatch, the console and the control panel, which are opt-in
+// utilities and interactive at all times. The HUD class (grids, cast timers,
+// the inspect panel) is mouse-transparent in normal play and is positioned
+// only in preview, through the shared overlay in KazBarsPreview; the inspect
+// panel therefore extends this base for its chrome and collapse alone.
+//
+// The panel<->core contract: the core drives every module through the typed
+// KazBarsModule lifecycle (create / loadState / saveState / previewOn /
+// previewOff / isActive / setActive / previewKey / previewLabel / cleanup),
+// plus configure() and the per-stub feeds; the ONE call that flows back is
+// KazBars.previewToggle(key, shown), routed from the preview panel's extra
+// rows. AS2 note: private members are visible to subclasses (there is no
+// protected), and all methods dispatch virtually — toggleCollapsed() here
+// lands on each panel's own applyCollapsed().
 class KazBarsPanel {
     private var rootClip:MovieClip;
     private var panelClip:MovieClip;
