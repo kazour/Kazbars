@@ -19,12 +19,12 @@
 // names it from a baked table, hit-tested off a Mouse listener rather than
 // rollover handlers — see hoverTick().
 //
-// Positioning mirrors the stopwatch: X/Y, font size and collapsed state baked
-// into config are the first-session defaults (the name strip shows live
-// coordinates while dragging), and drag + collapse persist via the archive
-// (inx/iny/inc, master switch
-// inv). All geometry
-// derives from fontSize.
+// Positioning mirrors the grids and the cast timer, not the stopwatch: this is
+// a HUD element, so it is mouse-transparent in normal play and is dragged only
+// in preview mode, through the shared overlay in KazBarsPreview. X/Y, font size
+// and collapsed state baked into config are the first-session defaults; drag +
+// collapse persist via the archive (inx/iny/inc, master switch inv). All
+// geometry derives from fontSize.
 //
 // Driven from KazBars: create() in onLoad, setSubject() from
 // SlotTargetChanged (first statement, so clears and raw tids both arrive),
@@ -55,10 +55,11 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
     private var W:Number;         // 2xPAD + LABEL_W + COL_GAP + VALUE_W
 
     // UI
+    private var preview:KazBarsPreview;   // the shared preview overlay: this
+                                          // panel's only positioning surface
     private var body:MovieClip;
     private var panelVis:Boolean;     // mirrors panelClip._visible; hoverTick
                                       // asks every mouse move
-    private var titleH:Number;
     private var fullH:Number;
     private var nameTF:TextField;
     private var collTF:TextField;     // the collapsed bar's whole content
@@ -127,6 +128,7 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
 
     public function KazBarsInspect(root:MovieClip) {
         super(root);
+        preview = new KazBarsPreview(root);
         m_Subject = null;
         subjName = "";
         subjKey = "";
@@ -152,7 +154,6 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         perksShown = false;
         tipSlot = -1;
         DASH = String.fromCharCode(8212);
-        titleH = 0;
         fullH = 0;
         subjIsPlayer = -1;
         // The baked tables — perk pool, names, class map, watch list — live in
@@ -320,12 +321,6 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         pveValTF.text = lastPve;
         pvpValTF.text = lastPvp;
 
-        // The readout doubles as a copyable value for pinning a spot in the app.
-        makeCoordReadout(PAD, W - PAD * 2 - BTN, Math.round(FS * 1.3));
-
-        // Name strip only: a whole-plate drag would eat combat clicks.
-        makeDragStrip("drag");
-
         makeCollapseBtn();
 
         // Perk-name chip, drawn last so it sits over the row it names. Opaque
@@ -338,8 +333,8 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         tipSlot = -1;
         // The hover source is a Mouse listener, NOT rollover handlers on the
         // slots: button handlers put a clip in button mode, and the row would
-        // then swallow left clicks the way a whole-plate drag would. Nothing
-        // in the panel is interactive except the drag strip and the button.
+        // then swallow left clicks the way a whole-plate drag would. The fold
+        // button and this hover are the panel's only interactive surfaces.
         // With the row baked off it is never installed at all — otherwise it
         // runs on every mouse move for a row that cannot render.
         if (SHOW_PERKS) {
@@ -360,7 +355,6 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
 
     private function layout():Void {
         if (panelClip == null) return;
-        titleH = TITLE_H;
         var y:Number = TITLE_H + NAME_GAP;
 
         pveHdrTF._y = y;
@@ -414,38 +408,31 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         // Collapsed passes read the title ids only, so an expand has nothing
         // to paint from — take the full pass now rather than show a quarter
         // second of the sheet the panel was folded on.
-        if (!collapsed && !previewMode && m_Subject != null) pollTick();
+        if (!collapsed && m_Subject != null) pollTick();
     }
 
     // The two states are different plates, not one plate at two heights: the
-    // sheet at W x fullH, and a labelled bar at COLL_W x COLL_H. Everything
-    // that sits on the title line — button, drag strip, drag readout — moves
-    // to whichever plate is on screen.
+    // sheet at W x fullH, and a labelled bar at COLL_W x COLL_H. The fold
+    // button moves to whichever plate is on screen.
     private function applyCollapsed():Void {
         if (panelClip == null) return;
         hideTip();
-        body._visible = !collapsed;
-        nameTF._visible = !collapsed;
-        collTF._visible = collapsed;
-        collapseBtn.label.text = collapsed ? "+" : "-";
-        curW = collapsed ? COLL_W : W;
-        curH = collapsed ? COLL_H : fullH;
-        var pad:Number = collapsed ? COLL_PAD : PAD;
+        // Preview renders the sheet at full size whatever the fold state is:
+        // the plate IS the drag target, and the bar is too small to aim at.
+        // The flag itself is untouched, so exiting preview folds it back — and
+        // the top-left anchor means the position does not shift either way.
+        var eff:Boolean = collapsed && !previewMode;
+        body._visible = !eff;
+        nameTF._visible = !eff;
+        collTF._visible = eff;
+        collapseBtn.label.text = eff ? "+" : "-";
+        curW = eff ? COLL_W : W;
+        curH = eff ? COLL_H : fullH;
+        var pad:Number = eff ? COLL_PAD : PAD;
         collapseBtn._x = curW - pad - BTN;
-        collapseBtn._y = Math.floor(((collapsed ? COLL_H : TITLE_H) - BTN) / 2);
-        coordTF._x = pad;
-        coordTF._y = collapsed ? collTF._y
-                               : Math.floor((TITLE_H - Math.round(FS * 1.3)) / 2);
-        coordTF._width = curW - pad * 2 - BTN;
-        // Stops short of the collapse button so it keeps its own press. The
-        // strip is the title line only when expanded — a whole-plate drag
-        // would eat combat clicks — but collapsed the bar IS the title line.
-        dragMC.clear();
-        dragMC.beginFill(0, 0);
-        rectPath(dragMC, 0, 0, curW - pad - BTN, collapsed ? COLL_H : titleH);
-        dragMC.endFill();
-        drawChrome(curW, curH, collapsed ? -1 : m_ruleA, collapsed ? -1 : m_ruleB,
-                   collapsed ? -1 : m_ruleC);
+        collapseBtn._y = Math.floor(((eff ? COLL_H : TITLE_H) - BTN) / 2);
+        drawChrome(curW, curH, eff ? -1 : m_ruleA, eff ? -1 : m_ruleB,
+                   eff ? -1 : m_ruleC);
     }
 
     private function drawChrome(w:Number, h:Number, rule1:Number, rule2:Number,
@@ -597,7 +584,10 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
 
         // Collapsed reads the teardown gate's two ids only; expanding runs a
         // full pass at once (toggleCollapsed), so the sheet is never stale.
-        var ids:Array = collapsed ? gateIds : watchIds;
+        // Preview reads the full list whatever the fold state is — it shows the
+        // sheet, so retargeting under the overlay has to fill it.
+        var eff:Boolean = collapsed && !previewMode;
+        var ids:Array = eff ? gateIds : watchIds;
         var i:Number = 0;
         while (i < ids.length) {
             var sid:Number = Number(ids[i]);
@@ -606,7 +596,7 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
             curV[sid] = v;
             i++;
         }
-        if (!collapsed) {
+        if (!eff) {
             subjPlayer = evalPlayer();
             // Mode-1 side-reads: the CDI attr term uses the PRE-multiplier
             // attribute sum — mode 2 is post %-multiplier (a x1.05 Dex feat
@@ -672,7 +662,6 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
             if (warmup < 3) return;
             haveFull = true;
         }
-        if (previewMode) return;
         render();
     }
 
@@ -963,8 +952,9 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
             return;
         }
         // Collapsed, the bar is a static label — nothing on it moves with the
-        // target, so there is nothing to paint and nothing was read.
-        if (collapsed) {
+        // target, so there is nothing to paint and nothing was read. In preview
+        // the sheet is on screen at full size, so it paints like any other pass.
+        if (collapsed && !previewMode) {
             updateVisibility();
             return;
         }
@@ -1267,9 +1257,11 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         if (!vis) hideTip();
     }
 
-    // Canned full-footprint sheet, so the panel can be positioned untargeted.
-    // Sections follow the baked gates; the perk boxes stay empty — there are
-    // no canned RDB icons to fill them with.
+    // The full-footprint sheet, live or empty: a target with a settled read
+    // renders normally under the overlay (perks included, and a retarget
+    // mid-preview follows), an untargeted panel shows the chrome and labels
+    // with empty values. Sections follow the baked gates rather than what this
+    // target happens to allow, so the footprint is the one being positioned.
     public function previewOn():Void {
         if (panelClip == null) return;
         previewMode = true;
@@ -1277,22 +1269,43 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
             pvpShown = SHOW_PVP;
             perksShown = SHOW_PERKS;
             layout();
+        } else {
+            applyCollapsed();
         }
-        clearPerkSlots();
-        nameTF.text = "Preview Bear Shaman (80/10)";
-        pveValTF.text = "11527 / 23093 (49%)\n12492 (55.7%)\n3233 (23.4%)\n3228 (23.2%)"
-                      + "\n3090 (22.6%)\n3090 (22.6%)\n3090 (22.6%)\n2196 (60.0%)\n2202 (60.2%)"
-                      + "\n2196 (877-898)\n1726\n3312 (90)\n20.5% / 2.0%\n467 (15.3%)\n431 (11.8%)"
-                      + "\n2112 (57.7%)\n260 (39.0%)";
-        pvpValTF.text = "8230 (38.1%)\n3090 (42.5%)\n3090 (42.5%)\n3090 (42.5%)\n3090 (42.5%)"
-                      + "\n3090 (42.5%)\n1844\n5269 (144)\n18304 / 16264";
+        // The gates just moved under the cache and the fields are rewritten
+        // either way, so nothing may assign-on-change against a stale string.
+        lastName = "";
+        lastPve = "";
+        lastPvp = "";
+        lastPerks = "";
+        if (m_Subject != null && haveFull) {
+            // A full pass, not a render: entering preview folded shows a sheet
+            // whose values were never read (collapsed passes take the gate ids
+            // only), and waiting for the next tick is a quarter second of
+            // dashes.
+            pollTick();
+        } else {
+            nameTF.text = "";
+            pveValTF.text = "";
+            pvpValTF.text = "";
+            clearPerkSlots();
+        }
         updateVisibility();
+        // Last: the overlay covers the whole plate, so it needs the height
+        // layout() just settled.
+        preview.attach({mc: panelClip, x: 0, y: 0, w: W, h: fullH,
+                        label: "Inspect", color: 0xFF0066});
     }
 
     public function previewOff():Void {
         if (panelClip == null) return;
         previewMode = false;
-        // Force a live reassign: the canned sheet bypassed the cache.
+        // Removed, never hidden: a hidden overlay would still take the clicks
+        // this panel is supposed to let through — the fold button included.
+        preview.detach(panelClip);
+        applyCollapsed();
+        // Force a live reassign: preview blanked the fields or showed sections
+        // this target does not get.
         lastName = "";
         lastPve = "";
         lastPvp = "";
