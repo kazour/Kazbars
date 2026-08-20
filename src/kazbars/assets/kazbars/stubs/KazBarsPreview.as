@@ -45,6 +45,10 @@ class KazBarsPreview {
         var w:Number = Number(spec.w);
         var h:Number = Number(spec.h);
 
+        // Topmost by depth, and it has to stay that way: anything the element
+        // adds to its own clip at getNextHighestDepth() AFTER this point draws
+        // over the frame and the readout. Grid slots keep a fixed depth across
+        // a type swap for exactly this reason (KazBarsSlot.swapType).
         var ov:MovieClip = mc.createEmptyMovieClip("_kbOv", mc.getNextHighestDepth());
         ov.lineStyle(2, 0xFFFFFF, 80);
         ov.beginFill(Number(spec.color), 20);
@@ -58,9 +62,15 @@ class KazBarsPreview {
         ov.endFill();
 
         if (spec.vertical == true) {
-            // A one-column bar has the width for neither a horizontal label nor
-            // "X:n Y:n" on one line: the label runs down it, the coords stack.
+            // A one-column bar is narrower than a horizontal label or a
+            // one-line "X:n Y:n", and either would hang most of its length
+            // out over the play area: the label runs down it, the coords
+            // stack.
             var vl:TextField = makeTF(ov, "lbl", x, y, h, 22, 14, 0xFFFFFF);
+            // The only field sized to something other than its text: it is
+            // as long as the bar so the rotated label centres ALONG it, and
+            // growing to fit would pin it to the top instead.
+            vl.autoSize = "none";
             vl.text = String(spec.label);
             vl._rotation = 90;
             vl._x = x + (w / 2) - 9;
@@ -80,9 +90,15 @@ class KazBarsPreview {
         // Bounds are read at press, not at creation: the rect is the anchor's
         // distance to each edge, and the Stage can be resized between the two.
         ov.onPress = function() {
-            this._mc.startDrag(false, -this._x0, -this._y0,
-                               Stage.width - (this._x0 + this._w),
-                               Stage.height - (this._y0 + this._h));
+            // Floored against the near edge: an element taller or wider than
+            // the Stage would otherwise hand startDrag a rect whose far edge
+            // sits behind its near one, and the drag throws the element off
+            // screen with no overlay left on screen to bring it back.
+            var l:Number = -this._x0;
+            var t:Number = -this._y0;
+            this._mc.startDrag(false, l, t,
+                               Math.max(l, Stage.width - (this._x0 + this._w)),
+                               Math.max(t, Stage.height - (this._y0 + this._h)));
             this.onMouseMove = function() { this._self.updCoords(this); };
         };
         ov.onRelease = ov.onReleaseOutside = function() {
@@ -120,6 +136,10 @@ class KazBarsPreview {
                             h:Number, size:Number, col:Number):TextField {
         var tf:TextField = ov.createTextField(id, ov.getNextHighestDepth(), x, y, w, h);
         tf.selectable = false;
+        // Centred on the footprint and free to grow past its edges: a
+        // two-column grid is narrower than "X:-1234 Y:-1234", and the readout
+        // is the number that gets typed back into the dialog.
+        tf.autoSize = "center";
         tf.embedFonts = false;
         tf.textColor = col;
         var fmt:TextFormat = new TextFormat();

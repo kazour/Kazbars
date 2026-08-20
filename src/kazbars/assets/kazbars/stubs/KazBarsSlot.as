@@ -81,12 +81,18 @@ class KazBarsSlot {
         var cfg:Object = obj.cfg;
         var oldX:Number = s._x;
         var oldY:Number = s._y;
+        // The slot keeps the depth it was created at. Taking a fresh top
+        // depth would put every category change above whatever else lives on
+        // the grid clip -- in preview that is the overlay, so a buff that
+        // turned into a debuff mid-fight would draw over the frame and the
+        // X:n Y:n readout while its unchanged neighbours stayed under them.
+        var d:Number = s.getDepth();
 
         s.removeMovieClip();
 
-        var newSlot:MovieClip = p.attachMovie(slotType, "s" + idx, p.getNextHighestDepth());
+        var newSlot:MovieClip = p.attachMovie(slotType, "s" + idx, d);
         if (newSlot == null) {
-            newSlot = p.createEmptyMovieClip("s" + idx, p.getNextHighestDepth());
+            newSlot = p.createEmptyMovieClip("s" + idx, d);
             newSlot.createEmptyMovieClip("m_icon", newSlot.getNextHighestDepth());
         }
 

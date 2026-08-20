@@ -958,8 +958,13 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
             updateVisibility();
             return;
         }
-        var wantPvp:Boolean = subjPlayer && SHOW_PVP;
-        var wantPerks:Boolean = subjPlayer && SHOW_PERKS;
+        // Preview keeps the baked gates whatever the target allows, the same
+        // ones previewOn laid out and sized the overlay to: a pass under the
+        // overlay must not resize the plate the overlay is drawn over, and a
+        // mob-to-player retarget mid-preview must not grow it out from under
+        // a drag rect that was measured before.
+        var wantPvp:Boolean = (previewMode || subjPlayer) && SHOW_PVP;
+        var wantPerks:Boolean = (previewMode || subjPlayer) && SHOW_PERKS;
         if (wantPvp != pvpShown || wantPerks != perksShown) {
             pvpShown = wantPvp;
             perksShown = wantPerks;
