@@ -104,8 +104,6 @@ class KazBarsConsole extends KazBarsPanel implements KazBarsModule {
         return (panelClip != null);
     }
 
-    // The control panel's row for this module: the key routes the check back
-    // through KazBars.previewToggle into setActive below.
     public function previewKey():String { return "console"; }
     public function previewLabel():String { return "Console"; }
 

@@ -11,12 +11,10 @@
 // on purpose (fold-before-clamp and friends).
 //
 // The drag half (makeDragStrip / makeCoordReadout / beginDrag / endDrag, and
-// the collapsed click-to-reopen that rides on it) belongs to the TOOL class —
-// the stopwatch, the console and the control panel, which are opt-in
-// utilities and interactive at all times. The HUD class (grids, cast timers,
-// the inspect panel) is mouse-transparent in normal play and is positioned
-// only in preview, through the shared overlay in KazBarsPreview; the inspect
-// panel therefore extends this base for its chrome and collapse alone.
+// the collapsed click-to-reopen that rides on it) serves the tool class — the
+// stopwatch, the console and the control panel; the inspect panel is a HUD
+// element (see KazBarsModule) and extends this base for chrome and collapse
+// alone.
 //
 // The panel<->core contract: the core drives every module through the typed
 // KazBarsModule lifecycle (create / loadState / saveState / previewOn /

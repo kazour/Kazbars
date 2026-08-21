@@ -37,7 +37,6 @@ class KazBars {
     private var _tempMisc:Array;
 
     // HELPER CLASSES: Preview, Slot, PreviewPanel, and (optional) Console (32KB bytecode limit workaround)
-    private var preview:KazBarsPreview;
 //#if CONSOLE
     private var console:KazBarsConsole;
 //#end
@@ -98,8 +97,7 @@ class KazBars {
         _tempDebuffs = new Array();
         _tempMisc = new Array();
 
-        // HELPER CLASSES: Initialize preview and slot managers (console added if enabled at build time)
-        preview = new KazBarsPreview(rootClip);
+        // HELPER CLASSES: slot manager and control panel (console added if enabled at build time)
 //#if CONSOLE
         console = new KazBarsConsole(rootClip);
 //#end
@@ -116,7 +114,8 @@ class KazBars {
 //#end
 
         // Registration order IS the control panel's row order, which is not the
-        // construction order above.
+        // construction order above. onLoad builds in this order too, so later
+        // rows stack above earlier ones (the console on top).
 //#if SW
         modules.push(stopwatch);
 //#end
@@ -818,7 +817,7 @@ class KazBars {
             obj.mc._visible = obj.shown;
             var j:Number = 0;
             while (j < obj.slots.length) { obj.slots[j]._visible = true; j++; }
-            preview.createOverlay(obj);
+            KazBarsPreview.createOverlay(obj);
             ppanel.addGrid(obj);
             i++;
         }
@@ -839,7 +838,7 @@ class KazBars {
     private function exitPreview():Void {
         if (!previewMode) return;
         previewMode = false;
-        saveAll(config);
+        saveAll();
         // Panel first — its position is already captured. Nothing is restored on
         // the way out: the checks are the settings now, and the final loop
         // re-applies each grid's shown flag.
@@ -851,7 +850,7 @@ class KazBars {
             mi++;
         }
         var i:Number = 0;
-        while (i < grids.length) { preview.removeOverlay(grids[i]); grids[i].dirty = true; updateGrid(grids[i]); i++; }
+        while (i < grids.length) { KazBarsPreview.detach(grids[i].mc); grids[i].dirty = true; updateGrid(grids[i]); i++; }
     }
 
     // Named dispatcher for the control panel's extra rows — the checkbox knows
@@ -882,7 +881,7 @@ class KazBars {
         var i:Number = 0;
         while (i < grids.length) {
             var obj:Object = grids[i];
-            preview.removeOverlay(obj);
+            KazBarsPreview.detach(obj.mc);
             var j:Number = 0;
             while (j < obj.loaders.length) { if (obj.loaders[j] != null) { obj.loaders[j].removeListener(this); obj.loaders[j] = null; } j++; }
             if (obj.mc != null) obj.mc.removeMovieClip();
@@ -925,7 +924,7 @@ class KazBars {
     // The archive, read and written in one place each. Both persist paths
     // (preview exit and deactivate) call saveAll, so a new key can be forgotten
     // on one side, not three.
-    private function loadAll(config:Object):Void {
+    private function loadAll():Void {
         if (config == null) return;
         var i:Number = 0;
         while (i < grids.length) {
@@ -957,7 +956,7 @@ class KazBars {
         }
     }
 
-    private function saveAll(config:Object):Void {
+    private function saveAll():Void {
         if (config == null) return;
         var i:Number = 0;
         while (i < grids.length) {
@@ -977,11 +976,11 @@ class KazBars {
 
     public function OnModuleActivated(archive:Object):Void {
         config = archive;
-        loadAll(config);
+        loadAll();
     }
 
     public function OnModuleDeactivated():Object {
-        saveAll(config);
+        saveAll();
         cleanup();
         try { com.GameInterface.Game.CharacterBase.SignalClientCharacterAlive.Disconnect(SlotAlive, this); } catch (e:Object) {}
         if (m_Player != null) { disconnectP(m_Player); m_Player = null; }

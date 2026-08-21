@@ -279,8 +279,6 @@ class KazBarsStopwatch extends KazBarsPanel implements KazBarsModule {
         collTF.text = (running || paused) ? lastText : "Stopwatch";
     }
 
-    // The control panel's row for this module: the key routes the check back
-    // through KazBars.previewToggle into setActive below.
     public function previewKey():String { return "sw"; }
     public function previewLabel():String { return "Stopwatch"; }
 

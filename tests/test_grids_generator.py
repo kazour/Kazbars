@@ -13,6 +13,8 @@ SlotPBuffAdd / SlotTBuffAdd, plus the preview-mode wiring.
 Run: `pytest tests/test_grids_generator.py` (from repo root).
 """
 
+import re
+
 from kazbars.buff_database import BuffDatabase
 from kazbars.grids_generator import CodeGenerator, escape_as2_string
 from kazbars.paths import KAZBARS_ASSETS
@@ -134,12 +136,9 @@ def test_console_on_emits_console_hooks():
     assert "console.logTarget(buff.m_Name, bid)" in main_code
     assert "modules.push(console);" in main_code
 
-    # Persistence lives wholly inside the stub, reached through saveAll/loadAll
-    # (preview exit + deactivate, and activation for the load).
+    # Persistence lives wholly inside the stub: no inline archive writes.
     assert 'config.ReplaceEntry("console_pin"' not in main_code
     assert 'config.ReplaceEntry("cnv"' not in main_code
-    assert main_code.count("saveAll(config);") == 2
-    assert "loadAll(config);" in main_code
 
     # No leftover tokens
     assert "{{CONSOLE_" not in main_code
@@ -414,7 +413,8 @@ def test_preview_panel_always_emitted():
     # (exitPreview + OnModuleDeactivated) call.
     assert main_code.count("ppanel.destroy();") == 2
     assert main_code.count("ppanel.saveState(config);") == 1
-    assert main_code.count("saveAll(config);") == 2
+    assert main_code.count("saveAll();") == 2
+    assert main_code.count("loadAll();") == 1
     assert "ppanel.loadState(config);" in main_code
 
     assert "{{PP_" not in main_code
@@ -457,6 +457,29 @@ def test_preview_panel_no_extras_has_no_extra_rows():
     for stub in ("KazBarsConsole", "KazBarsCastTimer", "KazBarsStopwatch",
                  "KazBarsInspect"):
         assert stub not in main_code
+
+
+def test_module_registry_emits_every_lifecycle_call_once():
+    """The registry loops are ungated: each lifecycle call runs off the typed
+    `m` exactly once, module or no module. A loop dropped here still compiles
+    and fails silently in-game (overlays never detached, state never saved)."""
+    main_code, _ = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0").generate()
+    for call in ("m.create();", "m.previewOn();", "m.previewOff();",
+                 "m.cleanup();", "m.loadState(config);", "m.saveState(config);"):
+        assert main_code.count(call) == 1, call
+
+
+def test_preview_keys_are_distinct():
+    """previewToggle matches rows on the key string with no break, so two stubs
+    sharing a key would flip together on one checkbox."""
+    keys = {}
+    for stub in sorted((KAZBARS_ASSETS / "stubs").glob("*.as")):
+        m = re.search(r'previewKey\(\):String \{ return "(\w+)"; \}',
+                      stub.read_text(encoding="utf-8"))
+        if m:
+            keys[stub.name] = m.group(1)
+    assert len(keys) == 4, keys
+    assert len(set(keys.values())) == len(keys), keys
 
 
 def test_preview_panel_rows_and_dispatch_all_extras():
@@ -523,7 +546,7 @@ def test_console_master_switch_defaults_active():
 
     assert main_code.index("m.create();") < main_code.index(
         "SignalClientCharacterAlive")
-    assert main_code.index("m.create();") < main_code.index("loadAll(config);")
+    assert main_code.index("m.create();") < main_code.index("loadAll();")
     assert "console_pin" not in main_code
 
 

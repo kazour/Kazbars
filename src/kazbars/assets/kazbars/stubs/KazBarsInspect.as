@@ -1,8 +1,8 @@
 // KazBarsInspect.as - Target inspect panel: a combat sheet for the current
 // target in the visual language of the game's default inspect window.
 // Runtime-drawn chrome + dynamic text fields (Arial resolves against the faces
-// embedded in base.swf), so it needs no new symbols. Plate, drag, collapse and
-// readout primitives inherit from KazBarsPanel.
+// embedded in base.swf), so it needs no new symbols. Plate and collapse
+// primitives inherit from KazBarsPanel.
 //
 // Reading rules are measured engine behaviour, not style: gear and rating ids
 // never fire SignalStatChanged and signal-time reads race the server, so the
@@ -55,8 +55,6 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
     private var W:Number;         // 2xPAD + LABEL_W + COL_GAP + VALUE_W
 
     // UI
-    private var preview:KazBarsPreview;   // the shared preview overlay: this
-                                          // panel's only positioning surface
     private var body:MovieClip;
     private var panelVis:Boolean;     // mirrors panelClip._visible; hoverTick
                                       // asks every mouse move
@@ -128,7 +126,6 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
 
     public function KazBarsInspect(root:MovieClip) {
         super(root);
-        preview = new KazBarsPreview(root);
         m_Subject = null;
         subjName = "";
         subjKey = "";
@@ -411,17 +408,22 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         if (!collapsed && m_Subject != null) pollTick();
     }
 
+    // The effective fold. Preview renders the sheet at full size whatever
+    // the flag says: the plate IS the drag target, and the bar is too small
+    // to aim at. The flag itself is untouched, so exiting preview folds it
+    // back — and the top-left anchor means the position does not shift
+    // either way.
+    private function folded():Boolean {
+        return collapsed && !previewMode;
+    }
+
     // The two states are different plates, not one plate at two heights: the
     // sheet at W x fullH, and a labelled bar at COLL_W x COLL_H. The fold
     // button moves to whichever plate is on screen.
     private function applyCollapsed():Void {
         if (panelClip == null) return;
         hideTip();
-        // Preview renders the sheet at full size whatever the fold state is:
-        // the plate IS the drag target, and the bar is too small to aim at.
-        // The flag itself is untouched, so exiting preview folds it back — and
-        // the top-left anchor means the position does not shift either way.
-        var eff:Boolean = collapsed && !previewMode;
+        var eff:Boolean = folded();
         body._visible = !eff;
         nameTF._visible = !eff;
         collTF._visible = eff;
@@ -551,6 +553,13 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         // no perks renders the same empty key the cache already holds, so
         // clearing the string alone would strand the old subject's icons.
         clearPerkSlots();
+        // Preview keeps the plate on screen with no subject, and nothing
+        // repaints until one settles: blank what the caches just forgot.
+        if (previewMode) {
+            nameTF.text = "";
+            pveValTF.text = "";
+            pvpValTF.text = "";
+        }
     }
 
     // =========================================================================
@@ -586,7 +595,7 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         // full pass at once (toggleCollapsed), so the sheet is never stale.
         // Preview reads the full list whatever the fold state is — it shows the
         // sheet, so retargeting under the overlay has to fill it.
-        var eff:Boolean = collapsed && !previewMode;
+        var eff:Boolean = folded();
         var ids:Array = eff ? gateIds : watchIds;
         var i:Number = 0;
         while (i < ids.length) {
@@ -954,7 +963,7 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         // Collapsed, the bar is a static label — nothing on it moves with the
         // target, so there is nothing to paint and nothing was read. In preview
         // the sheet is on screen at full size, so it paints like any other pass.
-        if (collapsed && !previewMode) {
+        if (folded()) {
             updateVisibility();
             return;
         }
@@ -1236,13 +1245,11 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         tipMC._visible = false;
     }
 
-    // The control panel's row for this module: the key routes the check back
-    // through KazBars.previewToggle into setActive below.
     public function previewKey():String { return "ins"; }
     public function previewLabel():String { return "Inspect panel"; }
 
     // Master switch (preview control panel + archive): folds into the one
-    // visibility gate, so live sheets and the canned preview sheet both obey it.
+    // visibility gate, so live sheets and the preview sheet both obey it.
     public function isActive():Boolean {
         return active;
     }
@@ -1270,13 +1277,9 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
     public function previewOn():Void {
         if (panelClip == null) return;
         previewMode = true;
-        if (pvpShown != SHOW_PVP || perksShown != SHOW_PERKS) {
-            pvpShown = SHOW_PVP;
-            perksShown = SHOW_PERKS;
-            layout();
-        } else {
-            applyCollapsed();
-        }
+        pvpShown = SHOW_PVP;
+        perksShown = SHOW_PERKS;
+        layout();
         // The gates just moved under the cache and the fields are rewritten
         // either way, so nothing may assign-on-change against a stale string.
         lastName = "";
@@ -1298,8 +1301,8 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         updateVisibility();
         // Last: the overlay covers the whole plate, so it needs the height
         // layout() just settled.
-        preview.attach({mc: panelClip, x: 0, y: 0, w: W, h: fullH,
-                        label: "Inspect", color: 0xFF0066});
+        KazBarsPreview.attach({mc: panelClip, x: 0, y: 0, w: W, h: fullH,
+                               label: "Inspect", color: 0xFF0066});
     }
 
     public function previewOff():Void {
@@ -1307,8 +1310,7 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         previewMode = false;
         // Removed, never hidden: a hidden overlay would still take the clicks
         // this panel is supposed to let through — the fold button included.
-        preview.detach(panelClip);
-        applyCollapsed();
+        KazBarsPreview.detach(panelClip);
         // Force a live reassign: preview blanked the fields or showed sections
         // this target does not get.
         lastName = "";
@@ -1316,13 +1318,12 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         lastPvp = "";
         lastPerks = "";
         if (m_Subject != null && haveFull) {
+            applyCollapsed();
             render();
         } else {
-            if (pvpShown || perksShown) {
-                pvpShown = false;
-                perksShown = false;
-                layout();
-            }
+            pvpShown = false;
+            perksShown = false;
+            layout();
             updateVisibility();
         }
     }

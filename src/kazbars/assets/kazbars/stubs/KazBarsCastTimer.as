@@ -42,13 +42,8 @@ class KazBarsCastTimer implements KazBarsModule {
     private var previewMode:Boolean;
     private var active:Boolean;
 
-    // The shared preview skin. Stateless — it reads the clip out of each spec —
-    // so one instance dresses both timers.
-    private var preview:KazBarsPreview;
-
     public function KazBarsCastTimer(root:MovieClip) {
         rootClip = root;
-        preview = new KazBarsPreview(root);
         previewMode = false;
         active = true;
         playerData = newCastData();
@@ -322,8 +317,6 @@ class KazBarsCastTimer implements KazBarsModule {
         hidePreview(m_TargetClip, targetData.casting && active);
     }
 
-    // The control panel's row for this module: the key routes the check back
-    // through KazBars.previewToggle into setActive below.
     public function previewKey():String { return "cast"; }
     public function previewLabel():String { return "Cast timer"; }
 
@@ -353,13 +346,13 @@ class KazBarsCastTimer implements KazBarsModule {
         if (clip == null) return;
         clip._visible = true;
         setText(clip, placeholder());
-        preview.attach({mc: clip, x: -48, y: -32, w: 96, h: SIZE + 60,
-                        label: title, color: col});
+        KazBarsPreview.attach({mc: clip, x: -48, y: -32, w: 96, h: SIZE + 60,
+                               label: title, color: col});
     }
 
     private function hidePreview(clip:MovieClip, stillCasting:Boolean):Void {
         if (clip == null) return;
-        preview.detach(clip);
+        KazBarsPreview.detach(clip);
         if (!stillCasting) { clip._visible = false; setText(clip, ""); }
     }
 

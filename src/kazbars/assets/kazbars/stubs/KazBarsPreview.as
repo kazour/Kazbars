@@ -10,16 +10,13 @@
 //
 // The skin is removed on exit, never hidden — a HUD element is mouse
 // transparent in normal play, and a hidden overlay would still take the click.
+//
+// Stateless, so every entry point is static: the core, the cast timer and the
+// inspect panel call the class, and nothing holds an instance.
 class KazBarsPreview {
-    private var rootClip:MovieClip;
-
-    public function KazBarsPreview(root:MovieClip) {
-        rootClip = root;
-    }
-
-    // Grid entry points: the footprint falls out of the grid's own geometry,
+    // Grid entry point: the footprint falls out of the grid's own geometry,
     // and a one-column bar takes the narrow layout.
-    public function createOverlay(obj:Object):Void {
+    public static function createOverlay(obj:Object):Void {
         var cfg:Object = obj.cfg;
         var step:Number = cfg.iconSize + cfg.gap;
         attach({mc: obj.mc,
@@ -31,12 +28,8 @@ class KazBarsPreview {
                 vertical: (cfg.cols == 1 && cfg.rows > 1)});
     }
 
-    public function removeOverlay(obj:Object):Void {
-        detach(obj.mc);
-    }
-
     // spec: {mc, x, y, w, h, label, color, vertical}
-    public function attach(spec:Object):Void {
+    public static function attach(spec:Object):Void {
         var mc:MovieClip = spec.mc;
         if (mc == null) return;
         detach(mc);
@@ -69,8 +62,12 @@ class KazBarsPreview {
             var vl:TextField = makeTF(ov, "lbl", x, y, h, 22, 14, 0xFFFFFF);
             // The only field sized to something other than its text: it is
             // as long as the bar so the rotated label centres ALONG it, and
-            // growing to fit would pin it to the top instead.
+            // growing to fit would pin it to the top instead. Switching
+            // autoSize off keeps whatever size the field has by then — on an
+            // empty field, the gutters — so the box is set again by hand.
             vl.autoSize = "none";
+            vl._width = h;
+            vl._height = 22;
             vl.text = String(spec.label);
             vl._rotation = 90;
             vl._x = x + (w / 2) - 9;
@@ -83,8 +80,6 @@ class KazBarsPreview {
             ov._xc = makeTF(ov, "xc", x, y + h - 18, w, 14, 11, 0xFFFF00);
         }
 
-        var self:KazBarsPreview = this;
-        ov._mc = mc; ov._self = self;
         ov._x0 = x; ov._y0 = y; ov._w = w; ov._h = h;
         ov.useHandCursor = true;
         // Bounds are read at press, not at creation: the rect is the anchor's
@@ -96,21 +91,21 @@ class KazBarsPreview {
             // screen with no overlay left on screen to bring it back.
             var l:Number = -this._x0;
             var t:Number = -this._y0;
-            this._mc.startDrag(false, l, t,
-                               Math.max(l, Stage.width - (this._x0 + this._w)),
-                               Math.max(t, Stage.height - (this._y0 + this._h)));
-            this.onMouseMove = function() { this._self.updCoords(this); };
+            this._parent.startDrag(false, l, t,
+                                   Math.max(l, Stage.width - (this._x0 + this._w)),
+                                   Math.max(t, Stage.height - (this._y0 + this._h)));
+            this.onMouseMove = function() { KazBarsPreview.updCoords(this); };
         };
         ov.onRelease = ov.onReleaseOutside = function() {
-            this._mc.stopDrag();
+            this._parent.stopDrag();
             delete this.onMouseMove;
-            this._self.updCoords(this);
+            KazBarsPreview.updCoords(this);
         };
         mc._kbOv = ov;
         updCoords(ov);
     }
 
-    public function detach(mc:MovieClip):Void {
+    public static function detach(mc:MovieClip):Void {
         if (mc == null) return;
         if (mc._kbOv != null) {
             mc._kbOv.removeMovieClip();
@@ -120,10 +115,10 @@ class KazBarsPreview {
 
     // Assigns text only: the format was set once at creation, so a drag does
     // not allocate a TextFormat per mouse move.
-    public function updCoords(ov:MovieClip):Void {
-        if (ov == null || ov._mc == null) return;
-        var px:Number = Math.round(ov._mc._x);
-        var py:Number = Math.round(ov._mc._y);
+    public static function updCoords(ov:MovieClip):Void {
+        if (ov == null) return;
+        var px:Number = Math.round(ov._parent._x);
+        var py:Number = Math.round(ov._parent._y);
         if (ov._yc != null) {
             ov._xc.text = "X:" + px;
             ov._yc.text = "Y:" + py;
@@ -132,8 +127,8 @@ class KazBarsPreview {
         }
     }
 
-    private function makeTF(ov:MovieClip, id:String, x:Number, y:Number, w:Number,
-                            h:Number, size:Number, col:Number):TextField {
+    private static function makeTF(ov:MovieClip, id:String, x:Number, y:Number, w:Number,
+                                   h:Number, size:Number, col:Number):TextField {
         var tf:TextField = ov.createTextField(id, ov.getNextHighestDepth(), x, y, w, h);
         tf.selectable = false;
         // Centred on the footprint and free to grow past its edges: a

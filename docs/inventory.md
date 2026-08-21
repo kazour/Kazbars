@@ -110,7 +110,7 @@
 | `tests/test_game_folder.py` | 99 |
 | `tests/test_game_persistence.py` | 723 |
 | `tests/test_grid_model.py` | 135 |
-| `tests/test_grids_generator.py` | 588 |
+| `tests/test_grids_generator.py` | 611 |
 | `tests/test_hud_overlay.py` | 141 |
 | `tests/test_imports.py` | 33 |
 | `tests/test_inspect.py` | 108 |
