@@ -81,12 +81,15 @@ class KazBarsSlot {
         var cfg:Object = obj.cfg;
         var oldX:Number = s._x;
         var oldY:Number = s._y;
+        // Re-attached at the depth it had: a fresh top depth would lift a
+        // category change above the preview overlay (KazBarsPreview.attach).
+        var d:Number = s.getDepth();
 
         s.removeMovieClip();
 
-        var newSlot:MovieClip = p.attachMovie(slotType, "s" + idx, p.getNextHighestDepth());
+        var newSlot:MovieClip = p.attachMovie(slotType, "s" + idx, d);
         if (newSlot == null) {
-            newSlot = p.createEmptyMovieClip("s" + idx, p.getNextHighestDepth());
+            newSlot = p.createEmptyMovieClip("s" + idx, d);
             newSlot.createEmptyMovieClip("m_icon", newSlot.getNextHighestDepth());
         }
 

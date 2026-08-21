@@ -70,7 +70,7 @@ STUB_TABLES = {
 }
 
 # The two stubs that build without ever being configured first (the stopwatch
-# and inspect panel are always configured before createPanel).
+# and inspect panel are always configured before create()).
 SELF_INIT_STUBS = ('KazBarsConsole.as', 'KazBarsPreviewPanel.as')
 
 # `NAME = Math.round(FS * 0.85);` and the bare `BOX = Math.round(FS);`

@@ -37,7 +37,6 @@ class KazBars {
     private var _tempMisc:Array;
 
     // HELPER CLASSES: Preview, Slot, PreviewPanel, and (optional) Console (32KB bytecode limit workaround)
-    private var preview:KazBarsPreview;
 //#if CONSOLE
     private var console:KazBarsConsole;
 //#end
@@ -53,6 +52,11 @@ class KazBars {
     private var inspect:KazBarsInspect;
 //#end
 
+    // Every optional module compiled into this build, in control-panel row
+    // order. The core reaches them ONLY through the KazBarsModule lifecycle,
+    // so a build that gates one out drops its push and nothing else.
+    private var modules:Array;
+
     // Key listener reference for proper cleanup
     private var keyListener:Object;
 
@@ -62,6 +66,7 @@ class KazBars {
         playerBuffs = new Array();
         targetBuffs = new Array();
         grids = new Array();
+        modules = new Array();
         buffIndexCache = {player: {}, target: {}};
         frameActive = false;
         frameCount = 0;
@@ -92,8 +97,7 @@ class KazBars {
         _tempDebuffs = new Array();
         _tempMisc = new Array();
 
-        // HELPER CLASSES: Initialize preview and slot managers (console added if enabled at build time)
-        preview = new KazBarsPreview(rootClip);
+        // HELPER CLASSES: slot manager and control panel (console added if enabled at build time)
 //#if CONSOLE
         console = new KazBarsConsole(rootClip);
 //#end
@@ -107,6 +111,22 @@ class KazBars {
 //#end
 //#if INS
         inspect = new KazBarsInspect(rootClip);
+//#end
+
+        // Registration order IS the control panel's row order, which is not the
+        // construction order above. onLoad builds in this order too, so later
+        // rows stack above earlier ones (the console on top).
+//#if SW
+        modules.push(stopwatch);
+//#end
+//#if INS
+        modules.push(inspect);
+//#end
+//#if CAST
+        modules.push(castTimer);
+//#end
+//#if CONSOLE
+        modules.push(console);
 //#end
 
         initConfig();
@@ -797,28 +817,20 @@ class KazBars {
             obj.mc._visible = obj.shown;
             var j:Number = 0;
             while (j < obj.slots.length) { obj.slots[j]._visible = true; j++; }
-            preview.createOverlay(obj);
+            KazBarsPreview.createOverlay(obj);
             ppanel.addGrid(obj);
             i++;
         }
-//#if CAST
-        castTimer.previewOn();
-//#end
-//#if INS
-        inspect.previewOn();
-//#end
-//#if SW
-        ppanel.addExtra("Stopwatch", "sw", stopwatch.isActive());
-//#end
-//#if INS
-        ppanel.addExtra("Inspect panel", "ins", inspect.isActive());
-//#end
-//#if CAST
-        ppanel.addExtra("Cast timer", "cast", castTimer.isActive());
-//#end
-//#if CONSOLE
-        ppanel.addExtra("Console", "console", console.isActive());
-//#end
+        // Each row is seeded from what its module is doing right now, so the
+        // panel caches no state of its own. previewOn runs first and must leave
+        // that state alone -- a display dresses itself for dragging, no more.
+        var mi:Number = 0;
+        while (mi < modules.length) {
+            var m:KazBarsModule = modules[mi];
+            m.previewOn();
+            ppanel.addExtra(m.previewLabel(), m.previewKey(), m.isActive());
+            mi++;
+        }
         // Last, so the control panel sits on top of everything it controls.
         ppanel.show();
     }
@@ -826,57 +838,30 @@ class KazBars {
     private function exitPreview():Void {
         if (!previewMode) return;
         previewMode = false;
-        if (config) {
-            var j:Number = 0;
-            while (j < grids.length) {
-                config.ReplaceEntry("g" + j + "_x", grids[j].mc._x);
-                config.ReplaceEntry("g" + j + "_y", grids[j].mc._y);
-                config.ReplaceEntry("g" + j + "_v", grids[j].shown ? 1 : 0);
-                j++;
-            }
-            ppanel.saveState(config);
-//#if CONSOLE
-            console.saveState(config);
-//#end
-//#if CAST
-            castTimer.savePositions(config);
-//#end
-//#if SW
-            stopwatch.saveState(config);
-//#end
-//#if INS
-            inspect.saveState(config);
-//#end
-        }
+        saveAll();
         // Panel first — its position is already captured. Nothing is restored on
         // the way out: the checks are the settings now, and the final loop
         // re-applies each grid's shown flag.
         ppanel.destroy();
-//#if CAST
-        castTimer.previewOff();
-//#end
-//#if INS
-        inspect.previewOff();
-//#end
+        var mi:Number = 0;
+        while (mi < modules.length) {
+            var m:KazBarsModule = modules[mi];
+            m.previewOff();
+            mi++;
+        }
         var i:Number = 0;
-        while (i < grids.length) { preview.removeOverlay(grids[i]); grids[i].dirty = true; updateGrid(grids[i]); i++; }
+        while (i < grids.length) { KazBarsPreview.detach(grids[i].mc); grids[i].dirty = true; updateGrid(grids[i]); i++; }
     }
 
     // Named dispatcher for the control panel's extra rows — the checkbox knows
     // a key, each stub has its own idea of what hiding means.
     public function previewToggle(key:String, shown:Boolean):Void {
-//#if SW
-        if (key == "sw") stopwatch.setActive(shown);
-//#end
-//#if INS
-        if (key == "ins") inspect.setActive(shown);
-//#end
-//#if CAST
-        if (key == "cast") castTimer.setActive(shown);
-//#end
-//#if CONSOLE
-        if (key == "console") console.setActive(shown);
-//#end
+        var mi:Number = 0;
+        while (mi < modules.length) {
+            var m:KazBarsModule = modules[mi];
+            if (m.previewKey() == key) m.setActive(shown);
+            mi++;
+        }
     }
 
     private function cleanup():Void {
@@ -884,25 +869,19 @@ class KazBars {
         previewMode = false;
         if (keyListener != null) { Key.removeListener(keyListener); keyListener = null; }
         ppanel.destroy();
-//#if CONSOLE
-        console.removeConsole();
-//#end
-//#if CAST
-        castTimer.cleanup();
-//#end
-//#if SW
-        stopwatch.cleanup();
-//#end
-//#if INS
-        inspect.cleanup();
-//#end
+        var mi:Number = 0;
+        while (mi < modules.length) {
+            var m:KazBarsModule = modules[mi];
+            m.cleanup();
+            mi++;
+        }
         playerBuffs = new Array();
         targetBuffs = new Array();
         buffIndexCache = {player: {}, target: {}};
         var i:Number = 0;
         while (i < grids.length) {
             var obj:Object = grids[i];
-            preview.removeOverlay(obj);
+            KazBarsPreview.detach(obj.mc);
             var j:Number = 0;
             while (j < obj.loaders.length) { if (obj.loaders[j] != null) { obj.loaders[j].removeListener(this); obj.loaders[j] = null; } j++; }
             if (obj.mc != null) obj.mc.removeMovieClip();
@@ -926,18 +905,15 @@ class KazBars {
         keyListener.onKeyUp = function() { self.handleKeyUp(); };
         Key.addListener(keyListener);
         createAllGrids();
-//#if CAST
-        castTimer.createFields();
-//#end
-//#if SW
-        stopwatch.createPanel();
-//#end
-//#if INS
-        inspect.createPanel();
-//#end
-//#if CONSOLE  // open at login is the default a first-ever session gets, before any archived state exists to say otherwise
-        console.createConsole();
-//#end
+        // Every module builds now, in whatever state it opens at login by
+        // default — what a first-ever session gets, before any archived state
+        // exists to say otherwise. loadAll reconciles once it arrives.
+        var mi:Number = 0;
+        while (mi < modules.length) {
+            var m:KazBarsModule = modules[mi];
+            m.create();
+            mi++;
+        }
         try {
             com.GameInterface.Game.CharacterBase.SignalClientCharacterAlive.Connect(SlotAlive, this);
             m_Player = com.GameInterface.Game.Character.GetClientCharacter();
@@ -945,66 +921,66 @@ class KazBars {
         } catch (e:Object) {}
     }
 
-    public function OnModuleActivated(archive:Object):Void {
-        config = archive;
-        if (config) {
-            var i:Number = 0;
-            while (i < grids.length) {
-                var gx:Object = config.FindEntry("g" + i + "_x");
-                var gy:Object = config.FindEntry("g" + i + "_y");
-                if (gx !== undefined && gy !== undefined) {
-                    grids[i].mc._x = Number(gx);
-                    grids[i].mc._y = Number(gy);
-                }
-                // Hiding directly covers the window where SlotAlive already
-                // painted a grid before the archive arrived; the show side needs
-                // nothing, since updateGrid honors shown from here on.
-                var gs:Object = config.FindEntry("g" + i + "_v");
-                if (gs !== undefined) {
-                    grids[i].shown = (gs == 1);
-                    if (!grids[i].shown) grids[i].mc._visible = false;
-                }
-                i++;
+    // The archive, read and written in one place each. Both persist paths
+    // (preview exit and deactivate) call saveAll, so a new key can be forgotten
+    // on one side, not three.
+    private function loadAll():Void {
+        if (config == null) return;
+        var i:Number = 0;
+        while (i < grids.length) {
+            var gx:Object = config.FindEntry("g" + i + "_x");
+            var gy:Object = config.FindEntry("g" + i + "_y");
+            if (gx !== undefined && gy !== undefined) {
+                grids[i].mc._x = Number(gx);
+                grids[i].mc._y = Number(gy);
             }
-            ppanel.loadState(config);
-//#if CONSOLE  // loadState owns the whole archive dance: keys, then the rebuild on the archived spot and fold (or removal when the master switch saved off)
-            console.loadState(config);
-//#end
-//#if CAST
-            castTimer.loadPositions(config);
-//#end
-//#if SW
-            stopwatch.loadState(config);
-//#end
-//#if INS
-            inspect.loadState(config);
-//#end
+            // Hiding directly covers the window where SlotAlive already
+            // painted a grid before the archive arrived; the show side needs
+            // nothing, since updateGrid honors shown from here on.
+            var gs:Object = config.FindEntry("g" + i + "_v");
+            if (gs !== undefined) {
+                grids[i].shown = (gs == 1);
+                if (!grids[i].shown) grids[i].mc._visible = false;
+            }
+            i++;
+        }
+        ppanel.loadState(config);
+        // A module's own loadState owns its whole archive dance: its keys, then
+        // whatever rebuild the archived spot, fold and master switch imply —
+        // the onLoad build above ran before any of that arrived.
+        var mi:Number = 0;
+        while (mi < modules.length) {
+            var m:KazBarsModule = modules[mi];
+            m.loadState(config);
+            mi++;
         }
     }
 
-    public function OnModuleDeactivated():Object {
-        if (config) {
-            var i:Number = 0;
-            while (i < grids.length) {
-                config.ReplaceEntry("g" + i + "_x", grids[i].mc._x);
-                config.ReplaceEntry("g" + i + "_y", grids[i].mc._y);
-                config.ReplaceEntry("g" + i + "_v", grids[i].shown ? 1 : 0);
-                i++;
-            }
-            ppanel.saveState(config);
-//#if CONSOLE
-            console.saveState(config);
-//#end
-//#if CAST
-            castTimer.savePositions(config);
-//#end
-//#if SW
-            stopwatch.saveState(config);
-//#end
-//#if INS
-            inspect.saveState(config);
-//#end
+    private function saveAll():Void {
+        if (config == null) return;
+        var i:Number = 0;
+        while (i < grids.length) {
+            config.ReplaceEntry("g" + i + "_x", grids[i].mc._x);
+            config.ReplaceEntry("g" + i + "_y", grids[i].mc._y);
+            config.ReplaceEntry("g" + i + "_v", grids[i].shown ? 1 : 0);
+            i++;
         }
+        ppanel.saveState(config);
+        var mi:Number = 0;
+        while (mi < modules.length) {
+            var m:KazBarsModule = modules[mi];
+            m.saveState(config);
+            mi++;
+        }
+    }
+
+    public function OnModuleActivated(archive:Object):Void {
+        config = archive;
+        loadAll();
+    }
+
+    public function OnModuleDeactivated():Object {
+        saveAll();
         cleanup();
         try { com.GameInterface.Game.CharacterBase.SignalClientCharacterAlive.Disconnect(SlotAlive, this); } catch (e:Object) {}
         if (m_Player != null) { disconnectP(m_Player); m_Player = null; }

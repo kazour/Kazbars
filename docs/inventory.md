@@ -83,7 +83,7 @@
 | `src/kazbars/userdata.py` | 110 |
 | `src/kazbars/window_position.py` | 116 |
 | `tests/test_app_contract.py` | 104 |
-| `tests/test_as2_class_names.py` | 61 |
+| `tests/test_as2_class_names.py` | 65 |
 | `tests/test_boss_timer.py` | 151 |
 | `tests/test_buff_db_layers.py` | 266 |
 | `tests/test_buff_xml.py` | 324 |
@@ -110,7 +110,7 @@
 | `tests/test_game_folder.py` | 99 |
 | `tests/test_game_persistence.py` | 723 |
 | `tests/test_grid_model.py` | 135 |
-| `tests/test_grids_generator.py` | 597 |
+| `tests/test_grids_generator.py` | 611 |
 | `tests/test_hud_overlay.py` | 141 |
 | `tests/test_imports.py` | 33 |
 | `tests/test_inspect.py` | 108 |

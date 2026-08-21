@@ -42,6 +42,8 @@ def test_generator_emits_the_bootstrapped_class_names():
 def test_every_stub_declares_a_kazbars_prefixed_class():
     # Non-recursive on purpose: the stubs/ subdirectories carry vendored helpers
     # (com/Utils/ID32.as and friends) that are not KazBars* classes.
+    # An interface binds the same way a class does -- KazBarsModule is the
+    # lifecycle every optional module implements -- so both count as declared.
     stubs = sorted(STUBS.glob('*.as'))
     assert stubs, f'no AS2 stubs found under {STUBS}'
     for path in stubs:
@@ -49,13 +51,15 @@ def test_every_stub_declares_a_kazbars_prefixed_class():
         declared = [
             line.strip().split()[1]
             for line in text.splitlines()
-            if line.strip().startswith('class ') and len(line.strip().split()) > 1
+            if line.strip().startswith(('class ', 'interface '))
+            and len(line.strip().split()) > 1
         ]
-        assert declared, f'{path.name} declares no class'
+        assert declared, f'{path.name} declares no class or interface'
         assert all(name.startswith('KazBars') for name in declared), (
             f'{path.name} declares {declared}; every stub class must keep its '
             f'KazBars* name or the base.swf bind breaks'
         )
         assert path.stem in declared, (
-            f'{path.name} must declare a class matching its filename, got {declared}'
+            f'{path.name} must declare a class or interface matching its '
+            f'filename, got {declared}'
         )

@@ -15,7 +15,7 @@
 // Drag is clamped to the Stage and the position and fold state persist in the
 // module config archive (cnx/cny/cnc) beside the master switch (cnv) and the
 // two log toggles.
-class KazBarsConsole extends KazBarsPanel {
+class KazBarsConsole extends KazBarsPanel implements KazBarsModule {
     private var m_Body:MovieClip;
     private var titleTF:TextField;
     private var collTF:TextField;
@@ -104,18 +104,26 @@ class KazBarsConsole extends KazBarsPanel {
         return (panelClip != null);
     }
 
+    public function previewKey():String { return "console"; }
+    public function previewLabel():String { return "Console"; }
+
+    // Tool class: already interactive in normal play, dragged by its own title
+    // strip, so preview has nothing to add or take away.
+    public function previewOn():Void {}
+    public function previewOff():Void {}
+
     // Master switch: the console's active state IS the clip's existence.
-    // createConsole/removeConsole already carry logs, position and fold across
+    // create()/removeConsole() already carry logs, position and fold across
     // the flip, so no second flag can drift from the truth.
     public function setActive(shown:Boolean):Void {
         if (shown) {
-            if (panelClip == null) createConsole();
+            if (panelClip == null) create();
         } else {
             removeConsole();
         }
     }
 
-    public function createConsole():Void {
+    public function create():Void {
         if (panelClip != null) panelClip.removeMovieClip();
         panelClip = rootClip.createEmptyMovieClip("buffConsole", rootClip.getNextHighestDepth());
 
@@ -208,7 +216,7 @@ class KazBarsConsole extends KazBarsPanel {
     // and re-clamped, so nothing is lost.
     private function rebuild():Void {
         capturePos();
-        createConsole();
+        create();
     }
 
     // Two plates, not one at two heights: the 500x320 sheet, and the labelled
@@ -350,7 +358,7 @@ class KazBarsConsole extends KazBarsPanel {
         // master switch was saved off.
         var v:Object = config.FindEntry("cnv");
         if (v !== undefined && v == 0) removeConsole();
-        else createConsole();
+        else create();
     }
 
     public function saveState(config:Object):Void {
@@ -363,5 +371,11 @@ class KazBarsConsole extends KazBarsPanel {
         if (isNaN(posX) || isNaN(posY)) return;
         config.ReplaceEntry("cnx", posX);
         config.ReplaceEntry("cny", posY);
+    }
+
+    // Deactivate teardown. The clip IS the active state, so the master
+    // switch and the module lifecycle take the console down the same way.
+    public function cleanup():Void {
+        removeConsole();
     }
 }

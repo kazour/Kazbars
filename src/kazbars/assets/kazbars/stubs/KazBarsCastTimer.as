@@ -9,10 +9,10 @@
 // control panel's master switch (ctv) — inactive renders nothing, live
 // casts included.
 //
-// Driven from KazBars: createFields() in onLoad, connectPlayer()/setTarget()
+// Driven from KazBars: create() in onLoad, connectPlayer()/setTarget()
 // from the existing player/target lifecycle, previewOn()/previewOff() from the
-// shared Shift+Ctrl+Alt preview, load/savePositions() from the module archive.
-class KazBarsCastTimer {
+// shared Shift+Ctrl+Alt preview, loadState()/saveState() from the module archive.
+class KazBarsCastTimer implements KazBarsModule {
     private var rootClip:MovieClip;
 
     // Config (set by configure())
@@ -73,7 +73,7 @@ class KazBarsCastTimer {
         COLOR = Number(cfg.color);
     }
 
-    public function createFields():Void {
+    public function create():Void {
         if (ENABLE_P) m_PlayerClip = makeClip("kbCastP", PLAYER_X, PLAYER_Y);
         if (ENABLE_T) m_TargetClip = makeClip("kbCastT", TARGET_X, TARGET_Y);
         // Frame-coherent update driver. Its own onEnterFrame reads getTimer() and
@@ -299,14 +299,14 @@ class KazBarsCastTimer {
     }
 
     // =========================================================================
-    // Preview drag (own visual style, decoupled from KazBarsPreview)
+    // Preview drag (the shared HUD overlay, same skin the grids wear)
     // =========================================================================
 
     public function previewOn():Void {
         previewMode = true;
         if (!active) return;
-        if (m_PlayerClip != null) showPreview(m_PlayerClip, 0x0066FF, "Player Cast");
-        if (m_TargetClip != null) showPreview(m_TargetClip, 0xFF0066, "Target Cast");
+        dressForDrag(m_PlayerClip, 0x0066FF, "Player Cast");
+        dressForDrag(m_TargetClip, 0xFF0066, "Target Cast");
     }
 
     public function previewOff():Void {
@@ -316,6 +316,9 @@ class KazBarsCastTimer {
         hidePreview(m_PlayerClip, playerData.casting && active);
         hidePreview(m_TargetClip, targetData.casting && active);
     }
+
+    public function previewKey():String { return "cast"; }
+    public function previewLabel():String { return "Cast timer"; }
 
     // Master switch (preview control panel + archive). Hiding is a hard hide of
     // both clips (the drag overlay is a child, so it follows); re-activating
@@ -336,48 +339,20 @@ class KazBarsCastTimer {
         }
     }
 
-    private function showPreview(clip:MovieClip, col:Number, title:String):Void {
+    // The footprint is the timer's own: the text is anchored on its centre, the
+    // title sits above it and the coordinate row below, so the box runs from 32
+    // above the anchor to 28 below the text.
+    private function dressForDrag(clip:MovieClip, col:Number, title:String):Void {
+        if (clip == null) return;
         clip._visible = true;
         setText(clip, placeholder());
-        if (clip._ov != null) clip._ov.removeMovieClip();
-        var w:Number = 96;
-        var top:Number = -32;          // box top -- the title sits above the timer text (anchored at y=0)
-        var bot:Number = SIZE + 28;    // box bottom -- below the coords row
-        var ov:MovieClip = clip.createEmptyMovieClip("_ov", clip.getNextHighestDepth());
-        ov.lineStyle(2, 0xFFFFFF, 80);
-        ov.beginFill(col, 20);
-        ov.moveTo(-w / 2, top); ov.lineTo(w / 2, top); ov.lineTo(w / 2, bot); ov.lineTo(-w / 2, bot); ov.lineTo(-w / 2, top);
-        ov.endFill();
-        // Title -- same style as the grid preview label (white Arial 14 bold, centered at top).
-        var tl:TextField = ov.createTextField("tl", ov.getNextHighestDepth(), -w / 2, top + 4, w, 18);
-        tl.selectable = false; tl.embedFonts = false; tl.text = title; tl.textColor = 0xFFFFFF;
-        var tfmt:TextFormat = new TextFormat();
-        tfmt.font = "Arial"; tfmt.size = 14; tfmt.bold = true; tfmt.align = "center";
-        tl.setTextFormat(tfmt);
-        var cf:TextField = ov.createTextField("co", ov.getNextHighestDepth(), -w / 2, bot - 18, w, 14);
-        cf.selectable = false; cf.embedFonts = false; cf.textColor = 0xFFFF00;
-        var self:KazBarsCastTimer = this;
-        ov._clip = clip; ov._cf = cf; ov._self = self; ov._hw = w / 2; ov._top = top; ov._bot = bot; ov.useHandCursor = true;
-        ov.onPress = function() {
-            this._clip.startDrag(false, this._hw, -this._top, Stage.width - this._hw, Stage.height - this._bot);
-            this.onMouseMove = function() { this._self.updCoord(this._cf, this._clip); };
-        };
-        ov.onRelease = ov.onReleaseOutside = function() { this._clip.stopDrag(); delete this.onMouseMove; this._self.updCoord(this._cf, this._clip); };
-        clip._ov = ov;
-        updCoord(cf, clip);
-    }
-
-    public function updCoord(cf:TextField, clip:MovieClip):Void {
-        if (cf == null || clip == null) return;
-        cf.text = "X:" + Math.round(clip._x) + " Y:" + Math.round(clip._y);
-        var fmt:TextFormat = new TextFormat();
-        fmt.font = "Arial"; fmt.size = 10; fmt.bold = true; fmt.align = "center";
-        cf.setTextFormat(fmt);
+        KazBarsPreview.attach({mc: clip, x: -48, y: -32, w: 96, h: SIZE + 60,
+                               label: title, color: col});
     }
 
     private function hidePreview(clip:MovieClip, stillCasting:Boolean):Void {
         if (clip == null) return;
-        if (clip._ov != null) { clip._ov.removeMovieClip(); clip._ov = null; }
+        KazBarsPreview.detach(clip);
         if (!stillCasting) { clip._visible = false; setText(clip, ""); }
     }
 
@@ -385,7 +360,7 @@ class KazBarsCastTimer {
     // Persistence (module config archive — permanent for every user)
     // =========================================================================
 
-    public function loadPositions(config:Object):Void {
+    public function loadState(config:Object):Void {
         if (config == null) return;
         applyPos(m_PlayerClip, config.FindEntry("ctpx"), config.FindEntry("ctpy"));
         applyPos(m_TargetClip, config.FindEntry("cttx"), config.FindEntry("ctty"));
@@ -398,7 +373,7 @@ class KazBarsCastTimer {
         if (x !== undefined && y !== undefined) { clip._x = Number(x); clip._y = Number(y); }
     }
 
-    public function savePositions(config:Object):Void {
+    public function saveState(config:Object):Void {
         if (config == null) return;
         if (m_PlayerClip != null) { config.ReplaceEntry("ctpx", m_PlayerClip._x); config.ReplaceEntry("ctpy", m_PlayerClip._y); }
         if (m_TargetClip != null) { config.ReplaceEntry("cttx", m_TargetClip._x); config.ReplaceEntry("ctty", m_TargetClip._y); }
