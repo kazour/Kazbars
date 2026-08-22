@@ -1246,7 +1246,7 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
     }
 
     public function previewKey():String { return "ins"; }
-    public function previewLabel():String { return "Inspect panel"; }
+    public function previewLabel():String { return "Inspect Panel"; }
 
     // Master switch (preview control panel + archive): folds into the one
     // visibility gate, so live sheets and the preview sheet both obey it.

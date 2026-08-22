@@ -318,7 +318,7 @@ class KazBarsCastTimer implements KazBarsModule {
     }
 
     public function previewKey():String { return "cast"; }
-    public function previewLabel():String { return "Cast timer"; }
+    public function previewLabel():String { return "Cast Timer"; }
 
     // Master switch (preview control panel + archive). Hiding is a hard hide of
     // both clips (the drag overlay is a child, so it follows); re-activating
