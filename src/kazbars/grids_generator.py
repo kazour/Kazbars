@@ -245,10 +245,12 @@ class CodeGenerator:
 
     def _panel_font_data_block(self):
         """AS2 `d.PF = {...}` literal — the shared panel text size, for the two
-        panels with no config of their own to override it from. Emitted
+        panels with no config of their own to override it from, plus the app
+        version the control panel's footer credit shows. Emitted
         unconditionally: `KazBarsPreviewPanel` is not gated and compiles into
         every build."""
-        return f"\n        d.PF = {{fontSize: {self.panel_font_size}}};"
+        return (f"\n        d.PF = {{fontSize: {self.panel_font_size}, "
+                f'version: "{escape_as2_string(self.app_version)}"}};')
 
     def _cast_data_block(self):
         """AS2 `d.CAST = {...}` literal for the cast-timer overlay. Positions

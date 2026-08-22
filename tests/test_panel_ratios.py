@@ -57,6 +57,9 @@ CONSOLE_RATIOS = {
 PREVIEW_RATIOS = {
     'ROW_H': (1.667, 20),
     'COL_W': (18.33, 220),
+    # Born with the grouped layout, so its "historical" value is its designed
+    # FS-12 one: the breathing room above a mid-column section header.
+    'HDR_GAP': (0.4, 5),
 }
 
 # Text sizes are written inline at the makeTF call, the family's idiom, so they

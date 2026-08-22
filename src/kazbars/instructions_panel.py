@@ -369,13 +369,16 @@ SECTIONS: list[_Section] = [
                 'colored rectangle with live X/Y. Drag things where you want '
                 '— the game remembers, across relogs and restarts.',
             ]),
-            _sub('The control panel', [
-                'Preview mode also shows a Control Panel: one checkbox per '
-                'grid and extra. Each box is a persistent master switch — '
-                'unchecked stays off until you re-check it.',
-                'Its text uses the size all four in-game panels share '
-                '(Extras ▸ Inspect panel…). With many grids it shrinks '
-                'itself to stay on screen.',
+            _sub('The KazBars Preview panel', [
+                'Preview mode also shows a KazBars Preview panel: one '
+                'checkbox per grid and extra, grouped under Player Grids, '
+                'Target Grids and Tools. Click a header to toggle its whole '
+                'group. Each box is a persistent master switch — unchecked '
+                'stays off until you re-check it.',
+                'Its footer repeats the exit keybind, the /reloadui '
+                'reminder and the app version. Its text uses the size all '
+                'four in-game panels share (Extras ▸ Inspect panel…). With '
+                'many grids it shrinks itself to stay on screen.',
             ]),
             _sub('X/Y in the app', [
                 'The Grids-tab X/Y only seed a first-ever session. Once you '

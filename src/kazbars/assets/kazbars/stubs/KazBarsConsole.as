@@ -105,7 +105,7 @@ class KazBarsConsole extends KazBarsPanel implements KazBarsModule {
     }
 
     public function previewKey():String { return "console"; }
-    public function previewLabel():String { return "Console"; }
+    public function previewLabel():String { return "Buff Console"; }
 
     // Tool class: already interactive in normal play, dragged by its own title
     // strip, so preview has nothing to add or take away.

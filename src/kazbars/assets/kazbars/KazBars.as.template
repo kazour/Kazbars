@@ -113,9 +113,9 @@ class KazBars {
         inspect = new KazBarsInspect(rootClip);
 //#end
 
-        // Registration order IS the control panel's row order, which is not the
-        // construction order above. onLoad builds in this order too, so later
-        // rows stack above earlier ones (the console on top).
+        // Registration order is z-order: onLoad builds in this order, so later
+        // modules stack above earlier ones (the console on top). The control
+        // panel's row order is enterPreview()'s addExtra sequence, not this.
 //#if SW
         modules.push(stopwatch);
 //#end
@@ -821,16 +821,30 @@ class KazBars {
             ppanel.addGrid(obj);
             i++;
         }
-        // Each row is seeded from what its module is doing right now, so the
-        // panel caches no state of its own. previewOn runs first and must leave
-        // that state alone -- a display dresses itself for dragging, no more.
+        // previewOn runs first and must leave module state alone -- a display
+        // dresses itself for dragging, no more.
         var mi:Number = 0;
         while (mi < modules.length) {
             var m:KazBarsModule = modules[mi];
             m.previewOn();
-            ppanel.addExtra(m.previewLabel(), m.previewKey(), m.isActive());
             mi++;
         }
+        // Explicit adds, not a modules loop: this sequence IS the panel's Tools
+        // row order, decoupled from the registration order above (which is
+        // z-order). Each row is seeded from what its module is doing right now,
+        // so the panel caches no state of its own.
+//#if CAST
+        ppanel.addExtra(castTimer.previewLabel(), castTimer.previewKey(), castTimer.isActive());
+//#end
+//#if INS
+        ppanel.addExtra(inspect.previewLabel(), inspect.previewKey(), inspect.isActive());
+//#end
+//#if CONSOLE
+        ppanel.addExtra(console.previewLabel(), console.previewKey(), console.isActive());
+//#end
+//#if SW
+        ppanel.addExtra(stopwatch.previewLabel(), stopwatch.previewKey(), stopwatch.isActive());
+//#end
         // Last, so the control panel sits on top of everything it controls.
         ppanel.show();
     }

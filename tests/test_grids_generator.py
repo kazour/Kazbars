@@ -426,14 +426,14 @@ def test_shared_panel_font_is_always_emitted_and_configured():
     identifiers must also stay clear of the bare 'stopwatch'/'inspect' substrings
     the off-path tests assert against the whole generated class."""
     main_code, data_code = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0").generate()
-    assert "d.PF = {fontSize: 12};" in data_code
+    assert 'd.PF = {fontSize: 12, version: "0.0.0"};' in data_code
     assert "ppanel.configure(d.PF);" in main_code
     assert "console.configure(d.PF);" not in main_code
 
     gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0",
                         include_console=True, panel_font_size=20)
     main_code, data_code = gen.generate()
-    assert "d.PF = {fontSize: 20};" in data_code
+    assert 'd.PF = {fontSize: 20, version: "0.0.0"};' in data_code
     assert "console.configure(d.PF);" in main_code
 
 
@@ -449,11 +449,13 @@ def test_shared_panel_font_is_clamped():
 
 
 def test_preview_panel_no_extras_has_no_extra_rows():
-    """With nothing compiled in, the registry is empty, so the rows loop and the
-    dispatcher loop both run over nothing. They are ungated — the check that
-    nothing was left dangling is that no stub is registered or named."""
+    """With nothing compiled in, the registry is empty, so the ungated previewOn
+    and dispatcher loops run over nothing, and the gated addExtra lines are
+    stripped — the check that nothing was left dangling is that no stub is
+    registered, named or given a row."""
     main_code, _ = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0").generate()
     assert "modules.push(" not in main_code
+    assert "ppanel.addExtra(" not in main_code
     for stub in ("KazBarsConsole", "KazBarsCastTimer", "KazBarsStopwatch",
                  "KazBarsInspect"):
         assert stub not in main_code
@@ -485,14 +487,22 @@ def test_preview_keys_are_distinct():
 def test_preview_panel_rows_and_dispatch_all_extras():
     main_code, _ = _all_extras_gen().generate()
 
-    # One row per registered module, each seeded from that module's live state
-    # and labelled by it — the panel never caches a flag of its own, and the
-    # core never spells out a row.
-    assert ("ppanel.addExtra(m.previewLabel(), m.previewKey(), m.isActive());"
-            in main_code)
+    # One row per compiled-in extra, each seeded from that module's live state
+    # and labelled by it — added explicitly in the panel's Tools display order
+    # (Cast Timer, Inspect Panel, Buff Console, Stopwatch), decoupled from the
+    # registration order.
+    extras = [
+        "ppanel.addExtra(castTimer.previewLabel(), castTimer.previewKey(), castTimer.isActive());",
+        "ppanel.addExtra(inspect.previewLabel(), inspect.previewKey(), inspect.isActive());",
+        "ppanel.addExtra(console.previewLabel(), console.previewKey(), console.isActive());",
+        "ppanel.addExtra(stopwatch.previewLabel(), stopwatch.previewKey(), stopwatch.isActive());",
+    ]
+    idxs = [main_code.index(line) for line in extras]
+    assert idxs == sorted(idxs)
 
-    # Registration order IS row order, and rows are added before the panel is
-    # built (which is what puts it topmost).
+    # Registration order is z-order (console topmost), untouched by the row
+    # order above; rows are still added before the panel is built (which is
+    # what puts it topmost).
     assert (main_code.index("modules.push(stopwatch);")
             < main_code.index("modules.push(inspect);")
             < main_code.index("modules.push(castTimer);")
