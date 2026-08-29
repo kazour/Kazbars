@@ -24,7 +24,10 @@ def _load_db() -> dict:
 
 
 def _load_default_profile() -> dict:
-    return json.loads((KAZBARS_ASSETS / "Default.json").read_text(encoding="utf-8"))
+    """The grids section of the document-format (schema 2) stock profile."""
+    doc = json.loads((KAZBARS_ASSETS / "Default.json").read_text(encoding="utf-8"))
+    assert doc["schema"] == 2 and doc["id"]
+    return doc["modules"]["grids"]
 
 
 def _collect_db_keys(db) -> tuple[set[int], set[str]]:
@@ -61,15 +64,6 @@ def _collect_refs(profile):
 
 def test_default_profile_buff_refs_resolve() -> None:
     _assert_refs_resolve(_load_default_profile())
-
-
-def test_template_profile_buff_refs_resolve() -> None:
-    # The revamp-format template (assets/kazbars/templates/Default.json)
-    # carries the same grids inside its `modules` map.
-    doc = json.loads(
-        (KAZBARS_ASSETS / "templates" / "Default.json").read_text(encoding="utf-8"))
-    assert doc["schema"] == 2 and doc["id"]
-    _assert_refs_resolve(doc["modules"]["grids"])
 
 
 def _assert_refs_resolve(profile) -> None:

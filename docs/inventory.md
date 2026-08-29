@@ -62,7 +62,7 @@
 | `src/kazbars/paths.py` | 46 |
 | `src/kazbars/prefs.py` | 223 |
 | `src/kazbars/profile_document.py` | 273 |
-| `src/kazbars/profile_io.py` | 329 |
+| `src/kazbars/profile_io.py` | 325 |
 | `src/kazbars/profile_library.py` | 300 |
 | `src/kazbars/profile_share.py` | 140 |
 | `src/kazbars/profile_store.py` | 130 |
@@ -96,7 +96,7 @@
 | `tests/test_damageinfo_colors_panel.py` | 293 |
 | `tests/test_damageinfo_generator.py` | 183 |
 | `tests/test_damageinfo_settings.py` | 336 |
-| `tests/test_data_integrity.py` | 127 |
+| `tests/test_data_integrity.py` | 121 |
 | `tests/test_deeps_meter.py` | 469 |
 | `tests/test_deeps_overlay.py` | 374 |
 | `tests/test_deeps_parsers.py` | 544 |
@@ -124,7 +124,7 @@
 | `tests/test_prefs_migration.py` | 99 |
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |
 | `tests/test_profile_document.py` | 249 |
-| `tests/test_profile_io.py` | 272 |
+| `tests/test_profile_io.py` | 270 |
 | `tests/test_profile_library.py` | 273 |
 | `tests/test_profile_share.py` | 198 |
 | `tests/test_profile_store.py` | 138 |
