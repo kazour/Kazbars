@@ -16,7 +16,12 @@ Run: `pytest tests/test_grids_generator.py` (from repo root).
 import re
 
 from kazbars.buff_database import BuffDatabase
-from kazbars.grids_generator import CodeGenerator, escape_as2_string
+from kazbars.grids_generator import (
+    DATA_CHUNK_BUDGET,
+    CodeGenerator,
+    _pack_units,
+    escape_as2_string,
+)
 from kazbars.paths import KAZBARS_ASSETS
 
 
@@ -662,3 +667,85 @@ def test_unknown_refs_are_skipped_at_emit_not_crashed_on():
     main_code, data_code = CodeGenerator([grid], db, "0.0.0").generate()
     assert "99999901" not in main_code + data_code
     assert "Ghost Buff" not in main_code + data_code
+
+
+# ============================================================================
+# DATA CLASS CHUNKING
+# ============================================================================
+# MTASC caps every class at 32 KB of bytecode, so the grid configs and buff
+# lookups are packed into KazBarsData1..N under DATA_CHUNK_BUDGET chars each.
+# test_build_compile pins the cap itself; these pin the packing and the shape.
+
+
+def _big_setup(n_ids=1200, n_grids=12):
+    """A synthetic catalog of `n_ids` seven-digit ids spread over `n_grids`
+    dynamic grids, plus one static grid on a stacking entry — several chunks'
+    worth of data."""
+    db = BuffDatabase()
+    db.buffs = [
+        {"name": f"Buff {n}", "ids": [5_000_000 + n], "category": "T", "type": "buff"}
+        for n in range(n_ids)
+    ]
+    db.buffs.append({"name": "Stacks 1-3", "ids": [6_000_001, 6_000_002, 6_000_003],
+                     "category": "T", "type": "debuff", "stacking": True})
+    db._rebuild_indexes()
+    per = n_ids // n_grids
+    grids = [
+        dict(_minimal_grid(), id=f"Grid {k}",
+             whitelist=[5_000_000 + n for n in range(k * per, (k + 1) * per)])
+        for k in range(n_grids)
+    ]
+    grids.append(dict(_minimal_grid(), id="Static", slotMode="static",
+                      slotAssignments={"0": [6_000_001]}))
+    return grids, db
+
+
+def test_pack_units_keeps_joined_chunks_within_budget_and_oversize_alone():
+    units = ["a" * 10, "b" * 10, "c" * 5, "d" * 30, "e"]
+    chunks = _pack_units(units, 24)
+    assert chunks == [["a" * 10, "b" * 10], ["c" * 5], ["d" * 30], ["e"]]
+    assert all(len("\n".join(c)) <= 24 for c in chunks if c != ["d" * 30])
+    assert _pack_units([], 24) == []
+
+
+def test_generate_files_splits_a_large_profile_into_consecutive_data_classes():
+    grids, db = _big_setup()
+    gen = CodeGenerator(grids, db, "0.0.0")
+    files = gen.generate_files()
+    n = len(files) - 2
+    assert n >= 3
+    assert [name for name, _ in files] == (
+        ["KazBars.as", "KazBarsData.as"] + [f"KazBarsData{k}.as" for k in range(1, n + 1)])
+    # init() calls every chunk once, in order
+    assert re.findall(r"KazBarsData(\d+)\.fill\(d\);", files[1][1]) == [
+        str(k) for k in range(1, n + 1)]
+    # each chunk file declares the class its name binds to, within budget
+    gen._used_keys = set()
+    longest = max(len(u) for u in gen._data_units())
+    for name, src in files[2:]:
+        assert f"class {name[:-3]} {{" in src
+        body = src.split("        var i:Number;\n", 1)[1].rsplit("\n    }\n}", 1)[0]
+        assert len(body) <= max(DATA_CHUNK_BUDGET, longest)
+
+
+def test_chunked_data_keeps_grid_order_and_lookups_after_the_grids():
+    grids, db = _big_setup()
+    _, data = CodeGenerator(grids, db, "0.0.0").generate()
+    assert re.findall(r"d\.CFG\.grids\.push\((\w+)\);", data) == (
+        [f"Grid_{k}_{k}" for k in range(12)] + ["Static_12"])
+    assert "Static_12.slots[0] = [6000001, 6000002, 6000003];" in data
+    last_grid = data.rindex("d.CFG.grids.push(")
+    assert data.index("d.STACK_LEVEL[6000001] = 1;") > last_grid
+    assert data.index("d.STACK_LEVEL[6000003] = 3;") > last_grid
+    assert data.count("d.ISDEB[") == 1200 + 3
+    assert data.count("class KazBarsData") == data.count(".fill(d);") + 1
+
+
+def test_generate_files_is_three_files_for_a_small_profile_and_two_for_none():
+    small = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0").generate_files()
+    assert [name for name, _ in small] == ["KazBars.as", "KazBarsData.as", "KazBarsData1.as"]
+    assert "KazBarsData1.fill(d);" in small[1][1]
+    empty = CodeGenerator([], _load_db(), "0.0.0").generate_files()
+    assert [name for name, _ in empty] == ["KazBars.as", "KazBarsData.as"]
+    assert ".fill(" not in empty[1][1]
+    assert "return d;" in empty[1][1]

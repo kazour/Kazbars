@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **Buff-database updates now need KazBars 3.0.0.** The shipped starter profile moved to the document format, so the content feed that carries it is stamped for 3.0.0 and up; a 2.2.2 install sees "New buffs are available — update KazBars to get them" and keeps the catalog it has. New from template reads one starter — the shipped one, or the content feed's newer copy when there is one.
 
+### Fixed
+
+- **Big layouts build again.** Build & Install used to stop with "MTASC compilation failed: Class KazBarsData excess 32K bytecode limit" once a layout tracked roughly 600 or more distinct buffs across its grids — the stock starter profile plus one more grid of about 50 fresh buffs was enough. All of a layout's buff data sat in one compiled class, and the game's compiler caps each class at 32 KB; it now splits across as many as the layout needs, so any layout within the 64-slot cap builds no matter how large the buff database grows. Nothing changes in-game.
+
 ## [3.0.0] — 2026-08-29
 
 ### Added

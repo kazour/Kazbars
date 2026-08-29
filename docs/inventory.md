@@ -51,7 +51,7 @@
 | `src/kazbars/grid_dialogs.py` | 896 |
 | `src/kazbars/grid_editor_panel.py` | 683 |
 | `src/kazbars/grid_model.py` | 296 |
-| `src/kazbars/grids_generator.py` | 591 |
+| `src/kazbars/grids_generator.py` | 648 |
 | `src/kazbars/grids_panel.py` | 708 |
 | `src/kazbars/inspect.py` | 64 |
 | `src/kazbars/inspect_panel.py` | 315 |
@@ -83,11 +83,11 @@
 | `src/kazbars/userdata.py` | 110 |
 | `src/kazbars/window_position.py` | 116 |
 | `tests/test_app_contract.py` | 104 |
-| `tests/test_as2_class_names.py` | 65 |
+| `tests/test_as2_class_names.py` | 80 |
 | `tests/test_boss_timer.py` | 151 |
 | `tests/test_buff_db_layers.py` | 266 |
 | `tests/test_buff_xml.py` | 324 |
-| `tests/test_build_compile.py` | 183 |
+| `tests/test_build_compile.py` | 216 |
 | `tests/test_build_executor.py` | 660 |
 | `tests/test_cast_timer.py` | 122 |
 | `tests/test_cluster_isolation.py` | 188 |
@@ -110,7 +110,7 @@
 | `tests/test_game_folder.py` | 119 |
 | `tests/test_game_persistence.py` | 748 |
 | `tests/test_grid_model.py` | 212 |
-| `tests/test_grids_generator.py` | 664 |
+| `tests/test_grids_generator.py` | 751 |
 | `tests/test_hud_overlay.py` | 141 |
 | `tests/test_imports.py` | 33 |
 | `tests/test_inspect.py` | 108 |

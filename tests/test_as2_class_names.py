@@ -11,6 +11,7 @@ stubs behaviourally; the names checked here are the ones nothing else pins.
 See docs/architecture.md -> Build pipeline.
 """
 
+import re
 from pathlib import Path
 
 from kazbars.buff_database import BuffDatabase
@@ -37,6 +38,20 @@ def test_generator_emits_the_bootstrapped_class_names():
         'new KazBars(this) and will not bind to anything else'
     )
     assert 'class KazBarsData {' in data
+
+
+def test_every_generated_data_class_keeps_the_prefix():
+    # The grid data is packed across KazBarsData1..N. base.swf never
+    # bootstraps those, but the whole generated set stays under the prefix
+    # so nothing shipped or generated can shadow a game-side class.
+    grid = {
+        'id': 'G', 'type': 'player', 'rows': 1, 'cols': 1, 'iconSize': 32,
+        'gap': 0, 'fx': 0.0, 'fy': 0.0, 'slotMode': 'dynamic', 'showTimers': False,
+        'fillDirection': 'LR', 'sortOrder': 'longest', 'layout': 'buffFirst',
+    }
+    _, data = CodeGenerator([grid], _db(), '0.0.0').generate()
+    declared = re.findall(r'^class (\w+) \{', data, re.M)
+    assert declared == ['KazBarsData', 'KazBarsData1']
 
 
 def test_every_stub_declares_a_kazbars_prefixed_class():
