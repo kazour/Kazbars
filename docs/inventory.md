@@ -20,8 +20,8 @@
 | `src/kazbars/buff_db_layers.py` | 267 |
 | `src/kazbars/buff_display_editor.py` | 712 |
 | `src/kazbars/buff_xml.py` | 377 |
-| `src/kazbars/build_action.py` | 345 |
-| `src/kazbars/build_executor.py` | 387 |
+| `src/kazbars/build_action.py` | 356 |
+| `src/kazbars/build_executor.py` | 390 |
 | `src/kazbars/build_loading.py` | 521 |
 | `src/kazbars/build_utils.py` | 86 |
 | `src/kazbars/cast_timer.py` | 93 |
@@ -45,8 +45,8 @@
 | `src/kazbars/first_launch.py` | 351 |
 | `src/kazbars/focus_watcher.py` | 85 |
 | `src/kazbars/foreground.py` | 111 |
-| `src/kazbars/game_folder.py` | 414 |
-| `src/kazbars/game_persistence.py` | 603 |
+| `src/kazbars/game_folder.py` | 424 |
+| `src/kazbars/game_persistence.py` | 608 |
 | `src/kazbars/game_resolution.py` | 104 |
 | `src/kazbars/grid_dialogs.py` | 896 |
 | `src/kazbars/grid_editor_panel.py` | 683 |
@@ -88,7 +88,7 @@
 | `tests/test_buff_db_layers.py` | 266 |
 | `tests/test_buff_xml.py` | 324 |
 | `tests/test_build_compile.py` | 183 |
-| `tests/test_build_executor.py` | 537 |
+| `tests/test_build_executor.py` | 660 |
 | `tests/test_cast_timer.py` | 122 |
 | `tests/test_cluster_isolation.py` | 188 |
 | `tests/test_combat_monitor.py` | 150 |
@@ -107,8 +107,8 @@
 | `tests/test_docs_in_sync.py` | 301 |
 | `tests/test_focus_watcher.py` | 96 |
 | `tests/test_foreground.py` | 95 |
-| `tests/test_game_folder.py` | 99 |
-| `tests/test_game_persistence.py` | 723 |
+| `tests/test_game_folder.py` | 119 |
+| `tests/test_game_persistence.py` | 748 |
 | `tests/test_grid_model.py` | 183 |
 | `tests/test_grids_generator.py` | 664 |
 | `tests/test_hud_overlay.py` | 141 |
@@ -133,7 +133,7 @@
 | `tests/test_settings_core.py` | 373 |
 | `tests/test_settings_manager.py` | 33 |
 | `tests/test_stopwatch.py` | 101 |
-| `tests/test_subprocess_flags.py` | 50 |
+| `tests/test_subprocess_flags.py` | 88 |
 | `tests/test_timer_sizing.py` | 41 |
 | `tests/test_toast_model.py` | 213 |
 | `tests/test_toggle_button_state.py` | 41 |

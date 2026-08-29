@@ -107,6 +107,17 @@ def save_game_path(app):
     app.grids_panel.notify_game_path_changed()
 
 
+def _engine_blocks(app, verb):
+    """True (after toasting why) when an engine process is running and its
+    exit-save would undo what `verb` is about to do to the game's own XMLs."""
+    from .build_executor import get_running_engine_process
+    running = get_running_engine_process()
+    if running:
+        app_toast(app, f"Close {running} first, then {verb}.", 'warning', 8)
+        return True
+    return False
+
+
 def uninstall_game(app):
     """Remove KazBars files from the configured game folder."""
     if not app.game_path:
@@ -114,6 +125,8 @@ def uninstall_game(app):
             "No game folder set. Configure one in the bottom bar first.",
             title="No Game Folder"
         )
+        return
+    if _engine_blocks(app, "uninstall"):
         return
     if not confirm(
         "Remove KazBars files from your game folder?\n\n"
@@ -149,10 +162,7 @@ def repair_game_install(app):
             title="No Game Folder")
         return
 
-    from .build_executor import get_running_engine_process
-    running = get_running_engine_process()
-    if running:
-        app_toast(app, f"Close {running} first, then repair.", 'warning', 8)
+    if _engine_blocks(app, "repair"):
         return
 
     declarations = gp.discover_aoc_archive_declarations(app.game_path)

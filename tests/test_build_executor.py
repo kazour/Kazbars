@@ -15,13 +15,14 @@ Run: `pytest tests/test_build_executor.py` (from repo root).
 
 import types
 
-from kazbars import build_executor
+from kazbars import build_action, build_executor
 from kazbars.build_executor import (
     AUTO_LOAD_MARKER,
     DAMAGEINFO_BACKUP,
     DAMAGEINFO_FILE,
     LEGACY_FLASH_FILES,
     LEGACY_SCRIPTS,
+    clean_auto_login,
     cleanup_legacy_files,
     get_running_engine_process,
     get_running_game_process,
@@ -36,6 +37,7 @@ from kazbars.game_persistence import (
     LEGACY_AOC_DIRS,
     MARKER_BEGIN,
     PATCHER_EXE,
+    is_merged,
 )
 
 # Minimal stand-ins for the game's XMLs — the splice only needs a </Root> to
@@ -242,6 +244,44 @@ class TestCleanupLegacy:
         assert (flash / "KazBars.swf").exists()
 
 
+class TestCleanAutoLogin:
+    def test_preserves_lf_line_endings(self, tmp_path):
+        # read_text()/write_text() translate newlines on Windows (LF -> CRLF
+        # on the way out); this file must round-trip byte-exact like every
+        # other game text file this module edits. Two surviving lines matter:
+        # a single line has no embedded "\n" left to mistranslate, so it can't
+        # tell the fix apart from the bug it guards.
+        game = tmp_path / "game"
+        auto_login = _scripts(game) / "auto_login"
+        auto_login.parent.mkdir(parents=True, exist_ok=True)
+        auto_login.write_bytes(
+            f"/say hi\nline2\n\n{AUTO_LOAD_MARKER}\n/loadclip KazBars.swf\n".encode())
+
+        assert clean_auto_login(str(game)) is True
+
+        raw = auto_login.read_bytes()
+        assert raw == b"/say hi\nline2"
+        assert b'\r' not in raw
+
+    def test_deletes_the_file_when_nothing_is_left(self, tmp_path):
+        game = tmp_path / "game"
+        auto_login = _scripts(game) / "auto_login"
+        auto_login.parent.mkdir(parents=True, exist_ok=True)
+        auto_login.write_bytes(f"{AUTO_LOAD_MARKER}\n/loadclip KazBars.swf\n".encode())
+
+        assert clean_auto_login(str(game)) is True
+        assert not auto_login.exists()
+
+    def test_no_op_when_no_marker_present(self, tmp_path):
+        game = tmp_path / "game"
+        auto_login = _scripts(game) / "auto_login"
+        auto_login.parent.mkdir(parents=True, exist_ok=True)
+        auto_login.write_bytes(b"/say hi\n")
+
+        assert clean_auto_login(str(game)) is False
+        assert auto_login.read_bytes() == b"/say hi\n"
+
+
 # =========================================================================== #
 # uninstall_from_client                                                       #
 # =========================================================================== #
@@ -307,6 +347,33 @@ class TestUninstall:
         ok, msg = uninstall_from_client(str(tmp_path))
         assert ok is True
         assert "isn't installed" in msg
+
+    def test_locked_damageinfo_leaves_declarations_and_swf_untouched(
+            self, tmp_path, monkeypatch):
+        # DamageInfo restore runs first (the only lock-prone step, mirroring
+        # install's rule): if it raises, nothing else must have happened yet.
+        game = _make_game(tmp_path)
+        di = tmp_path / "staging" / "DamageInfo.swf"
+        di.parent.mkdir(parents=True, exist_ok=True)
+        di.write_bytes(b"MODDED")
+        pristine = tmp_path / "assets" / "damageinfo" / "DamageInfo.swf"
+        pristine.parent.mkdir(parents=True, exist_ok=True)
+        pristine.write_bytes(b"STOCK")
+        (_flash(game)).mkdir(parents=True, exist_ok=True)
+        (_flash(game) / DAMAGEINFO_FILE).write_bytes(b"STOCK")
+        install_to_client(_staging_swf(tmp_path), str(game),
+                          damageinfo_swf=di, damageinfo_pristine=pristine)
+        assert is_merged(str(game)) is True
+
+        monkeypatch.setattr(
+            build_executor, "_atomic_install",
+            lambda src, dst: (_ for _ in ()).throw(OSError("locked")))
+
+        ok, msg = uninstall_from_client(str(game))
+
+        assert ok is False
+        assert (_flash(game) / "KazBars.swf").exists()
+        assert is_merged(str(game)) is True
 
 
 # =========================================================================== #
@@ -535,3 +602,59 @@ class TestRunningGameProcess:
         assert get_running_engine_process() == PATCHER_EXE
         assert seen == [*GAME_EXES, PATCHER_EXE]
         assert get_running_game_process() is None
+
+
+# =========================================================================== #
+# build_action gate                                                          #
+# (build_action.py has no test file of its own — this is the sole coverage   #
+# for _declarations_gate, which shares get_running_engine_process with the   #
+# tests above)                                                               #
+# =========================================================================== #
+
+def _running(name):
+    return lambda cmd, **kw: types.SimpleNamespace(
+        stdout=f"{cmd[2].split('eq ')[1]} 1 Console"
+        if cmd[2].split('eq ')[1] == name else "")
+
+
+class TestDeclarationsGate:
+    def test_blocks_when_not_merged_and_engine_running(self, tmp_path, monkeypatch):
+        # has_built_before=True on purpose: the old bug gated on that flag
+        # alone, so a client whose declarations never got spliced (or got
+        # wiped by a patch) sailed through after the first-ever build. The
+        # gate must still block here regardless of that flag's value.
+        game = _make_game(tmp_path)  # no markers spliced — not merged
+        app = types.SimpleNamespace(
+            game_path=str(game),
+            settings=types.SimpleNamespace(get=lambda k, d=None: True))
+        monkeypatch.setattr(build_executor.subprocess, "run", _running(GAME_EXES[0]))
+        dialogs = []
+        monkeypatch.setattr(
+            build_action, "show_close_game_required_dialog",
+            lambda a, process_name=None: dialogs.append(process_name))
+
+        assert build_action._declarations_gate(app) is False
+        assert dialogs == [GAME_EXES[0]]
+
+    def test_proceeds_when_merged_even_with_engine_running(self, tmp_path, monkeypatch):
+        game = _make_game(tmp_path)
+        install_to_client(_staging_swf(tmp_path), str(game))
+        assert is_merged(str(game)) is True
+        app = types.SimpleNamespace(game_path=str(game))
+        monkeypatch.setattr(build_executor.subprocess, "run", _running(GAME_EXES[0]))
+        dialogs = []
+        monkeypatch.setattr(
+            build_action, "show_close_game_required_dialog",
+            lambda a, process_name=None: dialogs.append(process_name))
+
+        assert build_action._declarations_gate(app) is True
+        assert dialogs == []
+
+    def test_proceeds_when_not_merged_but_nothing_running(self, tmp_path, monkeypatch):
+        game = _make_game(tmp_path)
+        app = types.SimpleNamespace(game_path=str(game))
+        monkeypatch.setattr(
+            build_executor.subprocess, "run",
+            lambda cmd, **kw: types.SimpleNamespace(stdout=""))
+
+        assert build_action._declarations_gate(app) is True

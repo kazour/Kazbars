@@ -16,6 +16,8 @@ from .game_persistence import (
     GAME_EXES,
     LEGACY_AOC_DIRS,
     PATCHER_EXE,
+    _read,
+    _write,
     discover_aoc_archive_declarations,
     ensure_flag,
     remove_flag,
@@ -267,14 +269,14 @@ def clean_auto_login(game_path):
     if not auto_login.exists():
         return False
     try:
-        content = auto_login.read_text(encoding='utf-8')
+        content = _read(auto_login)
         cleaned = strip_marker_block(content, AUTO_LOAD_MARKER)
         for legacy in LEGACY_AUTO_LOAD_MARKERS:
             cleaned = strip_marker_block(cleaned, legacy)
         if cleaned == content:
             return False
         if cleaned.strip():
-            auto_login.write_text(cleaned, encoding='utf-8')
+            _write(auto_login, cleaned)
         else:
             auto_login.unlink()
         return True
@@ -295,14 +297,10 @@ def uninstall_from_client(game_path, damageinfo_pristine=None):
     removed = []
     try:
         flash = Path(game_path) / "Data" / "Gui" / "Default" / "Flash"
-        swf = flash / "KazBars.swf"
-        if swf.exists():
-            swf.unlink()
-            removed.append("KazBars.swf")
 
-        # Damage Numbers: restore the stock DamageInfo.swf from our one-time backup; if
-        # that backup is gone but a non-stock (modded) file is still present, fall back to
-        # the bundled pristine so uninstall never leaves the game file modded.
+        # Damage Numbers first — the only lock-prone step here, same rule as
+        # install (commit_damageinfo, above): if DamageInfo.swf is locked,
+        # nothing else about the uninstall has happened yet to undo.
         di_backup = flash / DAMAGEINFO_BACKUP
         di_target = flash / DAMAGEINFO_FILE
         if di_backup.exists():
@@ -323,6 +321,11 @@ def uninstall_from_client(game_path, damageinfo_pristine=None):
         removed.extend(strip_declarations(game_path))
         if remove_flag(game_path):
             removed.append(FLAG_NAME)
+
+        swf = flash / "KazBars.swf"
+        if swf.exists():
+            swf.unlink()
+            removed.append("KazBars.swf")
 
         aoc_dir = Path(game_path) / "Data" / "Gui" / "Aoc" / "KazBars"
         if aoc_dir.exists():

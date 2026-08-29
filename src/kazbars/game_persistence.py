@@ -292,18 +292,23 @@ def _strip_file(path):
     """Remove our block from one XML, or restore the file wholesale from its
     backup when the file itself is unusable.
 
-    Unusable means the surgical path cannot run at all: unreadable or gone,
-    damaged markers, or no longer XML-shaped (no `</Root>` to splice against —
-    which is also what a later re-splice would choke on, so the restore is the
-    only way out). A file that is simply unmarked is NOT unusable: that is a
+    Unusable means the surgical path cannot run at all: unreadable, damaged
+    markers, or no longer XML-shaped (no `</Root>` to splice against — which
+    is also what a later re-splice would choke on, so the restore is the only
+    way out). A file that is simply unmarked is NOT unusable: that is a
     never-installed folder, or a freshly patched one whose new stock text must
-    not be reverted to our older backup.
+    not be reverted to our older backup. A file the user deleted outright is
+    also not unusable — restoring it from the backup would resurrect a file
+    they chose to remove, so that case exits before any backup is touched.
 
     The backup is dropped only once a strip or a restore actually succeeded, so
     a pass that achieved nothing leaves the user's escape hatch in place.
     Returns True if the file changed.
     """
     backup = path.with_name(path.name + BACKUP_SUFFIX)
+    if not path.is_file():
+        backup.unlink(missing_ok=True)
+        return False
     text = _read_or_none(path)
     changed = False
     unusable = text is None
