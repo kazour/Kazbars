@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [3.0.1] — 2026-08-30
+
 ### Changed
 
 - **Buff-database updates now need KazBars 3.0.0.** The shipped starter profile moved to the document format, so the content feed that carries it is stamped for 3.0.0 and up; a 2.2.2 install sees "New buffs are available — update KazBars to get them" and keeps the catalog it has. New from template reads one starter — the shipped one, or the content feed's newer copy when there is one.
