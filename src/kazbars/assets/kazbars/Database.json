@@ -514,7 +514,13 @@
     {
       "name": "Elemental Wrack",
       "ids": [
-        3963061
+        3963061,
+        4244589,
+        4244597,
+        4244598,
+        4244599,
+        4244600,
+        4244601
       ],
       "category": "#General",
       "type": "debuff"
@@ -606,7 +612,14 @@
     {
       "name": "Physical Wrack",
       "ids": [
-        3963058
+        3963058,
+        4244662,
+        4244665,
+        4244667,
+        4244669,
+        4244671,
+        4244672,
+        4244673
       ],
       "category": "#General",
       "type": "debuff"
@@ -700,7 +713,13 @@
       "ids": [
         3963068,
         4882958,
-        4887864
+        4887864,
+        4244735,
+        4244736,
+        4244737,
+        4244738,
+        4244739,
+        4244740
       ],
       "category": "#General",
       "type": "debuff"
@@ -3469,7 +3488,7 @@
         4046211,
         4046215
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff",
       "stacking": true,
       "stackEnd": 5
@@ -3480,7 +3499,7 @@
         4866663,
         4866666
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3490,7 +3509,7 @@
         4502998,
         4788836
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3499,7 +3518,7 @@
         4283587,
         4515792
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3507,7 +3526,7 @@
       "ids": [
         4515827
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3515,7 +3534,7 @@
       "ids": [
         4268087
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3523,7 +3542,7 @@
       "ids": [
         4549364
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3531,7 +3550,7 @@
       "ids": [
         4226929
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3539,7 +3558,7 @@
       "ids": [
         4507663
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3547,7 +3566,7 @@
       "ids": [
         4826763
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3555,7 +3574,7 @@
       "ids": [
         4051322
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3563,7 +3582,7 @@
       "ids": [
         4932986
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3571,7 +3590,7 @@
       "ids": [
         4990471
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3581,7 +3600,7 @@
         4804225,
         4804226
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3589,7 +3608,7 @@
       "ids": [
         4991521
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3597,7 +3616,7 @@
       "ids": [
         4732527
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3626,7 +3645,7 @@
       "ids": [
         4838217
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3634,7 +3653,7 @@
       "ids": [
         4935118
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3645,7 +3664,7 @@
         4935088,
         4935089
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff",
       "stacking": true,
       "stackEnd": 4
@@ -3659,7 +3678,7 @@
         4515819,
         4515820
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff",
       "stacking": true,
       "stackEnd": 5
@@ -3669,7 +3688,7 @@
       "ids": [
         4049150
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3677,7 +3696,7 @@
       "ids": [
         4490631
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3693,7 +3712,7 @@
       "ids": [
         4732523
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3701,7 +3720,7 @@
       "ids": [
         4732526
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3709,7 +3728,7 @@
       "ids": [
         4752009
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3717,7 +3736,7 @@
       "ids": [
         4548156
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3725,7 +3744,7 @@
       "ids": [
         4549368
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3733,7 +3752,7 @@
       "ids": [
         4707552
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3741,7 +3760,7 @@
       "ids": [
         4752047
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3750,7 +3769,7 @@
         4239687,
         4502967
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3758,7 +3777,7 @@
       "ids": [
         4239695
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3770,7 +3789,7 @@
         4043133,
         4043134
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff",
       "stacking": true,
       "stackEnd": 5
@@ -3784,7 +3803,7 @@
         4549507,
         4549508
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff",
       "stacking": true,
       "stackEnd": 5
@@ -3992,6 +4011,105 @@
       ],
       "category": "#Crowd Control",
       "type": "misc"
+    },
+    {
+      "name": "Physical Torment (Generic)",
+      "ids": [
+        3963274,
+        3963275,
+        3963276,
+        3963277,
+        3963278,
+        3963279,
+        3963280,
+        3963281,
+        3963283,
+        3963284,
+        3963285,
+        3963286,
+        3963287,
+        3963289,
+        3963290,
+        3963291,
+        3963292,
+        3963293,
+        3963294,
+        3963298,
+        4244619,
+        4244626,
+        4244627,
+        4244628,
+        4244629,
+        4244630
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Elemental Torment (Generic)",
+      "ids": [
+        3963165,
+        3963166,
+        3963167,
+        3963168,
+        3963169,
+        3963178,
+        3963179,
+        3963180,
+        3963181,
+        3963182,
+        3963183,
+        3963184,
+        3963185,
+        3963186,
+        3963187,
+        3963188,
+        3963189,
+        3963190,
+        3963191,
+        3963192,
+        4244605,
+        4244607,
+        4244608,
+        4244609,
+        4244610,
+        4244611
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Spiritual Torment (Generic)",
+      "ids": [
+        3963247,
+        3963248,
+        3963249,
+        3963250,
+        3963251,
+        3963252,
+        3963253,
+        3963254,
+        3963255,
+        3963256,
+        3963257,
+        3963258,
+        3963259,
+        3963260,
+        3963261,
+        3963262,
+        3963263,
+        3963264,
+        3963267,
+        3963273,
+        4244729,
+        4244730,
+        4244731,
+        4244732,
+        4244733,
+        4244734
+      ],
+      "category": "#General",
+      "type": "debuff"
     }
   ]
 }

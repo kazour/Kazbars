@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "content_version": 25,
+  "content_version": 27,
   "min_app_version": "2.2.2",
-  "notes": "A necromancer feat snare added, and a stun entry renamed to its real ability",
+  "notes": "Wrack alias IDs for the later generic re-issue; Physical, Elemental and Spiritual Torment (Generic) entries; new #Dungeons category for the named dungeon-boss debuffs",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
-      "sha256": "1403f0e76d378de594569d2928bdd56995375f1563704a21e6c2ce54a26ed0cf"
+      "sha256": "1d683ba48a52761056a84bc6f271931c5a01cf837f2d3fdc92e6f10c79870525"
     },
     "Default.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.json",
