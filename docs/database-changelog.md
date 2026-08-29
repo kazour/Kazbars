@@ -34,10 +34,12 @@ torment entries are stacking rank lists (`Physical Torment 1-5` etc.), where eve
 as a further stack level, so their same-named re-issues go into three new non-stacking `(Generic)`
 entries instead — one per element, holding every same-named ID outside the tracked rank set, so a copy
 the game applies is caught whichever set it comes from. Names, categories, types, and each existing
-entry's primary ID are unchanged, so no grid or profile whitelist is affected (`Default.json` untouched).
+entry's primary ID are unchanged, so no existing profile whitelist is affected. The stock `Default.json` and the `templates/Default.json` starter were resynced the same day (see the whitelist bullets below).
 - **Added:** `Physical Wrack` (#General debuff) alias spell IDs `4244662`, `4244665`, `4244667`, `4244669`, `4244671`, `4244672`, `4244673` (entry IDs now `3963058`, `4244662`, `4244665`, `4244667`, `4244669`, `4244671`, `4244672`, `4244673`).
 - **Added:** `Elemental Wrack` (#General debuff) alias spell IDs `4244589`, `4244597`, `4244598`, `4244599`, `4244600`, `4244601` (entry IDs now `3963061`, `4244589`, `4244597`, `4244598`, `4244599`, `4244600`, `4244601`).
 - **Added:** `Spiritual Wrack` (#General debuff) alias spell IDs `4244735`, `4244736`, `4244737`, `4244738`, `4244739`, `4244740` (entry IDs now `3963068`, `4882958`, `4887864`, `4244735`, `4244736`, `4244737`, `4244738`, `4244739`, `4244740`).
+- **Whitelists:** `templates/Default.json` (the New-from-template starter) — My Buffs 143 → 148 ids (adds the three Torment (Generic) primaries `3963165`, `3963247`, `3963274`, `Tome of Epithur (Necro)` `222609`, `Cover of Dusk (Sin)` `4484855` and `Sodabeh's Wrack (Ardashir Fort)` `4838302`; drops `4752009`, now an alias of `Crushed Armor Wrack (Dai Gang)`), Target Buffs 118 → 138 ids (adds 22 class buffs and debuffs, `Hand of Mitra` `146402` through `Stall the Advance 1-3` `4239176`, including the three generic Ruins; drops `Resistant to Bewilder` `1126127` and `Resistant to Warped Dread` `3964324`).
+- **Whitelists:** stock `Default.json` — My Buffs and Target Buffs now carry the same lists as the starter template (148 / 138 ids); Raid Debuffs and Target Debuffs unchanged.
 - **Added:** `Physical Torment (Generic)` — #General debuff, non-stacking: `3963274`, `3963275`, `3963276`, `3963277`, `3963278`, `3963279`, `3963280`, `3963281`, `3963283`, `3963284`, `3963285`, `3963286`, `3963287`, `3963289`, `3963290`, `3963291`, `3963292`, `3963293`, `3963294`, `3963298`, `4244619`, `4244626`, `4244627`, `4244628`, `4244629`, `4244630`. Companion to `Physical Torment 1-5`, which keeps its five rank IDs.
 - **Added:** `Elemental Torment (Generic)` — #General debuff, non-stacking: `3963165`, `3963166`, `3963167`, `3963168`, `3963169`, `3963178`, `3963179`, `3963180`, `3963181`, `3963182`, `3963183`, `3963184`, `3963185`, `3963186`, `3963187`, `3963188`, `3963189`, `3963190`, `3963191`, `3963192`, `4244605`, `4244607`, `4244608`, `4244609`, `4244610`, `4244611`. Companion to `Elemental Torment 1-5`.
 - **Added:** `Spiritual Torment (Generic)` — #General debuff, non-stacking: `3963247`, `3963248`, `3963249`, `3963250`, `3963251`, `3963252`, `3963253`, `3963254`, `3963255`, `3963256`, `3963257`, `3963258`, `3963259`, `3963260`, `3963261`, `3963262`, `3963263`, `3963264`, `3963267`, `3963273`, `4244729`, `4244730`, `4244731`, `4244732`, `4244733`, `4244734`. Companion to `Spiritual Torment 1-5`.
@@ -75,7 +77,6 @@ types are unchanged, so no grid or profile whitelist is affected.
 - **Reclassified:** `Slaughterer's Torment (Tetharos)` — #General → #Dungeons (`4490631`).
 - **Reclassified:** `Advisor's Wrack (Argo-satha)` — #General → #Dungeons (`4732523`).
 - **Reclassified:** `Advisor's Torment (Argo-satha)` — #General → #Dungeons (`4732526`).
-- **Reclassified:** `Crushed Armor Wrack (Kamangir)` — #General → #Dungeons (`4752009`).
 - **Reclassified:** `Sonic Missile Elemental Wrack (I-Po)` — #General → #Dungeons (`4548156`).
 - **Reclassified:** `Ghost Fangs Torment (Bhangi Khan)` — #General → #Dungeons (`4549368`).
 - **Reclassified:** `Wrack Armor (Ironwright)` — #General → #Dungeons (`4707552`).

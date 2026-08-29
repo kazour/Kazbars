@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "content_version": 31,
+  "content_version": 32,
   "min_app_version": "2.2.2",
-  "notes": "Wrack alias IDs for the later generic re-issue; Physical, Elemental and Spiritual Torment (Generic) entries; new #Dungeons and #World Bosses categories, dungeon entries named by instance; Sodabeh's Wrack; Crushed Armor Wrack attributed to Dai Gang; Nature's Wrath tracks all stacks",
+  "notes": "Stock Default.json whitelists follow the starter template (My Buffs 148, Target Buffs 138); Crushed Armor Wrack attribution corrected in the log",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
@@ -10,7 +10,7 @@
     },
     "Default.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.json",
-      "sha256": "a913b34c39cdd07a7270d33736f97e4d09d2ffa33f8bc787008845892f5304a7"
+      "sha256": "d8b5de477c4eeefecfd677fc08f5bfb6ba5b92210c39c14e8f6be0c24b469c25"
     }
   }
 }
