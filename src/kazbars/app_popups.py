@@ -299,7 +299,6 @@ def show_welcome_popup(parent, grid_count, enabled_count,
     popup.focus_set()
 
 
-DISCORD_URL = "https://discord.gg/ubK5Guryfa"
 GITHUB_URL = "https://github.com/kazour/Kazbars"
 
 
@@ -307,7 +306,7 @@ def show_about_popup(parent, app_name, app_version):
     """About dialog — same frameless dark style as build popups, with an
     animated miniature buff-grid scene at the bottom.
     """
-    h = 364 if GITHUB_URL else 342
+    h = 342 if GITHUB_URL else 320
 
     popup, canvas = make_popup_shell(parent, h)
 
@@ -366,8 +365,6 @@ def show_about_popup(parent, app_name, app_version):
         canvas.tag_bind(item, '<Button-1>',
                         lambda e: webbrowser.open(url))
 
-    make_link("▸ Join our Discord", DISCORD_URL, y)
-    y += 22
     if GITHUB_URL:
         make_link("▸ GitHub", GITHUB_URL, y)
         y += 22
@@ -424,7 +421,7 @@ def show_about_popup(parent, app_name, app_version):
     y += 6
     canvas.create_line(40, y, WIDTH - 40, y, fill=sep_color)
     y += 14
-    canvas.create_text(WIDTH // 2, y, text="MIT License",
+    canvas.create_text(WIDTH // 2, y, text=f"v{app_version}  ·  MIT License",
                        font=FONT_SMALL, fill=THEME_COLORS['muted'])
 
     # Animated buff-grid scene — 2x10 mini row, traveling wave,
