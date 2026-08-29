@@ -24,6 +24,7 @@ import logging
 import re
 from pathlib import Path
 
+from .grid_model import apply_seed_sizes
 from .profile_document import (
     DocumentError,
     SectionRegistry,
@@ -137,16 +138,23 @@ class ProfileLibrary:
         doc = new_document(self.registry, name, authored_at)
         return doc if self.write(doc) else None
 
-    def create_from_template(self, name: str) -> dict | None:
+    def create_from_template(self, name: str, authored_at: tuple[int, int]) -> dict | None:
         """Instantiate the first template on the chain that passes the gate:
         fresh id, given name, the template's own authored_at (its coordinates
-        were authored at that resolution). None if no template validates."""
+        were authored at that resolution). None if no template validates.
+
+        Grid positions are fractions and land proportionally on any screen, but
+        sizes are px — so the grids get `authored_at`'s tier sizes stamped on
+        instantiation, which is the one moment no user edit can be lost."""
         template = self._load_template()
         if template is None:
             return None
         doc = copy.deepcopy(template)
         doc['id'] = mint_id()
         doc['name'] = str(name).strip() or SEED_NAME
+        grids = doc['modules'].get('grids', {}).get('grids')
+        if grids:
+            apply_seed_sizes(grids, authored_at[1])
         return doc if self.write(doc) else None
 
     def _load_template(self) -> dict | None:
@@ -242,7 +250,7 @@ class ProfileLibrary:
         Returns the seeded document, or None when the library was not empty."""
         if self.list_profiles():
             return None
-        doc = self.create_from_template(SEED_NAME)
+        doc = self.create_from_template(SEED_NAME, authored_at)
         if doc is None:
             doc = self.create_blank(SEED_NAME, authored_at)
         return doc

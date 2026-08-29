@@ -34,6 +34,20 @@ FRACTION_SPECS = {
     'fx': 100 / 1920,
     'fy': 400 / 1080,
 }
+# Seed sizes per game-resolution tier: (max_height, {key: px}); the last entry
+# is the open-ended top tier. Positions are fractions and need no rescale, but
+# sizes stay px (icon art has a native size), so a template authored at 1080p
+# would seed pin-sized icons on a 1440p or 4K screen. These are the shipped
+# starting points, stamped when a template is instantiated and when first
+# launch re-anchors the seed to the chosen resolution — never on a document a
+# user has already tuned. The steps are deliberate, not a linear scale of the
+# pixel count: 4K gets 1.33× the 1080p icon, not 2×.
+SEED_SIZE_TIERS = (
+    (1080, {'iconSize': 48, 'timerFontSize': 17, 'stackFontSize': 16}),
+    (1440, {'iconSize': 56, 'timerFontSize': 20, 'stackFontSize': 19}),
+    (None, {'iconSize': 64, 'timerFontSize': 23, 'stackFontSize': 21}),
+)
+
 # key → (default, valid_values)
 ENUM_SPECS = {
     'type': ('player', ('player', 'target')),
@@ -82,6 +96,23 @@ def create_default_grid(grid_type="player", rows=1, cols=10, mode="dynamic", gri
         'whitelist': [],
         'slotAssignments': {}
     }
+
+
+def seed_sizes_for_height(height):
+    """The shipped icon/timer/stack sizes for a game-resolution height."""
+    for limit, sizes in SEED_SIZE_TIERS:
+        if limit is None or height <= limit:
+            return dict(sizes)
+    return dict(SEED_SIZE_TIERS[-1][1])
+
+
+def apply_seed_sizes(grids, height):
+    """Stamp the height's tier sizes onto every grid, in place. For freshly
+    instantiated templates only — it overwrites whatever the file carried."""
+    sizes = seed_sizes_for_height(height)
+    for grid in grids:
+        grid.update(sizes)
+    return grids
 
 
 def default_grid_name(grid_type, existing_ids):
