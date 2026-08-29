@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "content_version": 32,
-  "min_app_version": "2.2.2",
-  "notes": "Stock Default.json whitelists follow the starter template (My Buffs 148, Target Buffs 138); Crushed Armor Wrack attribution corrected in the log",
+  "content_version": 33,
+  "min_app_version": "3.0.0",
+  "notes": "Default profile moves to the document format (schema 2); requires KazBars 3.0.0",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
@@ -10,7 +10,7 @@
     },
     "Default.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.json",
-      "sha256": "d8b5de477c4eeefecfd677fc08f5bfb6ba5b92210c39c14e8f6be0c24b469c25"
+      "sha256": "5913a7894b49d4d1a2d546ca769eafc5dd0941902559a4c4391eb2d80b268019"
     }
   }
 }

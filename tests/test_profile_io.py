@@ -2,8 +2,8 @@
 
 Since the revamp, profile_io orchestrates `profile_library` + `profile_store`
 (each with its own suite); what's testable headless here is the template
-chain order — OTA content first, then the interim new-format template, then
-the shipped stock file — and the missing-buff message shape. The Tk-driven
+chain order — OTA content first, then the shipped stock file — and the
+missing-buff message shape. The Tk-driven
 flows (apply_document, switch, rename/delete dialogs) are covered by the
 panel-construction smoke and manual QA.
 
@@ -28,7 +28,6 @@ def test_template_chain_order(monkeypatch, tmp_path):
     # shipped baseline, which meets itself, so the entry is still included.
     assert chain == (
         tmp_path / "userdata" / "content" / "Default.json",
-        Path("A:/assets/kazbars/templates/Default.json"),
         Path("A:/assets/kazbars/Default.json"),
     )
 
@@ -48,7 +47,6 @@ def test_template_chain_drops_a_stale_content_entry(monkeypatch, tmp_path):
     chain = profile_io.template_paths(app)
 
     assert chain == (
-        Path("A:/assets/kazbars/templates/Default.json"),
         Path("A:/assets/kazbars/Default.json"),
     )
 
