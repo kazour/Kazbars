@@ -22,7 +22,7 @@ Split: pure helpers (``parse_manifest``/``is_newer``/``app_supports``/
 ``verify_sha256``/``apply_content``/``rollback``/``summarize_changes``) carry the
 logic and are unit-tested with an injected downloader (no network in tests); a
 thin Tk dispatcher (``check_and_apply``/``revert``) does the threading + toasts.
-Mirrors ``update_check``'s shape but doesn't cross-import it.
+Mirrors ``update_check``'s shape.
 """
 
 import hashlib
@@ -38,6 +38,7 @@ from pathlib import Path
 
 from . import CONTENT_BASELINE_VERSION, buff_db_layers
 from .ui_widgets import app_toast
+from .update_check import _parts
 from .userdata import content_dir
 
 logger = logging.getLogger(__name__)
@@ -59,15 +60,6 @@ CONTENT_FILES = ("Database.json", "Default.json")
 # PURE HELPERS (no Tk — unit-tested with an injected downloader)               #
 # =========================================================================== #
 
-def _version_parts(version):
-    """('2.1.0') -> (2, 1, 0) for ordered comparison; () on garbage. Inlined
-    rather than importing update_check (the two update modules stay decoupled)."""
-    try:
-        return tuple(int(p) for p in str(version).split('.'))
-    except ValueError:
-        return ()
-
-
 def parse_manifest(raw):
     """Parse + validate a manifest (bytes or str). Returns the dict, or None if
     malformed — a missing/wrong-typed required field rejects the whole thing."""
@@ -79,7 +71,8 @@ def parse_manifest(raw):
         return None
     if not isinstance(data.get('content_version'), int):
         return None
-    if not isinstance(data.get('min_app_version'), str):
+    mav = data.get('min_app_version')
+    if not isinstance(mav, str) or not _parts(mav):
         return None
     files = data.get('files')
     if not isinstance(files, dict) or not files:
@@ -113,7 +106,7 @@ def app_supports(manifest, app_version):
     """True if the running app is new enough for this content (``app_version >=
     min_app_version``) — the app-compat boundary that enforces DB+Default
     moving together."""
-    return _version_parts(app_version) >= _version_parts(manifest['min_app_version'])
+    return _parts(app_version) >= _parts(manifest['min_app_version'])
 
 
 def verify_sha256(data, expected_hex):
@@ -159,6 +152,28 @@ def _applied_version(content_path):
     m = _read_content_manifest(content_path)
     v = m.get('content_version') if m else None
     return v if isinstance(v, int) else CONTENT_BASELINE_VERSION
+
+
+def active_content_dir():
+    """``content_dir()`` when what is actually applied there is at least the
+    running app's own shipped baseline, else ``None`` (use stock).
+
+    An app upgrade can bump ``CONTENT_BASELINE_VERSION`` past whatever OTA
+    content an older app version already downloaded — that ``content/`` is
+    now stale relative to the *new* stock floor, and must yield to it rather
+    than silently regress the effective DB. Self-healing: the next OTA check
+    compares the manifest against this same floor, so ``is_newer`` sees a gap
+    and re-downloads."""
+    cd = content_dir()
+    return cd if _applied_version(cd) >= CONTENT_BASELINE_VERSION else None
+
+
+def active_content_db_path():
+    """``active_content_dir() / 'Database.json'``, or ``None`` when content/
+    isn't active — the one shape `BuffDatabase.load_layers`/`reload` want for
+    their content-layer path."""
+    cd = active_content_dir()
+    return cd / "Database.json" if cd else None
 
 
 def _is_consistent(content_path):
@@ -331,13 +346,13 @@ def _apply_on_main(app, manifest, payloads):
         app.settings.set('content_version', manifest['content_version'])
         app.settings.save()
         try:
-            app.database.reload()
+            app.database.reload(active_content_db_path())
         except Exception:
             logger.exception("OTA re-merge failed — rolling back")
             rollback(content_dir())
             app.settings.set('content_version', _applied_version(content_dir()))
             app.settings.save()
-            app.database.reload()
+            app.database.reload(active_content_db_path())
             _notify(app, "Buff-database update failed — reverted to the previous version", 'warning')
             return
         _refresh_db_views(db_panel)
@@ -357,7 +372,7 @@ def revert(app):
         return
     app.settings.set('content_version', _applied_version(content_dir()))
     app.settings.save()
-    app.database.reload()
+    app.database.reload(active_content_db_path())
     _refresh_db_views(getattr(app, 'db_panel', None))
     _notify(app, "Reverted to the previous buff database", 'success')
 

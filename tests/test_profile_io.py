@@ -10,10 +10,11 @@ panel-construction smoke and manual QA.
 Run: `pytest tests/test_profile_io.py` (from repo root).
 """
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from kazbars import profile_io, userdata
+from kazbars import content_update, profile_io, userdata
 from kazbars.profile_document import SectionRegistry, validate_document
 from kazbars.profile_library import ProfileLibrary
 from kazbars.profile_store import ProfileStore
@@ -23,8 +24,30 @@ def test_template_chain_order(monkeypatch, tmp_path):
     monkeypatch.setattr(userdata, "app_path", lambda: tmp_path)
     app = SimpleNamespace(assets_path=Path("A:/assets"))
     chain = profile_io.template_paths(app)
+    # No OTA content/ at all yet — active_content_dir() falls back to the
+    # shipped baseline, which meets itself, so the entry is still included.
     assert chain == (
         tmp_path / "userdata" / "content" / "Default.json",
+        Path("A:/assets/kazbars/templates/Default.json"),
+        Path("A:/assets/kazbars/Default.json"),
+    )
+
+
+def test_template_chain_drops_a_stale_content_entry(monkeypatch, tmp_path):
+    # An app upgrade can bump CONTENT_BASELINE_VERSION past whatever OTA
+    # content an older app version already applied — that content/ must not
+    # even be offered to the template gate until the next OTA catches it up.
+    monkeypatch.setattr(userdata, "app_path", lambda: tmp_path)
+    content = tmp_path / "userdata" / "content"
+    content.mkdir(parents=True)
+    stale = content_update.CONTENT_BASELINE_VERSION - 1
+    (content / "manifest.json").write_text(
+        json.dumps({"content_version": stale}), encoding="utf-8")
+    app = SimpleNamespace(assets_path=Path("A:/assets"))
+
+    chain = profile_io.template_paths(app)
+
+    assert chain == (
         Path("A:/assets/kazbars/templates/Default.json"),
         Path("A:/assets/kazbars/Default.json"),
     )
