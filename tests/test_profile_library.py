@@ -75,6 +75,30 @@ def test_old_format_and_corrupt_files_skipped_and_untouched(lib):
     assert after == before  # never migrated, moved, or deleted
 
 
+def test_listing_survives_a_file_vanishing_mid_dedupe(lib, monkeypatch):
+    """Two files land on the same id (e.g. a rename's old-file cleanup failed
+    mid-flight) — the mtime comparison used to dedupe them must not crash when
+    a file has vanished by the time it's stat'd (a race, not corruption).
+    `load()` (called on every profile switch) shares this code path."""
+    doc = _doc(lib.registry)
+    _write_raw(lib.profiles_dir, "Old Name.json", doc)
+    _write_raw(lib.profiles_dir, "New Name.json", doc)
+
+    real_read_doc = lib._read_doc
+
+    def _vanish_after_read(path):
+        result = real_read_doc(path)
+        path.unlink(missing_ok=True)   # gone before its mtime gets compared
+        return result
+
+    monkeypatch.setattr(lib, "_read_doc", _vanish_after_read)
+
+    held = lib.load(doc["id"])   # must not raise — load() shares list_profiles()'s dedupe
+
+    assert held is not None
+    assert held[1] == doc
+
+
 def test_listing_dedupes_by_id_newest_wins(lib):
     doc = _doc(lib.registry)
     stale = _write_raw(lib.profiles_dir, "Old Name.json", doc)

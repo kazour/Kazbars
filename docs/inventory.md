@@ -13,7 +13,7 @@
 |---|---:|
 | `src/kazbars/__init__.py` | 11 |
 | `src/kazbars/__main__.py` | 43 |
-| `src/kazbars/app.py` | 805 |
+| `src/kazbars/app.py` | 802 |
 | `src/kazbars/app_popups.py` | 489 |
 | `src/kazbars/boss_timer.py` | 399 |
 | `src/kazbars/buff_database.py` | 189 |
@@ -62,11 +62,11 @@
 | `src/kazbars/paths.py` | 46 |
 | `src/kazbars/prefs.py` | 223 |
 | `src/kazbars/profile_document.py` | 273 |
-| `src/kazbars/profile_io.py` | 300 |
-| `src/kazbars/profile_library.py` | 290 |
+| `src/kazbars/profile_io.py` | 329 |
+| `src/kazbars/profile_library.py` | 300 |
 | `src/kazbars/profile_share.py` | 140 |
 | `src/kazbars/profile_store.py` | 130 |
-| `src/kazbars/settings_backup.py` | 470 |
+| `src/kazbars/settings_backup.py` | 479 |
 | `src/kazbars/settings_core.py` | 298 |
 | `src/kazbars/settings_manager.py` | 56 |
 | `src/kazbars/stopwatch.py` | 62 |
@@ -124,12 +124,12 @@
 | `tests/test_prefs_migration.py` | 99 |
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |
 | `tests/test_profile_document.py` | 249 |
-| `tests/test_profile_io.py` | 110 |
-| `tests/test_profile_library.py` | 249 |
+| `tests/test_profile_io.py` | 272 |
+| `tests/test_profile_library.py` | 273 |
 | `tests/test_profile_share.py` | 198 |
 | `tests/test_profile_store.py` | 138 |
 | `tests/test_projection.py` | 89 |
-| `tests/test_settings_backup.py` | 163 |
+| `tests/test_settings_backup.py` | 226 |
 | `tests/test_settings_core.py` | 373 |
 | `tests/test_settings_manager.py` | 33 |
 | `tests/test_stopwatch.py` | 101 |

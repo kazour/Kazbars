@@ -3,18 +3,23 @@ Smoke test: the settings_backup pure layer round-trips and is safe.
 
 Covers backup → restore byte-identity, *.tmp exclusion, manifest validation
 (accept ours, reject foreign/non-zip), the Funcom-prefs locator under a
-monkeypatched LOCALAPPDATA, and the zip-slip guard on restore. The Tk dialog
-layer (open_backup_dialog / backup_settings / restore_settings) is exercised
-manually.
+monkeypatched LOCALAPPDATA, and the zip-slip guard on restore. Plus one
+handoff-order test for `restore_settings` itself — the live profile must
+flush before anything on disk changes, and reopen afterward — with every
+other dependency monkeypatched; the rest of the Tk dialog layer
+(open_backup_dialog / backup_settings) is exercised manually.
 
 Run: `pytest tests/test_settings_backup.py` (from repo root).
 """
 
 import zipfile
+from types import SimpleNamespace
 
+from kazbars import settings_backup
 from kazbars.settings_backup import (
     locate_funcom_prefs,
     read_manifest,
+    restore_settings,
     restore_zip,
     write_backup_zip,
 )
@@ -161,3 +166,61 @@ def test_restore_blocks_zip_slip(tmp_path) -> None:
     assert restored["funcom"] == 1  # only the in-tree entry
     assert (funcom_dest / "ok.xml").exists()
     assert not (tmp_path / "escape.txt").exists()
+
+
+def _stub_restore_settings_deps(monkeypatch, tmp_path, order, *, release_store_ok=True):
+    """Monkeypatch every restore_settings dependency except profile_io's
+    release_store/startup_profile (order-recorded by the caller) so the flow
+    runs to completion (or aborts, per release_store_ok) with no real disk/Tk."""
+    monkeypatch.setattr(settings_backup, "filedialog",
+                        SimpleNamespace(askopenfilename=lambda **k: str(tmp_path / "backup.zip")))
+    monkeypatch.setattr(settings_backup, "read_manifest", lambda p: {"created": "now"})
+    monkeypatch.setattr(settings_backup, "funcom_prefs_path", lambda: tmp_path / "funcom")
+    monkeypatch.setattr(settings_backup, "confirm", lambda *a, **k: True)
+    monkeypatch.setattr(settings_backup, "write_backup_zip", lambda *a, **k: {})
+    monkeypatch.setattr(settings_backup, "locate_funcom_prefs", lambda: None)
+    monkeypatch.setattr(settings_backup, "database_user_path", lambda: tmp_path / "db.json")
+    monkeypatch.setattr(settings_backup, "prefs_path", lambda: tmp_path / "prefs.json")
+    monkeypatch.setattr(settings_backup, "userdata_root", lambda: tmp_path)
+    monkeypatch.setattr(
+        settings_backup, "restore_zip",
+        lambda *a, **k: order.append("restore_zip") or {"funcom": 1, "kazbars": 1})
+    monkeypatch.setattr(
+        settings_backup.profile_io, "release_store",
+        lambda app: order.append("release_store") or release_store_ok)
+    monkeypatch.setattr(
+        settings_backup.profile_io, "startup_profile",
+        lambda app: order.append("startup_profile"))
+    monkeypatch.setattr(settings_backup, "Messagebox", SimpleNamespace(
+        show_info=lambda *a, **k: None, show_error=lambda *a, **k: None))
+
+
+def _restore_app(order, tmp_path):
+    return SimpleNamespace(
+        app_path=tmp_path, app_version="3.0.0", profiles_path=tmp_path / "profiles",
+        settings=SimpleNamespace(reload=lambda: order.append("settings.reload")),
+        database=SimpleNamespace(reload=lambda: order.append("database.reload")),
+        db_panel=None,
+    )
+
+
+def test_restore_settings_flushes_before_restoring_then_reopens(monkeypatch, tmp_path) -> None:
+    order = []
+    _stub_restore_settings_deps(monkeypatch, tmp_path, order)
+    app = _restore_app(order, tmp_path)
+
+    restore_settings(app, SimpleNamespace(destroy=lambda: None))
+
+    assert order == [
+        "release_store", "restore_zip", "settings.reload", "database.reload", "startup_profile"]
+
+
+def test_restore_settings_aborts_before_restore_zip_when_release_store_fails(
+        monkeypatch, tmp_path) -> None:
+    order = []
+    _stub_restore_settings_deps(monkeypatch, tmp_path, order, release_store_ok=False)
+    app = _restore_app(order, tmp_path)
+
+    restore_settings(app, SimpleNamespace(destroy=lambda: None))
+
+    assert order == ["release_store"]  # never reached restore_zip or anything after

@@ -42,6 +42,16 @@ SEED_NAME = 'My Setup'
 _ILLEGAL_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 
+def file_mtime(path: Path) -> float:
+    """`path`'s mtime, or 0.0 if it can no longer be stat'd — a file can
+    vanish between being listed/read and being compared (another process, a
+    concurrent delete), and a race is not the same as corruption."""
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
 def slugify(name: str) -> str:
     """A Windows-safe filename stem from a display name. Keeps case and spaces
     (tool-honest, browsable in Explorer); strips illegal chars and trailing
@@ -93,7 +103,7 @@ class ProfileLibrary:
             if doc is None:
                 continue
             held = by_id.get(doc['id'])
-            if held is None or path.stat().st_mtime > held[0].stat().st_mtime:
+            if held is None or file_mtime(path) > file_mtime(held[0]):
                 by_id[doc['id']] = (path, doc)
         return sorted(by_id.values(), key=lambda e: str(e[1]['name']).casefold())
 

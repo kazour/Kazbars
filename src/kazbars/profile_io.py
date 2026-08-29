@@ -27,7 +27,7 @@ from . import content_update, profile_share
 from .buff_db_layers import DeltaStore
 from .grid_model import get_game_resolution_or_default
 from .profile_document import DocumentError, mint_id, new_document, validate_document
-from .profile_library import SEED_NAME, slugify
+from .profile_library import SEED_NAME, file_mtime, slugify
 from .profile_store import ProfileStore
 from .settings_manager import safe_save_json
 from .ui_widgets import app_toast
@@ -62,6 +62,21 @@ def make_store(app, doc):
     )
 
 
+def release_store(app) -> bool:
+    """Mirror the grid cards, then flush the current store before it's about
+    to be replaced or the app closes. False (after a danger toast) means the
+    write failed — the caller must keep the old store, not drop it: it stays
+    armed and RETRY_MS keeps trying, so a dropped store can't orphan a dirty
+    document nobody will ever write again."""
+    app._on_grids_edited()
+    if app.profile_store.flush():
+        return True
+    app_toast(
+        app, "Profile not saved — check free space and permissions, then try again.",
+        'danger')
+    return False
+
+
 def _newest_doc(app):
     """Newest library entry. `ensure_nonempty` is best-effort — when the disk
     refused every seed write the library is still empty, so fall back to an
@@ -69,7 +84,7 @@ def _newest_doc(app):
     the exit rescue dialog surfaces the failure."""
     entries = app.library.list_profiles()
     if entries:
-        return max(entries, key=lambda e: e[0].stat().st_mtime)[1]
+        return max(entries, key=lambda e: file_mtime(e[0]))[1]
     logger.warning("Profile library empty and unseedable — using an in-memory profile")
     return new_document(app.registry, SEED_NAME, get_game_resolution_or_default())
 
@@ -126,7 +141,8 @@ def switch_profile(app, profile_id):
     target. A vanished target refreshes the menu instead of erroring."""
     if profile_id == app.profile_store.document['id']:
         return
-    app.profile_store.flush()
+    if not release_store(app):
+        return
     held = app.library.load(profile_id)
     if held is None:
         app_toast(app, "That profile is gone — list refreshed.", 'warning')
@@ -137,7 +153,8 @@ def switch_profile(app, profile_id):
 
 
 def new_blank_profile(app):
-    app.profile_store.flush()
+    if not release_store(app):
+        return
     doc = app.library.create_blank(
         app.library.unique_name('New Profile'), get_game_resolution_or_default())
     if doc is None:
@@ -148,7 +165,8 @@ def new_blank_profile(app):
 
 
 def new_from_template(app):
-    app.profile_store.flush()
+    if not release_store(app):
+        return
     doc = app.library.create_from_template(
         app.library.unique_name('Default'), get_game_resolution_or_default())
     if doc is None:
@@ -160,7 +178,8 @@ def new_from_template(app):
 
 def duplicate_current(app):
     """A safety copy of the current profile; stays on the current one."""
-    app.profile_store.flush()
+    if not release_store(app):
+        return
     doc = app.library.duplicate(app.profile_store.document['id'])
     if doc is None:
         Messagebox.show_error("Could not duplicate the profile.", title="Duplicate Profile")
@@ -199,7 +218,8 @@ def delete_current(app):
         return
     # Flush before the file moves: an orphaned debounce timer firing after the
     # delete would re-write the trashed document under a fresh slug.
-    store.flush()
+    if not release_store(app):
+        return
     app.library.delete(store.document['id'])
     app.library.ensure_nonempty(get_game_resolution_or_default())
     doc = _newest_doc(app)
@@ -223,7 +243,7 @@ def export_profile(app):
     """File ▸ Export profile… — one self-contained `.kazbars.json` envelope:
     the flushed document plus every referenced custom buff."""
     store = app.profile_store
-    store.flush()
+    release_store(app)  # best-effort; export reads the in-memory doc either way
     doc = store.document
     path = filedialog.asksaveasfilename(
         title="Export Profile",
@@ -272,7 +292,8 @@ def import_profile(app):
         Messagebox.show_error(str(e), title="Import Failed")
         return
 
-    app.profile_store.flush()
+    if not release_store(app):
+        return
     doc['id'] = mint_id()
     doc['name'] = app.library.unique_name(doc['name'])
     if app.library.write(doc) is None:
@@ -281,14 +302,20 @@ def import_profile(app):
         return
 
     added = skipped = 0
+    buffs_failed = False
     if embedded:
         existing_names = {b.get('name') for b in app.database.buffs if b.get('name')}
-        added, skipped = profile_share.merge_imported_buffs(
-            DeltaStore(database_user_path()), embedded,
-            existing_ids=set(app.database.by_id), existing_names=existing_names)
-        if added:
-            app.database.reload()
-            app.db_panel.refresh_from_database()
+        try:
+            added, skipped = profile_share.merge_imported_buffs(
+                DeltaStore(database_user_path()), embedded,
+                existing_ids=set(app.database.by_id), existing_names=existing_names)
+        except OSError as e:
+            logger.warning("Could not merge imported buffs: %s", e)
+            buffs_failed = True
+        else:
+            if added:
+                app.database.reload()
+                app.db_panel.refresh_from_database()
 
     app.profile_store = make_store(app, doc)
     apply_document(app)
@@ -297,4 +324,6 @@ def import_profile(app):
         parts.append(f"{added} custom buff{'s' if added != 1 else ''} added")
     if skipped:
         parts.append(f"{skipped} already existed")
+    if buffs_failed:
+        parts.append("custom buffs not added")
     app_toast(app, " — ".join(parts), 'success')

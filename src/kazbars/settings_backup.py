@@ -31,6 +31,7 @@ from tkinter import filedialog, ttk
 
 from ttkbootstrap.dialogs import Messagebox
 
+from . import profile_io
 from .ui_headers import create_dialog_header
 from .ui_helpers import (
     BTN_DIALOG,
@@ -420,6 +421,11 @@ def restore_settings(app, dialog, include_prefs=False):
     ):
         return
 
+    # Flush the live profile before anything on disk changes under it — a
+    # failed flush means unsaved edits, so bail rather than restore over them.
+    if not profile_io.release_store(app):
+        return
+
     # Best-effort safety snapshot of current state (don't block restore on it).
     snapshot = app.app_path / f"KazBars_PreRestore_{datetime.now():%Y%m%d_%H%M%S}.zip"
     try:
@@ -457,6 +463,9 @@ def restore_settings(app, dialog, include_prefs=False):
     # Database-editor save recomputes deltas from pre-restore memory and clobbers
     # the restored custom buffs.
     app.database.reload()
+    # The in-memory profile store still holds the pre-restore document; reopen
+    # whatever the restored userdata/profiles/ + active_profile pref now say.
+    profile_io.startup_profile(app)
     if db_panel is not None:
         db_panel.refresh_from_database()
         db_panel.modified = False   # in-memory now equals the restored disk state
