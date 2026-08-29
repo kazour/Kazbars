@@ -39,8 +39,9 @@ FRACTION_SPECS = {
 # sizes stay px (icon art has a native size), so a template authored at 1080p
 # would seed pin-sized icons on a 1440p or 4K screen. These are the shipped
 # starting points, stamped when a template is instantiated and when first
-# launch re-anchors the seed to the chosen resolution — never on a document a
-# user has already tuned. The steps are deliberate, not a linear scale of the
+# launch re-anchors the seed to the chosen resolution. A later resolution
+# change carries a tuned document across tiers by the tiers' ratio instead
+# (rescale_seed_sizes). The steps are deliberate, not a linear scale of the
 # pixel count: 4K gets 1.33× the 1080p icon, not 2×.
 SEED_SIZE_TIERS = (
     (1080, {'iconSize': 48, 'timerFontSize': 17, 'stackFontSize': 16}),
@@ -112,6 +113,22 @@ def apply_seed_sizes(grids, height):
     sizes = seed_sizes_for_height(height)
     for grid in grids:
         grid.update(sizes)
+    return grids
+
+
+def rescale_seed_sizes(grids, old_height, new_height):
+    """Carry every grid's icon/timer/stack size from one resolution tier to
+    another by the tiers' ratio, clamped to CLAMP_SPECS — a grid still on the
+    old seed lands exactly on the new one, a tuned grid keeps its tuning."""
+    old = seed_sizes_for_height(old_height)
+    new = seed_sizes_for_height(new_height)
+    if old == new:
+        return grids
+    for grid in grids:
+        for key, seed in new.items():
+            _, lo, hi = CLAMP_SPECS[key]
+            scaled = round(grid.get(key, old[key]) * seed / old[key])
+            grid[key] = max(lo, min(hi, scaled))
     return grids
 
 

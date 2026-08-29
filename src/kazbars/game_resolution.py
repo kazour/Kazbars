@@ -10,7 +10,11 @@ size. Functions take the KazBarsApp instance as first arg.
 import tkinter as tk
 from tkinter import ttk
 
-from .grid_model import get_game_resolution_or_default, parse_resolution
+from .grid_model import (
+    get_game_resolution_or_default,
+    parse_resolution,
+    rescale_seed_sizes,
+)
 from .ui_headers import create_dialog_header
 from .ui_helpers import (
     BTN_SMALL,
@@ -31,9 +35,9 @@ COMMON_RESOLUTIONS = ["1920x1080", "2560x1440", "3840x2160"]
 
 
 def change_game_resolution(app):
-    """Open the modal resolution picker. On confirm, anchor-scale all grids
-    from the previous resolution to the new one, persist the setting, and
-    rebuild the editor panels."""
+    """Open the modal resolution picker. On confirm, carry every grid's px
+    sizes to the new resolution's tier, persist the setting, and rebuild the
+    editor panels (positions are fractions and need nothing)."""
     current_w, current_h = get_game_resolution_or_default()
     current = f"{current_w}x{current_h}"
 
@@ -62,8 +66,8 @@ def change_game_resolution(app):
               font=FONT_SECTION, foreground=THEME_COLORS['heading']
               ).pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
     ttk.Label(content,
-              text="Grids keep their screen-relative positions; the editor's\n"
-                   "pixel fields re-read for the new size.",
+              text="Grids keep their screen-relative positions; icon and\n"
+                   "font sizes step with the resolution.",
               font=FONT_SMALL, foreground=THEME_COLORS['muted']
               ).pack(anchor='w', pady=(0, PAD_XS))
 
@@ -81,14 +85,17 @@ def change_game_resolution(app):
             return
         new_w, new_h = new_res
         if (new_w, new_h) != (current_w, current_h):
-            # Positions are fractions — nothing in the document moves. Flush
-            # the widgets at the OLD resolution first (their px unprojects
-            # against it), then persist and rebuild so every pixel field
-            # re-projects at the new one.
+            # Positions are fractions — nothing in the document moves; the px
+            # sizes step by the tier ratio. Flush the widgets at the OLD
+            # resolution first (their px unprojects against it), rescale, then
+            # persist and rebuild so every pixel field re-projects at the new
+            # one, and mirror the resized grids into the document.
             app.grids_panel.save_settings()
+            rescale_seed_sizes(app.grids_panel.grids, current_h, new_h)
             app.settings.set('game_resolution', [new_w, new_h])
             app.settings.save()
             app.grids_panel.refresh_panels()
+            app._on_grids_edited()
             # The installed SWF was baked at the old resolution — flip the
             # status row stale without touching the document.
             app.grids_panel.refresh_build_status()

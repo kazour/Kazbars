@@ -292,10 +292,11 @@ Steps:
 4. `parse_resolution()` — src/kazbars/grid_model.py — converts the chosen `"WxH"` string into `(w, h)`; on parse failure the dialog just closes
 5. **No-op short-circuit**: if `(new_w, new_h) == (current_w, current_h)`, dialog closes without scaling or persisting
 6. `GridsPanel.save_settings()` — src/kazbars/grids_panel.py — flushes the card widgets **at the old resolution first**: the pixel position fields unproject against the resolution they were displayed at, so the flush must precede the pref change
+6b. `rescale_seed_sizes()` — src/kazbars/grid_model.py — carries every grid's `iconSize` / `timerFontSize` / `stackFontSize` from the old height's `SEED_SIZE_TIERS` entry to the new one by ratio, clamped to `CLAMP_SPECS` (a grid still on its seed lands exactly on the new seed; a tuned grid keeps its tuning; same tier = no-op)
 7. `app.settings.set('game_resolution', [new_w, new_h])` + save, then `refresh_panels()` (src/kazbars/grids_panel.py) rebuilds the cards so every pixel field re-projects the stored fractions at the new size, and `refresh_build_status()` (grids_panel.py) flips the in-game status row stale — the installed SWF was baked at the old resolution. Nothing in the document moves — positions are fractions
-8. `app_toast()` — src/kazbars/ui_widgets.py — info toast `"Resolution set to {new_w}×{new_h}"`. Note: icon/font **sizes are not** restamped here — `SEED_SIZE_TIERS` seeds a fresh template (Flow 6), and a later resolution change must not overwrite sizes the user has since tuned
+8. `app_toast()` — src/kazbars/ui_widgets.py — info toast `"Resolution set to {new_w}×{new_h}"`. After the rebuild, `KazBarsApp._on_grids_edited()` (src/kazbars/app.py) mirrors the resized grids into the document and arms the autosave
 
-End state: `game_resolution` persisted; the document untouched (fractions are resolution-independent); editor pixel fields and the next build project at the new size
+End state: `game_resolution` persisted; positions untouched (fractions are resolution-independent), px sizes stepped to the new tier and autosaved; editor pixel fields and the next build project at the new size
 
 ---
 

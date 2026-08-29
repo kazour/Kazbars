@@ -47,10 +47,10 @@
 | `src/kazbars/foreground.py` | 111 |
 | `src/kazbars/game_folder.py` | 424 |
 | `src/kazbars/game_persistence.py` | 608 |
-| `src/kazbars/game_resolution.py` | 104 |
+| `src/kazbars/game_resolution.py` | 111 |
 | `src/kazbars/grid_dialogs.py` | 896 |
 | `src/kazbars/grid_editor_panel.py` | 683 |
-| `src/kazbars/grid_model.py` | 279 |
+| `src/kazbars/grid_model.py` | 296 |
 | `src/kazbars/grids_generator.py` | 591 |
 | `src/kazbars/grids_panel.py` | 708 |
 | `src/kazbars/inspect.py` | 64 |
@@ -109,7 +109,7 @@
 | `tests/test_foreground.py` | 95 |
 | `tests/test_game_folder.py` | 119 |
 | `tests/test_game_persistence.py` | 748 |
-| `tests/test_grid_model.py` | 183 |
+| `tests/test_grid_model.py` | 212 |
 | `tests/test_grids_generator.py` | 664 |
 | `tests/test_hud_overlay.py` | 141 |
 | `tests/test_imports.py` | 33 |

@@ -23,6 +23,7 @@ from kazbars.grid_model import (
     create_default_grid,
     dedupe_grid_ids,
     project_px,
+    rescale_seed_sizes,
     seed_sizes_for_height,
     unproject_px,
     validate_grid,
@@ -181,3 +182,31 @@ def test_seed_sizes_are_returned_as_copies():
     first = seed_sizes_for_height(1080)
     first["iconSize"] = 999
     assert seed_sizes_for_height(1080)["iconSize"] == 48
+
+
+def test_rescale_seed_sizes_moves_a_pristine_seed_onto_the_new_tier():
+    grids = apply_seed_sizes([create_default_grid(), create_default_grid("target")], 1080)
+    returned = rescale_seed_sizes(grids, 1080, 2160)
+    assert returned is grids
+    for grid in grids:
+        sizes = {k: grid[k] for k in ("iconSize", "timerFontSize", "stackFontSize")}
+        assert sizes == seed_sizes_for_height(2160)
+
+
+def test_rescale_seed_sizes_keeps_a_tuned_grid_proportional():
+    # 60 px icons on the 48 px tier = 1.25x the seed; on the 56 px tier that is 70.
+    grid = dict(create_default_grid(), iconSize=60, timerFontSize=17, stackFontSize=8)
+    rescale_seed_sizes([grid], 1080, 1440)
+    assert grid["iconSize"] == 70
+    assert grid["timerFontSize"] == 20          # exactly the new seed
+    assert grid["stackFontSize"] == 10          # round(8 * 19 / 16)
+    assert grid["gap"] == create_default_grid()["gap"]   # not a tier size
+
+
+def test_rescale_seed_sizes_clamps_and_noops_within_a_tier():
+    grid = dict(create_default_grid(), iconSize=120)
+    rescale_seed_sizes([grid], 1080, 2160)
+    assert grid["iconSize"] == CLAMP_SPECS["iconSize"][2]      # 160 clamped to 128
+    same = dict(create_default_grid(), iconSize=33)
+    rescale_seed_sizes([same], 1080, 720)                      # both on the 1080 tier
+    assert same["iconSize"] == 33
