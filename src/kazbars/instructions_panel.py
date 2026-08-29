@@ -166,7 +166,9 @@ SECTIONS: list[_Section] = [
                 '.kazbars.json file. File ▸ Import profile… reads one back.',
                 'Custom buffs the profile tracks travel inside the file, so '
                 "the importer's own database doesn't need to know them "
-                'first. Screen positions travel too, as fractions of your '
+                "first (if they can't be added, the profile still imports "
+                'and the toast says so). Screen positions travel too, as '
+                'fractions of your '
                 'resolution — a shared profile lands proportionally on any '
                 'screen.',
             ]),
@@ -377,9 +379,10 @@ SECTIONS: list[_Section] = [
              ('Close the game and the patcher before your first build.', _DANGER),
              (' After that, rebuild anytime and /reloadui.', None)],
             'A quiet status line under the extras cards reads "In game: '
-            '<profile>" and turns orange the moment the game no longer '
-            'matches — a different profile installed, or an edit since the '
-            'last build. It never blocks you; it just says a rebuild is due.',
+            '<profile>" and turns orange when the game no longer matches '
+            '— a different profile installed, an edit since the last build, '
+            'or a changed game resolution. It never blocks you; it just '
+            'says a rebuild is due.',
             'From here, two things matter: how you launch, and game patches.',
             _link('Launching the Game', 'launching'),
             _link('After a Game Patch', 'game-patch'),
