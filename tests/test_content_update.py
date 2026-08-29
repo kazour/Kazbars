@@ -82,6 +82,10 @@ def test_parse_valid():
     json.dumps({"content_version": 1, "min_app_version": "1", "files": {"manifest.json.": {"url": "u", "sha256": "s"}}}),
     json.dumps({"content_version": 1, "min_app_version": "1", "files": {"Database.json ": {"url": "u", "sha256": "s"}}}),
     json.dumps({"content_version": 1, "min_app_version": "1", "files": {"..": {"url": "u", "sha256": "s"}}}),
+    # A min_app_version with no leading digits at all would compare as "()",
+    # which is <= any real version — the gate would open for every app.
+    json.dumps({"content_version": 1, "min_app_version": "x", "files": {"a": {"url": "u", "sha256": "s"}}}),
+    json.dumps({"content_version": 1, "min_app_version": "", "files": {"a": {"url": "u", "sha256": "s"}}}),
 ])
 def test_parse_rejects(raw):
     assert C.parse_manifest(raw) is None
@@ -101,6 +105,14 @@ def test_app_supports_min_version_gate():
     assert C.app_supports(_manifest(min_app="2.0.0"), "2.1.0")
     assert C.app_supports(_manifest(min_app="2.1.0"), "2.1.0")
     assert not C.app_supports(_manifest(min_app="2.2.0"), "2.1.0")
+
+
+def test_app_supports_handles_suffixed_and_double_digit_versions():
+    # A suffixed running-app version (e.g. mid-release RC) must still compare
+    # as its numeric prefix, not fail the gate outright.
+    assert C.app_supports(_manifest(min_app="3.0.0"), "3.0.0-rc1")
+    # Numeric, not lexicographic: "2.10.0" < "2.9.0" as strings but not as versions.
+    assert C.app_supports(_manifest(min_app="2.9.0"), "2.10.0")
 
 
 def test_verify_sha256():
@@ -179,6 +191,37 @@ def test_mid_swap_self_heals(tmp_path):
     assert C._applied_version(content) == C.CONTENT_BASELINE_VERSION   # not yet committed
     C.apply_content(content, _manifest(version=7), _payloads(db=b"V7"))
     assert C._applied_version(content) == 7
+
+
+# --------------------------------------------------------------------------- #
+# active_content_dir — yields to stock when an app upgrade outpaces content/
+# --------------------------------------------------------------------------- #
+
+def test_active_content_dir_yields_to_stock_when_marker_is_stale(tmp_path, monkeypatch):
+    content = tmp_path / "content"
+    stale = C.CONTENT_BASELINE_VERSION - 1
+    C.apply_content(content, _manifest(version=stale), _payloads())
+    monkeypatch.setattr(C, "content_dir", lambda: content)
+
+    assert C.active_content_dir() is None
+
+
+def test_active_content_dir_is_active_when_marker_meets_baseline(tmp_path, monkeypatch):
+    content = tmp_path / "content"
+    C.apply_content(content, _manifest(version=C.CONTENT_BASELINE_VERSION), _payloads())
+    monkeypatch.setattr(C, "content_dir", lambda: content)
+
+    assert C.active_content_dir() == content
+
+
+def test_active_content_dir_is_active_with_no_marker_at_all(tmp_path, monkeypatch):
+    # _applied_version falls back to CONTENT_BASELINE_VERSION when content/
+    # holds no OTA marker (never-updated install) — that meets the floor by
+    # construction, so stock is not force-skipped.
+    content = tmp_path / "content"
+    monkeypatch.setattr(C, "content_dir", lambda: content)
+
+    assert C.active_content_dir() == content
 
 
 def test_apply_and_rollback_never_touch_user_deltas(tmp_path):
@@ -267,7 +310,11 @@ def test_worker_applies_remerges_and_persists(tmp_path, monkeypatch):
 
     new_db = json.dumps({"version": 2, "buffs": [_b(1, "S"), _b(2, "New")]}).encode()
     default_payload = b"{}"
-    manifest = _manifest(version=5, files={
+    # Meets CONTENT_BASELINE_VERSION on purpose: active_content_db_path()
+    # would otherwise deem this fresh content stale relative to the app's
+    # own floor and the live re-merge below would (correctly) skip it.
+    version = C.CONTENT_BASELINE_VERSION
+    manifest = _manifest(version=version, files={
         "Database.json": {"url": "http://x/db", "sha256": hashlib.sha256(new_db).hexdigest()},
         "Default.json": {"url": "http://x/def", "sha256": hashlib.sha256(default_payload).hexdigest()},
     })
@@ -276,9 +323,48 @@ def test_worker_applies_remerges_and_persists(tmp_path, monkeypatch):
 
     C._worker(app, "2.1.0", 1, manual=False, downloader=lambda url, **k: by_url[url])
 
-    assert C._applied_version(content) == 5
-    assert app.settings["content_version"] == 5
+    assert C._applied_version(content) == version
+    assert app.settings["content_version"] == version
     assert len(app.database.buffs) == 2          # re-merged over the new content
+
+
+def test_apply_picks_up_immediately_even_after_a_stale_boot(tmp_path, monkeypatch):
+    # The regression active_content_db_path() introduced: app.py resolves it
+    # once at boot and BuffDatabase freezes that into _layer_paths. Booting
+    # with content/ stale (as after an app upgrade) must not also freeze the
+    # live merge out of ever seeing a same-session OTA apply that pushes
+    # content/ back to active — reload() has to re-resolve it, not just
+    # replay the frozen boot-time path.
+    monkeypatch.setattr(C, "content_dir", lambda: tmp_path / "content")
+    monkeypatch.setattr(C, "app_toast", lambda *a, **k: None)
+    stock = _stock(tmp_path, [_b(1, "S")])
+    content = tmp_path / "content"
+    user = tmp_path / "database_user.json"
+    stale_version = C.CONTENT_BASELINE_VERSION - 1
+
+    stale_payloads = _payloads()
+    C.apply_content(content, _manifest(version=stale_version, payloads=stale_payloads), stale_payloads)
+    assert C.active_content_db_path() is None          # boot-time decision: stale, use stock
+
+    db = BuffDatabase()
+    db.load_layers(stock, C.active_content_db_path(), user)   # mirrors app.py's __init__
+    assert len(db.buffs) == 1
+
+    app = _FakeApp(_Settings(content_version=stale_version, auto_update_content=True), db)
+    new_db = json.dumps({"version": 2, "buffs": [_b(1, "S"), _b(2, "New")]}).encode()
+    default_payload = b"{}"
+    manifest = _manifest(version=C.CONTENT_BASELINE_VERSION, files={
+        "Database.json": {"url": "http://x/db", "sha256": hashlib.sha256(new_db).hexdigest()},
+        "Default.json": {"url": "http://x/def", "sha256": hashlib.sha256(default_payload).hexdigest()},
+    })
+    by_url = {C.MANIFEST_URL: json.dumps(manifest).encode(),
+              "http://x/db": new_db, "http://x/def": default_payload}
+
+    C._worker(app, "2.1.0", stale_version, manual=False, downloader=lambda url, **k: by_url[url])
+
+    # Without re-resolving the content path in reload(), this stays 1 — the
+    # frozen boot-time None layer, even though content/ is active again.
+    assert len(app.database.buffs) == 2
     assert app.database.provenance[2] == "content"
 
 

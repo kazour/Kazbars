@@ -16,7 +16,7 @@
 | `src/kazbars/app.py` | 805 |
 | `src/kazbars/app_popups.py` | 489 |
 | `src/kazbars/boss_timer.py` | 399 |
-| `src/kazbars/buff_database.py` | 176 |
+| `src/kazbars/buff_database.py` | 189 |
 | `src/kazbars/buff_db_layers.py` | 267 |
 | `src/kazbars/buff_display_editor.py` | 712 |
 | `src/kazbars/buff_xml.py` | 377 |
@@ -27,7 +27,7 @@
 | `src/kazbars/cast_timer.py` | 93 |
 | `src/kazbars/cast_timer_panel.py` | 310 |
 | `src/kazbars/combat_monitor.py` | 301 |
-| `src/kazbars/content_update.py` | 400 |
+| `src/kazbars/content_update.py` | 415 |
 | `src/kazbars/custom_menu_bar.py` | 446 |
 | `src/kazbars/damageinfo_colors_panel.py` | 566 |
 | `src/kazbars/damageinfo_generator.py` | 134 |
@@ -62,7 +62,7 @@
 | `src/kazbars/paths.py` | 46 |
 | `src/kazbars/prefs.py` | 223 |
 | `src/kazbars/profile_document.py` | 273 |
-| `src/kazbars/profile_io.py` | 298 |
+| `src/kazbars/profile_io.py` | 300 |
 | `src/kazbars/profile_library.py` | 290 |
 | `src/kazbars/profile_share.py` | 140 |
 | `src/kazbars/profile_store.py` | 130 |
@@ -92,7 +92,7 @@
 | `tests/test_cast_timer.py` | 122 |
 | `tests/test_cluster_isolation.py` | 188 |
 | `tests/test_combat_monitor.py` | 150 |
-| `tests/test_content_update.py` | 305 |
+| `tests/test_content_update.py` | 391 |
 | `tests/test_damageinfo_colors_panel.py` | 293 |
 | `tests/test_damageinfo_generator.py` | 183 |
 | `tests/test_damageinfo_settings.py` | 336 |
@@ -124,7 +124,7 @@
 | `tests/test_prefs_migration.py` | 99 |
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |
 | `tests/test_profile_document.py` | 249 |
-| `tests/test_profile_io.py` | 87 |
+| `tests/test_profile_io.py` | 110 |
 | `tests/test_profile_library.py` | 249 |
 | `tests/test_profile_share.py` | 198 |
 | `tests/test_profile_store.py` | 138 |

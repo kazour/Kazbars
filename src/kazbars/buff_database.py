@@ -25,6 +25,11 @@ logger = logging.getLogger(__name__)
 
 TYPE_FILTER_MAP = {"Buff": "buff", "Debuff": "debuff", "Misc": "misc"}
 
+# reload()'s "leave the remembered content path alone" default — None is a
+# legitimate explicit content path (no content layer), so it can't double as
+# the sentinel.
+_KEEP_CONTENT_PATH = object()
+
 
 class BuffDatabase:
     """Handles loading, searching, and managing the buff database."""
@@ -76,11 +81,19 @@ class BuffDatabase:
         self._rebuild_indexes()
         return bool(self.buffs)
 
-    def reload(self):
+    def reload(self, content_path=_KEEP_CONTENT_PATH):
         """Re-run the layered merge from the paths `load_layers` was last called
-        with. Used after the OTA updater swaps `content/` (Phase 4)."""
-        if self._layer_paths is not None:
-            self.load_layers(*self._layer_paths)
+        with. Used after the OTA updater swaps `content/` (Phase 4) — pass
+        `content_path` to also replace the remembered content-layer path
+        first, since whether content/ is active relative to the app's own
+        baseline was decided once at boot and would otherwise never observe
+        a same-session apply/revert."""
+        if self._layer_paths is None:
+            return
+        stock, content, user, fallback = self._layer_paths
+        if content_path is not _KEEP_CONTENT_PATH:
+            content = content_path
+        self.load_layers(stock, content, user, fallback)
 
     def current_floor(self):
         """The stock <- content floor (no user deltas) the editor diffs against

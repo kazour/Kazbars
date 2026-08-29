@@ -23,7 +23,7 @@ from tkinter import filedialog
 
 from ttkbootstrap.dialogs import Messagebox, MessageDialog, Querybox
 
-from . import profile_share
+from . import content_update, profile_share
 from .buff_db_layers import DeltaStore
 from .grid_model import get_game_resolution_or_default
 from .profile_document import DocumentError, mint_id, new_document, validate_document
@@ -31,21 +31,23 @@ from .profile_library import SEED_NAME, slugify
 from .profile_store import ProfileStore
 from .settings_manager import safe_save_json
 from .ui_widgets import app_toast
-from .userdata import content_dir, database_user_path
+from .userdata import database_user_path
 
 logger = logging.getLogger(__name__)
 
 
 def template_paths(app):
-    """The template chain, best first: OTA content (once it ships the new
-    format — old-format entries fail the gate and fall through), the interim
-    new-format template, the shipped stock Default.json (old format until the
-    release-day flip, so it currently falls through too)."""
-    return (
-        content_dir() / 'Default.json',
-        app.assets_path / 'kazbars' / 'templates' / 'Default.json',
-        app.assets_path / 'kazbars' / 'Default.json',
-    )
+    """The template chain, best first: OTA content (only while it's active —
+    active_content_dir() yields to stock when an app upgrade has moved the
+    baseline past it — and once it ships the new format; old-format entries
+    fail the gate and fall through), the interim new-format template, the
+    shipped stock Default.json (old format until the release-day flip, so it
+    currently falls through too)."""
+    active_content = content_update.active_content_dir()
+    paths = [active_content / 'Default.json'] if active_content else []
+    paths.append(app.assets_path / 'kazbars' / 'templates' / 'Default.json')
+    paths.append(app.assets_path / 'kazbars' / 'Default.json')
+    return tuple(paths)
 
 
 def make_store(app, doc):

@@ -71,7 +71,6 @@ from kazbars.ui_widgets import (
     blend_alpha,
 )
 from kazbars.userdata import (
-    content_dir,
     database_user_path,
     ensure_layout,
     profiles_dir,
@@ -112,11 +111,12 @@ class KazBarsApp(ttkb.Window):
         # Buff database — three layers merged, user always wins:
         #   stock (assets, read-only) <- OTA content/ (Phase 4) <- user deltas.
         # A corrupt stock file recovers from the bundled .default IN MEMORY; the
-        # app never writes assets/.
+        # app never writes assets/. active_content_dir() yields to stock when an
+        # app upgrade has moved the baseline past whatever content/ still holds.
         self.database = BuffDatabase()
         self.database.load_layers(
             KAZBARS_ASSETS / "Database.json",
-            content_dir() / "Database.json",
+            content_update.active_content_db_path(),
             database_user_path(),
             stock_fallback_path=KAZBARS_ASSETS / "Database.json.default",
         )
