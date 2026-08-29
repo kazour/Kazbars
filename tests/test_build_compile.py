@@ -22,6 +22,7 @@ from pathlib import Path
 
 import pytest
 
+from kazbars import grids_generator
 from kazbars.buff_database import BuffDatabase
 from kazbars.grids_generator import build_grids
 from kazbars.paths import COMPILER_ASSETS, KAZBARS_ASSETS
@@ -181,3 +182,35 @@ def test_all_features_together_compile():
     ok, msg, _ = _compile([_grid()], include_console=True, cast_config=cast,
                           stopwatch_config=sw, inspect_config=ins)
     assert ok, msg
+
+
+def _worst_case():
+    # The 64-slot cap bounds grids and slots, not the buff ids a profile
+    # references: eight dynamic 1x8 grids each whitelisting the whole catalog
+    # is the most data the generator can be handed, with every extra on so
+    # the main class is at its largest too.
+    every_primary = [b["ids"][0] for b in _db().buffs]
+    grids = [dict(_grid(f"All {k}"), cols=8, whitelist=every_primary) for k in range(8)]
+    cast = {"enabled": True, "enableP": True, "enableT": True,
+            "playerFx": 900 / 1920, "playerFy": 600 / 1080}
+    return grids, dict(include_console=True, cast_config=cast,
+                       stopwatch_config={"enabled": True}, inspect_config={"enabled": True})
+
+
+def test_worst_case_profile_compiles():
+    # Only compiles because the data is packed into KazBarsData1..N under
+    # MTASC's 32 KB-per-class bytecode cap; a catalog grown by OTA moves the
+    # chunk count, not the outcome.
+    grids, extras = _worst_case()
+    ok, msg, _ = _compile(grids, **extras)
+    assert ok, msg
+
+
+def test_worst_case_profile_fails_without_the_chunking(monkeypatch):
+    # Negative control: lift the budget past the data's size and everything
+    # lands in one class MTASC rejects — the positive case above is proving
+    # the packing, not the compiler's leniency.
+    monkeypatch.setattr(grids_generator, "DATA_CHUNK_BUDGET", 70_000)
+    grids, extras = _worst_case()
+    ok, msg, _ = _compile(grids, **extras)
+    assert not ok and "32K" in msg, msg

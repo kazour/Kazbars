@@ -31,6 +31,13 @@ CUSTOM_ICON_LINKAGE = {
     5077889: "IcoSlow60",  # Ice Cloak L
 }
 
+# MTASC caps every class at 32 KB of bytecode. The grid configs and buff
+# lookups are packed into KazBarsData1..N, each built from whole units up to
+# this many source chars. Measured AVM1 density is ~0.6 byte per source char
+# and the pessimistic bound (no push merging) is 1.0, so 24K chars keeps at
+# least 1.36x headroom under the cap. Don't raise it.
+DATA_CHUNK_BUDGET = 24_000
+
 
 _template_cache: dict[str, str] = {}
 
@@ -99,6 +106,24 @@ def _as_list(value):
     list) into a list — the shape `_expand_primary_ids` and the unresolved-ref
     scan both need."""
     return value if isinstance(value, list) else [value]
+
+
+def _pack_units(units, budget):
+    """Greedy split of consecutive source units into chunks whose joined
+    (newline-separated) source stays within `budget` chars; a unit bigger
+    than the budget gets a chunk of its own."""
+    chunks: list[list[str]] = []
+    current: list[str] = []
+    size = 0
+    for unit in units:
+        if current and size + len(unit) > budget:
+            chunks.append(current)
+            current, size = [], 0
+        current.append(unit)
+        size += len(unit) + 1
+    if current:
+        chunks.append(current)
+    return chunks
 
 
 def _stack_bound(value, fallback):
@@ -184,25 +209,33 @@ class CodeGenerator:
         self._used_keys.add(key)
         return key
 
-    def generate(self):
-        """Generate the main KazBars.as and separate KazBarsData.as source code."""
-        # Archive keys are stable across a rebuild only within one generate()
-        # call — reset here so re-using a CodeGenerator instance can't leak
-        # collision suffixes from a previous run into this one.
+    def generate_files(self):
+        """Every AS2 source of a build as `(file name, source)`, main class
+        first: `KazBars.as` (the hand-written template with its feature
+        tokens filled — the class calls `KazBarsData.init()`), `KazBarsData.as`
+        (init + feature blocks, calling each chunk in turn), then
+        `KazBarsData1..N.as` — the grid configs and buff lookups packed under
+        DATA_CHUNK_BUDGET per class so no profile hits MTASC's per-class
+        bytecode cap. MTASC binds file name == class name."""
+        # Archive keys are stable across a rebuild only within one call —
+        # reset here so re-using a CodeGenerator instance can't leak collision
+        # suffixes from a previous run into this one.
         self._used_keys: set[str] = set()
-        # Main class: the whole hand-written class lives in KazBars.as.template;
-        # the generator only fills feature tokens (no inline config — the class
-        # calls KazBarsData.init())
-        main = []
-        main.append(self._header())
-        main.append(self._main_class())
+        header = self._header()
+        chunks = _pack_units(self._data_units(), DATA_CHUNK_BUDGET)
+        files = [
+            ("KazBars.as", self._main_class()),
+            ("KazBarsData.as", self._data_class(len(chunks))),
+        ]
+        for n, units in enumerate(chunks, start=1):
+            files.append((f"KazBarsData{n}.as", self._data_chunk_class(n, units)))
+        return [(name, f"{header}\n{src}") for name, src in files]
 
-        # Data class (all grid configs, whitelists, buff lookups)
-        data = []
-        data.append(self._header())
-        data.append(self._data_class())
-
-        return "\n".join(main), "\n".join(data)
+    def generate(self):
+        """`(KazBars.as source, every data class joined)` — for callers that
+        only inspect the emitted text."""
+        files = self.generate_files()
+        return files[0][1], "\n".join(src for _, src in files[1:])
 
     def _header(self):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -327,7 +360,50 @@ class CodeGenerator:
             f"showPvp: {show_pvp}, showPerks: {show_perks}}};"
         )
 
-    def _data_class(self):
+    def _data_units(self):
+        """The data-class body as self-contained source units, in emit order:
+        one per grid (config + whitelist), then one per referenced buff id
+        (its debuff / type / stack-level / custom-icon rows). A unit never
+        splits across chunks, so a whitelist `while` loop stays whole. Grids
+        go first in one pass because `_resolve_grid` fills `_stack_labels`
+        and `_archive_key` claims keys as it goes."""
+        units = []
+        all_buff_ids = set()
+        for idx, grid in enumerate(self.grids):
+            resolved = self._resolve_grid(grid)
+            units.append(self._generate_grid_config(resolved, idx, var_prefix="d."))
+            all_buff_ids.update(resolved.get("whitelist", []))
+            for slot_ids in resolved.get("slotAssignments", {}).values():
+                all_buff_ids.update(slot_ids)
+
+        for bid in sorted(all_buff_ids):
+            is_deb = "true" if self.database.is_debuff(bid) else "false"
+            lines = [
+                f"        d.ISDEB[{bid}] = {is_deb};",
+                f'        d.BUFFTYPE[{bid}] = "{self.database.get_type(bid)}";',
+            ]
+            stack_level = self._stack_labels.get(bid)
+            if stack_level is not None:
+                lines.append(f"        d.STACK_LEVEL[{bid}] = {stack_level};")
+            if bid in CUSTOM_ICON_LINKAGE:
+                lines.append(f'        d.CUSTOMICON[{bid}] = "{CUSTOM_ICON_LINKAGE[bid]}";')
+            units.append("\n".join(lines))
+        return units
+
+    def _data_chunk_class(self, n, units):
+        """One `KazBarsData<n>` class filling `d` with a run of units. `i` is
+        declared unconditionally — MTASC rejects an assignment to an
+        undeclared var, an unused local is fine."""
+        body = "\n".join(units)
+        return f"""class KazBarsData{n} {{
+
+    public static function fill(d:Object):Void {{
+        var i:Number;
+{body}
+    }}
+}}"""
+
+    def _data_class(self, chunk_count):
         lines = [
             """class KazBarsData {
 
@@ -339,9 +415,7 @@ class CodeGenerator:
         d.ISDEB = {};
         d.BUFFTYPE = {};
         d.STACK_LEVEL = {};
-        d.CUSTOMICON = {};
-        var i:Number;
-"""
+        d.CUSTOMICON = {};"""
         ]
 
         lines.append(self._panel_font_data_block())
@@ -352,28 +426,10 @@ class CodeGenerator:
         if self.include_inspect:
             lines.append(self._inspect_data_block())
 
-        all_buff_ids = set()
-        for idx, grid in enumerate(self.grids):
-            resolved = self._resolve_grid(grid)
-            lines.append(self._generate_grid_config(resolved, idx, var_prefix="d."))
-            for bid in resolved.get("whitelist", []):
-                all_buff_ids.add(bid)
-            for slot_ids in resolved.get("slotAssignments", {}).values():
-                for bid in slot_ids:
-                    all_buff_ids.add(bid)
-
-        if all_buff_ids:
-            lines.append("\n        // Debuff, Type, and Stack Level lookup")
-            for bid in sorted(all_buff_ids):
-                is_deb = "true" if self.database.is_debuff(bid) else "false"
-                buff_type = self.database.get_type(bid)
-                lines.append(f"        d.ISDEB[{bid}] = {is_deb};")
-                lines.append(f'        d.BUFFTYPE[{bid}] = "{buff_type}";')
-                stack_level = self._stack_labels.get(bid)
-                if stack_level is not None:
-                    lines.append(f"        d.STACK_LEVEL[{bid}] = {stack_level};")
-                if bid in CUSTOM_ICON_LINKAGE:
-                    lines.append(f'        d.CUSTOMICON[{bid}] = "{CUSTOM_ICON_LINKAGE[bid]}";')
+        if chunk_count:
+            lines.append("")
+        for n in range(1, chunk_count + 1):
+            lines.append(f"        KazBarsData{n}.fill(d);")
 
         lines.append("        return d;")
         lines.append("    }")
@@ -533,7 +589,7 @@ def build_grids(
 
     temp_dir = None
     try:
-        # Step 1: Generate AS2 code (main class + data class)
+        # Step 1: Generate AS2 code (main class + data classes)
         generator = CodeGenerator(
             grids,
             database,
@@ -546,29 +602,30 @@ def build_grids(
             panel_font_size=panel_font_size,
             game_resolution=game_resolution,
         )
-        main_code, data_code = generator.generate()
+        files = generator.generate_files()
 
-        # Step 2: Write to temp .as files
+        # Step 2: Write every class to a temp .as file (MTASC binds file name
+        # == class name)
         temp_dir = tempfile.mkdtemp(prefix="kazbars_")
-        temp_main_as = Path(temp_dir) / "KazBars.as"
-        temp_data_as = Path(temp_dir) / "KazBarsData.as"
-        with open(temp_main_as, "w", encoding="utf-8") as f:
-            f.write(main_code)
-        with open(temp_data_as, "w", encoding="utf-8") as f:
-            f.write(data_code)
+        sources = []
+        for name, src in files:
+            path = Path(temp_dir) / name
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(src)
+            sources.append(path)
 
         # Step 3: Copy base.swf to temp
         output_swf.parent.mkdir(parents=True, exist_ok=True)
         temp_swf = Path(temp_dir) / "KazBars.swf"
         shutil.copy2(base_swf, temp_swf)
 
-        # Step 4: Compile (both main class and data class)
+        # Step 4: Compile (main class + every data class)
         common_stubs = base_swf.parent.parent / "common_stubs"
         ok, err = compile_as2(
             compiler_path,
             [stubs_path, common_stubs, temp_dir],
             temp_swf,
-            [temp_main_as, temp_data_as],
+            sources,
             temp_dir,
         )
         if not ok:
