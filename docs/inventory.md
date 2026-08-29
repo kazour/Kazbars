@@ -55,7 +55,7 @@
 | `src/kazbars/grids_panel.py` | 708 |
 | `src/kazbars/inspect.py` | 64 |
 | `src/kazbars/inspect_panel.py` | 315 |
-| `src/kazbars/instructions_panel.py` | 1084 |
+| `src/kazbars/instructions_panel.py` | 1131 |
 | `src/kazbars/live_tracker_panel.py` | 511 |
 | `src/kazbars/live_tracker_settings.py` | 175 |
 | `src/kazbars/overlay_engine.py` | 800 |

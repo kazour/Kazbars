@@ -35,7 +35,7 @@ These are measured engine behaviour, not style choices. Changing any of them cha
 
 ## 2. The watch list
 
-63 ids, polled every pass while the panel is open, in the order they appear in `watchIds` (collapsed, only `titleIds` is read — §1). `curV[id]` holds the last settled value; `gv(id)` returns 0 for absent, null or NaN.
+63 ids, polled every pass while the panel is open, in the order they appear in `watchIds` (collapsed, only `gateIds` is read — §1). `curV[id]` holds the last settled value; `gv(id)` returns 0 for absent, null or NaN.
 
 ### Vitals & identity
 
