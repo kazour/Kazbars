@@ -516,7 +516,7 @@ SECTIONS: list[_Section] = [
                 'Nothing to build — /reloadui in-game shows the change.',
             ]),
             _sub('Build & Install to apply', [
-                [('Damage Number Mod, Stopwatch, Inspect Panel and Cast Timer '
+                [('Damage Numbers, Stopwatch, Inspect Panel and Cast Timer '
                   'are off by default — off means zero code in the build. '
                   'Tick the box, ', None),
                  ('Apply', _SUCCESS),
