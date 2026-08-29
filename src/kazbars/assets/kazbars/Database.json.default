@@ -181,9 +181,11 @@
       "type": "debuff"
     },
     {
-      "name": "Crushed Armor Wrack (T4 adds)",
+      "name": "Crushed Armor Wrack (T4/T6 adds)",
       "ids": [
-        4553214
+        4553214,
+        5064099,
+        4752009
       ],
       "category": "#Raid T4",
       "type": "debuff"
@@ -3724,14 +3726,6 @@
       "type": "debuff"
     },
     {
-      "name": "Crushed Armor Wrack (Ardashir Fort)",
-      "ids": [
-        4752009
-      ],
-      "category": "#Dungeons",
-      "type": "debuff"
-    },
-    {
       "name": "Sonic Missile Elemental Wrack (Pillars of Heaven)",
       "ids": [
         4548156
@@ -4109,6 +4103,14 @@
         4244734
       ],
       "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Sodabeh's Wrack (Ardashir Fort)",
+      "ids": [
+        4838302
+      ],
+      "category": "#Dungeons",
       "type": "debuff"
     }
   ]

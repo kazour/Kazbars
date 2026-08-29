@@ -49,6 +49,7 @@ now name the **dungeon** in their suffix rather than the boss, so a grid reads b
 types are unchanged, so no grid or profile whitelist is affected.
 - **Added category:** `#Dungeons` (34 buffs).
 - **Added category:** `#World Bosses` (2 buffs).
+- **Added:** `Sodabeh's Wrack (Ardashir Fort)` — `4838302`, #Dungeons debuff. Sodabeh applies it directly (confirmed in a full Ardashir Fort clear); the game stores it under her bare name.
 - **Reclassified:** `Underworld Ruin 1-5 (Kun Whu)` — #General → #Dungeons (`4046208`, `4046209`, `4046210`, `4046211`, `4046215`).
 - **Reclassified:** `Eldritch Ruin (Little Prince)` — #General → #Dungeons (`4866663`, `4866666`).
 - **Reclassified:** `Mind Ruin (Necropolis)` — #General → #Dungeons (`4502966`, `4502998`, `4788836`).
@@ -108,7 +109,7 @@ types are unchanged, so no grid or profile whitelist is affected.
 - **Renamed:** `Slaughterer's Torment (Tetharos)` → `Slaughterer's Torment (Enigmata of Yag)` (`4490631`).
 - **Renamed:** `Advisor's Wrack (Argo-satha)` → `Advisor's Wrack (Vile Nativity)` (`4732523`).
 - **Renamed:** `Advisor's Torment (Argo-satha)` → `Advisor's Torment (Vile Nativity)` (`4732526`).
-- **Renamed:** `Crushed Armor Wrack (Kamangir)` → `Crushed Armor Wrack (Ardashir Fort)` (`4752009`).
+- **Fixed:** `Crushed Armor Wrack (T4 adds)` → `Crushed Armor Wrack (T4/T6 adds)`, now `4553214`, `5064099`, `4752009`. The debuff comes from the T4 and T6 raid adds; the T6 copy was untracked, and the former `Crushed Armor Wrack (Kamangir)` (`4752009`) was a mis-attributed third copy of the same wrack, so it is folded in here rather than kept as a dungeon entry. Grids that whitelisted `4752009` need the entry's primary id `4553214`.
 - **Renamed:** `Sonic Missile Elemental Wrack (I-Po)` → `Sonic Missile Elemental Wrack (Pillars of Heaven)` (`4548156`).
 - **Renamed:** `Ghost Fangs Torment (Bhangi Khan)` → `Ghost Fangs Torment (Pillars of Heaven)` (`4549368`).
 - **Renamed:** `Wrack Armor (Ironwright)` → `Wrack Armor (T'ian'an District Sewers)` (`4707552`).

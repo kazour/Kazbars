@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "content_version": 28,
+  "content_version": 29,
   "min_app_version": "2.2.2",
-  "notes": "Wrack alias IDs for the later generic re-issue; Physical, Elemental and Spiritual Torment (Generic) entries; new #Dungeons and #World Bosses categories, dungeon entries named by instance",
+  "notes": "Wrack alias IDs for the later generic re-issue; Physical, Elemental and Spiritual Torment (Generic) entries; new #Dungeons and #World Bosses categories, dungeon entries named by instance; Sodabeh's Wrack; Crushed Armor Wrack covers T4 and T6",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
-      "sha256": "68c703f0d0d1ccccf3ab3507e93d812eef218cf9a73f763e28d516ef2bc44510"
+      "sha256": "fd0c3a8687ab8552df65e30198db29310c5dce7357c733731343e1ebd1b579f3"
     },
     "Default.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.json",
