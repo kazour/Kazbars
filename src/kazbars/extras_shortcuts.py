@@ -2,7 +2,7 @@
 KazBars — Extras shortcuts row.
 
 Four toggle cards pinned above the grid list — one per SWF-build extra, in
-Extras-menu order (Damage numbers, Stopwatch, Inspect panel, Cast timer) so
+Extras-menu order (Cast timer, Damage numbers, Inspect panel, Stopwatch) so
 the row and the menu read as the same list. Each card shows whether its
 feature ships in the next Build & Install and flips the same profile-document
 section its Extras dialog writes (autosaved by the profile store;
@@ -53,22 +53,22 @@ def _make_section_setter(key, side_flags=()):
 
 # (key, title, off-toast tail, tooltip) + read/set — menu order.
 _FEATURES = (
-    ('damage_numbers', 'Damage numbers', 'next build restores stock',
-     "Re-tunes AoC's floating combat numbers. Configure in Extras ▸ Damage number mod…",
-     lambda app: _read_section(app, 'damage_numbers'),
-     _make_section_setter('damage_numbers')),
-    ('stopwatch', 'Stopwatch', 'next build removes it',
-     'In-game Start / Pause / Reset timer panel. Configure in Extras ▸ Stopwatch…',
-     lambda app: _read_section(app, 'stopwatch'),
-     _make_section_setter('stopwatch')),
-    ('inspect', 'Inspect panel', 'next build removes it',
-     'Combat sheet for your current target. Configure in Extras ▸ Inspect panel…',
-     lambda app: _read_section(app, 'inspect'),
-     _make_section_setter('inspect')),
     ('cast_timer', 'Cast timer', 'next build removes it',
      'Cast-time readout for you and your target. Configure in Extras ▸ Cast timer…',
      lambda app: _read_section(app, 'cast_timer'),
      _make_section_setter('cast_timer', side_flags=('enableP', 'enableT'))),
+    ('damage_numbers', 'Damage numbers', 'next build restores stock',
+     "Re-tunes AoC's floating combat numbers. Configure in Extras ▸ Damage number mod…",
+     lambda app: _read_section(app, 'damage_numbers'),
+     _make_section_setter('damage_numbers')),
+    ('inspect', 'Inspect panel', 'next build removes it',
+     'Combat sheet for your current target. Configure in Extras ▸ Inspect panel…',
+     lambda app: _read_section(app, 'inspect'),
+     _make_section_setter('inspect')),
+    ('stopwatch', 'Stopwatch', 'next build removes it',
+     'In-game Start / Pause / Reset timer panel. Configure in Extras ▸ Stopwatch…',
+     lambda app: _read_section(app, 'stopwatch'),
+     _make_section_setter('stopwatch')),
 )
 
 

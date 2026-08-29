@@ -676,7 +676,7 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
     }
 
     // =========================================================================
-    // Stat access + sheet syntheses (field-measured, sheet-exact at level 80)
+    // Stat access + sheet syntheses (field-measured at level 80, level-invariant)
     // =========================================================================
 
     // Keyed by the raw id: a full render asks this ~195 times, and building
