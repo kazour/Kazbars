@@ -44,7 +44,7 @@ These are measured engine behaviour, not style choices. Changing any of them cha
 | 1 | Max HP | half of the teardown gate |
 | 27 | Current HP | |
 | 525 | HP % | displayed verbatim — the game floors it |
-| 54 | Level | the level-80 gate for every percent decode; other half of the teardown gate; feeds the title |
+| 54 | Level | other half of the teardown gate; feeds the title |
 | 67 | Class id | 34 (dagger class) and 39 (Ranger) select Dex over Str for CDI — both named by the sheet's own tooltip; 34 alone gets the 5.0 crit base (Ranger sheet-verified on 2.5). Also feeds the title's class name via the measured table 18 Barbarian · 20 Guardian · 22 Conqueror · 24 Priest of Mitra · 28 Tempest of Set · 29 Bear Shaman · 31 Dark Templar · 34 Assassin · 39 Ranger · 41 Necromancer · 43 Herald of Xotli · 44 Demonologist — all twelve measured off live targets |
 | 70 | PvP level | raw; sheet-exact on five characters; feeds the title only |
 | 507 | Max Mana | gates the Bonus Spell Damage lines only — mana-less classes sheet the whole per-school block at 0 |
@@ -161,7 +161,7 @@ Excluded from the band as non-perks: the potion-effect family, `Ethereal Lash` (
 
 ## 3. Syntheses & constants
 
-Every constant below is a **level-80** figure. They are believed level-proportional but that has never been verified off-80, which is the entire reason for the level gate in §4.
+Every constant below was first measured at **level 80** and has since been confirmed level-invariant across the game's full 1–86 range by in-game verification — no level scaling applies, and no level gate exists in §4.
 
 ### Attribute decode
 
@@ -251,7 +251,7 @@ Heal Rating benefits specific heals only and has no percent form, so the panel s
 total = 861 + max(158, 876, 877, 878, 879) + round(0.6 × max(Int, Wis)) + 1041
 ```
 
-Only the highest school shows — a caster stacks exactly one. `max(Int, Wis)` avoids an unmeasured class table (priests lead on Wisdom, mages on Intelligence), the same shape as the school-CR heuristic above. The 1041 term is added flat despite its "Base Spell Damage %" label — read as a percent of the total it lands nowhere near the sheet. Player-only, level-80-only, and **mana-gated**: a mana-less class (Ranger measured — max mana 0, sheet block all zeros despite 861/1041 residue in stat space; Barbarian predicted) dashes rather than synthesize a number the sheet contradicts.
+Only the highest school shows — a caster stacks exactly one. `max(Int, Wis)` avoids an unmeasured class table (priests lead on Wisdom, mages on Intelligence), the same shape as the school-CR heuristic above. The 1041 term is added flat despite its "Base Spell Damage %" label — read as a percent of the total it lands nowhere near the sheet. Player-only and **mana-gated**: a mana-less class (Ranger measured — max mana 0, sheet block all zeros despite 861/1041 residue in stat space; Barbarian predicted) dashes rather than synthesize a number the sheet contradicts.
 
 The PvP row adds the per-school gap 226 flat on top of the same total — the composition every other PvP row uses (+454, +458, +225), and it is **sheet-verified on two characters**: a Tempest of Set with 226 = −186 read exactly `total + 226` on the school-carrying line (985) with the school-less lines ±1 (the fractional attr term's rounding surface), and a Bear Shaman with 226 = −250 sheeted −71 against a composed −72 — the sheet's PvP per-school block is absolutes, not gaps, and renders negative faithfully.
 
@@ -273,7 +273,6 @@ The mitigation curve and the 36.6 / 73.7 / 219.6 divisors originate in community
 
 - **Dash, never drop.** Absent data renders as an em dash (`String.fromCharCode(8212)`) inside the value field. Row counts never change, so `layout()` re-runs only on a section-visibility flip (PvP block / Perks row).
 - **Title line** is `Name Class (Level/PvP level)` — e.g. `Kazour Bear Shaman (80/10)`. The class name appends only when the PvP gate below agrees the subject is a player **and** id 67 maps (all twelve classes measured; an unmapped id would mean a patch moved the enum and simply omits the class); the level part drops absent components, so a mob reads `Name (83)` and a player with no PvP level `Name Class (80)`. Built per pass from polled stats and cached assign-on-change like the value columns; an overlong name + class combination clips at the name field's fixed width.
-- **Level gate.** Every percent decode is suppressed unless `GetStat(54, 2) == 80`. An off-80 target shows the raw rating with no parenthetical — the constants are level-80 measurements and applying them to a level-40 target would produce a confident wrong number.
 - **Line format** is `Rating (Effect%)`, matching the game's own combat-stats tab. The CDI synthesis is labeled **Combat Rating** on both sections; this doc keeps CDI as the synthesis name.
 - **Section toggles are baked.** The dialog's "Show the PvP section" and "Track slotted perks" checkbuttons bake `showPvp` / `showPerks` into the config block (both default on; absent keys read as on in `configure()`, so an old baked config keeps today's footprint). Off means the section never renders, previews included — changing either takes a Build & Install like every other baked value.
 - **PvP block gating.** Behind the `showPvp` gate, shown only when the engine's `ID32.IsPlayer()` **and** a decoded attribute spread both agree:
@@ -383,7 +382,6 @@ Researched and understood, but outside the current panel. Recorded so the ground
 
 ## 8. Open questions
 
-- **Level proportionality** of 36.6 / 73.7 / 219.6 is assumed but unverified off-80. The level gate exists so the assumption is never displayed as fact.
 - **Floor vs round** on the `attr / 2` term in the protection total is indistinguishable at even attribute values; the stub floors.
 - **The 1041 term** as a flat add is an inference — a character with 0.0% Base Spell Damage would discriminate it. Either reading disagrees by at most ±1, inside the sheet's own rounding law.
 - **Ferocity rounding.** The 0.15 slope is a single sheet pair (260 → 39.0%); its rounding at odd totals is unmeasured.
@@ -404,7 +402,7 @@ There is no automated coverage of the rendered panel — the AS2/SWF runtime is 
 4. **City guard or other attribute-carrying NPC** — still no PvP section. This is the case the decoded-attribute gate exists for.
 5. **Boss target** — template stats and critigation read, tenacity dashes; a mitigation-phase change moves the protection percentages mid-fight via id 911.
 6. **Destructible target** — stats read through the `Dynel` fallback rather than dashing out entirely.
-7. **Off-80 target** — raw ratings, no parenthetical percentages anywhere.
+7. **Off-80 target** — percentages render identically to a level-80 target (36.6/73.7/219.6 confirmed level-invariant across 1–86); no raw-only fallback.
 8. **Retarget rapidly** — no flash of the previous target's numbers (the warm-up), and re-targeting the same entity does not blank the sheet.
 9. **Zone or log out with the panel open** — it clears rather than freezing on a stale sheet or re-showing an all-dash phantom.
 10. **Collapse and re-open** — the − button folds the panel to the `Inspect` bar; it should measure the stopwatch's collapsed bar at FS 12 and carry no target name. The + button re-opens the full sheet *immediately* — no quarter-second of stale numbers, which is the collapsed pass's two-id diet showing through if it regresses. A plain press on the bar does nothing (intended: the bar is not a button any more), and clicking the name strip expanded does nothing either. Entering preview while folded must show the sheet with live values, not dashes — the same two-id diet, seen from the other side.

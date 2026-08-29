@@ -185,13 +185,6 @@ SECTIONS: list[_Section] = [
                 _link('Deeps', 'deeps'),
                 _link('Ethram-Fal Live Tracker', 'ethram-fal'),
             ]),
-            _note(
-                "Upgrading from an older KazBars? Profiles made before this "
-                "version don't show up here — the format changed, and old "
-                'files are left alone but invisible to the new library. Use '
-                'File ▸ New from template and rebuild your layout once; '
-                "everything works normally from there.",
-                _WARNING),
         ],
     },
     {
@@ -272,31 +265,6 @@ SECTIONS: list[_Section] = [
         ],
     },
     {
-        'cat': 'Grids',
-        'id': 'stacking',
-        'title': 'Stacking',
-        'body': [
-            'Some buffs have multiple stack levels, each with its own ID. '
-            'Stacking controls how those IDs are read.',
-            _sub('Stacking disabled (default)', [
-                'Multiple IDs are treated as ranks of the same buff. Only one '
-                'rank is active at a time; a higher rank replaces a lower one.',
-            ]),
-            _sub('Stacking enabled', [
-                'IDs are stack levels in order: stack 1 first, stack 2 second, '
-                'and so on. The current level shows over the icon.',
-            ]),
-            _sub('Partial list (stacking only)', [
-                'Turn on when you only have IDs for part of the stack range. '
-                "Example: 5 IDs of a ×15 buff, set 'Start at' to 11.",
-            ]),
-            _sub('Stack range (stacking only, partial list off)', [
-                "Show the icon only within a stack range. 'Start at' is when "
-                "it appears; 'End at' is the last shown (0 means show all).",
-            ]),
-        ],
-    },
-    {
         'cat': 'Buff Database',
         'id': 'database',
         'title': 'The Buff Database',
@@ -367,6 +335,31 @@ SECTIONS: list[_Section] = [
         ],
     },
     {
+        'cat': 'Buff Database',
+        'id': 'stacking',
+        'title': 'Stacking',
+        'body': [
+            'Some buffs have multiple stack levels, each with its own ID. '
+            'Stacking controls how those IDs are read.',
+            _sub('Stacking disabled (default)', [
+                'Multiple IDs are treated as ranks of the same buff. Only one '
+                'rank is active at a time; a higher rank replaces a lower one.',
+            ]),
+            _sub('Stacking enabled', [
+                'IDs are stack levels in order: stack 1 first, stack 2 second, '
+                'and so on. The current level shows over the icon.',
+            ]),
+            _sub('Partial list (stacking only)', [
+                'Turn on when you only have IDs for part of the stack range. '
+                "Example: 5 IDs of a ×15 buff, set 'Start at' to 11.",
+            ]),
+            _sub('Stack range (stacking only, partial list off)', [
+                "Show the icon only within a stack range. 'Start at' is when "
+                "it appears; 'End at' is the last shown (0 means show all).",
+            ]),
+        ],
+    },
+    {
         'cat': 'Building & In-Game',
         'id': 'building',
         'title': 'Building and Installing',
@@ -432,12 +425,6 @@ SECTIONS: list[_Section] = [
                 'The Grids-tab X/Y only seed a first-ever session. Once you '
                 'drag in-game, the dragged spot wins.',
             ]),
-            _note(
-                'Upgrading from an older KazBars? Dragged positions reset '
-                "once on this update, from a fix to how they're stored. "
-                'Reposition everything once in preview mode and it holds '
-                'from then on.',
-                _WARNING),
         ],
     },
     {
@@ -520,10 +507,16 @@ SECTIONS: list[_Section] = [
         'id': 'extras-shipping',
         'title': 'How Extras Ship',
         'body': [
-            'The Extras menu holds two kinds of add-on — its own captions '
-            'split them. Every extra applies one of these two ways.',
+            'The Extras menu is one alphabetized list per group, split by a '
+            'plain separator — no caption explains why. Every extra applies '
+            'one of these two ways.',
+            _sub('/reloadui to apply', [
+                'Default Buff Bars and Damage Number Colors edit the '
+                "game's own files on Apply.",
+                'Nothing to build — /reloadui in-game shows the change.',
+            ]),
             _sub('Build & Install to apply', [
-                [('Damage Numbers, Stopwatch, Inspect Panel and Cast Timer '
+                [('Damage Number Mod, Stopwatch, Inspect Panel and Cast Timer '
                   'are off by default — off means zero code in the build. '
                   'Tick the box, ', None),
                  ('Apply', _SUCCESS),
@@ -532,11 +525,6 @@ SECTIONS: list[_Section] = [
                  ('. Cancel, Escape or the X discard.', None)],
                 'The toggle cards above the grid list flip the same switches. '
                 'Configuring stays in the dialogs.',
-            ]),
-            _sub('/reloadui to apply', [
-                'Default Buff Bars and Damage Number Colors edit the '
-                "game's own files on Apply.",
-                'Nothing to build — /reloadui in-game shows the change.',
             ]),
             _sub('One text size, four panels', [
                 'Stopwatch, inspect panel, buff console and control panel '
@@ -667,8 +655,7 @@ SECTIONS: list[_Section] = [
                 'Health, armor, protections, crit and critigation, heal '
                 'rating, spell damage, combat and weapon damage, tenacity, '
                 "ferocity — in the game sheet's own Rating (Effect%) "
-                'language. A dash: the target lacks it. Below level 80: raw '
-                'ratings only.',
+                'language, at any target level. A dash: the target lacks it.',
                 [('Player targets add a PvP block. Untick ', None),
                  ('Show the PvP section', _SUCCESS),
                  (' to drop it from the build.', None)],

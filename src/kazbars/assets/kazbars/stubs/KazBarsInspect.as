@@ -8,8 +8,9 @@
 // never fire SignalStatChanged and signal-time reads race the server, so the
 // 250 ms GetStat poll is the data path; 3 clean passes settle before the panel
 // shows; id 1 + id 54 collapsing together is the logout/zone teardown burst,
-// not data. Every synthesis constant below is a level-80 measurement, so an
-// off-80 target shows raw ratings with the %-decodes suppressed.
+// not data. Every synthesis constant below is level-invariant (confirmed
+// in game across the full 1-86 range), so the %-decodes show for every
+// target regardless of level.
 //
 // The PvP section and the Perks row are baked config gates (showPvp /
 // showPerks). The Perks row shows the slotted AA perk buffs detected on a
@@ -719,10 +720,6 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         return hasAttrs;
     }
 
-    private function lvlOK():Boolean {
-        return gv(54) == 80;
-    }
-
     // linear rating law: effect% = classBase + rating/36.6
     private function pctOf(r:Number):Number {
         return Math.round(r / 36.6 * 10) / 10;
@@ -785,7 +782,7 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
     }
 
     // =========================================================================
-    // Line builders — "Rating (Effect%)", dash when absent, effect off-80
+    // Line builders — "Rating (Effect%)", dash when absent
     // =========================================================================
 
     private function fmt1(n:Number):String {
@@ -804,14 +801,12 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
 
     private function mitLine(v:Number, invulId:Number, a:Number):String {
         if (v == 0) return DASH;
-        if (!lvlOK()) return String(v);
         return v + " (" + fmt1(sheetMit(mitCurve(v, a), invulId)) + "%)";
     }
 
     // zero-base linear decode (critigation, tenacity)
     private function pctLine(r:Number):String {
         if (r == 0) return DASH;
-        if (!lvlOK()) return String(r);
         return r + " (" + fmt1(pctOf(r)) + "%)";
     }
 
@@ -824,7 +819,6 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
     private function critChanceLine():String {
         var r:Number = gv(312);
         if (r == 0) return DASH;
-        if (!lvlOK()) return String(r);
         var wpnBase:Number = (gv(67) == 34) ? 5 : 2.5;
         return r + " (" + fmt1(r / 36.6 + wpnBase) + "%)";
     }
@@ -835,7 +829,6 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         if (!subjPlayer) return DASH;
         var r:Number = gv(713);
         if (r == 0) return DASH;
-        if (!lvlOK()) return String(r);
         return r + " (" + Math.round(271 + r * 0.2761) + "-" + Math.round(292 + r * 0.2761) + ")";
     }
 
@@ -845,7 +838,7 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
     // highest school shows: a caster stacks exactly one. The PvP row adds the
     // per-school gap 226 on top — one value for all schools, the 458 shape.
     private function spellLine(add:Number):String {
-        if (!subjPlayer || !lvlOK()) return DASH;
+        if (!subjPlayer) return DASH;
         // Mana-less classes (Ranger measured; Barbarian predicted) sheet the
         // whole per-school block at 0 even when 861/1041 carry residue —
         // max mana 507 is the gate.
@@ -872,7 +865,6 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         if (!subjPlayer) return DASH;
         var t:Number = Math.floor(gv(1403) / 10);
         if (t == 0) return DASH;
-        if (!lvlOK()) return String(t);
         return t + " (" + fmt1(t * 0.15) + "%)";
     }
 
@@ -892,7 +884,6 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         var r:Number = cdiPvE();
         if (r == 0) return DASH;
         r += add;
-        if (!lvlOK()) return String(r);
         return r + " (" + Math.round(r / 36.6) + ")";
     }
 

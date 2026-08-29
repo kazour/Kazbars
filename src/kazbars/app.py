@@ -128,8 +128,10 @@ class KazBarsApp(ttkb.Window):
         self.registry.register(grid_model.PROFILE_SECTION)
         self.registry.register(live_tracker_settings.PROFILE_SECTION)
         self.registry.register(deeps_settings.PROFILE_SECTION)
-        # The three baked extras, in Extras-menu order (fixes their order in
-        # written documents).
+        # The three baked extras: this registration order is the document's
+        # own key order and is fixed independently of the (now alphabetical)
+        # Extras menu — reordering these calls would reorder keys in every
+        # autosaved profile.
         self.registry.register(stopwatch.PROFILE_SECTION)
         self.registry.register(inspect.PROFILE_SECTION)
         self.registry.register(cast_timer.PROFILE_SECTION)
@@ -396,25 +398,25 @@ class KazBarsApp(ttkb.Window):
             {'type': 'command', 'label': 'Uninstall from game client…',
              'command': self._uninstall_game},
         ])
-        # Two captioned groups, because the two halves behave differently: the
-        # XML editors write the game's own files on Apply (/reloadui to see),
-        # while the SWF forms stage settings the next Build & Install bakes in.
+        # Two groups separated by a rule, alphabetical within each: the XML
+        # editors that write the game's own files on Apply (/reloadui to see),
+        # then the SWF forms that stage settings the next Build & Install
+        # bakes in. The split is explained in the help panel, not captioned
+        # here.
         self._menubar.add_cascade(label="Extras", menu_def=[
-            {'type': 'header', 'label': '/reloadui to apply'},
-            {'type': 'command', 'label': 'Default buff bars…',
-             'command': self._open_buff_display_editor},
             {'type': 'command', 'label': 'Damage number colors…',
              'command': self._open_damage_number_colors},
+            {'type': 'command', 'label': 'Default buff bars…',
+             'command': self._open_buff_display_editor},
             {'type': 'separator'},
-            {'type': 'header', 'label': 'Build & Install to apply'},
-            {'type': 'command', 'label': 'Damage number mod…',
-             'command': self._open_damage_numbers},
-            {'type': 'command', 'label': 'Stopwatch…',
-             'command': self._open_stopwatch_settings},
-            {'type': 'command', 'label': 'Inspect panel…',
-             'command': self._open_inspect_settings},
             {'type': 'command', 'label': 'Cast timer…',
              'command': self._open_cast_timer_settings},
+            {'type': 'command', 'label': 'Damage number mod…',
+             'command': self._open_damage_numbers},
+            {'type': 'command', 'label': 'Inspect panel…',
+             'command': self._open_inspect_settings},
+            {'type': 'command', 'label': 'Stopwatch…',
+             'command': self._open_stopwatch_settings},
         ])
         self._menubar.add_cascade(label="Updates", menu_def=[
             {'type': 'checkbutton', 'label': 'Automatically update the buff database (recommended)',
