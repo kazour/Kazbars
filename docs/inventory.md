@@ -14,7 +14,7 @@
 | `src/kazbars/__init__.py` | 11 |
 | `src/kazbars/__main__.py` | 43 |
 | `src/kazbars/app.py` | 804 |
-| `src/kazbars/app_popups.py` | 489 |
+| `src/kazbars/app_popups.py` | 486 |
 | `src/kazbars/boss_timer.py` | 399 |
 | `src/kazbars/buff_database.py` | 189 |
 | `src/kazbars/buff_db_layers.py` | 267 |
