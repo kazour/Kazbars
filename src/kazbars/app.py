@@ -782,10 +782,7 @@ class KazBarsApp(ttkb.Window):
         a rescue prompt if the disk has been refusing writes)."""
         if not self._check_unsaved_db_changes():
             return
-        # Mirror grid-card fields the debounce hasn't seen (typed, no focus-out)
-        # so the final flush writes what's on screen.
-        self._on_grids_edited()
-        if self.profile_store and not self.profile_store.flush():
+        if self.profile_store and not profile_io.release_store(self):
             dialog = MessageDialog(
                 "Your profile couldn't be saved to disk — the last edits may "
                 "be lost.\n\nCheck free space and permissions, then try again.",
