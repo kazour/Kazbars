@@ -42,7 +42,7 @@
 | `src/kazbars/deeps_settings.py` | 336 |
 | `src/kazbars/deeps_trackers.py` | 182 |
 | `src/kazbars/extras_shortcuts.py` | 170 |
-| `src/kazbars/first_launch.py` | 337 |
+| `src/kazbars/first_launch.py` | 351 |
 | `src/kazbars/focus_watcher.py` | 85 |
 | `src/kazbars/foreground.py` | 111 |
 | `src/kazbars/game_folder.py` | 414 |
@@ -50,7 +50,7 @@
 | `src/kazbars/game_resolution.py` | 104 |
 | `src/kazbars/grid_dialogs.py` | 896 |
 | `src/kazbars/grid_editor_panel.py` | 683 |
-| `src/kazbars/grid_model.py` | 248 |
+| `src/kazbars/grid_model.py` | 279 |
 | `src/kazbars/grids_generator.py` | 562 |
 | `src/kazbars/grids_panel.py` | 708 |
 | `src/kazbars/inspect.py` | 64 |
@@ -62,8 +62,8 @@
 | `src/kazbars/paths.py` | 46 |
 | `src/kazbars/prefs.py` | 223 |
 | `src/kazbars/profile_document.py` | 273 |
-| `src/kazbars/profile_io.py` | 297 |
-| `src/kazbars/profile_library.py` | 282 |
+| `src/kazbars/profile_io.py` | 298 |
+| `src/kazbars/profile_library.py` | 290 |
 | `src/kazbars/profile_share.py` | 140 |
 | `src/kazbars/profile_store.py` | 130 |
 | `src/kazbars/settings_backup.py` | 470 |
@@ -109,7 +109,7 @@
 | `tests/test_foreground.py` | 95 |
 | `tests/test_game_folder.py` | 99 |
 | `tests/test_game_persistence.py` | 723 |
-| `tests/test_grid_model.py` | 135 |
+| `tests/test_grid_model.py` | 183 |
 | `tests/test_grids_generator.py` | 621 |
 | `tests/test_hud_overlay.py` | 141 |
 | `tests/test_imports.py` | 33 |
@@ -125,7 +125,7 @@
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |
 | `tests/test_profile_document.py` | 249 |
 | `tests/test_profile_io.py` | 87 |
-| `tests/test_profile_library.py` | 212 |
+| `tests/test_profile_library.py` | 249 |
 | `tests/test_profile_share.py` | 198 |
 | `tests/test_profile_store.py` | 138 |
 | `tests/test_projection.py` | 89 |

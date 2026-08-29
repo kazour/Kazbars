@@ -147,7 +147,8 @@ def new_blank_profile(app):
 
 def new_from_template(app):
     app.profile_store.flush()
-    doc = app.library.create_from_template(app.library.unique_name('Default'))
+    doc = app.library.create_from_template(
+        app.library.unique_name('Default'), get_game_resolution_or_default())
     if doc is None:
         Messagebox.show_warning("No profile template is available.", title="New Profile")
         return

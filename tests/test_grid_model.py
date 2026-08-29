@@ -18,9 +18,12 @@ Run: `pytest tests/test_grid_model.py` (from repo root).
 from kazbars.grid_model import (
     CLAMP_SPECS,
     FRACTION_SPECS,
+    SEED_SIZE_TIERS,
+    apply_seed_sizes,
     create_default_grid,
     dedupe_grid_ids,
     project_px,
+    seed_sizes_for_height,
     unproject_px,
     validate_grid,
 )
@@ -133,3 +136,48 @@ def test_projection_is_proportional_across_resolutions():
     assert project_px(f, 1920) == 960
     assert project_px(f, 3840) == 1920
     assert project_px(unproject_px(1224, 1440), 1080) == 918
+
+
+# --------------------------------------------------------------------------- #
+# Seed size tiers — px sizes for a template instantiated on a given screen
+# --------------------------------------------------------------------------- #
+
+def test_seed_sizes_pick_the_tier_by_height():
+    assert seed_sizes_for_height(1080)["iconSize"] == 48
+    assert seed_sizes_for_height(1440)["iconSize"] == 56
+    assert seed_sizes_for_height(2160)["iconSize"] == 64
+    # Boundaries are inclusive-upper, and the top tier is open-ended.
+    assert seed_sizes_for_height(1081)["iconSize"] == 56
+    assert seed_sizes_for_height(1441)["iconSize"] == 64
+    assert seed_sizes_for_height(4320)["iconSize"] == 64
+    # An ultrawide is keyed on height, so 3440x1440 seeds like any 1440p screen.
+    assert seed_sizes_for_height(1440) == seed_sizes_for_height(1440)
+    # Below the lowest tier still lands on it rather than falling through.
+    assert seed_sizes_for_height(720)["iconSize"] == 48
+
+
+def test_every_seed_size_survives_validate_grid():
+    # The tier table must stay inside CLAMP_SPECS or a seeded grid would be
+    # silently clamped on its first load.
+    for _, sizes in SEED_SIZE_TIERS:
+        grid = validate_grid(dict(sizes))
+        for key, value in sizes.items():
+            assert grid[key] == value, key
+
+
+def test_apply_seed_sizes_overwrites_every_grid_in_place():
+    grids = [create_default_grid(), create_default_grid("target")]
+    returned = apply_seed_sizes(grids, 2160)
+    assert returned is grids
+    for grid in grids:
+        assert grid["iconSize"] == 64
+        assert grid["timerFontSize"] == 23
+        assert grid["stackFontSize"] == 21
+    # Non-size fields are untouched — this only restamps the three px sizes.
+    assert grids[1]["type"] == "target"
+
+
+def test_seed_sizes_are_returned_as_copies():
+    first = seed_sizes_for_height(1080)
+    first["iconSize"] = 999
+    assert seed_sizes_for_height(1080)["iconSize"] == 48
