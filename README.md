@@ -58,6 +58,8 @@ If the game ever patches (it hasn't in years), run the official patcher once, th
 
 Once you know the flow, make it yours: `+ Add Grid` for your own layouts, then `Tracked Buffs...` to pick what each one watches. Up to **64 slots total** across all your grids.
 
+Sharing a layout: File ▸ Export profile… writes one `.kazbars.json` file, with any custom buffs it references baked in — the recipient doesn't need those buffs in their own database first. File ▸ Import profile… reads one back.
+
 > **SmartScreen warning**: Windows may flag the `.exe` as unrecognized on first launch. Click **More info** → **Run anyway**. KazBars is unsigned because code signing certificates aren't justified for a hobby project.
 
 ## Community

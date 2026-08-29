@@ -140,24 +140,56 @@ SECTIONS: list[_Section] = [
         'id': 'profiles',
         'title': 'Profiles',
         'body': [
-            'A profile is a saved set of grids. The File menu manages them: '
-            'New, Open…, Save, Save as…, Manage profiles….',
-            'Load default profile loads the starter layout — the one from '
-            'first launch.',
+            'A profile is a complete layout — every grid, plus the extras '
+            'and live overlays that go with it. The File menu lists every '
+            'profile you have; click one to switch, or use the commands '
+            'under the list to manage them.',
+            _sub('Switching, creating and organizing', [
+                'New profile starts a blank one. New from template starts '
+                'from the curated starter layout. Duplicate profile makes a '
+                'safety copy of the one you have open.',
+                "Delete profile… moves it to the profile trash "
+                "(userdata/profiles/trash) rather than erasing it outright.",
+                'Revert to session start undoes every edit back to how this '
+                'profile looked when you opened it this session.',
+            ]),
+            _sub("No Save button — it autosaves", [
+                'Every edit writes to disk about a second after you stop '
+                "typing or dragging. There's nothing to lose by closing the "
+                'app or switching profiles.',
+            ]),
             _sub('Which profile opens on launch', [
-                'KazBars reopens the profile you last had loaded. The ★ '
-                'default is different: first launch and Load default profile '
-                'load that one.',
+                'KazBars reopens whichever profile you last had loaded.',
             ]),
             _sub('Sharing a profile', [
-                'Export to clipboard (in Manage profiles…) turns a profile '
-                'into one long string. Paste it anywhere — Discord, forum, '
-                'text file. Import from string… reads one back.',
-                'Custom buffs travel inside the string. The importer needs '
-                'nothing from your database.',
-                'Screen positions do not travel; they belong to this PC.',
-                _link('Cast Timer', 'cast-timer'),
+                'File ▸ Export profile… writes one self-contained '
+                '.kazbars.json file. File ▸ Import profile… reads one back.',
+                'Custom buffs the profile tracks travel inside the file, so '
+                "the importer's own database doesn't need to know them "
+                'first. Screen positions travel too, as fractions of your '
+                'resolution — a shared profile lands proportionally on any '
+                'screen.',
             ]),
+            _sub('What travels with a profile', [
+                'Grids, Stopwatch, Inspect panel, Cast timer and Damage '
+                'Numbers all live inside it — and so do Deeps and the '
+                "Ethram-Fal Live Tracker's live settings. So do any Default "
+                'Buff Bars or Damage Number Colors '
+                "overrides you've set — only the fields you've actually "
+                'changed; everything else still defers to the game, and '
+                "only that editor's own Apply writes it.",
+                'Machine-local instead: the shared panel text size and the '
+                'buff-discovery console toggle.',
+                _link('Deeps', 'deeps'),
+                _link('Ethram-Fal Live Tracker', 'ethram-fal'),
+            ]),
+            _note(
+                "Upgrading from an older KazBars? Profiles made before this "
+                "version don't show up here — the format changed, and old "
+                'files are left alone but invisible to the new library. Use '
+                'File ▸ New from template and rebuild your layout once; '
+                "everything works normally from there.",
+                _WARNING),
         ],
     },
     {
@@ -211,6 +243,15 @@ SECTIONS: list[_Section] = [
             _sub('Static mode', [
                 'Assign buffs to each slot by position. Unassigned slots stay '
                 'empty; if several share a slot, the most recent wins.',
+            ]),
+            _sub("A tracked buff your database doesn't have", [
+                "An imported profile (or a buff a database update dropped) "
+                'can leave a reference your database no longer resolves. It '
+                'shows greyed out as "unknown buff" at the bottom of the '
+                "list — it rides along, tracking nothing, until the buff "
+                'comes back.',
+                'Build & Install counts these in its summary: "N unresolved '
+                'buffs excluded — a database update can bring them back."',
             ]),
         ],
     },
@@ -335,6 +376,10 @@ SECTIONS: list[_Section] = [
               'marked blocks in its config files, backed up beside them. ', None),
              ('Close the game and the patcher before your first build.', _DANGER),
              (' After that, rebuild anytime and /reloadui.', None)],
+            'A quiet status line under the extras cards reads "In game: '
+            '<profile>" and turns orange the moment the game no longer '
+            'matches — a different profile installed, or an edit since the '
+            'last build. It never blocks you; it just says a rebuild is due.',
             'From here, two things matter: how you launch, and game patches.',
             _link('Launching the Game', 'launching'),
             _link('After a Game Patch', 'game-patch'),
@@ -384,6 +429,12 @@ SECTIONS: list[_Section] = [
                 'The Grids-tab X/Y only seed a first-ever session. Once you '
                 'drag in-game, the dragged spot wins.',
             ]),
+            _note(
+                'Upgrading from an older KazBars? Dragged positions reset '
+                "once on this update, from a fix to how they're stored. "
+                'Reposition everything once in preview mode and it holds '
+                'from then on.',
+                _WARNING),
         ],
     },
     {
@@ -663,20 +714,16 @@ SECTIONS: list[_Section] = [
                 'Preview mode (Shift+Ctrl+Alt): drag each timer, the game '
                 "remembers. The dialog's X/Y only seed the first session.",
             ]),
-            _sub('Saved on this PC, not in your profile', [
-                'Settings live with your app preferences, like the stopwatch '
-                'and inspect panel. Switching profiles leaves the timer '
-                "alone; shared profiles don't carry positions.",
+            _sub('Positions travel with your profile', [
+                'Player and Target positions are fractions of your screen, '
+                'so they land proportionally at any resolution — and ride '
+                'along when you share the profile.',
             ]),
             [('Tick ', None),
              ('Include the cast timer in builds', _SUCCESS),
              (' to ship it. One toggle runs both the Player and Target sides.',
               None)],
             _link('How Extras Ship', 'extras-shipping'),
-            _note(
-                'Had a cast timer before this version? Set it once more in '
-                'the dialog — old profile values are no longer read.',
-                _WARNING),
         ],
     },
     {
