@@ -300,8 +300,10 @@ class KazBarsPanel {
     }
 
     // A plate wider or taller than the Stage inverts max; pinned to 0 like the
-    // drag floor in beginDrag, rather than seated partly off-screen.
-    private function clampPos(v:Number, max:Number):Number {
+    // drag floor in beginDrag, rather than seated partly off-screen. Static so
+    // KazBars (which holds no KazBarsPanel of its own — its grids are plain
+    // MovieClips) can clamp archived grid positions with the same rule.
+    public static function clampPos(v:Number, max:Number):Number {
         if (isNaN(v) || v < 0 || max < 0) return 0;
         if (v > max) return max;
         return v;

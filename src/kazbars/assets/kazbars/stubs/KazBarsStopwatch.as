@@ -90,6 +90,9 @@ class KazBarsStopwatch extends KazBarsPanel implements KazBarsModule {
     }
 
     public function create():Void {
+        // The host re-runs onLoad on this same instance; without this the old
+        // clip leaks (pattern: KazBarsInspect.as).
+        if (panelClip != null) panelClip.removeMovieClip();
         panelClip = rootClip.createEmptyMovieClip("kbStopwatch", rootClip.getNextHighestDepth());
         panelClip._x = START_X;
         panelClip._y = START_Y;
@@ -316,8 +319,8 @@ class KazBarsStopwatch extends KazBarsPanel implements KazBarsModule {
         var x:Object = config.FindEntry("swx");
         var y:Object = config.FindEntry("swy");
         if (x !== undefined && y !== undefined) {
-            panelClip._x = clampPos(Number(x), Stage.width - W);
-            panelClip._y = clampPos(Number(y), Stage.height - (collapsed ? H_COLLAPSED : H));
+            panelClip._x = KazBarsPanel.clampPos(Number(x), Stage.width - W);
+            panelClip._y = KazBarsPanel.clampPos(Number(y), Stage.height - (collapsed ? H_COLLAPSED : H));
         }
     }
 

@@ -74,6 +74,13 @@ class KazBarsCastTimer implements KazBarsModule {
     }
 
     public function create():Void {
+        // The host re-runs onLoad on this same instance; without this the old
+        // clips leak. Inlined rather than calling cleanup() — that also stops
+        // the driver, disconnects player/target and clears previewMode, state
+        // this method must leave alone.
+        if (m_PlayerClip != null) { m_PlayerClip.removeMovieClip(); m_PlayerClip = null; }
+        if (m_TargetClip != null) { m_TargetClip.removeMovieClip(); m_TargetClip = null; }
+        if (driverClip != null) { driverClip.removeMovieClip(); driverClip = null; }
         if (ENABLE_P) m_PlayerClip = makeClip("kbCastP", PLAYER_X, PLAYER_Y);
         if (ENABLE_T) m_TargetClip = makeClip("kbCastT", TARGET_X, TARGET_Y);
         // Frame-coherent update driver. Its own onEnterFrame reads getTimer() and
@@ -368,9 +375,17 @@ class KazBarsCastTimer implements KazBarsModule {
         if (v !== undefined) setActive(v == 1);
     }
 
+    // makeClip centers the text on the clip's own x (a box from -100 to +100),
+    // top-anchors it on y, so the clamp floor/ceiling shift by that half-width
+    // instead of reusing KazBarsPanel.clampPos's top-left-anchored assumption.
     private function applyPos(clip:MovieClip, x:Object, y:Object):Void {
         if (clip == null) return;
-        if (x !== undefined && y !== undefined) { clip._x = Number(x); clip._y = Number(y); }
+        if (x !== undefined && y !== undefined) {
+            var halfW:Number = 100;
+            var h:Number = SIZE + 8;
+            clip._x = halfW + KazBarsPanel.clampPos(Number(x) - halfW, Stage.width - halfW * 2);
+            clip._y = KazBarsPanel.clampPos(Number(y), Stage.height - h);
+        }
     }
 
     public function saveState(config:Object):Void {

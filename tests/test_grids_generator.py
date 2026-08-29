@@ -538,11 +538,11 @@ def test_grid_shown_is_master_switch():
     main_code, _ = _all_extras_gen().generate()
 
     assert "dirty: true, shown: true" in main_code
-    assert 'config.FindEntry("g" + i + "_v")' in main_code
+    assert 'config.FindEntry("gk_" + gk + "_v")' in main_code
     # Written once, in saveAll, keyed like the positions beside it — both
     # persist paths reach it from there.
     assert main_code.count(
-        'config.ReplaceEntry("g" + i + "_v", grids[i].shown ? 1 : 0);') == 1
+        'config.ReplaceEntry("gk_" + gk + "_v", grids[i].shown ? 1 : 0);') == 1
 
     assert "obj.mc._visible = obj.shown;" in main_code
     assert "obj.mc._visible = obj.shown && disp.length > 0;" in main_code
@@ -574,6 +574,49 @@ def test_stub_archive_keys_present():
         src = (stubs / name).read_text(encoding="utf-8")
         assert f'FindEntry("{key}")' in src, f"{name} never reads {key}"
         assert f'ReplaceEntry("{key}"' in src, f"{name} never writes {key}"
+
+
+# --------------------------------------------------------------------------
+# Archive keys: ASCII sanitization + collision dedup
+# --------------------------------------------------------------------------
+
+
+def test_sanitize_id_folds_non_ascii_to_a_valid_as2_identifier():
+    # isalnum() alone accepts non-ASCII letters (e.g. CJK), which MTASC's
+    # identifier grammar does not — sanitize_id must fold those to "_" too.
+    gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0")
+    safe = gen.sanitize_id("Grid ünïcodé 日本")
+    assert safe.isascii()
+    assert safe.isidentifier()
+
+
+def test_archive_key_dedupes_grids_that_sanitize_the_same():
+    grids = [dict(_minimal_grid(), id="a-b"), dict(_minimal_grid(), id="a b")]
+    _, data = CodeGenerator(grids, _load_db(), "0.0.0").generate()
+    assert 'key: "a_b"' in data
+    assert 'key: "a_b_2"' in data
+
+
+def test_resolve_grid_accepts_a_bare_scalar_slot_assignment():
+    # A hand-edited or imported profile can carry one known id instead of a
+    # list — _resolve_grid must not crash trying to iterate over it.
+    db = _load_db()
+    known = _known_primary_id(db)
+    gen = CodeGenerator([_minimal_grid()], db, "0.0.0")
+    grid = dict(_minimal_grid(), slotAssignments={"0": known})
+    resolved = gen._resolve_grid(grid)
+    assert resolved["slotAssignments"]["0"] == gen._expand_primary_ids([known])
+
+
+def test_resolve_grid_tolerates_a_malformed_slot_value():
+    # _as_list wraps a non-list scalar as a single-element list, so a
+    # thoroughly malformed value (an unhashable object, not the documented
+    # int/str scalar) reaches database.by_id.get() as that element — must
+    # skip it like any other unknown ref, not raise.
+    gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0")
+    grid = dict(_minimal_grid(), slotAssignments={"0": {"nested": "object"}})
+    resolved = gen._resolve_grid(grid)
+    assert resolved["slotAssignments"]["0"] == []
 
 
 # --------------------------------------------------------------------------

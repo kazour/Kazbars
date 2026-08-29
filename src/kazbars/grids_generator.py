@@ -93,6 +93,14 @@ def escape_as2_string(value):
     )
 
 
+def _as_list(value):
+    """Normalize a whitelist/slot-assignment value that may be a bare scalar
+    (an imported or hand-edited profile can carry one known id instead of a
+    list) into a list — the shape `_expand_primary_ids` and the unresolved-ref
+    scan both need."""
+    return value if isinstance(value, list) else [value]
+
+
 def _stack_bound(value, fallback):
     """Coerce a stackStart/stackEnd from an imported/hand-edited entry the way
     the other loaders coerce ints (numeric strings count, junk falls back), so
@@ -154,7 +162,7 @@ class CodeGenerator:
         """Convert a grid ID to a safe AS2 identifier by replacing invalid characters."""
         safe = ""
         for c in grid_id:
-            if c.isalnum() or c == "_":
+            if (c.isascii() and c.isalnum()) or c == "_":
                 safe += c
             else:
                 safe += "_"
@@ -162,8 +170,26 @@ class CodeGenerator:
             safe = "_" + safe
         return safe or "Grid"
 
+    def _archive_key(self, grid_id):
+        """Stable per-build archive key for a grid's persisted position — a
+        sanitized id, deduped against every other key already emitted this
+        generate() call (two ids that sanitize the same way, e.g. "a-b" and
+        "a b", still need distinct archive slots)."""
+        base = self.sanitize_id(grid_id)
+        key = base
+        suffix = 2
+        while key in self._used_keys:
+            key = f"{base}_{suffix}"
+            suffix += 1
+        self._used_keys.add(key)
+        return key
+
     def generate(self):
         """Generate the main KazBars.as and separate KazBarsData.as source code."""
+        # Archive keys are stable across a rebuild only within one generate()
+        # call — reset here so re-using a CodeGenerator instance can't leak
+        # collision suffixes from a previous run into this one.
+        self._used_keys: set[str] = set()
         # Main class: the whole hand-written class lives in KazBars.as.template;
         # the generator only fills feature tokens (no inline config — the class
         # calls KazBarsData.init())
@@ -192,7 +218,13 @@ class CodeGenerator:
         """Expand primary spell IDs to full ID lists (respecting stacking)."""
         ids = []
         for pid in primary_ids:
-            entry = self.database.by_id.get(pid)
+            try:
+                entry = self.database.by_id.get(pid)
+            except TypeError:
+                # A hand-edited or imported profile can carry a malformed
+                # (unhashable) ref, e.g. a nested object in place of an id —
+                # inert, same as any other id the database doesn't know.
+                entry = None
             if entry:
                 entry_ids = entry.get("ids", [])
                 if entry.get("stacking", False):
@@ -229,10 +261,7 @@ class CodeGenerator:
         if slot_assignments:
             resolved_sa = {}
             for k, v in slot_assignments.items():
-                if v:
-                    resolved_sa[k] = self._expand_primary_ids(v)
-                else:
-                    resolved_sa[k] = v
+                resolved_sa[k] = self._expand_primary_ids(_as_list(v)) if v else v
             resolved["slotAssignments"] = resolved_sa
         return resolved
 
@@ -355,6 +384,7 @@ class CodeGenerator:
         gid = grid["id"]
         gid_lit = escape_as2_string(gid)
         vid = f"{self.sanitize_id(gid)}_{idx}"
+        key = self._archive_key(gid)
         cfg = f"{var_prefix}CFG"
         wl = f"{var_prefix}WL"
         lines = []
@@ -363,6 +393,7 @@ class CodeGenerator:
         // {gid_lit}
         var {vid}:Object = {{
             id: "{gid_lit}",
+            key: "{key}",
             type: "{grid["type"]}",
             rows: {grid["rows"]},
             cols: {grid["cols"]},
@@ -438,10 +469,8 @@ def unresolved_refs(grids, database) -> list:
             continue
         refs = list(g.get('whitelist') or [])
         for val in (g.get('slotAssignments') or {}).values():
-            if isinstance(val, list):
-                refs.extend(val)
-            elif val:
-                refs.append(val)
+            if val:
+                refs.extend(_as_list(val))
         for ref in refs:
             if isinstance(ref, bool) or ref in seen:
                 continue
