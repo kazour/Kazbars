@@ -92,6 +92,35 @@ def test_grid_id_with_quote_newline_backslash_still_compiles():
     assert ok, msg
 
 
+def test_non_ascii_grid_name_still_compiles():
+    # Without the isascii() guard, sanitize_id lets non-ASCII letters (e.g.
+    # CJK) through into the AS2 identifier and MTASC rejects it.
+    ok, msg, _ = _compile([_grid("Grid ünïcodé 日本")])
+    assert ok, msg
+
+
+def test_grids_with_colliding_sanitized_ids_both_compile():
+    # "a-b" and "a b" sanitize to the same identifier stem; the archive key
+    # must be deduped ("a_b", "a_b_2") rather than emitted twice.
+    ok, msg, _ = _compile([_grid("a-b"), _grid("a b")])
+    assert ok, msg
+
+
+def test_zero_grids_compiles():
+    ok, msg, _ = _compile([])
+    assert ok, msg
+
+
+def test_zero_grids_with_an_extra_enabled_compiles():
+    ok, msg, _ = _compile([], stopwatch_config={"enabled": True})
+    assert ok, msg
+
+
+def test_all_grids_disabled_compiles():
+    ok, msg, _ = _compile([dict(_grid(), enabled=False)])
+    assert ok, msg
+
+
 def test_console_feature_compiles():
     ok, msg, _ = _compile([_grid()], include_console=True)
     assert ok, msg

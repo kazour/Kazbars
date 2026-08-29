@@ -942,16 +942,20 @@ class KazBars {
         if (config == null) return;
         var i:Number = 0;
         while (i < grids.length) {
-            var gx:Object = config.FindEntry("g" + i + "_x");
-            var gy:Object = config.FindEntry("g" + i + "_y");
+            // Keyed on the grid's own stable id, not its position in the
+            // array — a reorder or delete elsewhere in the library must not
+            // hand one grid's archived spot to a different one.
+            var gk:String = grids[i].cfg.key;
+            var gx:Object = config.FindEntry("gk_" + gk + "_x");
+            var gy:Object = config.FindEntry("gk_" + gk + "_y");
             if (gx !== undefined && gy !== undefined) {
-                grids[i].mc._x = Number(gx);
-                grids[i].mc._y = Number(gy);
+                grids[i].mc._x = KazBarsPanel.clampPos(Number(gx), Stage.width - grids[i].mc._width);
+                grids[i].mc._y = KazBarsPanel.clampPos(Number(gy), Stage.height - grids[i].mc._height);
             }
             // Hiding directly covers the window where SlotAlive already
             // painted a grid before the archive arrived; the show side needs
             // nothing, since updateGrid honors shown from here on.
-            var gs:Object = config.FindEntry("g" + i + "_v");
+            var gs:Object = config.FindEntry("gk_" + gk + "_v");
             if (gs !== undefined) {
                 grids[i].shown = (gs == 1);
                 if (!grids[i].shown) grids[i].mc._visible = false;
@@ -974,9 +978,10 @@ class KazBars {
         if (config == null) return;
         var i:Number = 0;
         while (i < grids.length) {
-            config.ReplaceEntry("g" + i + "_x", grids[i].mc._x);
-            config.ReplaceEntry("g" + i + "_y", grids[i].mc._y);
-            config.ReplaceEntry("g" + i + "_v", grids[i].shown ? 1 : 0);
+            var gk:String = grids[i].cfg.key;
+            config.ReplaceEntry("gk_" + gk + "_x", grids[i].mc._x);
+            config.ReplaceEntry("gk_" + gk + "_y", grids[i].mc._y);
+            config.ReplaceEntry("gk_" + gk + "_v", grids[i].shown ? 1 : 0);
             i++;
         }
         ppanel.saveState(config);

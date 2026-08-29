@@ -1347,8 +1347,8 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         var x:Object = config.FindEntry("inx");
         var y:Object = config.FindEntry("iny");
         if (x !== undefined && y !== undefined) {
-            panelClip._x = clampPos(Number(x), Stage.width - curW);
-            panelClip._y = clampPos(Number(y), Stage.height - curH);
+            panelClip._x = KazBarsPanel.clampPos(Number(x), Stage.width - curW);
+            panelClip._y = KazBarsPanel.clampPos(Number(y), Stage.height - curH);
         }
     }
 

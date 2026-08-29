@@ -263,8 +263,8 @@ class KazBarsPreviewPanel extends KazBarsPanel {
         // Placed last: the clamp has to measure the plate actually on screen.
         // First open sits clear of the console's own default y.
         panelClip._x = isNaN(posX) ? (Stage.width - curW) / 2
-                                   : clampPos(posX, Stage.width - curW);
-        panelClip._y = isNaN(posY) ? 100 : clampPos(posY, Stage.height - curH);
+                                   : KazBarsPanel.clampPos(posX, Stage.width - curW);
+        panelClip._y = isNaN(posY) ? 100 : KazBarsPanel.clampPos(posY, Stage.height - curH);
     }
 
     // =========================================================================
