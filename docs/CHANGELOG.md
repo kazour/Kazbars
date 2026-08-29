@@ -44,6 +44,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **The reset button in Damage number colors sits at the end of its row.** Each source now reads label, direction, swatch, then ↺ — the reset comes after both of the things it resets instead of sitting between them.
 
 ### Fixed
+- **Changing the game resolution now resizes your grids' icons and fonts too.** They step to the new resolution's sizes by the same ratio the starter template uses, so a grid you never touched lands on the stock size and a grid you tuned keeps its tuning; positions were already resolution-independent.
 - **Tooltips no longer get stuck on screen.** Removing a control while its tooltip was showing — deleting a grid card, for example — could leave the tooltip floating over the app. Tooltips now disappear with their control.
 - **Buff console entries read in the console's own type again.** Every logged buff name and ID was falling back to a mismatched serif font; entries now render in the same face as the rest of the panel — the buff name in parchment grey, `ID: nnnn` in green.
 - **Grid names with accented or non-Latin characters (é, ü, 日本語…) no longer fail to compile.** The build's internal identifier for each grid now also replaces any character MTASC's compiler wouldn't accept, instead of assuming any letter was safe just because it wasn't ASCII punctuation.
