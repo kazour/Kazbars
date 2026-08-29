@@ -42,10 +42,13 @@ entry's primary ID are unchanged, so no grid or profile whitelist is affected (`
 - **Added:** `Elemental Torment (Generic)` — #General debuff, non-stacking: `3963165`, `3963166`, `3963167`, `3963168`, `3963169`, `3963178`, `3963179`, `3963180`, `3963181`, `3963182`, `3963183`, `3963184`, `3963185`, `3963186`, `3963187`, `3963188`, `3963189`, `3963190`, `3963191`, `3963192`, `4244605`, `4244607`, `4244608`, `4244609`, `4244610`, `4244611`. Companion to `Elemental Torment 1-5`.
 - **Added:** `Spiritual Torment (Generic)` — #General debuff, non-stacking: `3963247`, `3963248`, `3963249`, `3963250`, `3963251`, `3963252`, `3963253`, `3963254`, `3963255`, `3963256`, `3963257`, `3963258`, `3963259`, `3963260`, `3963261`, `3963262`, `3963263`, `3963264`, `3963267`, `3963273`, `4244729`, `4244730`, `4244731`, `4244732`, `4244733`, `4244734`. Companion to `Spiritual Torment 1-5`.
 
-**New category `#Dungeons`.** Every `#General` debuff whose name carries a dungeon-boss or instance suffix
-moves into it, so `#General` is left with the bare-named generic families and the world/raid-boss entries.
-Names, spell IDs, and types are unchanged, so no grid or profile whitelist is affected.
-- **Added category:** `#Dungeons` (33 buffs).
+**New categories `#Dungeons` and `#World Bosses`.** Every `#General` debuff whose name carried a boss or
+instance suffix moves out: dungeon-boss debuffs into `#Dungeons`, the two world-boss debuffs into `#World Bosses`,
+and one raid-add debuff into `#Raid T4`, so `#General` keeps only the bare-named generic families. Dungeon entries
+now name the **dungeon** in their suffix rather than the boss, so a grid reads by where you are. Spell IDs and
+types are unchanged, so no grid or profile whitelist is affected.
+- **Added category:** `#Dungeons` (34 buffs).
+- **Added category:** `#World Bosses` (2 buffs).
 - **Reclassified:** `Underworld Ruin 1-5 (Kun Whu)` — #General → #Dungeons (`4046208`, `4046209`, `4046210`, `4046211`, `4046215`).
 - **Reclassified:** `Eldritch Ruin (Little Prince)` — #General → #Dungeons (`4866663`, `4866666`).
 - **Reclassified:** `Mind Ruin (Necropolis)` — #General → #Dungeons (`4502966`, `4502998`, `4788836`).
@@ -79,6 +82,41 @@ Names, spell IDs, and types are unchanged, so no grid or profile whitelist is af
 - **Reclassified:** `Ghostly Torment (Necropolis)` — #General → #Dungeons (`4239695`).
 - **Reclassified:** `Kian Lai's Wrack 1-5 (Kian Lai)` — #General → #Dungeons (`4043129`, `4043131`, `4043132`, `4043133`, `4043134`).
 - **Reclassified:** `Bhangi Khan Wrack 1-5` — #General → #Dungeons (`4549463`, `4549505`, `4549506`, `4549507`, `4549508`).
+- **Reclassified:** `Petrifying Ruin (Basilisk)` — #General → #World Bosses (`4989883`, `5056521`).
+- **Reclassified:** `Corrupted Claws Wrack 1-4 (Bone Golems)` — #General → #Raid T4, and renamed `Corrupted Claws Wrack 1-4 (Yah Chieng)` — the golems are Yah Chieng's adds (`4704444`, `4704445`, `4704446`, `4704447`).
+- **Reclassified:** `Lighter than Air Wrack (Air and Water)` — #General → #Dungeons, and renamed `Lighter than Air Wrack (Vortex of the Storm)` (`4550619`).
+- **Reclassified:** `Drowned God's Wrack (Thrice Drowned)` — #General → #World Bosses (`4991713`).
+- **Renamed:** `Underworld Ruin 1-5 (Kun Whu)` → `Underworld Ruin 1-5 (Abyss of Kun Whu)` (`4046208`, `4046209`, `4046210`, `4046211`, `4046215`).
+- **Renamed:** `Eldritch Ruin (Little Prince)` → `Eldritch Ruin (Vile Nativity)` (`4866663`, `4866666`).
+- **Renamed:** `Mind Ruin (Necropolis)` → `Mind Ruin (Celestial Necropolis)` (`4502966`, `4502998`, `4788836`).
+- **Renamed:** `Venomous Ruin (Kian Lai)` → `Venomous Ruin (Den of the Crowmen)` (`4283587`, `4515792`).
+- **Renamed:** `Dulling Roar Ruin (Bhangi Khan)` → `Dulling Roar Ruin (Pillars of Heaven)` (`4268087`).
+- **Renamed:** `Ravaging Howl Ruin (Bhangi Khan)` → `Ravaging Howl Ruin (Pillars of Heaven)` (`4549364`).
+- **Renamed:** `Netherfrost Nether Ruin (Yun Rau)` → `Netherfrost Nether Ruin (Palace of Yun Rau)` (`4226929`).
+- **Renamed:** `Capture Ruin (Sethik Bloodblade)` → `Capture Ruin (Caravan Raider's Hideout)` (`4826763`).
+- **Renamed:** `Batswarm Ruin (I-Po)` → `Batswarm Ruin (Pillars of Heaven)` (`4051322`).
+- **Renamed:** `Fiery Ruin (Dimensionalist)` → `Fiery Ruin (Amphitheater of Karutonia)` (`4932986`).
+- **Renamed:** `Aptitude Ruin (Grand Vizier)` → `Aptitude Ruin (Coils of Ubah Kan)` (`4990471`).
+- **Renamed:** `Kian Lai's Ruin (Kian Lai)` → `Kian Lai's Ruin (Den of the Crowmen)` (`4283403`, `4804225`, `4804226`).
+- **Renamed:** `Visions of Ruin (Omni-Prophet)` → `Visions of Ruin (Coils of Ubah Kan)` (`4991521`).
+- **Renamed:** `Advisor's Ruin (Argo-satha)` → `Advisor's Ruin (Vile Nativity)` (`4732527`).
+- **Renamed:** `Poison Pincer Wrack (Sodabeh)` → `Poison Pincer Wrack (Ardashir Fort)` (`4838217`).
+- **Renamed:** `Scorching Torment (Devourer)` → `Scorching Torment (Amphitheater of Karutonia)` (`4935118`).
+- **Renamed:** `Scorching Wrack 1-4 (Abyssal Convoker)` → `Scorching Wrack 1-4 (Amphitheater of Karutonia)` (`4935086`, `4935087`, `4935088`, `4935089`).
+- **Renamed:** `Malicious Wrack 1-5 (Jing-Zhi)` → `Malicious Wrack 1-5 (Cavern of Malice)` (`4515806`, `4515807`, `4515818`, `4515819`, `4515820`).
+- **Renamed:** `Enslaving Torment (Kun Whu)` → `Enslaving Torment (Abyss of Kun Whu)` (`4049150`).
+- **Renamed:** `Slaughterer's Torment (Tetharos)` → `Slaughterer's Torment (Enigmata of Yag)` (`4490631`).
+- **Renamed:** `Advisor's Wrack (Argo-satha)` → `Advisor's Wrack (Vile Nativity)` (`4732523`).
+- **Renamed:** `Advisor's Torment (Argo-satha)` → `Advisor's Torment (Vile Nativity)` (`4732526`).
+- **Renamed:** `Crushed Armor Wrack (Kamangir)` → `Crushed Armor Wrack (Ardashir Fort)` (`4752009`).
+- **Renamed:** `Sonic Missile Elemental Wrack (I-Po)` → `Sonic Missile Elemental Wrack (Pillars of Heaven)` (`4548156`).
+- **Renamed:** `Ghost Fangs Torment (Bhangi Khan)` → `Ghost Fangs Torment (Pillars of Heaven)` (`4549368`).
+- **Renamed:** `Wrack Armor (Ironwright)` → `Wrack Armor (T'ian'an District Sewers)` (`4707552`).
+- **Renamed:** `Tainted Claws Wrack (Craterspawn)` → `Tainted Claws Wrack (Celestial Necropolis)` (`4752047`).
+- **Renamed:** `Mind Wrack (Necropolis)` → `Mind Wrack (Celestial Necropolis)` (`4239687`, `4502967`).
+- **Renamed:** `Ghostly Torment (Necropolis)` → `Ghostly Torment (Celestial Necropolis)` (`4239695`).
+- **Renamed:** `Kian Lai's Wrack 1-5 (Kian Lai)` → `Kian Lai's Wrack 1-5 (Den of the Crowmen)` (`4043129`, `4043131`, `4043132`, `4043133`, `4043134`).
+- **Renamed:** `Bhangi Khan Wrack 1-5` → `Bhangi Khan Wrack 1-5 (Pillars of Heaven)` (`4549463`, `4549505`, `4549506`, `4549507`, `4549508`).
 
 ## 2026-08-15
 **Player crowd control — the remaining seven classes.** Completes the pass begun on 2026-08-14,

@@ -3476,11 +3476,11 @@
         4989883,
         5056521
       ],
-      "category": "#General",
+      "category": "#World Bosses",
       "type": "debuff"
     },
     {
-      "name": "Underworld Ruin 1-5 (Kun Whu)",
+      "name": "Underworld Ruin 1-5 (Abyss of Kun Whu)",
       "ids": [
         4046208,
         4046209,
@@ -3494,7 +3494,7 @@
       "stackEnd": 5
     },
     {
-      "name": "Eldritch Ruin (Little Prince)",
+      "name": "Eldritch Ruin (Vile Nativity)",
       "ids": [
         4866663,
         4866666
@@ -3503,7 +3503,7 @@
       "type": "debuff"
     },
     {
-      "name": "Mind Ruin (Necropolis)",
+      "name": "Mind Ruin (Celestial Necropolis)",
       "ids": [
         4502966,
         4502998,
@@ -3513,7 +3513,7 @@
       "type": "debuff"
     },
     {
-      "name": "Venomous Ruin (Kian Lai)",
+      "name": "Venomous Ruin (Den of the Crowmen)",
       "ids": [
         4283587,
         4515792
@@ -3530,7 +3530,7 @@
       "type": "debuff"
     },
     {
-      "name": "Dulling Roar Ruin (Bhangi Khan)",
+      "name": "Dulling Roar Ruin (Pillars of Heaven)",
       "ids": [
         4268087
       ],
@@ -3538,7 +3538,7 @@
       "type": "debuff"
     },
     {
-      "name": "Ravaging Howl Ruin (Bhangi Khan)",
+      "name": "Ravaging Howl Ruin (Pillars of Heaven)",
       "ids": [
         4549364
       ],
@@ -3546,7 +3546,7 @@
       "type": "debuff"
     },
     {
-      "name": "Netherfrost Nether Ruin (Yun Rau)",
+      "name": "Netherfrost Nether Ruin (Palace of Yun Rau)",
       "ids": [
         4226929
       ],
@@ -3562,7 +3562,7 @@
       "type": "debuff"
     },
     {
-      "name": "Capture Ruin (Sethik Bloodblade)",
+      "name": "Capture Ruin (Caravan Raider's Hideout)",
       "ids": [
         4826763
       ],
@@ -3570,7 +3570,7 @@
       "type": "debuff"
     },
     {
-      "name": "Batswarm Ruin (I-Po)",
+      "name": "Batswarm Ruin (Pillars of Heaven)",
       "ids": [
         4051322
       ],
@@ -3578,7 +3578,7 @@
       "type": "debuff"
     },
     {
-      "name": "Fiery Ruin (Dimensionalist)",
+      "name": "Fiery Ruin (Amphitheater of Karutonia)",
       "ids": [
         4932986
       ],
@@ -3586,7 +3586,7 @@
       "type": "debuff"
     },
     {
-      "name": "Aptitude Ruin (Grand Vizier)",
+      "name": "Aptitude Ruin (Coils of Ubah Kan)",
       "ids": [
         4990471
       ],
@@ -3594,7 +3594,7 @@
       "type": "debuff"
     },
     {
-      "name": "Kian Lai's Ruin (Kian Lai)",
+      "name": "Kian Lai's Ruin (Den of the Crowmen)",
       "ids": [
         4283403,
         4804225,
@@ -3604,7 +3604,7 @@
       "type": "debuff"
     },
     {
-      "name": "Visions of Ruin (Omni-Prophet)",
+      "name": "Visions of Ruin (Coils of Ubah Kan)",
       "ids": [
         4991521
       ],
@@ -3612,7 +3612,7 @@
       "type": "debuff"
     },
     {
-      "name": "Advisor's Ruin (Argo-satha)",
+      "name": "Advisor's Ruin (Vile Nativity)",
       "ids": [
         4732527
       ],
@@ -3620,28 +3620,28 @@
       "type": "debuff"
     },
     {
-      "name": "Corrupted Claws Wrack 1-4 (Bone Golems)",
+      "name": "Corrupted Claws Wrack 1-4 (Yah Chieng)",
       "ids": [
         4704444,
         4704445,
         4704446,
         4704447
       ],
-      "category": "#General",
+      "category": "#Raid T4",
       "type": "debuff",
       "stacking": true,
       "stackEnd": 4
     },
     {
-      "name": "Lighter than Air Wrack (Air and Water)",
+      "name": "Lighter than Air Wrack (Vortex of the Storm)",
       "ids": [
         4550619
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Poison Pincer Wrack (Sodabeh)",
+      "name": "Poison Pincer Wrack (Ardashir Fort)",
       "ids": [
         4838217
       ],
@@ -3649,7 +3649,7 @@
       "type": "debuff"
     },
     {
-      "name": "Scorching Torment (Devourer)",
+      "name": "Scorching Torment (Amphitheater of Karutonia)",
       "ids": [
         4935118
       ],
@@ -3657,7 +3657,7 @@
       "type": "debuff"
     },
     {
-      "name": "Scorching Wrack 1-4 (Abyssal Convoker)",
+      "name": "Scorching Wrack 1-4 (Amphitheater of Karutonia)",
       "ids": [
         4935086,
         4935087,
@@ -3670,7 +3670,7 @@
       "stackEnd": 4
     },
     {
-      "name": "Malicious Wrack 1-5 (Jing-Zhi)",
+      "name": "Malicious Wrack 1-5 (Cavern of Malice)",
       "ids": [
         4515806,
         4515807,
@@ -3684,7 +3684,7 @@
       "stackEnd": 5
     },
     {
-      "name": "Enslaving Torment (Kun Whu)",
+      "name": "Enslaving Torment (Abyss of Kun Whu)",
       "ids": [
         4049150
       ],
@@ -3692,7 +3692,7 @@
       "type": "debuff"
     },
     {
-      "name": "Slaughterer's Torment (Tetharos)",
+      "name": "Slaughterer's Torment (Enigmata of Yag)",
       "ids": [
         4490631
       ],
@@ -3704,11 +3704,11 @@
       "ids": [
         4991713
       ],
-      "category": "#General",
+      "category": "#World Bosses",
       "type": "debuff"
     },
     {
-      "name": "Advisor's Wrack (Argo-satha)",
+      "name": "Advisor's Wrack (Vile Nativity)",
       "ids": [
         4732523
       ],
@@ -3716,7 +3716,7 @@
       "type": "debuff"
     },
     {
-      "name": "Advisor's Torment (Argo-satha)",
+      "name": "Advisor's Torment (Vile Nativity)",
       "ids": [
         4732526
       ],
@@ -3724,7 +3724,7 @@
       "type": "debuff"
     },
     {
-      "name": "Crushed Armor Wrack (Kamangir)",
+      "name": "Crushed Armor Wrack (Ardashir Fort)",
       "ids": [
         4752009
       ],
@@ -3732,7 +3732,7 @@
       "type": "debuff"
     },
     {
-      "name": "Sonic Missile Elemental Wrack (I-Po)",
+      "name": "Sonic Missile Elemental Wrack (Pillars of Heaven)",
       "ids": [
         4548156
       ],
@@ -3740,7 +3740,7 @@
       "type": "debuff"
     },
     {
-      "name": "Ghost Fangs Torment (Bhangi Khan)",
+      "name": "Ghost Fangs Torment (Pillars of Heaven)",
       "ids": [
         4549368
       ],
@@ -3748,7 +3748,7 @@
       "type": "debuff"
     },
     {
-      "name": "Wrack Armor (Ironwright)",
+      "name": "Wrack Armor (T'ian'an District Sewers)",
       "ids": [
         4707552
       ],
@@ -3756,7 +3756,7 @@
       "type": "debuff"
     },
     {
-      "name": "Tainted Claws Wrack (Craterspawn)",
+      "name": "Tainted Claws Wrack (Celestial Necropolis)",
       "ids": [
         4752047
       ],
@@ -3764,7 +3764,7 @@
       "type": "debuff"
     },
     {
-      "name": "Mind Wrack (Necropolis)",
+      "name": "Mind Wrack (Celestial Necropolis)",
       "ids": [
         4239687,
         4502967
@@ -3773,7 +3773,7 @@
       "type": "debuff"
     },
     {
-      "name": "Ghostly Torment (Necropolis)",
+      "name": "Ghostly Torment (Celestial Necropolis)",
       "ids": [
         4239695
       ],
@@ -3781,7 +3781,7 @@
       "type": "debuff"
     },
     {
-      "name": "Kian Lai's Wrack 1-5 (Kian Lai)",
+      "name": "Kian Lai's Wrack 1-5 (Den of the Crowmen)",
       "ids": [
         4043129,
         4043131,
@@ -3795,7 +3795,7 @@
       "stackEnd": 5
     },
     {
-      "name": "Bhangi Khan Wrack 1-5",
+      "name": "Bhangi Khan Wrack 1-5 (Pillars of Heaven)",
       "ids": [
         4549463,
         4549505,

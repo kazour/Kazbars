@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "content_version": 27,
+  "content_version": 28,
   "min_app_version": "2.2.2",
-  "notes": "Wrack alias IDs for the later generic re-issue; Physical, Elemental and Spiritual Torment (Generic) entries; new #Dungeons category for the named dungeon-boss debuffs",
+  "notes": "Wrack alias IDs for the later generic re-issue; Physical, Elemental and Spiritual Torment (Generic) entries; new #Dungeons and #World Bosses categories, dungeon entries named by instance",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
-      "sha256": "1d683ba48a52761056a84bc6f271931c5a01cf837f2d3fdc92e6f10c79870525"
+      "sha256": "68c703f0d0d1ccccf3ab3507e93d812eef218cf9a73f763e28d516ef2bc44510"
     },
     "Default.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.json",
