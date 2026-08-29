@@ -49,6 +49,7 @@ now name the **dungeon** in their suffix rather than the boss, so a grid reads b
 types are unchanged, so no grid or profile whitelist is affected.
 - **Added category:** `#Dungeons` (34 buffs).
 - **Added category:** `#World Bosses` (2 buffs).
+- **Fixed:** `Nature's Wrath 1-10` (Bear Shaman buff) now tracks all ten stacks (`1126047`, `1126048`, `1126049`, `1126050`, `1126051`, `1126052`, `1126053`, `1126054`, `1126055`, `1126056`); it previously showed only the tenth.
 - **Added:** `Sodabeh's Wrack (Ardashir Fort)` — `4838302`, #Dungeons debuff. Sodabeh applies it directly (confirmed in a full Ardashir Fort clear); the game stores it under her bare name.
 - **Reclassified:** `Underworld Ruin 1-5 (Kun Whu)` — #General → #Dungeons (`4046208`, `4046209`, `4046210`, `4046211`, `4046215`).
 - **Reclassified:** `Eldritch Ruin (Little Prince)` — #General → #Dungeons (`4866663`, `4866666`).

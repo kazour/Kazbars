@@ -1081,8 +1081,7 @@
       ],
       "category": "Bear Shaman",
       "type": "buff",
-      "stacking": true,
-      "stackStart": 10
+      "stacking": true
     },
     {
       "name": "Renewal",
