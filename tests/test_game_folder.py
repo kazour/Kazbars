@@ -9,7 +9,9 @@ covers that). The dialog/toast orchestration around it is exercised manually.
 Run: `pytest tests/test_game_folder.py` (from repo root).
 """
 
-from kazbars import build_utils, damageinfo_generator
+import types
+
+from kazbars import build_executor, build_utils, damageinfo_generator, game_folder
 from kazbars.build_executor import DAMAGEINFO_BACKUP, DAMAGEINFO_FILE
 from kazbars.game_folder import _restore_damageinfo
 
@@ -97,3 +99,21 @@ class TestRestoreDamageInfo:
 
         assert not list(tmp_path.glob("kazbars_repair_*"))
         assert not list(_flash(game).glob("*.kaztmp"))
+
+
+class TestUninstallEngineGuard:
+    def test_blocks_before_confirm_when_engine_running(self, tmp_path, monkeypatch):
+        game = tmp_path / "game"
+        game.mkdir()
+        app = types.SimpleNamespace(game_path=str(game))
+
+        monkeypatch.setattr(
+            build_executor, "get_running_engine_process", lambda: "AgeOfConan.exe")
+
+        def _must_not_run(*a, **kw):
+            raise AssertionError("must not run while the engine is up")
+
+        monkeypatch.setattr(game_folder, "confirm", _must_not_run)
+        monkeypatch.setattr(build_executor, "uninstall_from_client", _must_not_run)
+
+        game_folder.uninstall_game(app)  # would raise via the stubs above if it got past the gate

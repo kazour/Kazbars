@@ -37,6 +37,25 @@ logger = logging.getLogger(__name__)
 PHASE_MIN_MS = 300
 
 
+def _declarations_gate(app):
+    """Block while any engine process is running, but only when our
+    declarations aren't already merged into the live game files: the client
+    has to start with them in place for the archive to survive, and a
+    patcher left open strips them on its own exit-save. Once merged,
+    install_to_client is an idempotent no-op and /reloadui handles the swap —
+    so this fires on the first build ever, and again on an upgrade whose
+    client never got spliced (e.g. a game patch wiped the declarations).
+    Returns False (after showing the dialog) when the build must stop."""
+    from .game_persistence import is_merged
+    if not is_merged(app.game_path):
+        from .build_executor import get_running_engine_process
+        running = get_running_engine_process()
+        if running:
+            show_close_game_required_dialog(app, process_name=running)
+            return False
+    return True
+
+
 def build(app):
     """Build and install KazBars.swf to the configured game folder."""
     if app._building:
@@ -128,16 +147,8 @@ def build(app):
         app.grids_panel.refresh_panels(expand_index=-1)
         app._on_grids_edited()
 
-    # Block while any engine process is running, but only on the first build: the
-    # client has to start with our declarations in place for the archive to
-    # survive, and a patcher left open strips it on its own exit-save. After a
-    # successful install, /reloadui handles the swap.
-    if not app.settings.get('has_built_before'):
-        from .build_executor import get_running_engine_process
-        running = get_running_engine_process()
-        if running:
-            show_close_game_required_dialog(app, process_name=running)
-            return
+    if not _declarations_gate(app):
+        return
 
     # Mirror the grid cards into the store (a field mid-typing hasn't fired
     # on_change yet), then flush, so built == saved and the build signature

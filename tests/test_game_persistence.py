@@ -372,6 +372,31 @@ class TestStrip:
         assert strip_declarations(game) == ["Default/MainPrefs.xml"]
         assert _read(_default_modules(game)) == 'garbage, no root tag'
 
+    def test_missing_target_is_not_resurrected_from_its_backup(self, tmp_path):
+        # A user can delete Customized/Modules.xml outright (e.g. removing a
+        # mod that created it) after it became our live target. The old bug
+        # treated "file gone" the same as "file unreadable" and restored it
+        # from our orphaned .bak — resurrecting a file the user chose to
+        # remove. MainPrefs.xml, still marked, must still get stripped in the
+        # same pass; the old Default/Modules.xml target was already
+        # self-cleaned when the second splice moved to Customized/, so it has
+        # nothing left to strip.
+        game = _make_game(tmp_path)
+        splice_declarations(game)                      # lands in Default/
+        _write(_customized_modules(game), STOCK_MODULES)
+        splice_declarations(game)                      # now lands in Customized/
+        customized_backup = _customized_modules(game).with_name(
+            "Modules.xml" + BACKUP_SUFFIX)
+        assert customized_backup.is_file()
+        assert MARKER_BEGIN not in _read(_default_modules(game))
+        _customized_modules(game).unlink()              # user deleted it
+
+        removed = strip_declarations(game)
+
+        assert not _customized_modules(game).exists()
+        assert not customized_backup.exists()
+        assert removed == ["Default/MainPrefs.xml"]
+
 
 # =========================================================================== #
 # IgnorePatcher.enable                                                        #
