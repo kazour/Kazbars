@@ -109,7 +109,7 @@ types are unchanged, so no grid or profile whitelist is affected.
 - **Renamed:** `Slaughterer's Torment (Tetharos)` → `Slaughterer's Torment (Enigmata of Yag)` (`4490631`).
 - **Renamed:** `Advisor's Wrack (Argo-satha)` → `Advisor's Wrack (Vile Nativity)` (`4732523`).
 - **Renamed:** `Advisor's Torment (Argo-satha)` → `Advisor's Torment (Vile Nativity)` (`4732526`).
-- **Fixed:** `Crushed Armor Wrack (T4 adds)` → `Crushed Armor Wrack (T4/T6 adds)`, now `4553214`, `5064099`, `4752009`. The debuff comes from the T4 and T6 raid adds; the T6 copy was untracked, and the former `Crushed Armor Wrack (Kamangir)` (`4752009`) was a mis-attributed third copy of the same wrack, so it is folded in here rather than kept as a dungeon entry. Grids that whitelisted `4752009` need the entry's primary id `4553214`.
+- **Fixed:** `Crushed Armor Wrack (T4 adds)` → `Crushed Armor Wrack (Dai Gang)`, now `4553214`, `5064099`, `4752009`. The debuff is Dai Gang's — one of the three bosses fought alongside General Sheng in the Jade Citadel Courtyard — not the adds'. The later copy `5064099` was untracked, and the former `Crushed Armor Wrack (Kamangir)` (`4752009`) was a mis-attributed third copy of the same wrack, so it is folded in here rather than kept as a dungeon entry. Grids that whitelisted `4752009` need the entry's primary id `4553214`.
 - **Renamed:** `Sonic Missile Elemental Wrack (I-Po)` → `Sonic Missile Elemental Wrack (Pillars of Heaven)` (`4548156`).
 - **Renamed:** `Ghost Fangs Torment (Bhangi Khan)` → `Ghost Fangs Torment (Pillars of Heaven)` (`4549368`).
 - **Renamed:** `Wrack Armor (Ironwright)` → `Wrack Armor (T'ian'an District Sewers)` (`4707552`).
