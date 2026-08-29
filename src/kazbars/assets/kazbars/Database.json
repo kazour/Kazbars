@@ -181,9 +181,11 @@
       "type": "debuff"
     },
     {
-      "name": "Crushed Armor Wrack (T4 adds)",
+      "name": "Crushed Armor Wrack (Dai Gang)",
       "ids": [
-        4553214
+        4553214,
+        5064099,
+        4752009
       ],
       "category": "#Raid T4",
       "type": "debuff"
@@ -514,7 +516,13 @@
     {
       "name": "Elemental Wrack",
       "ids": [
-        3963061
+        3963061,
+        4244589,
+        4244597,
+        4244598,
+        4244599,
+        4244600,
+        4244601
       ],
       "category": "#General",
       "type": "debuff"
@@ -606,7 +614,14 @@
     {
       "name": "Physical Wrack",
       "ids": [
-        3963058
+        3963058,
+        4244662,
+        4244665,
+        4244667,
+        4244669,
+        4244671,
+        4244672,
+        4244673
       ],
       "category": "#General",
       "type": "debuff"
@@ -700,7 +715,13 @@
       "ids": [
         3963068,
         4882958,
-        4887864
+        4887864,
+        4244735,
+        4244736,
+        4244737,
+        4244738,
+        4244739,
+        4244740
       ],
       "category": "#General",
       "type": "debuff"
@@ -1060,8 +1081,7 @@
       ],
       "category": "Bear Shaman",
       "type": "buff",
-      "stacking": true,
-      "stackStart": 10
+      "stacking": true
     },
     {
       "name": "Renewal",
@@ -3457,11 +3477,11 @@
         4989883,
         5056521
       ],
-      "category": "#General",
+      "category": "#World Bosses",
       "type": "debuff"
     },
     {
-      "name": "Underworld Ruin 1-5 (Kun Whu)",
+      "name": "Underworld Ruin 1-5 (Abyss of Kun Whu)",
       "ids": [
         4046208,
         4046209,
@@ -3469,37 +3489,37 @@
         4046211,
         4046215
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff",
       "stacking": true,
       "stackEnd": 5
     },
     {
-      "name": "Eldritch Ruin (Little Prince)",
+      "name": "Eldritch Ruin (Vile Nativity)",
       "ids": [
         4866663,
         4866666
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Mind Ruin (Necropolis)",
+      "name": "Mind Ruin (Celestial Necropolis)",
       "ids": [
         4502966,
         4502998,
         4788836
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Venomous Ruin (Kian Lai)",
+      "name": "Venomous Ruin (Den of the Crowmen)",
       "ids": [
         4283587,
         4515792
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3507,31 +3527,31 @@
       "ids": [
         4515827
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Dulling Roar Ruin (Bhangi Khan)",
+      "name": "Dulling Roar Ruin (Pillars of Heaven)",
       "ids": [
         4268087
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Ravaging Howl Ruin (Bhangi Khan)",
+      "name": "Ravaging Howl Ruin (Pillars of Heaven)",
       "ids": [
         4549364
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Netherfrost Nether Ruin (Yun Rau)",
+      "name": "Netherfrost Nether Ruin (Palace of Yun Rau)",
       "ids": [
         4226929
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3539,119 +3559,119 @@
       "ids": [
         4507663
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Capture Ruin (Sethik Bloodblade)",
+      "name": "Capture Ruin (Caravan Raider's Hideout)",
       "ids": [
         4826763
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Batswarm Ruin (I-Po)",
+      "name": "Batswarm Ruin (Pillars of Heaven)",
       "ids": [
         4051322
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Fiery Ruin (Dimensionalist)",
+      "name": "Fiery Ruin (Amphitheater of Karutonia)",
       "ids": [
         4932986
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Aptitude Ruin (Grand Vizier)",
+      "name": "Aptitude Ruin (Coils of Ubah Kan)",
       "ids": [
         4990471
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Kian Lai's Ruin (Kian Lai)",
+      "name": "Kian Lai's Ruin (Den of the Crowmen)",
       "ids": [
         4283403,
         4804225,
         4804226
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Visions of Ruin (Omni-Prophet)",
+      "name": "Visions of Ruin (Coils of Ubah Kan)",
       "ids": [
         4991521
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Advisor's Ruin (Argo-satha)",
+      "name": "Advisor's Ruin (Vile Nativity)",
       "ids": [
         4732527
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Corrupted Claws Wrack 1-4 (Bone Golems)",
+      "name": "Corrupted Claws Wrack 1-4 (Yah Chieng)",
       "ids": [
         4704444,
         4704445,
         4704446,
         4704447
       ],
-      "category": "#General",
+      "category": "#Raid T4",
       "type": "debuff",
       "stacking": true,
       "stackEnd": 4
     },
     {
-      "name": "Lighter than Air Wrack (Air and Water)",
+      "name": "Lighter than Air Wrack (Vortex of the Storm)",
       "ids": [
         4550619
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Poison Pincer Wrack (Sodabeh)",
+      "name": "Poison Pincer Wrack (Ardashir Fort)",
       "ids": [
         4838217
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Scorching Torment (Devourer)",
+      "name": "Scorching Torment (Amphitheater of Karutonia)",
       "ids": [
         4935118
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Scorching Wrack 1-4 (Abyssal Convoker)",
+      "name": "Scorching Wrack 1-4 (Amphitheater of Karutonia)",
       "ids": [
         4935086,
         4935087,
         4935088,
         4935089
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff",
       "stacking": true,
       "stackEnd": 4
     },
     {
-      "name": "Malicious Wrack 1-5 (Jing-Zhi)",
+      "name": "Malicious Wrack 1-5 (Cavern of Malice)",
       "ids": [
         4515806,
         4515807,
@@ -3659,25 +3679,25 @@
         4515819,
         4515820
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff",
       "stacking": true,
       "stackEnd": 5
     },
     {
-      "name": "Enslaving Torment (Kun Whu)",
+      "name": "Enslaving Torment (Abyss of Kun Whu)",
       "ids": [
         4049150
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Slaughterer's Torment (Tetharos)",
+      "name": "Slaughterer's Torment (Enigmata of Yag)",
       "ids": [
         4490631
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
@@ -3685,84 +3705,76 @@
       "ids": [
         4991713
       ],
-      "category": "#General",
+      "category": "#World Bosses",
       "type": "debuff"
     },
     {
-      "name": "Advisor's Wrack (Argo-satha)",
+      "name": "Advisor's Wrack (Vile Nativity)",
       "ids": [
         4732523
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Advisor's Torment (Argo-satha)",
+      "name": "Advisor's Torment (Vile Nativity)",
       "ids": [
         4732526
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Crushed Armor Wrack (Kamangir)",
-      "ids": [
-        4752009
-      ],
-      "category": "#General",
-      "type": "debuff"
-    },
-    {
-      "name": "Sonic Missile Elemental Wrack (I-Po)",
+      "name": "Sonic Missile Elemental Wrack (Pillars of Heaven)",
       "ids": [
         4548156
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Ghost Fangs Torment (Bhangi Khan)",
+      "name": "Ghost Fangs Torment (Pillars of Heaven)",
       "ids": [
         4549368
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Wrack Armor (Ironwright)",
+      "name": "Wrack Armor (T'ian'an District Sewers)",
       "ids": [
         4707552
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Tainted Claws Wrack (Craterspawn)",
+      "name": "Tainted Claws Wrack (Celestial Necropolis)",
       "ids": [
         4752047
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Mind Wrack (Necropolis)",
+      "name": "Mind Wrack (Celestial Necropolis)",
       "ids": [
         4239687,
         4502967
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Ghostly Torment (Necropolis)",
+      "name": "Ghostly Torment (Celestial Necropolis)",
       "ids": [
         4239695
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff"
     },
     {
-      "name": "Kian Lai's Wrack 1-5 (Kian Lai)",
+      "name": "Kian Lai's Wrack 1-5 (Den of the Crowmen)",
       "ids": [
         4043129,
         4043131,
@@ -3770,13 +3782,13 @@
         4043133,
         4043134
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff",
       "stacking": true,
       "stackEnd": 5
     },
     {
-      "name": "Bhangi Khan Wrack 1-5",
+      "name": "Bhangi Khan Wrack 1-5 (Pillars of Heaven)",
       "ids": [
         4549463,
         4549505,
@@ -3784,7 +3796,7 @@
         4549507,
         4549508
       ],
-      "category": "#General",
+      "category": "#Dungeons",
       "type": "debuff",
       "stacking": true,
       "stackEnd": 5
@@ -3992,6 +4004,113 @@
       ],
       "category": "#Crowd Control",
       "type": "misc"
+    },
+    {
+      "name": "Physical Torment (Generic)",
+      "ids": [
+        3963274,
+        3963275,
+        3963276,
+        3963277,
+        3963278,
+        3963279,
+        3963280,
+        3963281,
+        3963283,
+        3963284,
+        3963285,
+        3963286,
+        3963287,
+        3963289,
+        3963290,
+        3963291,
+        3963292,
+        3963293,
+        3963294,
+        3963298,
+        4244619,
+        4244626,
+        4244627,
+        4244628,
+        4244629,
+        4244630
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Elemental Torment (Generic)",
+      "ids": [
+        3963165,
+        3963166,
+        3963167,
+        3963168,
+        3963169,
+        3963178,
+        3963179,
+        3963180,
+        3963181,
+        3963182,
+        3963183,
+        3963184,
+        3963185,
+        3963186,
+        3963187,
+        3963188,
+        3963189,
+        3963190,
+        3963191,
+        3963192,
+        4244605,
+        4244607,
+        4244608,
+        4244609,
+        4244610,
+        4244611
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Spiritual Torment (Generic)",
+      "ids": [
+        3963247,
+        3963248,
+        3963249,
+        3963250,
+        3963251,
+        3963252,
+        3963253,
+        3963254,
+        3963255,
+        3963256,
+        3963257,
+        3963258,
+        3963259,
+        3963260,
+        3963261,
+        3963262,
+        3963263,
+        3963264,
+        3963267,
+        3963273,
+        4244729,
+        4244730,
+        4244731,
+        4244732,
+        4244733,
+        4244734
+      ],
+      "category": "#General",
+      "type": "debuff"
+    },
+    {
+      "name": "Sodabeh's Wrack (Ardashir Fort)",
+      "ids": [
+        4838302
+      ],
+      "category": "#Dungeons",
+      "type": "debuff"
     }
   ]
 }
