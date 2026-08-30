@@ -12,7 +12,7 @@
 | File | Lines |
 |---|---:|
 | `src/kazbars/__init__.py` | 11 |
-| `src/kazbars/__main__.py` | 55 |
+| `src/kazbars/__main__.py` | 71 |
 | `src/kazbars/app.py` | 811 |
 | `src/kazbars/app_popups.py` | 491 |
 | `src/kazbars/boss_timer.py` | 399 |

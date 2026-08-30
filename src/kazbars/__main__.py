@@ -35,6 +35,21 @@ def _configure_logging():
     )
 
 
+def _claim_taskbar_identity():
+    """A source run is hosted by python.exe, so the taskbar and Alt-Tab show
+    Python's icon (the title bar uses the window icon and is fine). An explicit
+    AppUserModelID makes Windows treat the window as its own app. The frozen
+    exe already is one — its identity stays untouched so pinned shortcuts keep
+    matching."""
+    if sys.platform != "win32" or getattr(sys, "frozen", False):
+        return
+    import ctypes
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Kazour.KazBars")
+    except (AttributeError, OSError):
+        pass
+
+
 def main():
     apply = self_update.parse_args(sys.argv[1:])
     if apply is not None:
@@ -47,6 +62,7 @@ def main():
         # An apply died mid-way with the staged exe intact: hand back to it.
         self_update.respawn_apply(app_path())
         return
+    _claim_taskbar_identity()
     app = KazBarsApp()
     app.mainloop()
 
