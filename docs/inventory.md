@@ -95,6 +95,7 @@
 | `tests/test_cluster_isolation.py` | 188 |
 | `tests/test_combat_monitor.py` | 150 |
 | `tests/test_content_update.py` | 391 |
+| `tests/test_cut_release.py` | 163 |
 | `tests/test_damageinfo_colors_panel.py` | 293 |
 | `tests/test_damageinfo_generator.py` | 183 |
 | `tests/test_damageinfo_settings.py` | 336 |
