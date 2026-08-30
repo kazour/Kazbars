@@ -112,14 +112,18 @@ The project follows a `src/` layout — entry point is `python -m kazbars`, whic
 
 ## Releasing
 
-Releases are tag-driven. Bump `__version__` in [`src/kazbars/__init__.py`](src/kazbars/__init__.py), update [`docs/CHANGELOG.md`](docs/CHANGELOG.md) and [`.github/release-notes.md`](.github/release-notes.md), then:
+Patch and minor releases cut themselves. [`release-train.yml`](.github/workflows/release-train.yml) runs daily; once `main` carries code changes since the last tag (under `src/` or `kazbars.spec`), [`docs/CHANGELOG.md`](docs/CHANGELOG.md) has entries under `[Unreleased]`, and the newest code commit is at least 48 hours old, it runs [`scripts/cut_release.py`](scripts/cut_release.py), commits `Release vX.Y.Z`, tags it, and [`release.yml`](.github/workflows/release.yml) builds and publishes `KazBars.zip` + SHA256 checksum from the tag. The script reads `[Unreleased]`, picks the bump (`### Added` present means minor, otherwise patch), dates the changelog section, bumps `__version__` in [`src/kazbars/__init__.py`](src/kazbars/__init__.py), and writes the What's New block into [`.github/release-notes.md`](.github/release-notes.md). `--dry-run` prints the plan and writes nothing; setting the repository variable `RELEASE_HOLD` pauses the train.
+
+A major release, or one whose notes deserve a polish, is the same script by hand:
 
 ```bash
-git tag v2.0.0
-git push origin v2.0.0
+python scripts/cut_release.py --version X.Y.Z
+# review the What's New block in .github/release-notes.md, then:
+git commit -am "Release vX.Y.Z"
+git tag -a vX.Y.Z -m "KazBars vX.Y.Z"
+git push origin main
+git push origin vX.Y.Z
 ```
-
-The release workflow builds `KazBars.zip` + SHA256 checksum and publishes them as a GitHub release.
 
 ## License
 

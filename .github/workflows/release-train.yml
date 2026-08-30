@@ -1,0 +1,103 @@
+name: Release train
+
+# Cuts a patch (or minor) release on its own when main carries code that has not
+# shipped yet. Every gate must hold, otherwise the run ends with a notice:
+#   1. src/ or kazbars.spec changed since the last v* tag — docs, CI and uv.lock
+#      alone never trigger; a Dependabot bump rides along with the next change;
+#   2. docs/CHANGELOG.md has entries under [Unreleased] — blank notes never ship
+#      (code without an entry is a warning, not a release);
+#   3. the newest such commit is at least QUIET_HOURS old — batching without a
+#      calendar. A manual dispatch with force=true skips this gate only;
+#   4. the repository variable RELEASE_HOLD is empty.
+# Then scripts/cut_release.py bumps __version__, dates the changelog section and
+# writes What's New, the docs-sync suite re-checks the result, and the release
+# commit + annotated tag are pushed with RELEASE_TOKEN (a PAT with Contents:
+# read/write — a tag pushed with GITHUB_TOKEN does not trigger release.yml, and
+# an admin token is what may push to the protected branch). release.yml then
+# builds and publishes exactly as for a manual tag. Tags are never deleted or
+# moved; a bad release is fixed forward by the next run.
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Skip the quiet window
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  QUIET_HOURS: 48
+
+jobs:
+  cut:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Decide
+        id: gate
+        env:
+          FORCE: ${{ inputs.force }}
+          HOLD: ${{ vars.RELEASE_HOLD }}
+        run: |
+          if [ -n "$HOLD" ]; then
+            echo "::notice::RELEASE_HOLD is set — not cutting"; exit 0
+          fi
+          prev=$(git describe --tags --abbrev=0 --match 'v[0-9]*')
+          if git diff --quiet "$prev"..HEAD -- src kazbars.spec; then
+            echo "::notice::no code change since $prev"; exit 0
+          fi
+          python3 scripts/cut_release.py --dry-run > /dev/null; rc=$?
+          if [ "$rc" -eq 3 ]; then
+            echo "::warning::code changed since $prev but docs/CHANGELOG.md [Unreleased] is empty — add the entry and the next run will cut"; exit 0
+          elif [ "$rc" -ne 0 ]; then
+            exit "$rc"
+          fi
+          newest=$(git log -1 --format=%ct -- src kazbars.spec)
+          age=$(( ($(date +%s) - newest) / 3600 ))
+          if [ "$FORCE" != "true" ] && [ "$age" -lt "$QUIET_HOURS" ]; then
+            echo "::notice::newest code commit is ${age}h old — inside the ${QUIET_HOURS}h quiet window"; exit 0
+          fi
+          echo "go=true" >> "$GITHUB_OUTPUT"
+
+      - uses: astral-sh/setup-uv@v7
+        if: steps.gate.outputs.go == 'true'
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        if: steps.gate.outputs.go == 'true'
+        run: uv sync --locked --extra dev
+
+      - name: Cut
+        id: cut
+        if: steps.gate.outputs.go == 'true'
+        run: |
+          uv run python scripts/cut_release.py
+          echo "version=$(grep -oP '__version__ = "\K[^"]+' src/kazbars/__init__.py)" >> "$GITHUB_OUTPUT"
+
+      - name: Verify
+        if: steps.gate.outputs.go == 'true'
+        run: uv run pytest tests/test_docs_in_sync.py tests/test_manifest.py tests/test_cut_release.py -q --tb=short
+
+      - name: Commit, tag, push
+        if: steps.gate.outputs.go == 'true'
+        env:
+          VERSION: ${{ steps.cut.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/kazbars/__init__.py docs/CHANGELOG.md .github/release-notes.md
+          git commit -m "Release v${VERSION}"
+          git tag -a "v${VERSION}" -m "KazBars v${VERSION}"
+          git push origin main
+          git push origin "v${VERSION}"
+          echo "::notice::Released v${VERSION} — release.yml builds it from the tag"
