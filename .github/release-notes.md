@@ -1,14 +1,14 @@
-## What's New in v3.0.1
+## What's New in v3.1.0
 
-A patch release: one build fix, plus a note for anyone still on 2.2.2.
+A small update: 1 added, 1 changed.
+
+### Added
+
+- **KazBars updates itself.** When a newer release is out, the launch notice reads "KazBars vX is available — click to install": one click downloads it in the background, a second click restarts KazBars into the new version. Your profiles, settings, custom buffs and buff-database updates stay exactly where they are — no re-download, no first-time setup, no old folder to delete. If a download fails, nothing changes and the notice opens the release page instead. Installs older than this release still need one manual update: extract the new zip over your existing KazBars folder.
 
 ### Changed
 
-**Buff-database updates now need KazBars 3.0.0.** They carry the starter profile from now on, so New from template always uses the newest one. On 2.2.2 you'll see "New buffs are available — update KazBars to get them" and keep the catalog you have. Upgrading from 2.2.2 means your old profiles won't carry over — read the v3.0.0 release notes first.
-
-### Fixed
-
-**Big layouts build again.** Build & Install used to stop with "Class KazBarsData excess 32K bytecode limit" once your grids tracked roughly 600 or more distinct buffs between them — the starter profile plus one more grid of about 50 new buffs was enough. Any layout within the 64-slot cap now builds, however large the buff database grows. Nothing changes in-game.
+- **One check for everything.** Updates ▸ Check for updates now looks for a new KazBars release first and, when you're already current, for buff-database updates — replacing the two separate menu items. The About window's check now starts the install directly.
 
 ---
 
