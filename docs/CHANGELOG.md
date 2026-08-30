@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **KazBars updates itself.** When a newer release is out, the launch notice reads "KazBars vX is available — click to install": one click downloads it in the background, a second click restarts KazBars into the new version. Your profiles, settings, custom buffs and buff-database updates stay exactly where they are — no re-download, no first-time setup, no old folder to delete. If a download fails, nothing changes and the notice opens the release page instead. Installs older than this release still need one manual update: extract the new zip over your existing KazBars folder.
+
+### Changed
+
+- **One check for everything.** Updates ▸ Check for updates now looks for a new KazBars release first and, when you're already current, for buff-database updates — replacing the two separate menu items. The About window's check now starts the install directly.
+
 ## [3.0.1] — 2026-08-30
 
 ### Changed

@@ -12,9 +12,9 @@
 | File | Lines |
 |---|---:|
 | `src/kazbars/__init__.py` | 11 |
-| `src/kazbars/__main__.py` | 43 |
+| `src/kazbars/__main__.py` | 55 |
 | `src/kazbars/app.py` | 804 |
-| `src/kazbars/app_popups.py` | 486 |
+| `src/kazbars/app_popups.py` | 491 |
 | `src/kazbars/boss_timer.py` | 399 |
 | `src/kazbars/buff_database.py` | 189 |
 | `src/kazbars/buff_db_layers.py` | 267 |
@@ -55,7 +55,7 @@
 | `src/kazbars/grids_panel.py` | 708 |
 | `src/kazbars/inspect.py` | 64 |
 | `src/kazbars/inspect_panel.py` | 315 |
-| `src/kazbars/instructions_panel.py` | 1121 |
+| `src/kazbars/instructions_panel.py` | 1137 |
 | `src/kazbars/live_tracker_panel.py` | 511 |
 | `src/kazbars/live_tracker_settings.py` | 175 |
 | `src/kazbars/overlay_engine.py` | 800 |
@@ -66,6 +66,7 @@
 | `src/kazbars/profile_library.py` | 300 |
 | `src/kazbars/profile_share.py` | 140 |
 | `src/kazbars/profile_store.py` | 130 |
+| `src/kazbars/self_update.py` | 487 |
 | `src/kazbars/settings_backup.py` | 479 |
 | `src/kazbars/settings_core.py` | 298 |
 | `src/kazbars/settings_manager.py` | 56 |
@@ -79,7 +80,8 @@
 | `src/kazbars/ui_helpers.py` | 195 |
 | `src/kazbars/ui_tk_style.py` | 67 |
 | `src/kazbars/ui_widgets.py` | 320 |
-| `src/kazbars/update_check.py` | 114 |
+| `src/kazbars/update_check.py` | 64 |
+| `src/kazbars/update_orchestrator.py` | 148 |
 | `src/kazbars/userdata.py` | 110 |
 | `src/kazbars/window_position.py` | 116 |
 | `tests/test_app_contract.py` | 104 |
@@ -119,7 +121,7 @@
 | `tests/test_mypy_gate.py` | 74 |
 | `tests/test_overlay_config.py` | 102 |
 | `tests/test_panel_ratios.py` | 158 |
-| `tests/test_panels_construct.py` | 309 |
+| `tests/test_panels_construct.py` | 310 |
 | `tests/test_prefs.py` | 58 |
 | `tests/test_prefs_migration.py` | 99 |
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |
@@ -129,6 +131,8 @@
 | `tests/test_profile_share.py` | 198 |
 | `tests/test_profile_store.py` | 138 |
 | `tests/test_projection.py` | 89 |
+| `tests/test_release_assets.py` | 33 |
+| `tests/test_self_update.py` | 505 |
 | `tests/test_settings_backup.py` | 226 |
 | `tests/test_settings_core.py` | 373 |
 | `tests/test_settings_manager.py` | 33 |
@@ -137,5 +141,6 @@
 | `tests/test_timer_sizing.py` | 41 |
 | `tests/test_toast_model.py` | 213 |
 | `tests/test_toggle_button_state.py` | 41 |
-| `tests/test_update_check.py` | 35 |
+| `tests/test_update_check.py` | 83 |
+| `tests/test_update_orchestrator.py` | 226 |
 | `tests/test_userdata.py` | 71 |

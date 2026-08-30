@@ -28,7 +28,7 @@ from kazbars import (
     live_tracker_settings,
     profile_io,
     stopwatch,
-    update_check,
+    update_orchestrator,
 )
 from kazbars import __version__ as APP_VERSION
 from kazbars.app_popups import show_about_popup
@@ -149,6 +149,8 @@ class KazBarsApp(ttkb.Window):
         self.current_view = 'grids'
         self._building = False
         self._ota_app_update_notified = False
+        self._app_update_phase = None      # None | 'downloading' | 'ready'
+        self._app_update_staged = None     # staged exe path once 'ready'
         self.boss_timer_panel = None
         self.deeps_panel = None
         self.damage_numbers_panel = None
@@ -192,16 +194,18 @@ class KazBarsApp(ttkb.Window):
         if not self.game_path:
             self.after(100, self._show_first_launch_dialog)
         else:
-            # Returning user — poll for OTA buff-content now. A fresh install runs
-            # this from the first-launch completion path instead (see first_launch),
-            # so a rare update never races the welcome flow.
-            content_update.check_and_apply(self, APP_VERSION, self.settings.get('content_version'))
+            # Returning user — one check for an app release and OTA buff-content.
+            # A fresh install runs it from the first-launch completion path
+            # instead (see first_launch), so an update never races the welcome flow.
+            update_orchestrator.check_on_launch(self)
             # Deferred like the first-launch dialog beside it: the check touches
             # the game folder and can toast, neither of which belongs in the
             # startup path before the window is up.
             self.after(100, lambda: game_folder.check_install_health(self))
 
-        update_check.check_for_updates(self, APP_VERSION)
+        # An apply just ran (or died): report it and drop the staging dir once
+        # the staged exe has had time to exit.
+        self.after(1500, lambda: update_orchestrator.finish_startup(self))
 
     # ========================================================================
     # WIDGET CREATION
@@ -422,13 +426,10 @@ class KazBarsApp(ttkb.Window):
             {'type': 'checkbutton', 'label': 'Automatically update the buff database (recommended)',
              'variable': self._auto_update_var,
              'command': self._on_toggle_auto_update},
-            {'type': 'command', 'label': 'Check for buff-database updates now',
-             'command': self._check_content_updates_now},
+            {'type': 'command', 'label': 'Check for updates now',
+             'command': self._check_updates_now},
             {'type': 'command', 'label': 'Revert last buff-database update',
              'command': self._revert_content_update},
-            {'type': 'separator'},
-            {'type': 'command', 'label': 'Check for app updates now',
-             'command': self._check_app_updates_now},
         ])
         self._menubar.add_command(label="About", command=self._show_about)
 
@@ -658,9 +659,8 @@ class KazBarsApp(ttkb.Window):
                else "Automatic buff-database updates turned off")
         self.toast.show(msg, style='info', duration=4)
 
-    def _check_content_updates_now(self):
-        content_update.check_and_apply(
-            self, APP_VERSION, self.settings.get('content_version'), manual=True)
+    def _check_updates_now(self):
+        update_orchestrator.check_now(self)
 
     def _revert_content_update(self):
         content_update.revert(self)
@@ -669,9 +669,6 @@ class KazBarsApp(ttkb.Window):
         """Open the configured game folder in Windows Explorer."""
         if self.game_path and Path(self.game_path).is_dir():
             os.startfile(self.game_path)
-
-    def _check_app_updates_now(self):
-        return update_check.check_for_updates_manual(self, self.app_version)
 
     # ========================================================================
     # PROFILE SYSTEM
@@ -781,9 +778,11 @@ class KazBarsApp(ttkb.Window):
     # ========================================================================
     def _on_close(self):
         """Handle window close: DB-editor guard, then flush the profile (with
-        a rescue prompt if the disk has been refusing writes)."""
+        a rescue prompt if the disk has been refusing writes). Returns True
+        once the window is gone, False when a guard kept it open — the update
+        restart hands off only on True."""
         if not self._check_unsaved_db_changes():
-            return
+            return False
         if self.profile_store and not profile_io.release_store(self):
             dialog = MessageDialog(
                 "Your profile couldn't be saved to disk — the last edits may "
@@ -792,7 +791,7 @@ class KazBarsApp(ttkb.Window):
                 buttons=['Cancel:secondary', 'Exit anyway:danger'])
             dialog.show()
             if dialog.result != 'Exit anyway':
-                return
+                return False
         self.focus_watcher.stop()
         if bt := self._boss_timer_if_alive():
             bt.cleanup()
@@ -802,3 +801,4 @@ class KazBarsApp(ttkb.Window):
             dp.destroy()
 
         self.destroy()
+        return True

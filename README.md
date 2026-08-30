@@ -40,7 +40,7 @@ Most of what KazBars builds is set up once and runs on its own after you close t
 
 ## Install
 
-1. Download `KazBars.zip` from the [latest release](../../releases/latest) and extract it anywhere.
+1. Download `KazBars.zip` from the [latest release](../../releases/latest) and extract it anywhere. Upgrading from 3.0.1 or earlier? Extract it over your existing KazBars folder instead — profiles and settings survive. That's the last manual update: from then on KazBars offers new versions itself, one click to download and one to restart.
 
 2. Run `KazBars.exe` as Administrator.
 
@@ -60,7 +60,7 @@ Once you know the flow, make it yours: `+ Add Grid` for your own layouts, then `
 
 Sharing a layout: File ▸ Export profile… writes one `.kazbars.json` file, with any custom buffs it references baked in — the recipient doesn't need those buffs in their own database first. File ▸ Import profile… reads one back.
 
-> **SmartScreen warning**: Windows may flag the `.exe` as unrecognized on first launch. Click **More info** → **Run anyway**. KazBars is unsigned because code signing certificates aren't justified for a hobby project.
+> **SmartScreen warning**: Windows may flag the `.exe` as unrecognized on first launch. Click **More info** → **Run anyway**. Updates KazBars installs on its own don't trigger it. KazBars is unsigned because code signing certificates aren't justified for a hobby project.
 
 ## Community
 

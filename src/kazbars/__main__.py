@@ -1,8 +1,10 @@
 """KazBars entry point — `python -m kazbars`."""
 
 import logging
+import sys
 from logging.handlers import RotatingFileHandler
 
+from kazbars import __version__, self_update
 from kazbars.app import KazBarsApp
 from kazbars.paths import app_path
 
@@ -34,7 +36,17 @@ def _configure_logging():
 
 
 def main():
+    apply = self_update.parse_args(sys.argv[1:])
+    if apply is not None:
+        # Running as the staged exe: swap the install, relaunch it, exit. No
+        # logging setup here — run_apply logs into the install's own logs/.
+        sys.exit(self_update.run_apply(*apply))
     _configure_logging()
+    action, _pending = self_update.startup_action(app_path(), __version__)
+    if action == 'retry':
+        # An apply died mid-way with the staged exe intact: hand back to it.
+        self_update.respawn_apply(app_path())
+        return
     app = KazBarsApp()
     app.mainloop()
 
