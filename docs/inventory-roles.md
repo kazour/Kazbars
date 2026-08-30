@@ -90,7 +90,8 @@
 | `src/kazbars/ui_tk_style.py` | Raw-tk widget styling + dark titlebar |
 | `src/kazbars/foreground.py` | Pure ctypes foreground probe (`app_or_game_foreground`) — no Tk/PIL. Shared by both clusters + the `ForegroundWatcher`; defaults to "show" on any probe failure |
 | `src/kazbars/focus_watcher.py` | `ForegroundWatcher` — one app-owned ~250 ms tick that probes foreground once and fans `set_focus_suppressed` out to every registered overlay. Replaced the per-cluster focus polls |
-| `src/kazbars/paths.py` | Path constants: `PACKAGE_ROOT`/`ASSETS`/`KAZBARS_ASSETS` (bundled read-only assets, dev + frozen) + `app_path()` (user-writable runtime root next to the .exe) |
+| `src/kazbars/paths.py` | Path constants: `PACKAGE_ROOT`/`ASSETS`/`KAZBARS_ASSETS`/`APP_ICON` (bundled read-only assets, dev + frozen) + `app_path()` (user-writable runtime root next to the .exe) |
+| `tests/test_app_icon.py` | The app-icon contract — `assets/icon/KazBars.ico` exists with the 16/32/48 DIB frames and the PNG-compressed 256, `kazbars.spec` bundles the folder and bakes the exe icon from it, `app.py` passes `iconphoto=None` (no ttkbootstrap logo) and installs it via `iconbitmap(default=…)` |
 | `tests/test_imports.py` | Import-graph smoke test |
 | `tests/test_docs_in_sync.py` | this file's guard (no phantom rows, every `*.py` listed, line counts within `max(40, 25%)` tolerance) + `database-changelog.md` buff-total parity + flows.md ref guard (no `file:line` refs, referenced files exist, step subject callables resolve in the referenced file's AST) + CHANGELOG release guard (every `v*` tag has a `## [X.Y.Z]` section; CI checks out full history, so it bites there and in pre-commit) |
 | `tests/test_mypy_gate.py` | mypy-gate loop closer — the Tk-free module set (AST-derived) must equal `[tool.mypy] files` in both directions, no phantom entries |
