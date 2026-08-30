@@ -42,7 +42,7 @@ from kazbars.game_resolution import change_game_resolution
 from kazbars.grids_panel import GridsPanel
 from kazbars.instructions_panel import InstructionsPanel
 from kazbars.live_tracker_panel import LiveTrackerPanel
-from kazbars.paths import ASSETS, KAZBARS_ASSETS, app_path
+from kazbars.paths import APP_ICON, ASSETS, KAZBARS_ASSETS, app_path
 from kazbars.prefs import PREFS_SCHEMA
 from kazbars.profile_document import SectionRegistry
 from kazbars.profile_library import ProfileLibrary
@@ -88,11 +88,18 @@ class KazBarsApp(ttkb.Window):
     """KazBars — Standalone grid editor for Age of Conan."""
 
     def __init__(self):
-        super().__init__(themename="darkly")
+        # iconphoto=None: don't let ttkbootstrap install its own logo — the
+        # .ico below carries hand-tuned 16/32 px frames Windows picks itself.
+        super().__init__(themename="darkly", iconphoto=None)
         self.withdraw()
 
         self.title(f"{APP_NAME} — Untitled")
         self.iconname(APP_NAME)
+        try:
+            # default= : every Toplevel (dialogs included) inherits it.
+            self.iconbitmap(default=str(APP_ICON))
+        except tk.TclError:
+            logger.debug("App icon not applied", exc_info=True)
 
         # Paths — see kazbars.paths for the resolution rules. All user + machine
         # data lives under userdata/, created fresh here on first launch (no

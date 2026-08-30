@@ -22,6 +22,9 @@ a = Analysis(
         # Damage Numbers: the pristine game SWF + the lean AS2 source tree the
         # generator bakes + MTASC-injects on each build (see damageinfo_generator).
         (str(ASSETS / "damageinfo"), "kazbars/assets/damageinfo"),
+        # App icon: the window/taskbar icon at runtime (paths.APP_ICON); the exe
+        # resource below is baked from the same file.
+        (str(ASSETS / "icon"), "kazbars/assets/icon"),
     ],
     hiddenimports=[],
     hookspath=[],
@@ -54,6 +57,7 @@ exe = EXE(
     strip=False,
     upx=False,
     console=False,
+    icon=str(ASSETS / "icon" / "KazBars.ico"),
 )
 
 coll = COLLECT(

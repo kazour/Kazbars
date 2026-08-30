@@ -13,7 +13,7 @@
 |---|---:|
 | `src/kazbars/__init__.py` | 11 |
 | `src/kazbars/__main__.py` | 55 |
-| `src/kazbars/app.py` | 804 |
+| `src/kazbars/app.py` | 811 |
 | `src/kazbars/app_popups.py` | 491 |
 | `src/kazbars/boss_timer.py` | 399 |
 | `src/kazbars/buff_database.py` | 189 |
@@ -59,7 +59,7 @@
 | `src/kazbars/live_tracker_panel.py` | 511 |
 | `src/kazbars/live_tracker_settings.py` | 175 |
 | `src/kazbars/overlay_engine.py` | 800 |
-| `src/kazbars/paths.py` | 46 |
+| `src/kazbars/paths.py` | 47 |
 | `src/kazbars/prefs.py` | 223 |
 | `src/kazbars/profile_document.py` | 273 |
 | `src/kazbars/profile_io.py` | 325 |
@@ -85,6 +85,7 @@
 | `src/kazbars/userdata.py` | 110 |
 | `src/kazbars/window_position.py` | 116 |
 | `tests/test_app_contract.py` | 104 |
+| `tests/test_app_icon.py` | 43 |
 | `tests/test_as2_class_names.py` | 80 |
 | `tests/test_boss_timer.py` | 151 |
 | `tests/test_buff_db_layers.py` | 266 |

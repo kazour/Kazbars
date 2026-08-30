@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **KazBars has its own icon.** A 3×3 buff grid with the top row lit in the app's blue, in the title bar, the taskbar, Alt-Tab and on `KazBars.exe` itself — replacing the generic placeholder and the ttkbootstrap logo.
+
 ## [3.1.0] — 2026-08-30
 
 ### Added
