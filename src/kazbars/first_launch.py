@@ -9,7 +9,7 @@ from tkinter import filedialog, ttk
 
 from ttkbootstrap.dialogs import Messagebox
 
-from . import content_update, game_folder
+from . import game_folder, update_orchestrator
 from .app_popups import show_welcome_popup
 from .grid_model import apply_seed_sizes, parse_resolution
 from .ui_headers import create_dialog_header
@@ -340,9 +340,9 @@ def run_first_launch(app, app_name):
                 welcome_data['enabled_count'],
                 resolution_str=welcome_data['resolution'],
                 profile_name=welcome_data['profile_name']))
-        # First launch is complete — now safe to poll for OTA buff-content
-        # (deferred so a rare update never races the welcome popup).
-        content_update.check_and_apply(app, app.app_version, app.settings.get('content_version'))
+        # First launch is complete — now safe to check for updates (app release,
+        # then OTA buff-content; deferred so it never races the welcome popup).
+        update_orchestrator.check_on_launch(app)
         game_folder.check_install_health(app)
 
     show_first_launch_dialog(

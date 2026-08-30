@@ -110,8 +110,10 @@ files = [
     "src/kazbars/profile_share.py",
     "src/kazbars/profile_store.py",
     "src/kazbars/settings_core.py",
+    "src/kazbars/self_update.py",
     "src/kazbars/settings_manager.py",
     "src/kazbars/stopwatch.py",
+    "src/kazbars/update_check.py",
     "src/kazbars/userdata.py",
 ]
 ignore_missing_imports = true

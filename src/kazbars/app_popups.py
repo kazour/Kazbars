@@ -15,6 +15,7 @@ import webbrowser
 
 logger = logging.getLogger(__name__)
 
+from . import update_orchestrator
 from .ui_helpers import (
     FONT_BODY,
     FONT_HEADING,
@@ -27,7 +28,7 @@ from .ui_helpers import (
     TK_COLORS,
 )
 from .ui_widgets import blend_alpha
-from .update_check import fetch_latest
+from .update_check import fetch_release, release_tag
 
 # Layout — the popup family's shared frame (build_loading imports these)
 WIDTH = 420
@@ -370,20 +371,21 @@ def show_about_popup(parent, app_name, app_version):
         y += 22
 
     # Check for updates — same row style as the links, but the result lands
-    # in place: a clickable "vX.Y.Z available", a muted "latest", or a warning.
+    # in place: a clickable "vX.Y.Z available" that starts the in-place update,
+    # a muted "latest", or a warning.
     check_item = canvas.create_text(WIDTH // 2, y, text="▸ Check for updates",
                                     font=FONT_SECTION, fill=link_color)
     y += 22
-    check_state = {'mode': 'idle', 'url': None}
+    check_state = {'mode': 'idle', 'release': None}
 
-    def _apply_check_result(status, tag, url):
+    def _apply_check_result(status, release):
         """Main-thread dispatcher — the popup may have closed mid-fetch."""
         if not canvas.winfo_exists():
             return
         if status == 'update':
-            check_state.update(mode='url', url=url)
+            check_state.update(mode='install', release=release)
             canvas.itemconfig(check_item, fill=link_color,
-                              text=f"▸ v{tag} available — release notes")
+                              text=f"▸ v{release_tag(release)} available — install")
         elif status == 'current':
             check_state['mode'] = 'done'
             canvas.itemconfig(check_item, fill=THEME_COLORS['muted'],
@@ -394,15 +396,18 @@ def show_about_popup(parent, app_name, app_version):
                               text="Couldn't reach GitHub — check your connection")
 
     def _run_check():
-        status, tag, url = fetch_latest(app_version)
+        status, release = fetch_release(app_version)
         try:
-            popup.after(0, _apply_check_result, status, tag, url)
+            popup.after(0, _apply_check_result, status, release)
         except tk.TclError:
             pass
 
     def _on_check_click(_e=None):
-        if check_state['mode'] == 'url':
-            webbrowser.open(check_state['url'])
+        if check_state['mode'] == 'install':
+            # Hand the release to the app's update routine (the toast flow);
+            # the popup's grab must go first or the toast can't be clicked.
+            popup.destroy()
+            update_orchestrator.start_install(parent, check_state['release'])
         elif check_state['mode'] == 'idle':
             check_state['mode'] = 'busy'
             canvas.itemconfig(check_item, text="Checking…",
@@ -410,7 +415,7 @@ def show_about_popup(parent, app_name, app_version):
             threading.Thread(target=_run_check, daemon=True).start()
 
     def _on_check_hover(_e=None):
-        if check_state['mode'] in ('idle', 'url'):
+        if check_state['mode'] in ('idle', 'install'):
             canvas.config(cursor='hand2')
 
     canvas.tag_bind(check_item, '<Button-1>', _on_check_click)

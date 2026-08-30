@@ -391,10 +391,10 @@ End state: only this profile's *overridden* fields are written into `Customized/
 
 ## 22. OTA buff-database update on launch
 
-Trigger: `KazBarsApp.__init__` calls `content_update.check_and_apply(self, APP_VERSION, prefs.content_version)` after the layered DB load (returning user); on a fresh install `first_launch.on_dialog_closed` calls it once the welcome flow finishes (so an update never races the welcome popup). Auto-runs only if the "Automatically update the buff database" toggle is on.
+Trigger: the one update check — `KazBarsApp.__init__` calls `update_orchestrator.check_on_launch(self)` after the layered DB load (returning user); on a fresh install `first_launch.on_dialog_closed` calls it once the welcome flow finishes (so an update never races the welcome popup). The orchestrator asks GitHub for a newer app release first (Flow 31) and reaches this flow only when there is nothing to install. Auto-runs only if the "Automatically update the buff database" toggle is on.
 
 Steps:
-1. `content_update.check_and_apply()` — src/kazbars/content_update.py — bails immediately if (auto and the toggle is off); otherwise spawns a daemon worker thread.
+1. `content_update.check_and_apply()` — src/kazbars/content_update.py — called from `_check_worker()` (src/kazbars/update_orchestrator.py) with the app's version and `prefs.content_version`; bails immediately if (auto and the toggle is off); otherwise spawns a daemon worker thread.
 2. `_worker()` — fetches `ota/manifest.json` (raw URL on `main`); `parse_manifest` validates it. If `app_supports` is false (app older than `min_app_version`), schedules the once-per-session "New buffs are available — update KazBars" compat toast and stops. If not `is_newer(manifest, prefs.content_version)`, stops (manual run toasts "already up to date").
 3. Downloads each SHA-pinned payload (`Database.json`, `Default.json`); a `verify_sha256` mismatch aborts and swaps nothing. Then hops to the main thread via `app.after(0, _apply_on_main, …)`.
 4. `_apply_on_main()` — **apply guard:** if `db_panel.modified` or `app._building`, defer (do nothing — retry next launch). Else `apply_content(content_dir(), …)`: snapshot the current `content/` into `.bak/prev/`, `os.replace` each verified payload into `content/`, then write `content/manifest.json` LAST as the commit marker (a crash between the replace and the marker re-applies next launch — never half-applied).
@@ -407,10 +407,10 @@ End state: `userdata/content/` holds the new stock `Database.json` + `Default.js
 
 ## 23. check / revert buff-database updates (manual)
 
-Trigger: Updates ▸ "Check for buff-database updates now" or Updates ▸ "Revert last buff-database update".
+Trigger: Updates ▸ "Check for updates now" or Updates ▸ "Revert last buff-database update".
 
 Steps:
-- **Check now** → `KazBarsApp._check_content_updates_now()` → `content_update.check_and_apply(..., manual=True)` — the Flow 22 path, but runs regardless of the toggle and reports the outcome (applies an update, or toasts "already up to date" / "couldn't reach the update server").
+- **Check now** → `KazBarsApp._check_updates_now()` → `update_orchestrator.check_now(app)` — Flow 31 steps 1–2 with `manual=True`: a newer app release is offered instead; otherwise `content_update.check_and_apply(..., manual=True)` — the Flow 22 path, but runs regardless of the toggle and reports the outcome (applies an update, or toasts "already up to date" / "couldn't reach the update server").
 - **Revert** → `KazBarsApp._revert_content_update()` → `content_update.revert(app)` — `rollback(content_dir())` restores `content/` from `.bak/prev/` (a first-ever update clears `content/` back to the stock floor); sets `prefs.content_version` to the restored marker's version (or `CONTENT_BASELINE_VERSION`); `BuffDatabase.reload(content_update.active_content_db_path())` re-merges — the content layer is re-resolved at reload time and yields to stock when `content/` is below `CONTENT_BASELINE_VERSION`; refreshes the DB view; toasts. User deltas untouched. With nothing to revert, toasts so.
 
 End state: content reverted to the previous applied version (or the shipped stock); the live DB re-merged; prefs version aligned to what's on disk.
@@ -526,3 +526,24 @@ Steps:
 7. Result — src/kazbars/game_folder.py — success toast naming the shortcut, or a Messagebox carrying the PowerShell failure detail
 
 End state: a desktop shortcut launches the chosen client exe directly with `-novideo` and the game folder as its working directory — the launch path that preserves the declarations. `desktop_shortcut_offered` is set either way, so the automatic offer never fires twice; the Game menu re-offers it on demand, for a second client or a deleted shortcut.
+
+---
+
+## 31. install an app update (in place)
+
+Trigger: the launch check (`KazBarsApp.__init__` → `update_orchestrator.check_on_launch(self)` for a returning user; `first_launch.on_dialog_closed` for a fresh install), Updates ▸ "Check for updates now" (`KazBarsApp._check_updates_now()` → `check_now`), or About ▸ "Check for updates" (`show_about_popup`'s row, whose hit hands the release to `start_install`). One routine for both channels — the app release is asked first; the buff-database check (Flow 22) runs only when there is nothing to install.
+
+Steps:
+1. `check_on_launch()` / `check_now()` — src/kazbars/update_orchestrator.py — spawn `_check_worker` on a daemon thread (`manual` False / True).
+2. `_check_worker()` — src/kazbars/update_orchestrator.py — `update_check.fetch_release()` (src/kazbars/update_check.py): `'update'` (a newer tag) hops to `_offer_install` via `content_update._post`; `'error'` on a manual check toasts "Couldn't reach GitHub" and stops; anything else falls through to `content_update.check_and_apply(..., manual=manual)` — Flow 22 from its step 1.
+3. `_offer_install()` — src/kazbars/update_orchestrator.py — main thread. One toast under the `app-update` key: "KazBars vX is available — click to install". A download already running is left alone; a tree already staged (`app._app_update_phase == 'ready'`) is re-offered through `_show_ready`.
+4. `start_install()` — src/kazbars/update_orchestrator.py — **click 1** (also the About popup's entry): sets the phase to `'downloading'` and spawns `_install_worker`.
+5. `_install_worker()` — src/kazbars/update_orchestrator.py — worker thread: `self_update.stage_release()` (src/kazbars/self_update.py) — `pick_assets` (the `KazBars.zip` + `.sha256` contract), free-space check, `stream_download` into `<install>/.update/KazBars.zip` (sha256 in the same pass; every whole percent hops to `_show_progress`, which re-emits the same toast as "Downloading … NN%" then "Unpacking …"), `parse_sha256_file` compare, `validate_zip` (zip-slip guard, single `KazBars/` root, exe present), `extract_staged` to `.update/KazBars/`, zip deleted, `pending.json` written (`state: staged`). Any failure removes `.update/` and raises `StageError` → `_show_failed` resets the phase and toasts "… — click to open the release page".
+6. `_show_ready()` — src/kazbars/update_orchestrator.py — phase `'ready'`, staged exe remembered on `app._app_update_staged`; toast "KazBars vX downloaded — click to restart and install".
+7. `restart_to_install()` — src/kazbars/update_orchestrator.py — **click 2**: `KazBarsApp._on_close()` (src/kazbars/app.py) runs the normal close path — the DB-editor unsaved guard and the profile flush-with-rescue may cancel, returning False, in which case nothing happens and the staged tree waits (the next check re-offers it). On True the window is gone; `self_update.spawn_apply()` launches the **staged** exe with `--apply-update --target <install> --wait-pid <pid>` (`spawn_detached`, `cwd` = install root, `CREATE_NO_WINDOW`) and this process exits.
+8. `main()` — src/kazbars/__main__.py — in the staged exe: `self_update.parse_args()` sees the flag and calls `run_apply()` before any logging or Tk (`app_path()` would point at the staging dir).
+9. `run_apply()` — src/kazbars/self_update.py — logs to `<install>/logs/update.log`; marks `pending.json` `applying` (attempts +1); `wait_for_pid()` (ctypes `OpenProcess`/`WaitForSingleObject`); `wait_until_writable()` on the install's exe — the real "nobody runs this install" signal (PID reuse, a second instance, AV still scanning); `plan_copy()` (skips `userdata/`, `logs/`, `.update/`; exe last); `apply_tree()` — phase A copies every file to a `.kbnew` sibling (a failure here unwinds to nothing), phase B is one `os.replace` burst; `prune_internal()` drops `_internal/` files the new build doesn't ship; marks `applied`; relaunches `<install>/KazBars.exe`. Any exception marks `failed` (error recorded), removes stray temps, and still relaunches the install's exe — the user is never left without an app.
+10. `main()` — src/kazbars/__main__.py — the relaunched app: `startup_action()` (src/kazbars/self_update.py) classifies `.update/`; `'retry'` (an apply died under `MAX_APPLY_ATTEMPTS` with the staged exe intact) → `respawn_apply()` and return, before any window exists.
+11. `finish_startup()` — src/kazbars/update_orchestrator.py — `KazBarsApp.__init__` schedules it 1.5 s after launch (the staged exe is still tearing down): `'updated'` (running version == `pending.version`) toasts "KazBars updated to vX — click for what's new"; `'failed'` toasts "The update couldn't be installed — click to download it manually"; then `discard_staging()` removes `.update/` (best-effort; leftovers go next launch).
+
+End state: the install folder holds the new build with `userdata/` (profiles, prefs, user DB deltas, OTA content) and `logs/` byte-for-byte untouched, `.update/` gone, `logs/update.log` recording the apply. Files written by `urllib`/`zipfile` carry no Mark-of-the-Web, so the relaunch shows no SmartScreen prompt. A build older than the first self-updating release has no updater and is upgraded once by hand (extract the new zip over the existing folder).

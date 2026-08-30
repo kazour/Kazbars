@@ -739,23 +739,39 @@ SECTIONS: list[_Section] = [
         'id': 'updates',
         'title': 'Updates',
         'body': [
-            'The Updates menu covers two things: the buff database, and '
-            'KazBars itself.',
+            'One check covers KazBars itself and the buff database. It runs '
+            'at every launch; Updates ▸ Check for updates now — or Check for '
+            'updates in the About window — runs it on demand. KazBars comes '
+            'first; the buff database is only checked once the app is '
+            'current.',
+            _sub('App updates', [
+                'A newer release shows "KazBars vX is available — click to '
+                'install". Click it: the download runs in the background, '
+                'progress in the same notice, which then reads "downloaded — '
+                'click to restart and install".',
+                'The second click closes KazBars, installs the new version '
+                'over the existing folder, and reopens it. The usual '
+                'unsaved-changes prompts still apply — cancel, and the '
+                'downloaded update waits. Next launch: "KazBars updated to '
+                'vX — click for what\'s new".',
+                'Nothing you own moves. Profiles, settings, custom buffs and '
+                'buff-database updates all stay — no first-run setup again, '
+                'no old folder to delete, no SmartScreen prompt on the '
+                'relaunch.',
+                "If the download fails or doesn't verify, nothing changes. "
+                'The notice says what failed — click it to open the release '
+                'page.',
+            ]),
             _sub('Buff-database updates', [
-                [('The stock buff catalog refreshes over the internet. ', None),
+                [('The stock buff catalog refreshes over the internet once '
+                  'KazBars itself is current. ', None),
                  ('Automatically update the buff database', _SUCCESS),
-                 (' is on by default; Check for buff-database updates now '
-                  'asks immediately.', None)],
+                 (' is on by default; Check for updates now asks '
+                  'immediately.', None)],
                 'Updates never touch your own entries. Your edits sit in a '
                 'layer above the stock catalog and always win.',
                 'Revert last buff-database update undoes the most recent one '
                 'only — not a history.',
-            ]),
-            _sub('App updates', [
-                'Check for app updates now asks GitHub for a newer release. '
-                'The notice opens its download page.',
-                'KazBars never updates itself — you download and replace '
-                'your copy.',
             ]),
         ],
     },

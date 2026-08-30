@@ -69,8 +69,8 @@ def test_every_subprocess_spawn_passes_creationflags():
 
 def test_the_scan_still_finds_the_known_call_sites():
     """Canary: if a refactor hides every spawn from the AST walk, the check above
-    would pass vacuously. Three sites are known to exist."""
-    assert len(list(_spawn_sites())) == 3
+    would pass vacuously. Four sites are known to exist."""
+    assert len(list(_spawn_sites())) == 4
 
 
 def test_scan_detects_aliased_module_and_from_import_spawns():

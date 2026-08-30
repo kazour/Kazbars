@@ -13,7 +13,7 @@ show_close_game_required_dialog, BuildLoadingScreen, the settings_backup
 dialog, show_welcome_popup.
 
 The fixture neutralizes the two network entry points fired by
-KazBarsApp.__init__ (update_check, content_update), relocates userdata/ to a
+KazBarsApp.__init__ (update_orchestrator), relocates userdata/ to a
 tmp dir (patch seam: kazbars.userdata.app_path — userdata binds the name at
 import, so patching kazbars.paths.app_path would miss), and pre-seeds
 prefs.json with a game_path so the first-launch modal never fires.
@@ -41,7 +41,7 @@ APP_PY = REPO_ROOT / 'src' / 'kazbars' / 'app.py'
 @pytest.fixture(scope='module')
 def app(tmp_path_factory):
     """Boot one real KazBarsApp (withdrawn) shared by all tests in this module."""
-    from kazbars import content_update, update_check, userdata
+    from kazbars import content_update, update_orchestrator, userdata
     from kazbars.prefs import PREFS_SCHEMA
     from kazbars.settings_core import Store
 
@@ -51,7 +51,8 @@ def app(tmp_path_factory):
     (fake_game / 'Data' / 'Gui' / 'Default' / 'Flash').mkdir(parents=True)
 
     mp.setattr(userdata, 'app_path', lambda: root)
-    mp.setattr(update_check, 'check_for_updates', lambda *a, **k: None)
+    mp.setattr(update_orchestrator, 'check_on_launch', lambda *a, **k: None)
+    mp.setattr(update_orchestrator, 'finish_startup', lambda *a, **k: None)
     mp.setattr(content_update, 'check_and_apply', lambda *a, **k: None)
 
     # Pre-seed prefs with a game_path BEFORE the app constructs — __init__

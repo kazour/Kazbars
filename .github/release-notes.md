@@ -45,7 +45,7 @@ Buff/debuff overlay editor for **Age of Conan**. Design icon grids or bars that 
 
 ## Install
 
-1. Download `KazBars.zip` below and extract it anywhere.
+1. Download `KazBars.zip` below and extract it anywhere. Upgrading from 3.0.1 or earlier? Extract it over your existing KazBars folder instead — profiles and settings survive, and from then on KazBars offers updates itself.
 2. Run `KazBars.exe` as Administrator.
 3. The first-run setup window opens. Point it at your Age of Conan folder.
 4. Choose **Use Defaults** — ready-made grids for common raid buffs and debuffs, sized to your screen. (Or **Start Empty** to build your own from scratch.)
@@ -56,7 +56,7 @@ Positioning happens in-game: press Shift+Ctrl+Alt for preview mode and drag your
 
 Once you know the flow, make it yours: `+ Add Grid` for your own layouts, then `Tracked Buffs...` to pick what each one watches.
 
-> **SmartScreen warning**: Windows may flag the `.exe` as unrecognized on first launch. Click **More info** → **Run anyway**. KazBars is unsigned because code signing certificates aren't justified for a hobby project. If you want to verify the download, `KazBars.zip.sha256` is attached alongside the zip — compare it with `Get-FileHash "KazBars.zip"` in PowerShell.
+> **SmartScreen warning**: on a first install, Windows may flag the `.exe` as unrecognized. Click **More info** → **Run anyway**. Updates KazBars installs on its own don't trigger it. KazBars is unsigned because code signing certificates aren't justified for a hobby project. If you want to verify the download, `KazBars.zip.sha256` is attached alongside the zip — compare it with `Get-FileHash "KazBars.zip"` in PowerShell.
 
 ## Requirements
 
