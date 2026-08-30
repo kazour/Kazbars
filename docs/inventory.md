@@ -117,7 +117,7 @@
 | `tests/test_imports.py` | 33 |
 | `tests/test_inspect.py` | 108 |
 | `tests/test_log_name.py` | 22 |
-| `tests/test_manifest.py` | 59 |
+| `tests/test_manifest.py` | 124 |
 | `tests/test_mypy_gate.py` | 74 |
 | `tests/test_overlay_config.py` | 102 |
 | `tests/test_panel_ratios.py` | 158 |
