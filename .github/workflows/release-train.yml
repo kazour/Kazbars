@@ -1,13 +1,15 @@
 name: Release train
 
-# Cuts a patch (or minor) release on its own when main carries code that has not
-# shipped yet. Every gate must hold, otherwise the run ends with a notice:
-#   1. src/ or kazbars.spec changed since the last v* tag — docs, CI and uv.lock
+# Cuts a patch (or minor) release on its own, every second Monday, when main
+# carries code that has not shipped yet. Every gate must hold, otherwise the run
+# ends with a notice:
+#   1. it is a release Monday — the cron fires every Monday 00:01 UTC and the run
+#      skips itself unless a whole number of fortnights has passed since
+#      ANCHOR_MONDAY (a manual dispatch ignores this gate);
+#   2. src/ or kazbars.spec changed since the last v* tag — docs, CI and uv.lock
 #      alone never trigger; a Dependabot bump rides along with the next change;
-#   2. docs/CHANGELOG.md has entries under [Unreleased] — blank notes never ship
+#   3. docs/CHANGELOG.md has entries under [Unreleased] — blank notes never ship
 #      (code without an entry is a warning, not a release);
-#   3. the newest such commit is at least QUIET_HOURS old — batching without a
-#      calendar. A manual dispatch with force=true skips this gate only;
 #   4. the repository variable RELEASE_HOLD is empty.
 # Then scripts/cut_release.py bumps __version__, dates the changelog section and
 # writes What's New, the docs-sync suite re-checks the result, and the release
@@ -19,19 +21,14 @@ name: Release train
 
 on:
   schedule:
-    - cron: '0 4 * * *'
+    - cron: '1 0 * * 1'
   workflow_dispatch:
-    inputs:
-      force:
-        description: Skip the quiet window
-        type: boolean
-        default: false
 
 permissions:
   contents: write
 
 env:
-  QUIET_HOURS: 48
+  ANCHOR_MONDAY: '2026-08-31'
 
 jobs:
   cut:
@@ -45,11 +42,16 @@ jobs:
       - name: Decide
         id: gate
         env:
-          FORCE: ${{ inputs.force }}
           HOLD: ${{ vars.RELEASE_HOLD }}
         run: |
           if [ -n "$HOLD" ]; then
             echo "::notice::RELEASE_HOLD is set — not cutting"; exit 0
+          fi
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ]; then
+            days=$(( ( $(date -u +%s) - $(date -u -d "$ANCHOR_MONDAY" +%s) ) / 86400 ))
+            if [ $(( days % 14 )) -ne 0 ]; then
+              echo "::notice::off-week Monday (${days} days since ${ANCHOR_MONDAY}) — next release Monday in $(( 14 - days % 14 )) days"; exit 0
+            fi
           fi
           prev=$(git describe --tags --abbrev=0 --match 'v[0-9]*')
           if git diff --quiet "$prev"..HEAD -- src kazbars.spec; then
@@ -60,11 +62,6 @@ jobs:
             echo "::warning::code changed since $prev but docs/CHANGELOG.md [Unreleased] is empty — add the entry and the next run will cut"; exit 0
           elif [ "$rc" -ne 0 ]; then
             exit "$rc"
-          fi
-          newest=$(git log -1 --format=%ct -- src kazbars.spec)
-          age=$(( ($(date +%s) - newest) / 3600 ))
-          if [ "$FORCE" != "true" ] && [ "$age" -lt "$QUIET_HOURS" ]; then
-            echo "::notice::newest code commit is ${age}h old — inside the ${QUIET_HOURS}h quiet window"; exit 0
           fi
           echo "go=true" >> "$GITHUB_OUTPUT"
 
