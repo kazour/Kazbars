@@ -5,6 +5,8 @@ Run: `pytest tests/test_cut_release.py` (from repo root).
 """
 
 import importlib.util
+import io
+import sys
 from pathlib import Path
 
 import pytest
@@ -161,3 +163,15 @@ def test_real_repo_dry_run_parses():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     assert mod.main(["--dry-run"]) in (0, mod.NOTHING_TO_DO)
+
+
+def test_dry_run_survives_a_cp1252_console(cr, monkeypatch):
+    """The manual routine runs on Windows, whose console is cp1252 by default;
+    the What's New block carries ▸ and —. Printing must not crash after the
+    files have been written, so the script fixes its own stdout encoding."""
+    cr.CHANGELOG.write_text(CHANGELOG.replace("Both updates", "Updates ▸ Check — both"), encoding="utf-8")
+    raw = io.BytesIO()
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(raw, encoding="cp1252", write_through=True))
+    assert cr.main(["--dry-run", "--date", "2026-09-06"]) == 0
+    sys.stdout.flush()
+    assert "Updates ▸ Check — both" in raw.getvalue().decode("utf-8")

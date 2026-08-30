@@ -109,6 +109,11 @@ def main(argv=None):
     ap.add_argument("--date", default=datetime.date.today().isoformat(), help="YYYY-MM-DD (default: today)")
     ap.add_argument("--dry-run", action="store_true", help="print the plan, write nothing")
     args = ap.parse_args(argv)
+    if hasattr(sys.stdout, "reconfigure"):
+        # The What's New block carries ▸, — and friends; a cp1252 console (the
+        # Windows default) would otherwise crash the final print — after the
+        # files were already written.
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     body = unreleased_body(CHANGELOG.read_text(encoding="utf-8"))
     if not body:
