@@ -12,16 +12,23 @@ It reads the two shipped stock files, computes their sha256, points each payload
 URL at the ``main`` branch ref (integrity is the sha256, not URL immutability —
 the client rejects any payload whose hash doesn't match), bumps ``content_version``
 only when the content actually changed, preserves the existing ``notes`` when none
-is passed, fills ``min_app_version`` from ``__version__``, writes
-``ota/manifest.json``, and stamps the same version into ``src/kazbars/__init__.py``
-as ``CONTENT_BASELINE_VERSION``. ``tests/test_manifest.py`` guards that the two
-stay in lockstep and that the manifest sha256 matches the committed stock files.
+is passed, preserves ``min_app_version`` unless ``--min-app X.Y.Z`` raises it (a
+first-ever manifest floors at ``__version__``), writes ``ota/manifest.json``, and
+stamps the same version into ``src/kazbars/__init__.py`` as
+``CONTENT_BASELINE_VERSION``. ``tests/test_manifest.py`` guards that the two stay
+in lockstep, that the manifest sha256 matches the committed stock files, and that
+a regeneration keeps the floor.
+
+The floor is a deliberate choice, not the running version: raise it only when a
+payload genuinely needs a newer app (a schema change), and say why in the notes.
+Stamping ``__version__`` here would lock every older install out of the catalog
+on each patch release for no reason.
 """
 
+import argparse
 import hashlib
 import json
 import re
-import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -58,7 +65,7 @@ def _stamp_baseline(version):
     INIT.write_text(new, encoding="utf-8")
 
 
-def main(notes=None):
+def main(notes=None, min_app=None):
     shas = {name: _sha256(STOCK / name) for name in FILES}
     existing = _read_json(MANIFEST)
     if existing is None:
@@ -69,10 +76,12 @@ def main(notes=None):
         version = int(existing["content_version"]) + 1  # content moved — bump
     if notes is None:
         notes = (existing or {}).get("notes", "")       # preserve when not restated (CI verify)
+    if min_app is None:
+        min_app = (existing or {}).get("min_app_version") or _app_version()
     manifest = {
         "schema": 1,
         "content_version": version,
-        "min_app_version": _app_version(),
+        "min_app_version": min_app,
         "notes": notes,
         "files": {
             name: {"url": RAW_URL.format(name=name), "sha256": shas[name]}
@@ -89,4 +98,10 @@ def main(notes=None):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else None)
+    ap = argparse.ArgumentParser(description="Regenerate ota/manifest.json + CONTENT_BASELINE_VERSION.")
+    ap.add_argument("notes", nargs="?", default=None,
+                    help="release notes for this content version (omitted: keep the committed notes)")
+    ap.add_argument("--min-app", default=None, metavar="X.Y.Z",
+                    help="raise the app-version floor; only when a payload needs a newer app")
+    args = ap.parse_args()
+    main(args.notes, args.min_app)

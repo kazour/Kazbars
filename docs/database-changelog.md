@@ -8,7 +8,9 @@ Every change to the buff database (`src/kazbars/assets/kazbars/Database.json`) �
 **Scope:** the **shipped stock catalog** at `src/kazbars/assets/kazbars/Database.json` only.
 Per-user deltas in `userdata/database_user.json` are per-machine and not logged
 (`architecture.md` → "Buff database"). A stock change also needs its OTA manifest
-regenerated in the same commit — `architecture.md` → "Reference content / OTA".
+regenerated in the same commit — `architecture.md` → "Reference content / OTA". The
+manifest's `min_app_version` floor is preserved by the regeneration; pass `--min-app X.Y.Z`
+only when the new content needs a newer app, and say why in the notes.
 
 Add a bullet under a `## YYYY-MM-DD` heading at the top (reuse today's if it exists):
 
