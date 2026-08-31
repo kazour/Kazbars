@@ -7,7 +7,7 @@ name = "kazbars"
 description = "KazBars — Standalone buff-tracking grid editor for Age of Conan"
 readme = "README.md"
 requires-python = ">=3.12"
-license = "MIT"
+license = "GPL-2.0-or-later"
 authors = [{ name = "Kaz" }]
 dynamic = ["version"]
 dependencies = [

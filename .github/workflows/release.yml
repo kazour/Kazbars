@@ -26,6 +26,7 @@ jobs:
       - name: Package zip
         shell: pwsh
         run: |
+          Copy-Item LICENSE, THIRD_PARTY.md -Destination "dist/KazBars"
           Compress-Archive -Path "dist/KazBars" -DestinationPath "KazBars.zip" -Force
 
       - name: Compute SHA256
