@@ -1,9 +1,9 @@
-"""Damage Numbers generator — bake settings into the lean AS2, MTASC-inject the SWF.
+"""Damage Numbers generator — bake settings into the lean AS2, compile it into the SWF.
 
 ``generate()`` copies the shipped ``assets/damageinfo/src/__Packages`` tree to a temp
 dir and regex-rewrites each named constant to ``game_default + offset`` (the bake-map
 lives in :mod:`damageinfo_settings`). ``build_damageinfo()`` then copies the pristine
-game ``DamageInfo.swf`` and compiles the baked sources into that copy via MTASC
+game ``DamageInfo.swf`` and compiles the baked sources into that copy
 (``compile_as2``), replacing the damage-number classes while leaving the SWF's symbols
 and timeline intact. Two entry points are forced so ``FixOnLoad`` (which makes the
 container's ``onLoad`` fire) survives the inject. Pure build logic; no Tk.
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 # Entry points compiled into the SWF (relative to the __Packages classpath root).
 # FixOnLoad is force-compiled so the NumbersContainer symbol's registered class
-# survives MTASC's -swf inject (otherwise the container's onLoad never fires).
+# survives the inject (otherwise the container's onLoad never fires).
 ENTRY_POINTS = (
     'MainDamageNumbers.as',
     'com/helperFramework/display/FixOnLoad.as',
@@ -90,24 +90,21 @@ class DamageInfoGenerator:
         return ok
 
 
-def build_damageinfo(assets_path: str | Path, settings: dict, compiler_path: str | Path,
+def build_damageinfo(assets_path: str | Path, settings: dict,
                      output_swf: str | Path) -> tuple[bool, str]:
     """Bake + compile the modded ``DamageInfo.swf`` to ``output_swf``.
 
-    Copies the pristine game SWF shipped under ``assets/damageinfo/`` and MTASC-injects
-    the baked classes into it. Returns ``(success, message)``.
+    Copies the pristine game SWF shipped under ``assets/damageinfo/`` and injects the
+    baked classes into it. Returns ``(success, message)``.
     """
     assets_path = Path(assets_path)
-    compiler_path = Path(compiler_path)
     output_swf = Path(output_swf)
 
     di_dir = assets_path / 'damageinfo'
     pristine = di_dir / 'DamageInfo.swf'
     source_pkg = di_dir / 'src' / '__Packages'
-    std = compiler_path.parent / 'std'
-    std8 = compiler_path.parent / 'std8'
 
-    for label, p in (('pristine SWF', pristine), ('AS2 source', source_pkg), ('compiler', compiler_path)):
+    for label, p in (('pristine SWF', pristine), ('AS2 source', source_pkg)):
         if not p.exists():
             return False, f'Damage Numbers {label} missing: {p}'
 
@@ -123,10 +120,10 @@ def build_damageinfo(assets_path: str | Path, settings: dict, compiler_path: str
             return False, f'Damage Numbers entry point not found: {missing[0]}'
 
         shutil.copy2(pristine, output_swf)
-        ok, err = compile_as2(compiler_path, [std, std8, temp_pkg], output_swf, entries, temp_dir)
+        ok, err = compile_as2([temp_pkg], output_swf, entries)
         if not ok:
             output_swf.unlink(missing_ok=True)  # don't leave a pristine/partial SWF at the caller's path
-            return False, f'Damage Numbers MTASC compile failed:\n{err}'
+            return False, f'Damage Numbers compile failed:\n{err}'
 
         size = output_swf.stat().st_size
         return True, f'DamageInfo.swf built ({size:,} bytes)'

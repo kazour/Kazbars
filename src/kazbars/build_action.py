@@ -2,7 +2,7 @@
 KazBars — Build action.
 
 The Build & Install flow: validate prerequisites, auto-save the profile,
-compile grids to a staging SWF via MTASC, install to the game folder, and
+compile grids to a staging SWF, install to the game folder, and
 surface progress + summary via the BuildLoadingScreen. Takes the KazBarsApp
 instance as first arg.
 """
@@ -19,7 +19,6 @@ from ttkbootstrap.dialogs import Messagebox
 from . import game_folder
 from .app_popups import show_close_game_required_dialog
 from .build_loading import BuildLoadingScreen
-from .build_utils import find_compiler
 from .cast_timer import is_enabled as cast_is_enabled
 from .cast_timer import validate_config as validate_cast_config
 from .grid_model import get_game_resolution_or_default
@@ -67,7 +66,6 @@ def build(app):
         and (Path(app.game_path) / "Data" / "Gui" / "Default").exists()
     )
 
-    compiler = find_compiler(app.assets_path, app.app_path)
     grids = app.grids_panel.get_profile_data()
     total_slots = app.grids_panel.get_total_slots()
 
@@ -99,9 +97,6 @@ def build(app):
         (not valid,
          "No valid game folder configured.\n\n"
          "Set your Age of Conan folder from the bottom bar."),
-        (compiler is None,
-         "A required build file is missing.\n\n"
-         "Re-download KazBars to restore it."),
         (not grids and not any_extra,
          "Nothing to build.\n\nAdd a grid or enable an extra first."),
         (total_slots > MAX_TOTAL_SLOTS,
@@ -174,7 +169,6 @@ def build(app):
         'grids': grids,
         'database': app.database,
         'assets_path': app.assets_path,
-        'compiler': compiler,
         'app_version': app.app_version,
         'include_console': bool(app.settings.get('build_console', False)),
         'cast_config': cast_config,
@@ -228,8 +222,7 @@ def _build_worker(app, loading, ctx):
     try:
         started = time.monotonic()
         staging_dir, compile_result = compile_to_staging(
-            ctx['grids'], ctx['database'], ctx['assets_path'], ctx['compiler'],
-            ctx['app_version'],
+            ctx['grids'], ctx['database'], ctx['assets_path'], ctx['app_version'],
             include_console=ctx['include_console'], cast_config=ctx['cast_config'],
             stopwatch_config=ctx['stopwatch_config'],
             inspect_config=ctx['inspect_config'],
@@ -252,8 +245,7 @@ def _build_worker(app, loading, ctx):
             _post(app, loading.advance_step, "Baking damage numbers...")
             from .damageinfo_generator import build_damageinfo
             staged_di = staging_dir / "DamageInfo.swf"
-            di_ok, di_msg = build_damageinfo(
-                ctx['assets_path'], ctx['di_settings'], ctx['compiler'], staged_di)
+            di_ok, di_msg = build_damageinfo(ctx['assets_path'], ctx['di_settings'], staged_di)
             if not di_ok:
                 logger.warning("Damage Numbers build failed: %s", di_msg)
                 _hold_phase(started)

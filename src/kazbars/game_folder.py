@@ -220,32 +220,25 @@ def _restore_damageinfo(app):
 
     The same patch that restores the interface XMLs restores the stock
     DamageInfo.swf, so a Repair that skipped this would put the grids back and
-    silently leave the numbers vanilla. Rebakes from the current settings through
-    the compiler and commits down `build_executor`'s staged path, exactly as a
-    build does.
+    silently leave the numbers vanilla. Rebakes from the current settings and
+    commits down `build_executor`'s staged path, exactly as a build does.
 
     Returns False only when the mod is enabled and could not be restored — the
     caller says so, but Repair still counts as done: the declarations are what
     it exists for, and a rebuild fixes the rest.
     """
     from .build_executor import commit_damageinfo
-    from .build_utils import find_compiler
     from .damageinfo_generator import build_damageinfo
 
     settings = dict(app.profile_store.get_section('damage_numbers'))
     if not settings.get('enabled'):
         return True
 
-    compiler = find_compiler(app.assets_path, app.app_path)
-    if compiler is None:
-        logger.warning("Damage Numbers not restored: no compiler found")
-        return False
-
     flash = Path(app.game_path) / "Data" / "Gui" / "Default" / "Flash"
     pristine = Path(app.assets_path) / "damageinfo" / "DamageInfo.swf"
     with tempfile.TemporaryDirectory(prefix="kazbars_repair_") as staging:
         staged = Path(staging) / "DamageInfo.swf"
-        ok, msg = build_damageinfo(app.assets_path, settings, compiler, staged)
+        ok, msg = build_damageinfo(app.assets_path, settings, staged)
         if not ok:
             logger.warning("Damage Numbers not restored: %s", msg)
             return False

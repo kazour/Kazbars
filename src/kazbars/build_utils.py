@@ -7,11 +7,14 @@ import logging
 import subprocess
 from pathlib import Path
 
-from .paths import ASSETS, COMPILER_ASSETS
+from as2c.compile import compile_swf
+from as2c.diagnostics import CompileError
+
+from .paths import ASSETS
 
 logger = logging.getLogger(__name__)
 
-# KazBars is a windowed (no-console) app; spawning a console child (mtasc, tasklist)
+# KazBars is a windowed (no-console) app; spawning a console child (tasklist)
 # makes Windows stand up a console/conhost for it via the CSR subsystem, a handshake
 # that can stall ~5s per spawn on some systems (the child's initial thread blocks in
 # an Executive/CSR-LPC wait). CREATE_NO_WINDOW skips the console allocation entirely.
@@ -27,41 +30,14 @@ def resolve_assets_path(assets_path=None):
     return ASSETS
 
 
-def find_compiler(assets_path, app_path):
-    """Find MTASC compiler, checking multiple locations. Returns Path or None."""
-    for path in [
-        Path(assets_path) / "compiler" / "mtasc.exe",
-        COMPILER_ASSETS / "mtasc.exe",
-        Path(app_path) / "compiler" / "mtasc.exe",
-        Path(app_path) / "mtasc.exe",
-    ]:
-        if path.exists():
-            return path
-    return None
-
-
-def compile_as2(compiler_path, classpaths, base_swf, source_as, cwd, timeout=60, extra_flags=None):
-    """Run MTASC compiler. Returns (success, error_message_or_empty)."""
-    cmd = [str(compiler_path)]
-    for cp in classpaths:
-        if Path(cp).exists():
-            cmd.extend(["-cp", str(cp)])
-    if extra_flags:
-        cmd.extend(extra_flags)
-    cmd.extend(["-swf", str(base_swf), "-version", "8"])
-    if isinstance(source_as, list):
-        for sa in source_as:
-            cmd.append(str(sa))
-    else:
-        cmd.append(str(source_as))
+def compile_as2(classpaths, base_swf, sources):
+    """Compile `sources` (and every class they reach) into `base_swf` in place, mtasc
+    `-swf -version 8` semantics via as2c. Returns (success, error_message_or_empty)."""
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(cwd),
-                                timeout=timeout, creationflags=CREATE_NO_WINDOW)
-    except subprocess.TimeoutExpired:
-        return False, f"MTASC compilation timed out after {timeout}s"
-    if result.returncode != 0:
-        error = result.stderr or result.stdout or f"Unknown MTASC error (exit code {result.returncode})"
-        return False, error
+        compile_swf(base_swf, [str(cp) for cp in classpaths if Path(cp).exists()],
+                    [str(s) for s in sources])
+    except CompileError as e:
+        return False, str(e)
     return True, ""
 
 

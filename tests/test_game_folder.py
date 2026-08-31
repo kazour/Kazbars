@@ -2,7 +2,7 @@
 
 Only the parts that touch disk rather than Tk: the Damage Numbers ride-along
 that Repair performs, which has to put the mod back after a game patch restored
-the stock DamageInfo.swf. The compiler and the bake are monkeypatched — this is
+the stock DamageInfo.swf. The bake is monkeypatched — this is
 about the decision and the commit, not about MTASC (test_damageinfo_generator.py
 covers that). The dialog/toast orchestration around it is exercised manually.
 
@@ -11,7 +11,7 @@ Run: `pytest tests/test_game_folder.py` (from repo root).
 
 import types
 
-from kazbars import build_executor, build_utils, damageinfo_generator, game_folder
+from kazbars import build_executor, damageinfo_generator, game_folder
 from kazbars.build_executor import DAMAGEINFO_BACKUP, DAMAGEINFO_FILE
 from kazbars.game_folder import _restore_damageinfo
 
@@ -38,7 +38,7 @@ def _flash(game):
     return game / "Data" / "Gui" / "Default" / "Flash"
 
 
-def _setup(tmp_path, *, enabled, monkeypatch, compiler=True, bake=(True, "")):
+def _setup(tmp_path, *, enabled, monkeypatch, bake=(True, "")):
     game = tmp_path / "game"
     _flash(game).mkdir(parents=True)
     (_flash(game) / DAMAGEINFO_FILE).write_bytes(b"STOCK")
@@ -46,10 +46,7 @@ def _setup(tmp_path, *, enabled, monkeypatch, compiler=True, bake=(True, "")):
     (app.assets_path / "damageinfo").mkdir(parents=True)
     (app.assets_path / "damageinfo" / DAMAGEINFO_FILE).write_bytes(b"STOCK")
 
-    monkeypatch.setattr(build_utils, 'find_compiler',
-                        lambda _a, _b: tmp_path / "mtasc.exe" if compiler else None)
-
-    def fake_build(_assets, _settings, _compiler, output):
+    def fake_build(_assets, _settings, output):
         if bake[0]:
             output.write_bytes(b"MODDED")
         return bake
@@ -76,18 +73,9 @@ class TestRestoreDamageInfo:
         assert (_flash(game) / DAMAGEINFO_FILE).read_bytes() == b"STOCK"
         assert not (_flash(game) / DAMAGEINFO_BACKUP).exists()
 
-    def test_reports_a_missing_compiler(self, tmp_path, monkeypatch):
-        app, game = _setup(tmp_path, enabled=True, monkeypatch=monkeypatch,
-                           compiler=False)
-
-        # Repair still succeeds overall; the caller turns this into the
-        # "run Build & Install to restore Damage Numbers" toast.
-        assert _restore_damageinfo(app) is False
-        assert (_flash(game) / DAMAGEINFO_FILE).read_bytes() == b"STOCK"
-
     def test_reports_a_failed_bake(self, tmp_path, monkeypatch):
         app, game = _setup(tmp_path, enabled=True, monkeypatch=monkeypatch,
-                           bake=(False, "mtasc exploded"))
+                           bake=(False, "compiler exploded"))
 
         assert _restore_damageinfo(app) is False
         assert (_flash(game) / DAMAGEINFO_FILE).read_bytes() == b"STOCK"

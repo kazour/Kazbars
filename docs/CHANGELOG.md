@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - **KazBars is now licensed under the GNU GPL v2 or later.** Nothing changes in how you use it — anyone may copy, modify, and share it under the same terms. Third-party parts keep their own terms; see [THIRD_PARTY.md](../THIRD_PARTY.md).
+- **Builds no longer run a separate compiler program.** KazBars compiles your grids itself instead of shelling out to a bundled `mtasc.exe`, which is gone from the download. Build & Install works exactly the same otherwise.
 
 ## [3.1.1] — 2026-08-31
 

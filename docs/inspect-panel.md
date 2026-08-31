@@ -2,7 +2,7 @@
 
 What the `KazBarsInspect` stub reads, and why every constant in it is the number it is. Update when the watch list, a synthesis formula, or a display gate changes — the stub carries the rules as comments, this doc carries the reasoning and the id table behind them.
 
-The panel is an optional in-game overlay (Extras ▸ Inspect panel…) that renders a combat sheet for the current target in the visual language of the game's own inspect window. It is off by default; when off the build emits zero references and MTASC skips the stub entirely.
+The panel is an optional in-game overlay (Extras ▸ Inspect panel…) that renders a combat sheet for the current target in the visual language of the game's own inspect window. It is off by default; when off the build emits zero references and the compiler skips the stub entirely.
 
 | Piece | Where |
 |---|---|
@@ -14,7 +14,7 @@ The panel is an optional in-game overlay (Extras ▸ Inspect panel…) that rend
 | Config flow | [`flows.md`](flows.md) → flow 26 · build gating → flow 1, steps 9–11 |
 | Module wiring | [`architecture.md`](architecture.md) → Build pipeline |
 
-Nothing here is unit-testable — `tests/test_inspect.py` covers the config layer, `tests/test_grids_generator.py` the on/off codegen contract, and `tests/test_build_compile.py` a real MTASC compile of the stub, but the numbers below only prove themselves against the live game sheet. See **Verification** at the bottom.
+Nothing here is unit-testable — `tests/test_inspect.py` covers the config layer, `tests/test_grids_generator.py` the on/off codegen contract, and `tests/test_build_compile.py` a real compile of the stub, but the numbers below only prove themselves against the live game sheet. See **Verification** at the bottom.
 
 ---
 

@@ -35,7 +35,6 @@ def _resolve_assets() -> Path:
 
 ASSETS = _resolve_assets()
 KAZBARS_ASSETS = ASSETS / "kazbars"
-COMPILER_ASSETS = ASSETS / "compiler"
 APP_ICON = ASSETS / "icon" / "KazBars.ico"
 
 

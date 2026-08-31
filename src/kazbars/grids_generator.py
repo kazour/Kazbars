@@ -552,7 +552,6 @@ def build_grids(
     base_swf: str | Path,
     stubs_path: str | Path,
     output_swf: str | Path,
-    compiler_path: str | Path,
     app_version: str = "3.6.0",
     assets_path=None,
     include_console: bool = False,
@@ -571,7 +570,6 @@ def build_grids(
         base_swf: Path to assets/kazbars/base.swf
         stubs_path: Path to assets/kazbars/stubs/
         output_swf: Path to write final KazBars.swf
-        compiler_path: Path to mtasc.exe
         app_version: Version string for header comment
 
     Returns:
@@ -580,12 +578,9 @@ def build_grids(
     base_swf = Path(base_swf)
     stubs_path = Path(stubs_path)
     output_swf = Path(output_swf)
-    compiler_path = Path(compiler_path)
 
     if not base_swf.exists():
         return False, f"KazBars base.swf not found:\n{base_swf}"
-    if not compiler_path.exists():
-        return False, f"MTASC compiler not found:\n{compiler_path}"
 
     temp_dir = None
     try:
@@ -604,8 +599,8 @@ def build_grids(
         )
         files = generator.generate_files()
 
-        # Step 2: Write every class to a temp .as file (MTASC binds file name
-        # == class name)
+        # Step 2: Write every class to a temp .as file (the compiler binds file
+        # name == class name)
         temp_dir = tempfile.mkdtemp(prefix="kazbars_")
         sources = []
         for name, src in files:
@@ -621,15 +616,9 @@ def build_grids(
 
         # Step 4: Compile (main class + every data class)
         common_stubs = base_swf.parent.parent / "common_stubs"
-        ok, err = compile_as2(
-            compiler_path,
-            [stubs_path, common_stubs, temp_dir],
-            temp_swf,
-            sources,
-            temp_dir,
-        )
+        ok, err = compile_as2([stubs_path, common_stubs, temp_dir], temp_swf, sources)
         if not ok:
-            return False, f"MTASC compilation failed:\n{err}"
+            return False, f"Compilation failed:\n{err}"
 
         # Step 5: Copy to game directory
         shutil.copy2(temp_swf, output_swf)

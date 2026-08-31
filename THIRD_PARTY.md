@@ -3,12 +3,13 @@
 KazBars itself is licensed under the GNU General Public License v2.0 or later (see `LICENSE`).
 The following parts are not KazBars's own work and keep their own terms.
 
-## MTASC — ActionScript 2 compiler
+## as2c / MTASC — ActionScript 2 compiler
 
-`src/kazbars/assets/compiler/` ships `mtasc.exe` 1.14 and its `std/` and `std8/` class
-headers. MTASC is © 2004–2008 Nicolas Cannasse / Motion-Twin, licensed under the GNU GPL
-version 2 or later. Its source code is available at <https://github.com/ncannasse/mtasc>.
-KazBars runs it as a separate program; the SWF files it produces are not covered by its license.
+KazBars compiles its grids with [as2c](https://github.com/kazour/as2c) (GPL-2.0-or-later), a
+Python port of MTASC 1.14 that also carries MTASC's `std/` and `std8/` class headers. MTASC is
+© 2004–2008 Nicolas Cannasse / Motion-Twin, GNU GPL version 2 or later; its source code is at
+<https://github.com/ncannasse/mtasc>. The SWF files the compiler produces are not covered by
+its license.
 
 ## Deeps — combat-log parsers
 

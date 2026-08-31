@@ -1,39 +1,26 @@
-"""MTASC compile-integration test for the AS2 code generator.
+"""Compile-integration test for the AS2 code generator.
 
 The strongest form of the codegen test: run the *whole* generated source
-through the bundled `mtasc.exe` and assert exit-0. It is the single check that
+through the AS2 compiler and assert success. It is the single check that
 bridges Python-side correctness to SWF-side correctness — a unit test on the
 emitted strings can't catch AS2 the compiler rejects.
 
 Crucially it pins the §6 escaping fix: a grid `id` containing a quote, a
-newline, and a backslash must still produce a SWF MTASC accepts, proving
+newline, and a backslash must still produce a SWF the compiler accepts, proving
 `escape_as2_string` keeps the emitted string literal well-formed.
-
-Windows + bundled-compiler gated (mirrors test_deeps_meter's win32 guard) so
-the suite stays green on a CI image or dev box without the MTASC payload. CI
-runs windows-latest with the compiler bundled, so it executes there.
 
 Run: `pytest tests/test_build_compile.py` (from repo root).
 """
 
-import sys
 import tempfile
 from pathlib import Path
-
-import pytest
 
 from kazbars import grids_generator
 from kazbars.buff_database import BuffDatabase
 from kazbars.grids_generator import build_grids
-from kazbars.paths import COMPILER_ASSETS, KAZBARS_ASSETS
+from kazbars.paths import KAZBARS_ASSETS
 
-_COMPILER = COMPILER_ASSETS / "mtasc.exe"
 _BASE_SWF = KAZBARS_ASSETS / "base.swf"
-
-pytestmark = pytest.mark.skipif(
-    sys.platform != "win32" or not _COMPILER.exists() or not _BASE_SWF.exists(),
-    reason="needs Windows + the bundled mtasc.exe and base.swf",
-)
 
 
 def _db():
@@ -72,7 +59,7 @@ def _compile(grids, **kwargs):
     ok, msg = build_grids(
         grids, _db(),
         str(_BASE_SWF), str(KAZBARS_ASSETS / "stubs"),
-        str(out), str(_COMPILER),
+        str(out),
         "0.0.0",
         assets_path=KAZBARS_ASSETS.parent,
         **kwargs,
@@ -87,7 +74,7 @@ def test_minimal_grid_compiles_to_swf():
 
 
 def test_grid_id_with_quote_newline_backslash_still_compiles():
-    # Without escape_as2_string this emits a broken string literal and MTASC
+    # Without escape_as2_string this emits a broken string literal and the compiler
     # fails — so this is the regression guard for the §6 fix end-to-end.
     ok, msg, _ = _compile([_grid('My"Grid\n\\evil')])
     assert ok, msg
@@ -199,8 +186,8 @@ def _worst_case():
 
 def test_worst_case_profile_compiles():
     # Only compiles because the data is packed into KazBarsData1..N under
-    # MTASC's 32 KB-per-class bytecode cap; a catalog grown by OTA moves the
-    # chunk count, not the outcome.
+    # the compiler's 32 KB-per-class bytecode cap; a catalog grown by OTA moves
+    # the chunk count, not the outcome.
     grids, extras = _worst_case()
     ok, msg, _ = _compile(grids, **extras)
     assert ok, msg
@@ -208,7 +195,7 @@ def test_worst_case_profile_compiles():
 
 def test_worst_case_profile_fails_without_the_chunking(monkeypatch):
     # Negative control: lift the budget past the data's size and everything
-    # lands in one class MTASC rejects — the positive case above is proving
+    # lands in one class the compiler rejects — the positive case above is proving
     # the packing, not the compiler's leniency.
     monkeypatch.setattr(grids_generator, "DATA_CHUNK_BUDGET", 70_000)
     grids, extras = _worst_case()
