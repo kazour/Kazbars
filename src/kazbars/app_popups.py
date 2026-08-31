@@ -426,7 +426,7 @@ def show_about_popup(parent, app_name, app_version):
     y += 6
     canvas.create_line(40, y, WIDTH - 40, y, fill=sep_color)
     y += 14
-    canvas.create_text(WIDTH // 2, y, text=f"v{app_version}  ·  MIT License",
+    canvas.create_text(WIDTH // 2, y, text=f"v{app_version}  ·  GPL-2.0-or-later",
                        font=FONT_SMALL, fill=THEME_COLORS['muted'])
 
     # Animated buff-grid scene — 2x10 mini row, traveling wave,

@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/kazour/Kazbars/actions/workflows/ci.yml/badge.svg)](https://github.com/kazour/Kazbars/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/kazour/Kazbars?label=release)](https://github.com/kazour/Kazbars/releases/latest)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: GPL-2.0-or-later](https://img.shields.io/badge/license-GPL--2.0--or--later-blue.svg)](LICENSE)
 
 Buff/debuff overlay editor for **Age of Conan** — design icon grids and bars that show your active effects on top of the game, then compile and install them in one click. It also ships live combat HUDs and a handful of in-game extras: a cast timer, a stopwatch, a target inspect panel, leaner damage numbers, a real-time deeps meter, and the Ethram-Fal seed timer.
 
@@ -127,4 +127,4 @@ git push origin vX.Y.Z
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+GPL-2.0-or-later — see [LICENSE](LICENSE). Some bundled parts keep their own terms: the MTASC compiler, Funcom's game files, and the Deeps parsers. See [THIRD_PARTY.md](THIRD_PARTY.md) for the full list.

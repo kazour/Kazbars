@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **KazBars is now licensed under the GNU GPL v2 or later.** Nothing changes in how you use it — anyone may copy, modify, and share it under the same terms. Third-party parts keep their own terms; see [THIRD_PARTY.md](../THIRD_PARTY.md).
+
 ## [3.1.1] — 2026-08-31
 
 ### Changed
