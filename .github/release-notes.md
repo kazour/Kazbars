@@ -1,14 +1,10 @@
-## What's New in v3.1.0
+## What's New in v3.1.1
 
-A small update: 1 added, 1 changed.
-
-### Added
-
-- **KazBars updates itself.** When a newer release is out, the launch notice reads "KazBars vX is available — click to install": one click downloads it in the background, a second click restarts KazBars into the new version. Your profiles, settings, custom buffs and buff-database updates stay exactly where they are — no re-download, no first-time setup, no old folder to delete. If a download fails, nothing changes and the notice opens the release page instead. Installs older than this release still need one manual update: extract the new zip over your existing KazBars folder.
+A small update: 1 changed.
 
 ### Changed
 
-- **One check for everything.** Updates ▸ Check for updates now looks for a new KazBars release first and, when you're already current, for buff-database updates — replacing the two separate menu items. The About window's check now starts the install directly.
+- **KazBars has its own icon.** A 3×3 buff grid with the top row lit in the app's blue, in the title bar, the taskbar, Alt-Tab and on `KazBars.exe` itself — replacing the generic placeholder and the ttkbootstrap logo.
 
 ---
 

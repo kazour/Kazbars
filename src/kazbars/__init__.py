@@ -1,6 +1,6 @@
 """KazBars — Standalone buff-tracking grid editor for Age of Conan."""
 
-__version__ = "3.1.0"
+__version__ = "3.1.1"
 APP_NAME = "KazBars"
 
 # The buff-content version this build ships with — the floor for the OTA check.
