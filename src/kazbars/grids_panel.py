@@ -26,7 +26,11 @@ from .grid_model import (
 )
 from .profile_document import build_signature
 from .settings_manager import get_setting
-from .ui_components import DragReorderManager, create_scrollable_frame
+from .ui_components import (
+    DragReorderManager,
+    create_scrollable_frame,
+    scroll_widget_into_view,
+)
 from .ui_forms import draw_grid_cells
 from .ui_helpers import (
     BTN_MEDIUM,
@@ -108,14 +112,14 @@ class GridsPanel(ttk.Frame):
         # grids down the page; the state widgets take what is left, and the tip
         # bar still anchors `before` it (pack order, not position).
         self.extras_row = None
-        self._build_status_lbl = None
+        self.build_status_lbl = None
         if self.app is not None:
             self.extras_row = ExtrasShortcutsRow(self, self.app)
             self.extras_row.pack(side='bottom', fill='x', padx=PAD_TAB,
                                  pady=(PAD_XS, 0))
             # In-game status line under the cards — packed by
             # refresh_build_status() once a build has been recorded.
-            self._build_status_lbl = ttk.Label(self, font=FONT_SMALL,
+            self.build_status_lbl = ttk.Label(self, font=FONT_SMALL,
                                                foreground=THEME_COLORS['muted'])
 
         content = ttk.Frame(self._normal_view)
@@ -369,12 +373,12 @@ class GridsPanel(ttk.Frame):
         built from, and whether the live document (BUILD sections + target
         resolution) still matches it. No modal anywhere — staleness is a quiet
         row, not an interruption. Hidden until a build is recorded."""
-        if self._build_status_lbl is None:
+        if self.build_status_lbl is None:
             return
         last = self.app.settings.get('last_build') or {}
         store = self.app.profile_store
         if not last or store is None:
-            self._build_status_lbl.pack_forget()
+            self.build_status_lbl.pack_forget()
             return
         name = last.get('profile_name') or 'another profile'
         if last.get('profile_id') != store.document['id']:
@@ -389,10 +393,10 @@ class GridsPanel(ttk.Frame):
         else:
             text = f"In game: {name}"
             fg = THEME_COLORS['muted']
-        self._build_status_lbl.configure(text=text, foreground=fg)
+        self.build_status_lbl.configure(text=text, foreground=fg)
         # `after` is pack order; with side='bottom' that lands it directly
         # above the extras tiles, under the cards it describes.
-        self._build_status_lbl.pack(side='bottom', fill='x', padx=PAD_TAB,
+        self.build_status_lbl.pack(side='bottom', fill='x', padx=PAD_TAB,
                                     pady=(PAD_XS, 0), after=self.extras_row)
 
     def _update_tip(self):
@@ -672,7 +676,9 @@ class GridsPanel(ttk.Frame):
         new_index = index + delta
         if 0 <= new_index < len(self.grid_panels):
             self._reorder_grid(index, new_index)
-            self.grid_panels[new_index].drag_handle.focus_set()
+            moved = self.grid_panels[new_index]
+            moved.drag_handle.focus_set()
+            scroll_widget_into_view(self.grids_canvas, moved)
         return 'break'
 
     def _reorder_grid(self, old_index, new_index):

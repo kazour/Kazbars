@@ -310,6 +310,14 @@ class KazBarsApp(ttkb.Window):
         # Instructions view
         self.instructions_panel = InstructionsPanel(self.content_frame)
 
+        # The extras tiles and the "In game" row above them own the bottom strip
+        # of the Grids tab, which is where toasts stack — lift them clear of
+        # both, so a Build & Install toast can't cover the build-status line the
+        # same action just refreshed. Unmapped on the other two tabs, so the
+        # guard costs nothing there.
+        self.toast.set_bottom_guard(self.grids_panel.extras_row,
+                                    self.grids_panel.build_status_lbl)
+
         # Show default view — set initial underlines directly (canvas not mapped yet)
         self.grids_panel.pack(fill='both', expand=True)
         for name, widgets in self.nav_buttons.items():
@@ -512,6 +520,10 @@ class KazBarsApp(ttkb.Window):
             'instructions': self.instructions_panel,
         }
         views[view_name].pack(fill='both', expand=True)
+
+        # A toast raised before the switch is still on screen and still placed
+        # against the old tab's bottom guards — re-place it against this one's.
+        self.toast.relayout()
 
         # Refresh database list when switching to it (grid usage may have changed)
         if view_name == 'database':

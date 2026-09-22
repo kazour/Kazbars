@@ -1,8 +1,10 @@
 """Tests for kazbars.ui_components.ToastModel — the pure state core of the
 toast system: per-severity duration defaults, coalesce-by-key, the visible
 cap + overflow queue, two-tier priority, and bottom-anchored slot offsets
-(the overlap regression). The Tk renderer (ToastManager) stays manual-QA
-territory — animations and real geometry aren't unit-testable headlessly.
+(the overlap regression), plus the renderer's bottom guard, which is pure
+given a stub widget. The rest of the Tk renderer (ToastManager) stays
+manual-QA territory — animations and real geometry aren't unit-testable
+headlessly.
 
 Run: `pytest tests/test_toast_model.py` (from repo root).
 """
@@ -211,3 +213,65 @@ def test_every_severity_has_a_color_and_danger_is_red():
         assert style in ToastManager.STYLES
     assert ToastManager.STYLES['danger'] == 'danger'
     assert ToastManager.STYLES['error'] == 'danger'
+
+
+# ============================================================================
+# BOTTOM GUARD (renderer, but pure — no Tk needed)
+# ============================================================================
+# Toasts stack in the parent's bottom-right strip, which on the Grids tab holds
+# the extras tile row and the "In game" status row above it. The guard lifts the
+# stack clear of every one of those that is actually on screen — they are all
+# unmapped on the other two tabs.
+
+class _Guard:
+    def __init__(self, mapped, height=50):
+        self._mapped, self._height = mapped, height
+
+    def winfo_ismapped(self):
+        return self._mapped
+
+    def winfo_height(self):
+        return self._height
+
+
+def test_bottom_inset_is_zero_without_a_guard():
+    assert ToastManager(object())._bottom_inset() == 0
+
+
+def test_bottom_inset_tracks_a_mapped_guard():
+    mgr = ToastManager(object())
+    mgr.set_bottom_guard(_Guard(mapped=1, height=50))
+    assert mgr._bottom_inset() == 50 + 4          # + PAD_XS
+
+
+def test_bottom_inset_ignores_an_unmapped_guard():
+    """Switching to the Database or Help tab unmaps the row without unpacking
+    it — `winfo_ismapped` is what tells those two states apart."""
+    mgr = ToastManager(object())
+    mgr.set_bottom_guard(_Guard(mapped=0, height=50))
+    assert mgr._bottom_inset() == 0
+
+
+def test_bottom_inset_sums_stacked_guards():
+    """The Grids tab stacks two things in the toast strip — the extras tiles and
+    the "In game" row above them. A toast has to clear both, or a Build &
+    Install toast covers the status line that same build just refreshed."""
+    mgr = ToastManager(object())
+    mgr.set_bottom_guard(_Guard(mapped=1, height=50), _Guard(mapped=1, height=17))
+    assert mgr._bottom_inset() == (50 + 4) + (17 + 4)
+
+    # The status row is packed only once a build has been recorded.
+    mgr.set_bottom_guard(_Guard(mapped=1, height=50), _Guard(mapped=0, height=17))
+    assert mgr._bottom_inset() == 50 + 4
+
+
+def test_bottom_inset_survives_a_torn_down_guard():
+    import tkinter as tk
+
+    class _Dead:
+        def winfo_ismapped(self):
+            raise tk.TclError('bad window path name')
+
+    mgr = ToastManager(object())
+    mgr.set_bottom_guard(_Dead())
+    assert mgr._bottom_inset() == 0

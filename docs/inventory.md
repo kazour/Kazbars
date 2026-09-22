@@ -13,7 +13,7 @@
 |---|---:|
 | `src/kazbars/__init__.py` | 11 |
 | `src/kazbars/__main__.py` | 71 |
-| `src/kazbars/app.py` | 815 |
+| `src/kazbars/app.py` | 827 |
 | `src/kazbars/app_popups.py` | 491 |
 | `src/kazbars/boss_timer.py` | 399 |
 | `src/kazbars/buff_database.py` | 189 |
@@ -52,7 +52,7 @@
 | `src/kazbars/grid_editor_panel.py` | 710 |
 | `src/kazbars/grid_model.py` | 296 |
 | `src/kazbars/grids_generator.py` | 637 |
-| `src/kazbars/grids_panel.py` | 725 |
+| `src/kazbars/grids_panel.py` | 731 |
 | `src/kazbars/inspect.py` | 64 |
 | `src/kazbars/inspect_panel.py` | 315 |
 | `src/kazbars/instructions_panel.py` | 1140 |
@@ -74,7 +74,7 @@
 | `src/kazbars/stopwatch_panel.py` | 243 |
 | `src/kazbars/timer_overlay.py` | 372 |
 | `src/kazbars/ui_collapsible.py` | 232 |
-| `src/kazbars/ui_components.py` | 624 |
+| `src/kazbars/ui_components.py` | 674 |
 | `src/kazbars/ui_forms.py` | 460 |
 | `src/kazbars/ui_headers.py` | 197 |
 | `src/kazbars/ui_helpers.py` | 196 |
@@ -141,7 +141,7 @@
 | `tests/test_stopwatch.py` | 101 |
 | `tests/test_subprocess_flags.py` | 88 |
 | `tests/test_timer_sizing.py` | 41 |
-| `tests/test_toast_model.py` | 213 |
+| `tests/test_toast_model.py` | 277 |
 | `tests/test_toggle_button_state.py` | 41 |
 | `tests/test_update_check.py` | 83 |
 | `tests/test_update_orchestrator.py` | 226 |

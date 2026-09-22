@@ -289,6 +289,29 @@ class ToastManager:
     def __init__(self, parent):
         self._parent = parent
         self._model = ToastModel()
+        self._bottom_guards = ()
+
+    def set_bottom_guard(self, *widgets):
+        """Keep the toast stack clear of whatever is pinned to the parent's
+        bottom edge — on the Grids tab, the extras tiles and the "In game" row
+        stacked above them. Read live in `_bottom_inset`, never cached: the same
+        strip is empty on the other tabs, where those widgets are unmapped."""
+        self._bottom_guards = widgets
+
+    def relayout(self):
+        """Re-place live toasts after something outside the stack moved — a tab
+        switch maps or unmaps the guards without touching the toasts."""
+        self._layout()
+
+    def _bottom_inset(self):
+        inset = 0
+        for guard in self._bottom_guards:
+            try:
+                if guard is not None and guard.winfo_ismapped():
+                    inset += guard.winfo_height() + PAD_XS
+            except tk.TclError:
+                pass      # torn down mid-layout — no guard, same as unmapped
+        return inset
 
     def show(self, message, style='info', duration=None, on_click=None, key=None):
         state, toast = self._model.show(message, style, duration, key, on_click)
@@ -405,7 +428,8 @@ class ToastManager:
 
     def _place(self, frame):
         frame.place(relx=1.0, rely=1.0, anchor='se',
-                    x=-PAD_TAB, y=frame.slot_y + frame.anim_offset)
+                    x=-PAD_TAB,
+                    y=frame.slot_y + frame.anim_offset - self._bottom_inset())
 
     def _animate_entrance(self, toast):
         """Slide up from below the slot: eases the frame's anim_offset to 0,
@@ -484,6 +508,32 @@ class ToastManager:
 # ============================================================================
 # SCROLLABLE FRAME HELPER
 # ============================================================================
+def scroll_widget_into_view(canvas, widget):
+    """Scroll `canvas` the least it takes to show `widget` whole.
+
+    For keyboard-driven movement, where nothing drags the viewport along the way
+    (`DragReorderManager` auto-scrolls only near the edges, and only under the
+    mouse). Without it a card walked down with Alt+Down leaves the viewport and
+    every further keypress acts on something off screen. `widget` must be a
+    direct child of the canvas's inner frame, which sits at canvas y 0.
+    """
+    try:
+        canvas.update_idletasks()
+        region = canvas.bbox('all')
+        view_h = canvas.winfo_height()
+        if not region or region[3] - region[1] <= view_h:
+            return                    # everything already fits
+        total = region[3] - region[1]
+        top, view_top = widget.winfo_y(), canvas.canvasy(0)
+        bottom = top + widget.winfo_height()
+        if top < view_top:
+            canvas.yview_moveto(top / total)
+        elif bottom > view_top + view_h:
+            canvas.yview_moveto((bottom - view_h) / total)
+    except tk.TclError:
+        pass                          # torn down mid-move
+
+
 def create_scrollable_frame(parent, resize_flag=None):
     """Create a scrollable frame with canvas + scrollbar + mousewheel binding.
 
