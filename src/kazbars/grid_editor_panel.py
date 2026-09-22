@@ -158,8 +158,8 @@ class GridEditorPanel(ttk.Frame):
         delete_label.pack(side='right', padx=(PAD_XS, 0))
         for seq in ('<Button-1>', '<Return>', '<space>'):
             delete_label.bind(seq, lambda e: self.delete_grid())
-        bind_label_hover_colors(delete_label, THEME_COLORS['muted'], THEME_COLORS['danger'])
-        bind_label_press_effect(delete_label, THEME_COLORS['danger'])
+        bind_label_hover_colors(delete_label, THEME_COLORS['muted'], THEME_COLORS['danger_text'])
+        bind_label_press_effect(delete_label, THEME_COLORS['danger_text'])
         add_tooltip(delete_label, "Delete this grid")
         ttk.Checkbutton(header, text="Enabled",
                         variable=self.enabled_var,

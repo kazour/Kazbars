@@ -75,6 +75,7 @@ class BuffEditDialog(tk.Toplevel):
                                 app_window, resizable=False)
         bind_window_position_save(self, 'buff_edit_dialog', save_size=False)
         self.deiconify()
+        self.name_entry.focus_set()
 
     def create_widgets(self, buff):
         buff = buff or {}
@@ -84,8 +85,8 @@ class BuffEditDialog(tk.Toplevel):
         frame.pack(fill='both', expand=True)
 
         self.name_var = tk.StringVar(value=buff.get('name', ''))
-        self._add_grid_row(frame, 0, "Name:",
-                           ttk.Entry(frame, textvariable=self.name_var, width=35))
+        self.name_entry = ttk.Entry(frame, textvariable=self.name_var, width=35)
+        self._add_grid_row(frame, 0, "Name:", self.name_entry)
 
         ttk.Label(frame, text="ID(s):").grid(row=1, column=0, sticky='nw', pady=PAD_SMALL)
         id_frame = ttk.Frame(frame)

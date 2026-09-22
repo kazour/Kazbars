@@ -40,8 +40,8 @@ THEME_COLORS = {
     'purple':     '#9b59b6',   # Database nav accent
     # Buff classification tints — paired with the type label, never standalone.
     # Buff stays at 'body'; debuff/misc carry a desaturated hue at AAA contrast on #222.
-    'type_debuff': '#F0A0A0',  # Muted red (~7.6:1 AAA)
-    'type_misc':   '#E0C880',  # Warm gold (~9.3:1 AAA)
+    'type_debuff': '#F0A0A0',  # Muted red (7.76:1 AAA)
+    'type_misc':   '#E0C880',  # Warm gold (9.65:1 AAA)
 }
 
 # Colors for raw tk widgets (Canvas, Listbox, Text) that ttkbootstrap can't theme

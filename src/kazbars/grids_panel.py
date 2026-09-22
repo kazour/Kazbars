@@ -546,7 +546,7 @@ class GridsPanel(ttk.Frame):
         pct = total / MAX_TOTAL_SLOTS
         base = f"{total} / {MAX_TOTAL_SLOTS} slots"
         if pct >= 0.95:
-            color = THEME_COLORS['danger']
+            color = THEME_COLORS['danger_text']
             text = f"! {base}"
         elif pct >= 0.80:
             color = THEME_COLORS['warning']

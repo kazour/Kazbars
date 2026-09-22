@@ -232,6 +232,7 @@ def open_stopwatch_dialog(app):
     bind_window_position_save(dialog, 'stopwatch_settings', save_size=False)
     dialog.deiconify()
 
+    dialog.bind("<Return>", lambda e: _apply())
     dialog.bind("<Escape>", lambda e: dialog.destroy())
     dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
     # The global one-shot dark-titlebar patch can miss a Toplevel built this

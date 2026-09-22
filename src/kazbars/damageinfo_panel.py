@@ -107,6 +107,7 @@ class DamageNumbersPanel(tk.Toplevel):
         restore_window_position(self, "damage_numbers", _W, _H, parent, resizable=False)
         bind_window_position_save(self, "damage_numbers", save_size=False)
         self.deiconify()
+        self.bind("<Return>", lambda e: self._on_apply())
         self.bind("<Escape>", lambda e: self.destroy())
         self.protocol("WM_DELETE_WINDOW", self.destroy)
         # The global one-shot dark-titlebar patch can miss a deep/scrollable Toplevel

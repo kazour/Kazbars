@@ -254,7 +254,10 @@ class KazBarsApp(ttkb.Window):
 
             tab_color = self.nav_colors[view_name]
             dim_color = blend_alpha(tab_color, TK_COLORS['bg'], 30)
-            underline = tk.Canvas(btn_frame, height=1, highlightthickness=0,
+            # BOTH sizes must be explicit — the Tk default is 378x265, and
+            # fill='x' stretches the rendered canvas without shrinking what
+            # it asks btn_frame for (same class as the grid card's stripe).
+            underline = tk.Canvas(btn_frame, width=1, height=1, highlightthickness=0,
                                   bg=dim_color)
             underline.pack(fill='x')
 

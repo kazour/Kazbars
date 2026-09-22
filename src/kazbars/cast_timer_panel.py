@@ -299,6 +299,7 @@ def open_cast_timer_dialog(app):
     bind_window_position_save(dialog, 'cast_timer_settings', save_size=False)
     dialog.deiconify()
 
+    dialog.bind("<Return>", lambda e: _apply())
     dialog.bind("<Escape>", lambda e: dialog.destroy())
     dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
     # The global one-shot dark-titlebar patch can miss a Toplevel built this

@@ -358,7 +358,7 @@ class BuildLoadingScreen(tk.Toplevel):
             canvas.create_text(46, y, text="Compilation", anchor='w',
                                 font=FONT_SECTION, fill=THEME_COLORS['heading'])
             canvas.create_text(WIDTH - 40, y, text='\u2716', anchor='e',
-                                font=FONT_BODY, fill=THEME_COLORS['danger'])
+                                font=FONT_BODY, fill=THEME_COLORS['danger_text'])
             canvas.create_text(WIDTH - 50, y, text="Failed", anchor='e',
                                 font=FONT_BODY, fill=THEME_COLORS['warning'])
             y += 22
@@ -394,7 +394,7 @@ class BuildLoadingScreen(tk.Toplevel):
             for name, ok, err in client_results:
                 dot_color = _ACCENT if ok else THEME_COLORS['danger']
                 icon = '\u2713' if ok else '\u2716'
-                icon_color = THEME_COLORS['success'] if ok else THEME_COLORS['danger']
+                icon_color = THEME_COLORS['success'] if ok else THEME_COLORS['danger_text']
                 label = "Updated" if ok else "Failed"
                 label_color = THEME_COLORS['body'] if ok else THEME_COLORS['warning']
 

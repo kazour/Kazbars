@@ -42,7 +42,7 @@ from .ui_helpers import (
 
 _SUCCESS = THEME_COLORS['success']
 _ACCENT = THEME_COLORS['accent']
-_DANGER = THEME_COLORS['danger']
+_DANGER_TEXT = THEME_COLORS['danger_text']
 _WARNING = THEME_COLORS['warning']
 _MUTED = THEME_COLORS['muted']
 
@@ -297,7 +297,7 @@ SECTIONS: list[_Section] = [
             _sub('Debuff', [
                 'Negative effects, typically the non-removable bar or '
                 'anything you track on a target. Red border.',
-            ], _DANGER),
+            ], _DANGER_TEXT),
             _sub('Misc', [
                 'Anything separated from Buff/Debuff. Golden border.',
                 'The bundled database uses Misc for CC durations and heals-over-time.',
@@ -369,7 +369,7 @@ SECTIONS: list[_Section] = [
               'bundled — nothing else to install.', None)],
             [("The first build also registers KazBars with the game — two "
               'marked blocks in its config files, backed up beside them. ', None),
-             ('Close the game and the patcher before your first build.', _DANGER),
+             ('Close the game and the patcher before your first build.', _DANGER_TEXT),
              (' After that, rebuild anytime and /reloadui.', None)],
             'A quiet status line above the extras cards reads "In game: '
             '<profile>" and turns orange when the game no longer matches '
@@ -1094,8 +1094,10 @@ class InstructionsPanel(ttk.Frame):
                     tokens.append((text_part[i:j], color, False))
                 i = j
 
+        # BOTH sizes must be explicit — the Tk default is 378x265, and fill='x'
+        # stretches the rendered canvas without shrinking what it asks for.
         canvas = tk.Canvas(parent, bg=self._frame_bg, highlightthickness=0, borderwidth=0,
-                           height=line_h, takefocus=0)
+                           width=1, height=line_h, takefocus=0)
         canvas.pack(fill='x', padx=padx, pady=(0, PAD_XS))
 
         def relayout(width):

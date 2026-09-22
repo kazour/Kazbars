@@ -544,7 +544,10 @@ def create_scrollable_frame(parent, resize_flag=None):
     resize_flag: optional list [bool] — when True, layout updates are deferred.
     """
     outer = ttk.Frame(parent)
-    canvas = tk.Canvas(outer, highlightthickness=0, borderwidth=0)
+    # BOTH sizes must be explicit — the Tk default is 378x265, and the
+    # fill='both'/expand=True pack below stretches the rendered canvas
+    # without shrinking what it asks the parent for before that pack settles.
+    canvas = tk.Canvas(outer, width=1, height=1, highlightthickness=0, borderwidth=0)
     scrollbar = ttk.Scrollbar(outer, orient='vertical', command=canvas.yview)
     inner = ttk.Frame(canvas)
 

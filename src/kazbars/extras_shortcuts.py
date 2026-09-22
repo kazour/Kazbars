@@ -30,7 +30,7 @@ from .ui_helpers import (
     THEME_COLORS,
     TK_COLORS,
 )
-from .ui_widgets import add_tooltip, app_toast, bind_card_events
+from .ui_widgets import add_tooltip, app_toast
 
 
 # ============================================================================
@@ -56,6 +56,20 @@ def _make_section_setter(key, side_flags=()):
 
 # Shared by all four switches — they do the same thing on every card.
 _TOGGLE_TOOLTIP = 'Whether this ships in your next Build & Install'
+
+# The hover cue for whichever zone the pointer is over — same white as the
+# round-1 drag handle's lit state, not a new token.
+_HOVER_BORDER = '#ffffff'
+
+
+def _is_descendant(widget, ancestor):
+    w = widget
+    while w is not None:
+        if w is ancestor:
+            return True
+        w = getattr(w, 'master', None)
+    return False
+
 
 # (key, title, off-toast tail, tooltip, opener) + read/set — menu order.
 # `opener` is the KazBarsApp method the matching Extras menu item calls.
@@ -110,13 +124,23 @@ class ExtrasShortcutsRow(ttk.Frame):
         body = ttk.Frame(card)
         body.pack(fill='x', padx=PAD_LF, pady=PAD_SMALL)
 
+        # A cell of its own, not just the checkbutton, so the switch gets a
+        # hover border to answer with — same highlightthickness trick as the
+        # card, one size down, resting at the card's own background.
+        switch_cell = tk.Frame(body, bg=TK_COLORS['bg'],
+                               highlightbackground=TK_COLORS['bg'],
+                               highlightcolor=TK_COLORS['bg'],
+                               highlightthickness=1, cursor='hand2')
+        switch_cell.pack(side='right', padx=(PAD_XS, 0))
+
         var = tk.BooleanVar(value=False)
         toggle = ttk.Checkbutton(
-            body, variable=var,
+            switch_cell, variable=var,
             command=lambda k=key: self._on_toggle(k),
             bootstyle='success-round-toggle',  # type: ignore[call-arg]
+            cursor='hand2',
         )
-        toggle.pack(side='right', padx=(PAD_XS, 0))
+        toggle.pack()
 
         text = ttk.Frame(body)
         text.pack(side='left', fill='x', expand=True)
@@ -129,8 +153,8 @@ class ExtrasShortcutsRow(ttk.Frame):
 
         tile = {'key': key, 'title': title, 'off_tail': off_tail,
                 'read': read, 'write': write, 'opener': opener, 'var': var,
-                'card': card, 'status': status_lbl,
-                'resting': TK_COLORS['border'], 'on': None}
+                'card': card, 'switch_cell': switch_cell, 'status': status_lbl,
+                'on': None, 'hover': None}
         self._tiles[key] = tile
 
         # The card body opens settings. Tk delivers <Button-1> to the widget
@@ -140,9 +164,32 @@ class ExtrasShortcutsRow(ttk.Frame):
         for widget in (card, body, text, title_lbl, status_lbl):
             widget.bind('<Button-1>', lambda e, k=key: self._open_settings(k))
             widget.configure(cursor='hand2')
-        bind_card_events(card, lambda t=tile: t['resting'])
-        add_tooltip(card, tooltip)
+            self._bind_zone(widget, key, card, 'body')
+            add_tooltip(widget, tooltip)
+        self._bind_zone(switch_cell, key, card, 'switch')
         add_tooltip(toggle, _TOGGLE_TOOLTIP)
+
+    def _bind_zone(self, widget, key, card, zone):
+        """Enter always claims the zone; Leave only releases it once the
+        pointer is confirmed outside the card — moving straight from the
+        body onto the switch cell (or back) must not flicker through None."""
+        widget.bind('<Enter>', lambda e: self._set_hover(key, zone))
+        widget.bind('<Leave>', lambda e: self._on_zone_leave(e, key, card))
+
+    def _on_zone_leave(self, event, key, card):
+        try:
+            under = card.winfo_containing(event.x_root, event.y_root)
+        except (tk.TclError, RuntimeError):
+            under = None
+        if under is not None and _is_descendant(under, card):
+            return
+        self._set_hover(key, None)
+
+    def _set_hover(self, key, zone):
+        tile = self._tiles[key]
+        if tile['hover'] != zone:
+            tile['hover'] = zone
+            self._paint_tile(tile)
 
     # ------------------------------------------------------------------
     # Toggling & state
@@ -176,9 +223,19 @@ class ExtrasShortcutsRow(ttk.Frame):
                 continue
             tile['on'] = on
             tile['var'].set(on)
-            border = THEME_COLORS['success'] if on else TK_COLORS['border']
-            tile['resting'] = border
-            tile['card'].configure(highlightbackground=border, highlightcolor=border)
             tile['status'].configure(
                 text='In next build' if on else 'Off',
                 foreground=THEME_COLORS['success'] if on else TK_COLORS['dim_text'])
+            self._paint_tile(tile)
+
+    def _paint_tile(self, tile):
+        """The one place that touches either border — hover and on/off state
+        both flow through here, so a switch flip mid-hover (refresh() above)
+        repaints from the pointer's actual position instead of resetting to
+        resting underneath it."""
+        state_color = THEME_COLORS['success'] if tile['on'] else TK_COLORS['border']
+        card_color = _HOVER_BORDER if tile['hover'] == 'body' else state_color
+        tile['card'].configure(highlightbackground=card_color, highlightcolor=card_color)
+        switch_color = _HOVER_BORDER if tile['hover'] == 'switch' else TK_COLORS['bg']
+        tile['switch_cell'].configure(highlightbackground=switch_color,
+                                      highlightcolor=switch_color)

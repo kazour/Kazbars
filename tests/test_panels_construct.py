@@ -391,6 +391,38 @@ def test_first_launch_leaves_ambiguous_install_blank(app, monkeypatch, tmp_path)
         app.update()
 
 
+def test_first_launch_found_list_hides_the_matched_path(app, monkeypatch):
+    """The suggestion block repeats whatever the entry already holds —
+    noise, not help — so the single-install pre-fill hides it immediately;
+    editing away from every listed path brings it back, and retyping an
+    exact match hides it again. `winfo_children()` returns a pack_forget'd
+    widget same as a packed one, so this checks the frame's own geometry
+    manager, not label text — 'pack' if shown, '' once forgotten."""
+    from tkinter import ttk
+    dialog, entry, _buttons, _texts = _open_first_launch(
+        app, monkeypatch, [app.game_path])
+    try:
+        found_lbl = next(lbl for lbl in _widgets(dialog, ttk.Label)
+                         if str(lbl.cget('text')) == 'Found on this PC:')
+        found_frame = found_lbl.master
+
+        assert found_frame.winfo_manager() == ''      # pre-filled match: hidden
+
+        entry.delete(0, 'end')
+        entry.insert(0, 'Z:\\not-a-real-install')
+        app.update()
+        assert found_frame.winfo_manager() == 'pack'   # no match: shown
+
+        entry.delete(0, 'end')
+        entry.insert(0, str(app.game_path))
+        app.update()
+        assert found_frame.winfo_manager() == ''       # matches again: hidden
+    finally:
+        dialog.grab_release()
+        dialog.destroy()
+        app.update()
+
+
 # ============================================================================
 # BUFF-DB AUTOSAVE SEAM (rides the same app instance)
 # ============================================================================
@@ -454,9 +486,9 @@ def test_alt_arrow_moves_grid(app):
     app.update()
     assert _stored_grid(app, last - 1)['id'] == 'SeamMoveB'
     assert _stored_grid(app, last)['id'] == 'SeamMoveA'
-    # Focus-follows-the-grid is /smoke's to confirm: focus_set is a no-op while
-    # the fixture's app is withdrawn. What is checkable here is that the repack
-    # re-bound the keys at the new indices.
+    # Focus-follows-the-grid needs manual QA to confirm: focus_set is a no-op
+    # while the fixture's app is withdrawn. What is checkable here is that the
+    # repack re-bound the keys at the new indices.
     for handle in (gp.grid_panels[last - 1].drag_handle,
                    gp.grid_panels[last].drag_handle):
         assert handle.bind('<Alt-Up>') and handle.bind('<Alt-Down>')
@@ -528,7 +560,7 @@ def test_toast_guards_the_whole_bottom_strip(app):
 # winfo_width/height is 1 and geometry() is "1x1+0+0". Requested sizes DO
 # resolve, so these pin the two things that are checkable headlessly: the pure
 # fit function, and that each panel's status render is wired to it. Whether the
-# window visibly follows is /smoke's.
+# window visibly follows needs manual QA.
 
 class _StubWindow:
     """Minimal window surface `fit_window_height` touches."""
@@ -682,3 +714,117 @@ def test_extras_switch_toggles_without_opening_settings(app, monkeypatch):
     assert bool(tile['var'].get()) is not before
     assert app.profile_store.get_section('stopwatch')['enabled'] is not before
     assert opened == []
+
+
+def test_extras_card_hover_zones(app):
+    """One painter drives both zones: hovering the body lights the card
+    border; hovering the switch cell lights the switch instead and leaves
+    the card at its resting/state colour; and a state flip while the body
+    is hovered must not drop the border back to resting underneath the
+    pointer (the measured bug — refresh() used to repaint unconditionally)."""
+    from kazbars.extras_shortcuts import _HOVER_BORDER
+    row = app.grids_panel.extras_row
+    tile = row._tiles['inspect']
+    card, switch_cell = tile['card'], tile['switch_cell']
+
+    card.event_generate('<Enter>')
+    app.update()
+    assert str(card.cget('highlightbackground')) == _HOVER_BORDER
+
+    switch_cell.event_generate('<Enter>')
+    app.update()
+    assert str(card.cget('highlightbackground')) != _HOVER_BORDER
+    assert str(switch_cell.cget('highlightbackground')) == _HOVER_BORDER
+
+    card.event_generate('<Enter>')
+    app.update()
+    before = tile['on']
+    try:
+        app.profile_store.update_section('inspect', {'enabled': not before})
+        row.refresh()
+        assert str(card.cget('highlightbackground')) == _HOVER_BORDER
+    finally:
+        app.profile_store.update_section('inspect', {'enabled': before})
+        row.refresh()
+
+
+def test_extras_card_tooltip_reaches_labels(app):
+    """Every widget the open-settings click is bound to also carries its own
+    tooltip — Tk hides a parent's tooltip the instant the pointer crosses
+    onto a child, so the card frame alone isn't enough to reach the title
+    or status line."""
+    tile = app.grids_panel.extras_row._tiles['damage_numbers']
+    card = tile['card']
+    body = card.winfo_children()[0]
+    text = next(w for w in body.winfo_children() if w is not tile['switch_cell'])
+    title_lbl, status_lbl = text.winfo_children()
+    for w in (card, body, text, title_lbl, status_lbl):
+        assert getattr(w, '_kz_tooltip', None) is not None
+
+
+# ============================================================================
+# EVERY DIALOG CONFIRMS ON ENTER (WHERE ONE EXISTS) AND OPENS FOCUSED
+# ============================================================================
+# focus_set() is a no-op while the fixture's app is withdrawn (real focus
+# needs a mapped window — see test_alt_arrow_moves_grid above), so this pins
+# that a focus_set call happened at all, not which widget ended up focused;
+# whether the right one did needs manual QA. show_about isn't part of this
+# dialog inventory (a frameless popup, not one of the 16) and is excluded.
+_DIALOG_OPENERS = [(m, g) for m, g in OPENERS if m != '_show_about']
+
+# The two persistent panels have no single OK — Start/Stop takes the initial
+# focus instead, and ttkbootstrap's own TButton class binding already lets
+# Enter reach a focused button for free, so they deliberately bind no <Return>.
+_NO_RETURN_BINDING = {'_open_boss_timer', '_open_deeps_panel'}
+
+# damage_number_colors and buff_display_editor only pick an initial focus
+# target once they find real game XML to read — the fixture's fake install
+# is otherwise just an empty Data/Gui tree, which parks both in their
+# "nothing to show" state before ever reaching that code.
+_MIN_BUFFLISTVIEW = '<BuffListView icon_size="31" icon_spacing="2" max_columns="6" filter="friendly"/>'
+
+
+def _seed_game_xml(app):
+    from kazbars.buff_xml import BUFF_FILES
+    gui_default = Path(app.game_path) / 'Data' / 'Gui' / 'Default'
+    (gui_default / 'TextColors.xml').write_text('<TextColors/>', encoding='utf-8')
+    for _label, relpath in BUFF_FILES:
+        path = gui_default / relpath
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(_MIN_BUFFLISTVIEW, encoding='utf-8')
+
+
+@pytest.mark.parametrize('method,getter', _DIALOG_OPENERS, ids=[m for m, _ in _DIALOG_OPENERS])
+def test_dialogs_confirm_and_focus(app, monkeypatch, method, getter):
+    """Runs after the rest of the module, so the two single-instance panels
+    (Deeps, Live Tracker) may already be alive-but-withdrawn from an earlier
+    test — their opener then re-shows with focus_force(), not the fresh
+    focus_set() __init__ sets on a real first open. Both count here."""
+    _seed_game_xml(app)
+    calls = []
+    orig_focus_set = tk.Misc.focus_set
+    orig_focus_force = tk.Misc.focus_force
+
+    def _record(fn):
+        def _wrapped(self, *a, **k):
+            calls.append(self)
+            return fn(self, *a, **k)
+        return _wrapped
+
+    monkeypatch.setattr(tk.Misc, 'focus_set', _record(orig_focus_set))
+    monkeypatch.setattr(tk.Misc, 'focus_force', _record(orig_focus_force))
+
+    getattr(app, method)()
+    app.update()
+    panel = getter(app)
+    assert panel is not None
+    assert calls, f'{method}: no focus_set/focus_force call while opening'
+
+    bound = bool(panel.bind('<Return>'))
+    if method in _NO_RETURN_BINDING:
+        assert not bound, f'{method}: persistent panel should not bind <Return>'
+    else:
+        assert bound, f'{method}: no <Return> bound for its primary action'
+
+    _close_via_protocol(panel)
+    app.update()

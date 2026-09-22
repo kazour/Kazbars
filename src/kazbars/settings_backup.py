@@ -324,11 +324,12 @@ def open_backup_dialog(app):
     # but are left out of a restore unless the user opts in — a same-PC restore
     # wants them; a backup carried to another machine does not.
     include_prefs_var = tk.BooleanVar(value=False)
-    ttk.Checkbutton(
+    include_prefs_cb = ttk.Checkbutton(
         content,
         text="On restore, also bring back this PC's settings (window positions, game folder)",
         variable=include_prefs_var,
-    ).pack(anchor="w", pady=(0, PAD_SMALL))
+    )
+    include_prefs_cb.pack(anchor="w", pady=(0, PAD_SMALL))
 
     btns = ttk.Frame(content)
     btns.pack(fill="x", pady=(PAD_SMALL, 0))
@@ -352,6 +353,9 @@ def open_backup_dialog(app):
 
     dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
     dialog.bind('<Escape>', lambda e: dialog.destroy())
+    # No Enter binding: Back up… and Restore… are two peer actions, not one
+    # primary — each already opens its own file dialog for the actual commit.
+    include_prefs_cb.focus_set()
 
 
 def backup_settings(app, dialog):

@@ -114,13 +114,17 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
         else:
             warn_label.configure(text="")
 
-    # Common locations (only show paths that exist)
+    # Common locations (only show paths that exist). Its own frame, not packed
+    # straight on content, so it can hide once the entry already holds one of
+    # these paths — repeating a path the user just typed or clicked is noise,
+    # not help.
     existing_paths = [cp for cp in COMMON_INSTALL_PATHS if Path(cp).exists()]
+    found_frame = ttk.Frame(content)
     if existing_paths:
-        ttk.Label(content, text="Found on this PC:", font=FONT_SMALL,
+        ttk.Label(found_frame, text="Found on this PC:", font=FONT_SMALL,
                   foreground=THEME_COLORS['muted']).pack(anchor='w', pady=(PAD_XS, PAD_TINY))
         for cp in existing_paths:
-            lbl = ttk.Label(content, text=f"  {cp}", font=FONT_SMALL,
+            lbl = ttk.Label(found_frame, text=f"  {cp}", font=FONT_SMALL,
                             foreground=THEME_COLORS['body'], cursor='hand2',
                             takefocus=True)
             lbl.pack(anchor='w')
@@ -132,6 +136,7 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
             lbl.bind('<FocusOut>', lambda e, l=lbl: l.config(
                 foreground=THEME_COLORS['body']))
             bind_label_press_effect(lbl)
+        found_frame.pack(fill='x')
 
     # Separator
     sep = ttk.Separator(content, orient='horizontal')
@@ -266,7 +271,8 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
 
     # Enable/disable action buttons based on game path
     def _on_path_changed(*_):
-        has_path = bool(path_var.get().strip())
+        p = path_var.get().strip()
+        has_path = bool(p)
         state = 'normal' if has_path else 'disabled'
         if btn_defaults:
             btn_defaults.configure(state=state)
@@ -274,6 +280,14 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
         gate_label.configure(
             text="" if has_path else "Set your game folder above to start.")
         _validate_path_hint()
+        # The entry already shows one of these paths verbatim — repeating it
+        # in the list below is noise, not help. Clearing or editing it away
+        # from every listed path brings the list back.
+        if existing_paths:
+            if p in existing_paths:
+                found_frame.pack_forget()
+            else:
+                found_frame.pack(fill='x', before=sep)
 
     path_var.trace_add('write', _on_path_changed)
     _on_path_changed()

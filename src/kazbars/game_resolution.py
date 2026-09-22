@@ -72,8 +72,9 @@ def change_game_resolution(app):
               ).pack(anchor='w', pady=(0, PAD_XS))
 
     res_var = tk.StringVar(value=current)
-    ttk.Combobox(content, textvariable=res_var, values=options,
-                 width=14, font=FONT_BODY).pack(anchor='w', pady=(0, PAD_SMALL))
+    res_combo = ttk.Combobox(content, textvariable=res_var, values=options,
+                             width=14, font=FONT_BODY)
+    res_combo.pack(anchor='w', pady=(0, PAD_SMALL))
 
     btns = ttk.Frame(content)
     btns.pack(fill='x', pady=(PAD_SMALL, 0))
@@ -111,3 +112,4 @@ def change_game_resolution(app):
     dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
     dialog.bind('<Escape>', lambda e: dialog.destroy())
     dialog.bind('<Return>', lambda e: _apply())
+    res_combo.focus_set()

@@ -231,6 +231,10 @@ class DeepsPanel(tk.Toplevel):
 
         self.protocol("WM_DELETE_WINDOW", self._on_withdraw)
         self.bind('<Escape>', lambda e: self._on_withdraw())
+        # No single OK to bind Enter to — Start/Stop is the headline action,
+        # so it gets the initial focus instead.
+        if self._start_btn is not None:
+            self._start_btn.focus_set()
 
     # ------------------------------------------------------------------ #
     # UI construction                                                    #
