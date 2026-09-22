@@ -127,4 +127,4 @@ git push origin vX.Y.Z
 
 ## License
 
-GPL-2.0-or-later — see [LICENSE](LICENSE). Some bundled parts keep their own terms: the MTASC compiler, Funcom's game files, and the Deeps parsers. See [THIRD_PARTY.md](THIRD_PARTY.md) for the full list.
+GPL-2.0-or-later — see [LICENSE](LICENSE). Some bundled parts keep their own terms: as2c (a port of MTASC), Funcom's game files, and the Deeps parsers. See [THIRD_PARTY.md](THIRD_PARTY.md) for the full list.
