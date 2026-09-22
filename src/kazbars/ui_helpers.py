@@ -29,12 +29,12 @@ FONT_STATUS_ICON_LG = ('Segoe UI', 28, 'bold')   # Build status icon (glow layer
 # Semantic colors for ttk widget foreground text
 THEME_COLORS = {
     'heading':    '#FFFFFF',   # Section headings
-    'body':       '#C0C7CE',   # Body/descriptions (~7.2:1 WCAG AAA on #222)
-    'muted':      '#B0B0B0',   # Hints, placeholders (~6.0:1 on #222)
+    'body':       '#C0C7CE',   # Body/descriptions (9.32:1 WCAG AAA on #222)
+    'muted':      '#B0B0B0',   # Hints, placeholders (7.34:1 AAA on #222)
     'accent':     '#3498db',   # Links, emphasis
     'warning':    '#f39c12',   # Warnings
     'danger':     '#e74c3c',   # Errors — fills/borders/dots (~4.2:1 on #222, below AA for text)
-    'danger_text': '#f06a5d',  # Error text on #222 (~5.3:1 AA) — use for readable danger labels
+    'danger_text': '#f06a5d',  # Error text on #222 (5.25:1 AA) — use for readable danger labels
     'success':    '#00bc8c',   # Success
     'info_value': '#3498db',   # Info display values
     'purple':     '#9b59b6',   # Database nav accent

@@ -86,7 +86,7 @@ Trigger: User clicks "+ Add Grid" button on the grids panel toolbar (also reacha
 
 Steps:
 1. `add_grid()` — src/kazbars/grids_panel.py — checks the slot budget against `MAX_TOTAL_SLOTS` (64); opens `AddGridWizard` dialog
-2. `AddGridWizard.__init__()` — src/kazbars/grid_dialogs.py — builds wizard UI with name, source/mode/dimension fields and four preset shape buttons; calls `restore_window_position()`
+2. `AddGridWizard.__init__()` — src/kazbars/grid_dialogs.py — builds wizard UI with name, source/mode/dimension fields and four preset shape buttons; calls `restore_window_position()`, then `fit_window_height()` — the dialog is fixed-size with no scroll, so it re-fits to the content height at the current Windows text scaling
 3. `AddGridWizard.on_create()` — src/kazbars/grid_dialogs.py — validates name (non-empty, unique), enforces slot budget; calls `create_default_grid()`
 4. `create_default_grid()` — src/kazbars/grid_model.py — returns a complete grid config dict populated with caller-specified `grid_type`, `rows`, `cols`, `mode`, `grid_id`; auto-coerces `1×1` to static mode and picks a sensible `fillDirection`
 5. `refresh_panels()` — src/kazbars/grids_panel.py — destroys and recreates all `GridEditorPanel` cards; the newly added card is initially expanded

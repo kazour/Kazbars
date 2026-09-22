@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Builds no longer run a separate compiler program.** KazBars compiles your grids itself instead of shelling out to a bundled `mtasc.exe`, which is gone from the download. Build & Install works exactly the same otherwise.
 - **The Database tab has no Save button — buff edits save themselves.** Every add, edit, delete, import and category rename is written to disk the moment you confirm it, so an interrupted session can't lose buff work.
 - **First launch fills in your game folder when there's only one.** When exactly one Age of Conan install is found on the PC, the path is already in the box with "Load Defaults" ready to press. Two or more, or none, and nothing is assumed — a line under the buttons says what's missing. "Set up later" at the bottom now reads as the link it always was.
-- **The four extras cards moved to the bottom of the Grids tab**, next to Build & Install, so the grid list starts at the top of the page.
+- **The four extras cards moved to the bottom of the Grids tab**, next to Build & Install, so the grid list starts at the top of the page. Toasts stack above the cards, clear of their switches.
 - **Grid cards are calmer.** A grid's player/target colour is now a stripe down the card's left edge instead of a full coloured outline.
 
 ### Fixed
@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Grids can be reordered from the keyboard.** Tab to a grid card's ☰ handle, then Alt+↑ / Alt+↓ moves it one place.
 - **Two rough edges in the Add Grid wizard.** The "Exceeds available slots" warning was too dark to read against its background, and an empty band sat below the buttons.
 - **The "Tracked Buffs..." button shows its whole label** instead of clipping on each grid card.
+- **The Deeps and Ethram-Fal Live Tracker windows no longer cut off their last line.** Both size themselves to their content as they open, so a status line that wrapped to two lines — a long combat-log filename in Deeps, a long game folder path in the tracker — used to push the bottom row off the edge, with no way to resize or scroll to it. They now resize when the status line changes.
 
 ## [3.1.1] — 2026-08-31
 
