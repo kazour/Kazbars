@@ -196,7 +196,12 @@ class ExtrasShortcutsRow(ttk.Frame):
     # ------------------------------------------------------------------
     def _open_settings(self, key):
         """Card body click — open the feature's Extras dialog, exactly as its
-        menu item does. The dialog owns Apply/Cancel; nothing is written here."""
+        menu item does. The dialog owns Apply/Cancel; nothing is written here.
+        Clears hover first: the dialog's grab_set() can steal every pointer
+        event the app gets from here on, so the card may never see the
+        <Leave> that would otherwise turn its border off, and it would stay
+        lit long after the pointer — and the dialog — are gone."""
+        self._set_hover(key, None)
         getattr(self.app, self._tiles[key]['opener'])()
 
     def _on_toggle(self, key):

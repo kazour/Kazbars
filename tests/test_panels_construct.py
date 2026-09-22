@@ -748,6 +748,24 @@ def test_extras_card_hover_zones(app):
         row.refresh()
 
 
+def test_extras_card_click_clears_the_hover(app, monkeypatch):
+    """Opening a dialog can grab_set() every pointer event the app gets from
+    here on, so the card may never see the <Leave> that would otherwise turn
+    its border off — it used to stay lit long after the dialog opened."""
+    from kazbars.extras_shortcuts import _HOVER_BORDER
+    row = app.grids_panel.extras_row
+    tile = row._tiles['cast_timer']
+    monkeypatch.setattr(app, '_open_cast_timer_settings', lambda: None)
+
+    tile['card'].event_generate('<Enter>')
+    app.update()
+    assert str(tile['card'].cget('highlightbackground')) == _HOVER_BORDER
+
+    tile['card'].event_generate('<Button-1>', x=5, y=5)
+    app.update()
+    assert str(tile['card'].cget('highlightbackground')) != _HOVER_BORDER
+
+
 def test_extras_card_tooltip_reaches_labels(app):
     """Every widget the open-settings click is bound to also carries its own
     tooltip — Tk hides a parent's tooltip the instant the pointer crosses
