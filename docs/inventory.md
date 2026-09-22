@@ -13,7 +13,7 @@
 |---|---:|
 | `src/kazbars/__init__.py` | 11 |
 | `src/kazbars/__main__.py` | 71 |
-| `src/kazbars/app.py` | 811 |
+| `src/kazbars/app.py` | 815 |
 | `src/kazbars/app_popups.py` | 491 |
 | `src/kazbars/boss_timer.py` | 399 |
 | `src/kazbars/buff_database.py` | 189 |
@@ -33,7 +33,7 @@
 | `src/kazbars/damageinfo_generator.py` | 131 |
 | `src/kazbars/damageinfo_panel.py` | 435 |
 | `src/kazbars/damageinfo_settings.py` | 533 |
-| `src/kazbars/database_editor.py` | 850 |
+| `src/kazbars/database_editor.py` | 854 |
 | `src/kazbars/deeps_meter.py` | 485 |
 | `src/kazbars/deeps_overlay.py` | 757 |
 | `src/kazbars/deeps_panel.py` | 997 |

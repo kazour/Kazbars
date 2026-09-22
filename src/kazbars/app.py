@@ -682,7 +682,11 @@ class KazBarsApp(ttkb.Window):
     # ========================================================================
     def _check_unsaved_db_changes(self):
         """Exit guard for the buff-DB editor's own dirty state (the profile
-        autosaves and has no dirty state). True = safe to proceed."""
+        autosaves and has no dirty state). True = safe to proceed.
+
+        The editor writes every change as it happens, so `modified` is only ever
+        True here after a write that failed — this is the retry, not the routine
+        save prompt it used to be."""
         if not self.db_panel.modified:
             return True
         dialog = MessageDialog(

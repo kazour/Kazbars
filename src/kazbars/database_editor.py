@@ -452,17 +452,19 @@ class DatabaseEditorTab(ttk.Frame):
         btn_frame = ttk.Frame(self, padding=PAD_SMALL)
         btn_frame.pack(fill='x')
 
-        # (label, command, width, tooltip, separator_after)
+        # (label, command, width, tooltip, separator_after, bootstyle).
+        # The file actions carry the outline style so they read as their own
+        # group past the separator, not as two more list verbs.
         button_specs = [
-            ("Save Database", self.save,          BTN_MEDIUM, "Save all buff entries to database file",       True),
-            ("Add",           self.add_buff,      BTN_SMALL,  "Create a new buff entry",                       False),
-            ("Edit",          self.edit_buff,     BTN_SMALL,  "Edit the selected buff entry",                  False),
-            ("Delete",        self.delete_buff,   BTN_SMALL,  "Delete a buff you added, or hide a built-in one", True),
-            ("Import...",     self.import_buffs,  BTN_MEDIUM, "Import buff entries from a JSON file",          False),
-            ("Export...",     self.export_buffs,  BTN_MEDIUM, "Export the currently filtered buffs to a JSON file", False),
+            ("Add",           self.add_buff,      BTN_SMALL,  "Create a new buff entry",                       False, ''),
+            ("Edit",          self.edit_buff,     BTN_SMALL,  "Edit the selected buff entry",                  False, ''),
+            ("Delete",        self.delete_buff,   BTN_SMALL,  "Delete a buff you added, or hide a built-in one", True, ''),
+            ("Import...",     self.import_buffs,  BTN_MEDIUM, "Import buff entries from a JSON file",          False, 'info-outline'),
+            ("Export...",     self.export_buffs,  BTN_MEDIUM, "Export the currently filtered buffs to a JSON file", False, 'info-outline'),
         ]
-        for text, cmd, width, tooltip, separator in button_specs:
-            btn = ttk.Button(btn_frame, text=text, command=cmd, width=width)
+        for text, cmd, width, tooltip, separator, bootstyle in button_specs:
+            btn = ttk.Button(btn_frame, text=text, command=cmd, width=width,
+                             bootstyle=bootstyle)
             btn.pack(side='left', padx=PAD_XS)
             add_tooltip(btn, tooltip)
             if separator:
@@ -609,10 +611,16 @@ class DatabaseEditorTab(ttk.Frame):
         return validate
 
     def _after_db_change(self):
-        """Post-mutation refresh: mark dirty, refresh categories, redraw the list."""
+        """Post-mutation refresh: mark dirty, refresh categories, redraw the list,
+        then write. Every caller is a confirmed discrete action (dialog OK,
+        confirm, import), so the write is immediate rather than debounced — and
+        `modified` stays True only when that write failed. Returns whether the
+        write landed — callers gate their success toast on it, so a failure
+        raises the error dialog alone, never a green "Added: X" behind it."""
         self._set_modified()
         self.update_categories()
         self.refresh_list()
+        return self.save()
 
     def refresh_from_database(self):
         """Re-pull the floor + redraw the list after `self.database` was re-merged
@@ -632,8 +640,8 @@ class DatabaseEditorTab(ttk.Frame):
 
         if dialog.result:
             self.database.add_buff(dialog.result)
-            self._after_db_change()
-            app_toast(self, f"Added: {dialog.result['name']}", 'success')
+            if self._after_db_change():
+                app_toast(self, f"Added: {dialog.result['name']}", 'success')
 
     def edit_buff(self):
         """Edit selected buff entry."""
@@ -650,8 +658,8 @@ class DatabaseEditorTab(ttk.Frame):
 
         if dialog.result:
             self.database.update_buff(old_ids, dialog.result)
-            self._after_db_change()
-            app_toast(self, f"Updated: {dialog.result['name']}", 'success')
+            if self._after_db_change():
+                app_toast(self, f"Updated: {dialog.result['name']}", 'success')
 
     def delete_buff(self):
         """Delete a buff you added, or hide a built-in one (a reversible
@@ -678,8 +686,8 @@ class DatabaseEditorTab(ttk.Frame):
 
         if confirmed:
             self.database.remove_buff(ids)
-            self._after_db_change()
-            app_toast(self, toast, 'info')
+            if self._after_db_change():
+                app_toast(self, toast, 'info')
 
     def import_buffs(self):
         """Import buffs from JSON file."""
@@ -736,7 +744,8 @@ class DatabaseEditorTab(ttk.Frame):
                 existing_names.add(buff['name'])
                 added += 1
 
-            self._after_db_change()
+            if not self._after_db_change():
+                return
 
             msg = f"Imported {added} buffs"
             details = []
@@ -791,26 +800,21 @@ class DatabaseEditorTab(ttk.Frame):
             Messagebox.show_error(f"Failed to export buffs.\n\nCheck that the destination isn't read-only.\n\n({e})", title="Error")
 
     def save(self):
-        """Save your buff changes as deltas to userdata/database_user.json — the
+        """Write your buff changes as deltas to userdata/database_user.json — the
         shipped assets/ database is never written. Adds and edits become user
-        buffs (or overrides of a built-in); hidden built-ins become tombstones."""
+        buffs (or overrides of a built-in); hidden built-ins become tombstones.
+
+        Silent on success: `_after_db_change` calls it after every edit, and the
+        edit's own toast already said what happened. Returns True when the file
+        was written; False leaves `modified` True for the exit-time retry."""
         delta = buff_db_layers.compute_delta(self._floor_buffs, self.database.buffs)
         try:
             self._delta_store.save(delta)
             self.modified = False
-            n_buffs = len(delta['buffs'])
-            n_hidden = len(delta['deleted'])
-            if n_buffs or n_hidden:
-                parts = []
-                if n_buffs:
-                    parts.append(f"{n_buffs} custom buff{'s' if n_buffs != 1 else ''}")
-                if n_hidden:
-                    parts.append(f"{n_hidden} hidden built-in{'s' if n_hidden != 1 else ''}")
-                app_toast(self, "Saved: " + ", ".join(parts), 'success')
-            else:
-                app_toast(self, "Saved — no custom changes", 'success')
+            return True
         except OSError as e:
             Messagebox.show_error(f"Failed to save your buff changes.\n\nCheck that the file isn't in use by another program.\n\n({e})", title="Error")
+            return False
 
     def _show_category_menu(self, event):
         """Show right-click context menu on category dropdown."""
