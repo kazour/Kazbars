@@ -361,6 +361,20 @@ def test_first_launch_prefills_single_install(app, monkeypatch):
         app.update()
 
 
+def test_enter_can_reach_a_focused_button(app):
+    """The first-launch pre-fill focuses Load Defaults so Enter proceeds, and no
+    dialog-level `<Return>` binding backs that up. What makes it work is
+    ttkbootstrap's Window, which installs a `<Return>` class binding on TButton
+    that a bare `tk.Tk()` root does not — verified live: Enter and KP_Enter both
+    invoke a focused ttk.Button under `ttkb.Window`, neither does under `tk.Tk`.
+    Delivering the keypress needs real focus, which the withdrawn fixture cannot
+    give, so pin the mechanism: if ttkbootstrap ever drops it, Enter dies
+    silently on the app's first screen."""
+    import ttkbootstrap as ttkb
+    assert isinstance(app, ttkb.Window)
+    assert app.bind_class('TButton', '<Return>')
+
+
 def test_first_launch_leaves_ambiguous_install_blank(app, monkeypatch, tmp_path):
     second = tmp_path / 'AoC2'
     (second / 'Data' / 'Gui' / 'Default').mkdir(parents=True)
@@ -498,3 +512,115 @@ def test_drag_handle_stays_lit_while_focused(app):
 
 def test_extras_row_packed_at_bottom(app):
     assert app.grids_panel.extras_row.pack_info()['side'] == 'bottom'
+
+
+def test_toast_guards_the_whole_bottom_strip(app):
+    """Both widgets the Grids tab pins to the toast strip are guarded, in the
+    order they stack."""
+    gp = app.grids_panel
+    assert app.toast._bottom_guards == (gp.extras_row, gp.build_status_lbl)
+
+
+# ============================================================================
+# ROUND-2 LAYOUT GUARDS (rides the same app instance)
+# ============================================================================
+# Real geometry is unreadable here — the fixture's app is withdrawn, so every
+# winfo_width/height is 1 and geometry() is "1x1+0+0". Requested sizes DO
+# resolve, so these pin the two things that are checkable headlessly: the pure
+# fit function, and that each panel's status render is wired to it. Whether the
+# window visibly follows is /smoke's.
+
+class _StubWindow:
+    """Minimal window surface `fit_window_height` touches."""
+
+    def __init__(self, height, reqheight):
+        self._height, self._reqheight = height, reqheight
+        self.geometry_calls = []
+
+    def update_idletasks(self):
+        pass
+
+    def winfo_reqheight(self):
+        return self._reqheight
+
+    def winfo_height(self):
+        return self._height
+
+    def winfo_x(self):
+        return 100
+
+    def winfo_y(self):
+        return 100
+
+    def geometry(self, spec):
+        self.geometry_calls.append(spec)
+
+
+def test_fit_window_height_follows_its_content():
+    from kazbars.window_position import fit_window_height
+    grown = _StubWindow(height=744, reqheight=759)
+    fit_window_height(grown, 440)
+    assert grown.geometry_calls and grown.geometry_calls[0].startswith('440x759+')
+
+    settled = _StubWindow(height=744, reqheight=744)
+    fit_window_height(settled, 440)
+    assert settled.geometry_calls == []          # no churn on the status tick
+
+
+def test_deeps_status_render_refits_the_panel(app, monkeypatch):
+    """A long log filename wraps the status line to two rows. The panel locked
+    its height at build time, so without this the pet caveat — its own last
+    line, with no scrollbar to reach it — falls off the bottom edge."""
+    from kazbars import deeps_panel as dp
+    from kazbars.deeps_meter import MeterSnapshot, Status
+    app._open_deeps_panel()
+    app.update()
+    panel = app.deeps_panel
+    panel.update_idletasks()
+    before = panel.winfo_reqheight()
+
+    calls = []
+    monkeypatch.setattr(dp, 'fit_window_height', lambda w, width: calls.append((w, width)))
+    monkeypatch.setattr(panel.meter, 'is_running', lambda: True)
+    panel._render_status(MeterSnapshot(
+        dps=None, dpis=None, hps=None, hps_out=None, status=Status.OLD_LOG,
+        log_filename='Combat_2026-09-22_18-42-11_Kazour_Fury_of_Crom.txt'))
+    panel.update_idletasks()
+
+    assert panel.winfo_reqheight() > before      # the wrap really does grow it
+    assert calls == [(panel, dp._PANEL_DEFAULT_WIDTH)]
+    _close_via_protocol(panel)
+    app.update()
+
+
+def test_live_tracker_status_render_refits_the_panel(app, monkeypatch):
+    from kazbars import live_tracker_panel as lt
+    app._open_boss_timer()
+    app.update()
+    panel = app.boss_timer_panel
+
+    calls = []
+    monkeypatch.setattr(lt, 'fit_window_height', lambda w, width: calls.append((w, width)))
+    panel._render_status()
+    assert calls == [(panel, lt._PANEL_DEFAULT_WIDTH)]
+    _close_via_protocol(panel)
+    app.update()
+
+
+def test_start_button_label_fits_its_button(app):
+    """`BTN_LARGE` is 20 average character widths (146px here), not 20 glyphs.
+    Rendered pixels are the rule that matters — pins the disabled label, which a
+    character count reads as one over budget and clipped when it is neither."""
+    from tkinter import font as tkfont
+
+    from kazbars.ui_forms import toggle_button_state
+    app._open_deeps_panel()
+    app.update()
+    panel = app.deeps_panel
+    label = toggle_button_state(running=False, enabled=False,
+                                disabled_label='Set game folder first')[0]
+    panel._start_btn.configure(text=label)
+    app.update_idletasks()
+    assert tkfont.Font(font='TkDefaultFont').measure(label) < panel._start_btn.winfo_reqwidth()
+    _close_via_protocol(panel)
+    app.update()

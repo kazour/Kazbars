@@ -62,7 +62,11 @@ from .ui_helpers import (
     THEME_COLORS,
 )
 from .ui_widgets import add_tooltip
-from .window_position import bind_window_position_save, restore_window_position
+from .window_position import (
+    bind_window_position_save,
+    fit_window_height,
+    restore_window_position,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -223,8 +227,7 @@ class DeepsPanel(tk.Toplevel):
         # `resizable=False` means the saved height is ignored anyway, so this
         # is the only place geometry is locked in for non-saved-position runs;
         # for saved-position runs, only the height changes (x/y preserved).
-        self.update_idletasks()
-        self.geometry(f"{_PANEL_DEFAULT_WIDTH}x{self.winfo_reqheight()}")
+        fit_window_height(self, _PANEL_DEFAULT_WIDTH)
 
         self.protocol("WM_DELETE_WINDOW", self._on_withdraw)
         self.bind('<Escape>', lambda e: self._on_withdraw())
@@ -895,6 +898,9 @@ class DeepsPanel(tk.Toplevel):
             return
         self._last_status = (text, color)
         self._status_label.configure(text=text, foreground=color)
+        # A long log filename wraps this line to two; without the re-fit the
+        # panel keeps its build-time height and eats the pet caveat below.
+        fit_window_height(self, _PANEL_DEFAULT_WIDTH)
 
     def _update_alarm_state(self, snapshot: MeterSnapshot) -> None:
         """Hysteresis state machine on the DPS rate.

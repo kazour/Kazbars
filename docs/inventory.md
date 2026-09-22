@@ -36,7 +36,7 @@
 | `src/kazbars/database_editor.py` | 854 |
 | `src/kazbars/deeps_meter.py` | 485 |
 | `src/kazbars/deeps_overlay.py` | 757 |
-| `src/kazbars/deeps_panel.py` | 998 |
+| `src/kazbars/deeps_panel.py` | 1004 |
 | `src/kazbars/deeps_parsers.py` | 408 |
 | `src/kazbars/deeps_rolling_window.py` | 81 |
 | `src/kazbars/deeps_settings.py` | 336 |
@@ -48,7 +48,7 @@
 | `src/kazbars/game_folder.py` | 417 |
 | `src/kazbars/game_persistence.py` | 608 |
 | `src/kazbars/game_resolution.py` | 113 |
-| `src/kazbars/grid_dialogs.py` | 899 |
+| `src/kazbars/grid_dialogs.py` | 908 |
 | `src/kazbars/grid_editor_panel.py` | 710 |
 | `src/kazbars/grid_model.py` | 296 |
 | `src/kazbars/grids_generator.py` | 637 |
@@ -56,7 +56,7 @@
 | `src/kazbars/inspect.py` | 64 |
 | `src/kazbars/inspect_panel.py` | 315 |
 | `src/kazbars/instructions_panel.py` | 1140 |
-| `src/kazbars/live_tracker_panel.py` | 512 |
+| `src/kazbars/live_tracker_panel.py` | 518 |
 | `src/kazbars/live_tracker_settings.py` | 175 |
 | `src/kazbars/overlay_engine.py` | 800 |
 | `src/kazbars/paths.py` | 46 |
@@ -83,7 +83,7 @@
 | `src/kazbars/update_check.py` | 64 |
 | `src/kazbars/update_orchestrator.py` | 148 |
 | `src/kazbars/userdata.py` | 110 |
-| `src/kazbars/window_position.py` | 116 |
+| `src/kazbars/window_position.py` | 134 |
 | `tests/test_app_contract.py` | 104 |
 | `tests/test_app_icon.py` | 43 |
 | `tests/test_as2_class_names.py` | 80 |
@@ -123,7 +123,7 @@
 | `tests/test_mypy_gate.py` | 74 |
 | `tests/test_overlay_config.py` | 102 |
 | `tests/test_panel_ratios.py` | 158 |
-| `tests/test_panels_construct.py` | 500 |
+| `tests/test_panels_construct.py` | 626 |
 | `tests/test_prefs.py` | 58 |
 | `tests/test_prefs_migration.py` | 99 |
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |

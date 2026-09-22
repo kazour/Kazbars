@@ -43,6 +43,24 @@ def clamp_to_screen(x, y, width, height):
         return x, y
 
 
+def fit_window_height(window, width):
+    """Re-fit a fixed-width window to the height its content needs right now.
+
+    A panel that locks its geometry once at construction clips its last row the
+    moment a runtime string wraps to a second line — a two-line status, a long
+    log filename — because the window never follows the content. Call this
+    wherever that text is written, not just at build time. Cheap: it reconfigures
+    only when the needed height actually moved, and re-clamps so growing can't
+    push the window off the bottom of the screen.
+    """
+    window.update_idletasks()
+    needed = window.winfo_reqheight()
+    if needed == window.winfo_height():
+        return
+    x, y = clamp_to_screen(window.winfo_x(), window.winfo_y(), width, needed)
+    window.geometry(f'{width}x{needed}+{x}+{y}')
+
+
 def save_window_position(window_name, x, y, width=None, height=None):
     """Persist a window's position and optional size into the shared
     ``window_positions`` prefs dict, keyed by window name."""

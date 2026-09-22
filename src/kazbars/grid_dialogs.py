@@ -46,10 +46,15 @@ from .ui_helpers import (
 )
 from .ui_tk_style import style_tk_listbox
 from .ui_widgets import app_toast, blend_alpha, debounced_callback
-from .window_position import bind_window_position_save, restore_window_position
+from .window_position import (
+    bind_window_position_save,
+    fit_window_height,
+    restore_window_position,
+)
 
-ADD_GRID_WIZARD_SIZE = (460, 549)   # measured content height; the dialog is fixed-size,
-                                    # so anything smaller clips the button row
+ADD_GRID_WIZARD_SIZE = (460, 549)   # measured content height at the stock font; the
+                                    # dialog is fixed-size, so `fit_window_height` re-fits
+                                    # it rather than clip the button row at larger text
 BUFF_SELECTOR_SIZE = (800, 600)
 BUFF_SELECTOR_MIN = (640, 400)
 SLOT_ASSIGNMENT_SIZE = (620, 520)
@@ -101,6 +106,10 @@ class AddGridWizard(tk.Toplevel):
 
         self.create_widgets()
         restore_window_position(self, 'add_grid_wizard', *ADD_GRID_WIZARD_SIZE, parent, resizable=False)
+        # The constant is measured at the stock Segoe UI 9. Windows text scaling
+        # grows every row, and this dialog can't be resized or scrolled, so fit
+        # it to what the content actually asks for or Cancel/Create fall off.
+        fit_window_height(self, ADD_GRID_WIZARD_SIZE[0])
         bind_window_position_save(self, 'add_grid_wizard', save_size=False)
         self.deiconify()
         self.name_entry.focus_set()
