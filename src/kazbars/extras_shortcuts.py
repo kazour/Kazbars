@@ -4,11 +4,14 @@ KazBars — Extras shortcuts row.
 Four toggle cards along the bottom of the Grids tab, beside Build & Install —
 one per SWF-build extra, in Extras-menu order (Cast timer, Damage numbers,
 Inspect panel, Stopwatch) so the row and the menu read as the same list. Each
-card shows whether its feature ships in the next Build & Install and flips the
-same profile-document section its Extras dialog writes (autosaved by the
-profile store; `apply_document` resyncs the cards on every profile switch). Configuration
-stays in the dialogs, which push `refresh()` back through
-`GridsPanel.refresh_extras_shortcuts()` on Apply.
+card carries two controls, not one: the **card body** opens that feature's
+Extras dialog (the same opener the menu item calls), and the **round switch**
+flips whether it ships in the next Build & Install, writing the same
+profile-document section that dialog writes (autosaved by the profile store;
+`apply_document` resyncs the cards on every profile switch). The switch's hit
+area is the switch — a click anywhere else on the card opens settings, so the
+two never race. Configuration still lives in the dialogs, which push `refresh()`
+back through `GridsPanel.refresh_extras_shortcuts()` on Apply.
 
 Semantic color only: "in the next build" lights the card border, status line
 and toggle in the success green the tip bar and Build & Install already use.
@@ -51,22 +54,30 @@ def _make_section_setter(key, side_flags=()):
     return _set
 
 
-# (key, title, off-toast tail, tooltip) + read/set — menu order.
+# Shared by all four switches — they do the same thing on every card.
+_TOGGLE_TOOLTIP = 'Whether this ships in your next Build & Install'
+
+# (key, title, off-toast tail, tooltip, opener) + read/set — menu order.
+# `opener` is the KazBarsApp method the matching Extras menu item calls.
 _FEATURES = (
     ('cast_timer', 'Cast timer', 'next build removes it',
-     'Cast-time readout for you and your target. Configure in Extras ▸ Cast timer…',
+     'Cast-time readout for you and your target. Click to open Extras ▸ Cast timer…',
+     '_open_cast_timer_settings',
      lambda app: _read_section(app, 'cast_timer'),
      _make_section_setter('cast_timer', side_flags=('enableP', 'enableT'))),
     ('damage_numbers', 'Damage numbers', 'next build restores stock',
-     "Re-tunes AoC's floating combat numbers. Configure in Extras ▸ Damage number mod…",
+     "Re-tunes AoC's floating combat numbers. Click to open Extras ▸ Damage number mod…",
+     '_open_damage_numbers',
      lambda app: _read_section(app, 'damage_numbers'),
      _make_section_setter('damage_numbers')),
     ('inspect', 'Inspect panel', 'next build removes it',
-     'Combat sheet for your current target. Configure in Extras ▸ Inspect panel…',
+     'Combat sheet for your current target. Click to open Extras ▸ Inspect panel…',
+     '_open_inspect_settings',
      lambda app: _read_section(app, 'inspect'),
      _make_section_setter('inspect')),
     ('stopwatch', 'Stopwatch', 'next build removes it',
-     'In-game Start / Pause / Reset timer panel. Configure in Extras ▸ Stopwatch…',
+     'In-game Start / Pause / Reset timer panel. Click to open Extras ▸ Stopwatch…',
+     '_open_stopwatch_settings',
      lambda app: _read_section(app, 'stopwatch'),
      _make_section_setter('stopwatch')),
 )
@@ -88,7 +99,7 @@ class ExtrasShortcutsRow(ttk.Frame):
         self.refresh()
 
     def _build_tile(self, col, spec):
-        key, title, off_tail, tooltip, read, write = spec
+        key, title, off_tail, tooltip, opener, read, write = spec
         card = tk.Frame(self,
                         highlightbackground=TK_COLORS['border'],
                         highlightcolor=TK_COLORS['border'],
@@ -117,26 +128,29 @@ class ExtrasShortcutsRow(ttk.Frame):
         status_lbl.pack(anchor='w')
 
         tile = {'key': key, 'title': title, 'off_tail': off_tail,
-                'read': read, 'write': write, 'var': var, 'card': card,
-                'status': status_lbl, 'resting': TK_COLORS['border'], 'on': None}
+                'read': read, 'write': write, 'opener': opener, 'var': var,
+                'card': card, 'status': status_lbl,
+                'resting': TK_COLORS['border'], 'on': None}
         self._tiles[key] = tile
 
-        # The whole card is one big toggle target; the checkbutton keeps its
-        # own press so the two never double-fire.
+        # The card body opens settings. Tk delivers <Button-1> to the widget
+        # under the pointer and does not walk it up to the parent, so the
+        # checkbutton's own press is the switch's whole hit area — the two
+        # can't double-fire, and the switch needs no binding of its own.
         for widget in (card, body, text, title_lbl, status_lbl):
-            widget.bind('<Button-1>', lambda e, k=key: self._on_card_click(k))
+            widget.bind('<Button-1>', lambda e, k=key: self._open_settings(k))
             widget.configure(cursor='hand2')
         bind_card_events(card, lambda t=tile: t['resting'])
         add_tooltip(card, tooltip)
-        add_tooltip(toggle, tooltip)
+        add_tooltip(toggle, _TOGGLE_TOOLTIP)
 
     # ------------------------------------------------------------------
     # Toggling & state
     # ------------------------------------------------------------------
-    def _on_card_click(self, key):
-        tile = self._tiles[key]
-        tile['var'].set(not tile['var'].get())
-        self._on_toggle(key)
+    def _open_settings(self, key):
+        """Card body click — open the feature's Extras dialog, exactly as its
+        menu item does. The dialog owns Apply/Cancel; nothing is written here."""
+        getattr(self.app, self._tiles[key]['opener'])()
 
     def _on_toggle(self, key):
         """Write the flipped state to the feature's own store, then resync."""

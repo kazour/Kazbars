@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **The Database tab has no Save button — buff edits save themselves.** Every add, edit, delete, import and category rename is written to disk the moment you confirm it, so an interrupted session can't lose buff work.
 - **First launch fills in your game folder when there's only one.** When exactly one Age of Conan install is found on the PC, the path is already in the box with "Load Defaults" ready to press. Two or more, or none, and nothing is assumed — a line under the buttons says what's missing. "Set up later" at the bottom now reads as the link it always was.
 - **The four extras cards moved to the bottom of the Grids tab**, next to Build & Install, so the grid list starts at the top of the page. Toasts stack above the cards, clear of their switches.
+- **Clicking an extras card now opens its settings.** The four cards at the bottom of the Grids tab used to be one big on/off switch. Now the card and the switch do different jobs: click anywhere on the card — title, status line, the box itself — and that feature's dialog opens, the same one Extras ▸ Cast timer…, Damage number mod…, Inspect panel… and Stopwatch… open. The round switch on the right still decides whether the feature ships in your next Build & Install.
 - **Grid cards are calmer.** A grid's player/target colour is now a stripe down the card's left edge instead of a full coloured outline.
 
 ### Fixed

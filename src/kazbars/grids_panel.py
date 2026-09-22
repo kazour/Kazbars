@@ -117,7 +117,8 @@ class GridsPanel(ttk.Frame):
             self.extras_row = ExtrasShortcutsRow(self, self.app)
             self.extras_row.pack(side='bottom', fill='x', padx=PAD_TAB,
                                  pady=(PAD_XS, 0))
-            # In-game status line under the cards — packed by
+            # In-game status line above the cards (both pack side='bottom',
+            # so `after` puts this one on top of them) — packed by
             # refresh_build_status() once a build has been recorded.
             self.build_status_lbl = ttk.Label(self, font=FONT_SMALL,
                                                foreground=THEME_COLORS['muted'])

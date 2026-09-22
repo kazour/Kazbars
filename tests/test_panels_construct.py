@@ -624,3 +624,61 @@ def test_start_button_label_fits_its_button(app):
     assert tkfont.Font(font='TkDefaultFont').measure(label) < panel._start_btn.winfo_reqwidth()
     _close_via_protocol(panel)
     app.update()
+
+
+# ============================================================================
+# EXTRAS CARDS: TWO CONTROLS (rides the same app instance)
+# ============================================================================
+# The card body opens the feature's Extras dialog; the round switch flips what
+# the next build bakes. Tk delivers <Button-1> to the widget under the pointer
+# and never walks it up to the parent, so the switch's hit area is the switch.
+
+EXTRAS_OPENERS = {
+    'cast_timer': '_open_cast_timer_settings',
+    'damage_numbers': '_open_damage_numbers',
+    'inspect': '_open_inspect_settings',
+    'stopwatch': '_open_stopwatch_settings',
+}
+
+
+def test_extras_openers_exist_on_the_app(app):
+    """A card routes its click through `getattr(app, opener)`. Renaming an
+    opener would break the card silently — nothing else resolves these names."""
+    from kazbars.extras_shortcuts import _FEATURES
+    named = {spec[0]: spec[4] for spec in _FEATURES}
+    assert named == EXTRAS_OPENERS
+    for opener in named.values():
+        assert callable(getattr(app, opener))
+
+
+@pytest.mark.parametrize('key', list(EXTRAS_OPENERS))
+def test_extras_card_click_opens_settings(app, monkeypatch, key):
+    opened = []
+    for feature_key, opener in EXTRAS_OPENERS.items():
+        monkeypatch.setattr(app, opener, lambda k=feature_key: opened.append(k))
+    tile = app.grids_panel.extras_row._tiles[key]
+    before = bool(tile['var'].get())
+
+    tile['card'].event_generate('<Button-1>', x=5, y=5)
+    app.update()
+
+    assert opened == [key]
+    assert bool(tile['var'].get()) is before      # the click did not flip it
+
+
+def test_extras_switch_toggles_without_opening_settings(app, monkeypatch):
+    from tkinter import ttk
+    opened = []
+    for opener in EXTRAS_OPENERS.values():
+        monkeypatch.setattr(app, opener, lambda: opened.append(opener))
+    tile = app.grids_panel.extras_row._tiles['stopwatch']
+    switch = _widgets(tile['card'], ttk.Checkbutton)[0]
+    before = bool(tile['var'].get())
+
+    switch.event_generate('<Button-1>', x=5, y=5)
+    switch.event_generate('<ButtonRelease-1>', x=5, y=5)
+    app.update()
+
+    assert bool(tile['var'].get()) is not before
+    assert app.profile_store.get_section('stopwatch')['enabled'] is not before
+    assert opened == []

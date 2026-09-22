@@ -479,15 +479,27 @@ End state: the profile document's `cast_timer` section reflects the choices (aut
 
 ## 28. toggle an extra from the main-screen shortcuts
 
-Trigger: User clicks one of the four extras cards (Damage numbers / Stopwatch / Inspect panel / Cast timer) along the bottom of the Grids tab, just above the app's bottom bar, or its round-toggle.
+Trigger: User clicks the round switch on one of the four extras cards (Damage numbers / Stopwatch / Inspect panel / Cast timer) along the bottom of the Grids tab, just above the app's bottom bar. The switch is the only control that toggles — a click anywhere else on the card opens that feature's dialog instead (Flow 28a).
 
 Steps:
-1. `ExtrasShortcutsRow._on_card_click()` — src/kazbars/extras_shortcuts.py — a click anywhere on the card (frame or labels) flips the tile's BooleanVar and falls through to `_on_toggle()`; a click on the round-toggle lands there directly (the checkbutton flips its own var first), so the two paths never double-fire.
-2. `_on_toggle()` — src/kazbars/extras_shortcuts.py — reads the flipped var and calls the tile's writer with the new state: the exact write its Extras dialog makes. All four flip `enabled` in their profile section via `ProfileStore.update_section` (debounced autosave, Flow 3) — the cast timer flips `enabled`/`enableP`/`enableT` together (`is_enabled` needs master AND a side). No store race is possible: all four Extras dialogs are modal, so none can be open while a card is clickable.
+1. The `ttk.Checkbutton`'s own `command` — src/kazbars/extras_shortcuts.py — fires `_on_toggle()` after the checkbutton has flipped its own BooleanVar. Tk delivers `<Button-1>` to the widget under the pointer and never walks it up to the parent, so the switch's hit area is the switch itself: the card's own bindings (Flow 28a) cannot fire from a click on it, and the two paths can never double-fire.
+2. `_on_toggle()` — src/kazbars/extras_shortcuts.py — reads the flipped var and calls the tile's writer with the new state: the exact write its Extras dialog makes. All four flip `enabled` in their profile section via `ProfileStore.update_section` (debounced autosave, Flow 3) — the cast timer flips `enabled`/`enableP`/`enableT` together (`is_enabled` needs master AND a side). No store race is possible: three of the four Extras dialogs are modal, and the non-modal Damage Numbers panel writes the same section through the same store.
 3. `refresh()` — src/kazbars/extras_shortcuts.py — resyncs every tile from its store, no-op for unchanged ones: BooleanVar, card border (`success` when in the next build, neutral `border` when off — the resting colour `bind_card_events` hover restores to), and the status line ("In next build" in success / "Off" in dim). The four profile-backed reads rest off while `app.profile_store` is still `None` (the row is built with `GridsPanel`, before `startup_profile` installs the store). The same method is the push target the four dialogs call after their own Apply, via `GridsPanel.refresh_extras_shortcuts()` — src/kazbars/grids_panel.py — and the target `profile_io.apply_document` hits on every profile switch, since the four gates travel with the profile.
 4. Per-flip toast via `app_toast` — on ⇒ "<Feature> on — Build & Install to apply" (success); off ⇒ "<Feature> off — next build removes it" ("restores stock" for Damage numbers), `key='extras_<name>'` so rapid flips coalesce instead of stacking.
 
 End state: the feature's profile section reflects the new gate — autosaved, travels with the profile — identical to ticking the master toggle in the feature's dialog and Applying. Nothing is applied in-game until the next Build & Install (Flow 1). The row itself is built by `GridsPanel` as a child of the panel (not the normal view) and packed `side='bottom'`, so it stays visible in the zero-grids empty state and off-by-default add-ons never push the grid list down the page; the "In game:" status row packs `side='bottom'` `after` it and so lands directly above the tiles, and the first-run tip bar still anchors `before` the row in pack order, which puts it at the top of the tab — tip bar · "+ Add Grid" toolbar · grid list · "In game:" line · tiles.
+
+---
+
+## 28a. open an extra's settings from its card
+
+Trigger: User clicks an extras card anywhere but its round switch — the card frame, the body, the title, or the "In next build" / "Off" status line.
+
+Steps:
+1. `ExtrasShortcutsRow._open_settings()` — src/kazbars/extras_shortcuts.py — bound to `<Button-1>` on the card frame, its body, the text frame and both labels (all five carry `cursor='hand2'`). Resolves the tile's `opener` — the `KazBarsApp` method name stored as the 5th element of its `_FEATURES` tuple — and calls it: `_open_cast_timer_settings` (Flow 27), `_open_damage_numbers` (Flow 20), `_open_inspect_settings` (Flow 26), `_open_stopwatch_settings` (Flow 25). `tests/test_panels_construct.py` pins those four names against the app, since `getattr` is the only thing that resolves them.
+2. The opener runs its own flow unchanged. Nothing is written here: no store write, no toast, no change to the tile's BooleanVar — the dialog owns Apply/Cancel, and its Apply pushes `refresh()` back through `GridsPanel.refresh_extras_shortcuts()` (Flow 28 step 3).
+
+End state: the feature's Extras dialog is open, exactly as its menu item would have opened it. The card is unchanged until that dialog writes something.
 
 ---
 

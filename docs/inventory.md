@@ -41,7 +41,7 @@
 | `src/kazbars/deeps_rolling_window.py` | 81 |
 | `src/kazbars/deeps_settings.py` | 336 |
 | `src/kazbars/deeps_trackers.py` | 182 |
-| `src/kazbars/extras_shortcuts.py` | 170 |
+| `src/kazbars/extras_shortcuts.py` | 184 |
 | `src/kazbars/first_launch.py` | 392 |
 | `src/kazbars/focus_watcher.py` | 85 |
 | `src/kazbars/foreground.py` | 111 |
@@ -52,10 +52,10 @@
 | `src/kazbars/grid_editor_panel.py` | 710 |
 | `src/kazbars/grid_model.py` | 296 |
 | `src/kazbars/grids_generator.py` | 637 |
-| `src/kazbars/grids_panel.py` | 731 |
+| `src/kazbars/grids_panel.py` | 732 |
 | `src/kazbars/inspect.py` | 64 |
 | `src/kazbars/inspect_panel.py` | 315 |
-| `src/kazbars/instructions_panel.py` | 1140 |
+| `src/kazbars/instructions_panel.py` | 1141 |
 | `src/kazbars/live_tracker_panel.py` | 518 |
 | `src/kazbars/live_tracker_settings.py` | 175 |
 | `src/kazbars/overlay_engine.py` | 800 |
@@ -123,7 +123,7 @@
 | `tests/test_mypy_gate.py` | 74 |
 | `tests/test_overlay_config.py` | 102 |
 | `tests/test_panel_ratios.py` | 158 |
-| `tests/test_panels_construct.py` | 626 |
+| `tests/test_panels_construct.py` | 684 |
 | `tests/test_prefs.py` | 58 |
 | `tests/test_prefs_migration.py` | 99 |
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |

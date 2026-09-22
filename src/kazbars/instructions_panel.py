@@ -526,8 +526,9 @@ SECTIONS: list[_Section] = [
                 [('The four cards at the bottom of the Grids tab, just '
                   'above ', None),
                  ('Build & Install', _SUCCESS),
-                 (', flip the same switches. Configuring stays in the '
-                  'dialogs.', None)],
+                 (', are two controls: the switch flips whether the '
+                  'feature ships, and clicking anywhere else on the card '
+                  'opens its dialog.', None)],
             ]),
             _sub('One text size, four panels', [
                 'Stopwatch, inspect panel, buff console and control panel '
