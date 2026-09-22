@@ -109,3 +109,5 @@ def change_game_resolution(app):
                ).pack(side='right', padx=(0, PAD_XS))
 
     dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
+    dialog.bind('<Escape>', lambda e: dialog.destroy())
+    dialog.bind('<Return>', lambda e: _apply())

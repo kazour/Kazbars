@@ -227,6 +227,7 @@ class DeepsPanel(tk.Toplevel):
         self.geometry(f"{_PANEL_DEFAULT_WIDTH}x{self.winfo_reqheight()}")
 
         self.protocol("WM_DELETE_WINDOW", self._on_withdraw)
+        self.bind('<Escape>', lambda e: self._on_withdraw())
 
     # ------------------------------------------------------------------ #
     # UI construction                                                    #

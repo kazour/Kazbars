@@ -351,6 +351,7 @@ def open_backup_dialog(app):
     ).pack(side="right")
 
     dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
+    dialog.bind('<Escape>', lambda e: dialog.destroy())
 
 
 def backup_settings(app, dialog):

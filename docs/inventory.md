@@ -36,7 +36,7 @@
 | `src/kazbars/database_editor.py` | 854 |
 | `src/kazbars/deeps_meter.py` | 485 |
 | `src/kazbars/deeps_overlay.py` | 757 |
-| `src/kazbars/deeps_panel.py` | 997 |
+| `src/kazbars/deeps_panel.py` | 998 |
 | `src/kazbars/deeps_parsers.py` | 408 |
 | `src/kazbars/deeps_rolling_window.py` | 81 |
 | `src/kazbars/deeps_settings.py` | 336 |
@@ -47,7 +47,7 @@
 | `src/kazbars/foreground.py` | 111 |
 | `src/kazbars/game_folder.py` | 417 |
 | `src/kazbars/game_persistence.py` | 608 |
-| `src/kazbars/game_resolution.py` | 111 |
+| `src/kazbars/game_resolution.py` | 113 |
 | `src/kazbars/grid_dialogs.py` | 896 |
 | `src/kazbars/grid_editor_panel.py` | 683 |
 | `src/kazbars/grid_model.py` | 296 |
@@ -56,7 +56,7 @@
 | `src/kazbars/inspect.py` | 64 |
 | `src/kazbars/inspect_panel.py` | 315 |
 | `src/kazbars/instructions_panel.py` | 1137 |
-| `src/kazbars/live_tracker_panel.py` | 511 |
+| `src/kazbars/live_tracker_panel.py` | 512 |
 | `src/kazbars/live_tracker_settings.py` | 175 |
 | `src/kazbars/overlay_engine.py` | 800 |
 | `src/kazbars/paths.py` | 46 |
@@ -67,7 +67,7 @@
 | `src/kazbars/profile_share.py` | 140 |
 | `src/kazbars/profile_store.py` | 130 |
 | `src/kazbars/self_update.py` | 487 |
-| `src/kazbars/settings_backup.py` | 479 |
+| `src/kazbars/settings_backup.py` | 480 |
 | `src/kazbars/settings_core.py` | 298 |
 | `src/kazbars/settings_manager.py` | 56 |
 | `src/kazbars/stopwatch.py` | 62 |
