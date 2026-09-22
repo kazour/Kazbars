@@ -42,7 +42,7 @@
 | `src/kazbars/deeps_settings.py` | 336 |
 | `src/kazbars/deeps_trackers.py` | 182 |
 | `src/kazbars/extras_shortcuts.py` | 170 |
-| `src/kazbars/first_launch.py` | 351 |
+| `src/kazbars/first_launch.py` | 392 |
 | `src/kazbars/focus_watcher.py` | 85 |
 | `src/kazbars/foreground.py` | 111 |
 | `src/kazbars/game_folder.py` | 417 |

@@ -28,7 +28,24 @@ from .ui_helpers import (
     TK_COLORS,
 )
 from .ui_widgets import bind_label_press_effect
-from .window_position import restore_window_position
+from .window_position import clamp_to_screen, restore_window_position
+
+FIRST_LAUNCH_SIZE = (520, 480)
+
+COMMON_INSTALL_PATHS = [
+    r"C:\Funcom\Age of Conan",
+    r"D:\Games\Age of Conan",
+    r"C:\Program Files (x86)\Funcom\Age of Conan",
+    r"C:\Program Files (x86)\Steam\steamapps\common\Age of Conan - Unchained",
+    r"C:\Steam\steamapps\common\Age of Conan - Unchained",
+    r"D:\Steam\steamapps\common\Age of Conan - Unchained",
+    r"D:\SteamLibrary\steamapps\common\Age of Conan - Unchained",
+]
+
+
+def _is_game_folder(path):
+    """The AoC marker the path hint and the pre-fill both key on."""
+    return (Path(path) / "Data" / "Gui" / "Default").exists()
 
 
 def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
@@ -49,11 +66,12 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
     dialog.transient(parent)
     dialog.grab_set()
 
-    restore_window_position(dialog, 'first_launch', 520, 480, parent, resizable=False)
+    restore_window_position(dialog, 'first_launch', *FIRST_LAUNCH_SIZE, parent,
+                            resizable=False)
 
     # Header
     create_dialog_header(dialog, f"Welcome to {app_name}",
-                         MODULE_COLORS['grids'], width=520)
+                         MODULE_COLORS['grids'], width=FIRST_LAUNCH_SIZE[0])
 
     content = ttk.Frame(dialog)
     content.pack(fill='both', expand=True, padx=PAD_TAB * 2, pady=(PAD_TAB, PAD_LF))
@@ -89,7 +107,7 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
 
     def _validate_path_hint():
         p = path_var.get().strip()
-        if p and not (Path(p) / "Data" / "Gui" / "Default").exists():
+        if p and not _is_game_folder(p):
             warn_label.configure(
                 text="This doesn't look like an AoC install — missing Data/Gui/Default/",
                 foreground=THEME_COLORS['warning'])
@@ -97,16 +115,7 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
             warn_label.configure(text="")
 
     # Common locations (only show paths that exist)
-    common_paths = [
-        r"C:\Funcom\Age of Conan",
-        r"D:\Games\Age of Conan",
-        r"C:\Program Files (x86)\Funcom\Age of Conan",
-        r"C:\Program Files (x86)\Steam\steamapps\common\Age of Conan - Unchained",
-        r"C:\Steam\steamapps\common\Age of Conan - Unchained",
-        r"D:\Steam\steamapps\common\Age of Conan - Unchained",
-        r"D:\SteamLibrary\steamapps\common\Age of Conan - Unchained",
-    ]
-    existing_paths = [cp for cp in common_paths if Path(cp).exists()]
+    existing_paths = [cp for cp in COMMON_INSTALL_PATHS if Path(cp).exists()]
     if existing_paths:
         ttk.Label(content, text="Found on this PC:", font=FONT_SMALL,
                   foreground=THEME_COLORS['muted']).pack(anchor='w', pady=(PAD_XS, PAD_TINY))
@@ -249,6 +258,12 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
                            state='disabled')
     btn_empty.pack(anchor='w')
 
+    # Says why both buttons are off. Always packed (empty when a path is set) so
+    # the cards don't shift as the user types.
+    gate_label = ttk.Label(content, text="", font=FONT_SMALL,
+                           foreground=THEME_COLORS['muted'])
+    gate_label.pack(anchor='w', pady=(0, PAD_TINY))
+
     # Enable/disable action buttons based on game path
     def _on_path_changed(*_):
         has_path = bool(path_var.get().strip())
@@ -256,16 +271,30 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
         if btn_defaults:
             btn_defaults.configure(state=state)
         btn_empty.configure(state=state)
+        gate_label.configure(
+            text="" if has_path else "Set your game folder above to start.")
         _validate_path_hint()
 
     path_var.trace_add('write', _on_path_changed)
+    _on_path_changed()
+
+    # One unambiguous install → fill it in and arm the buttons, so Enter starts
+    # the app. Two candidates is a choice only the user can make; zero leaves
+    # the entry as the one thing to do. Set after the trace so it wires through
+    # the same enable path as typing.
+    _detected = [cp for cp in existing_paths if _is_game_folder(cp)]
+    if len(_detected) == 1:
+        path_var.set(_detected[0])
+        (btn_defaults or btn_empty).focus_set()
+    else:
+        path_entry.focus_set()
 
     # Skip at the bottom
     ttk.Separator(content, orient='horizontal').pack(fill='x', side='bottom')
     skip_frame = ttk.Frame(content)
     skip_frame.pack(fill='x', side='bottom', pady=(PAD_SMALL, 0))
     skip_lbl = ttk.Label(skip_frame, text="Set up later",
-                         font=FONT_SMALL, foreground=THEME_COLORS['muted'],
+                         font=FONT_BODY, foreground=THEME_COLORS['accent'],
                          cursor='hand2', takefocus=True)
     skip_lbl.pack(side='right')
     skip_lbl.bind('<Button-1>', lambda e: skip())
@@ -274,10 +303,22 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
     skip_lbl.bind('<Enter>', lambda e: skip_lbl.config(
         foreground=THEME_COLORS['heading']))
     skip_lbl.bind('<Leave>', lambda e: skip_lbl.config(
-        foreground=THEME_COLORS['muted']))
+        foreground=THEME_COLORS['accent']))
     bind_label_press_effect(skip_lbl)
 
     dialog.protocol("WM_DELETE_WINDOW", skip)
+    dialog.bind('<Escape>', lambda e: skip())
+
+    # "Found on this PC" is as long as the PC makes it; grow rather than clip
+    # the bottom-packed "Set up later" row. Never shrinks below the design size,
+    # and re-clamps — restore_window_position only placed the design height, so
+    # growing without this can push that same row off the bottom of the screen.
+    dialog.update_idletasks()
+    width, height = FIRST_LAUNCH_SIZE
+    if dialog.winfo_reqheight() > height:
+        height = dialog.winfo_reqheight()
+        x, y = clamp_to_screen(dialog.winfo_x(), dialog.winfo_y(), width, height)
+        dialog.geometry(f'{width}x{height}+{x}+{y}')
 
 
 def run_first_launch(app, app_name):
