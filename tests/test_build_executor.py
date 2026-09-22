@@ -1,12 +1,12 @@
 """Smoke tests for kazbars.build_executor — the install/uninstall orchestration.
 
 Covers the filesystem side of the build pipeline (the riskiest untested path
-per the audit), with no MTASC and no Tk: SWF deployment, the permanent module
+per the audit), with no compile and no Tk: SWF deployment, the permanent module
 declarations + patcher-bypass flag that make positions persist, clearing both
 predecessor eras' load paths (and leaving them alone when the splice fails),
 byte-exact uninstall, and the process-probe argv — including the patcher, whose
 exit-save strips archives just as a client's does. The surgery itself is
-unit-tested in test_game_persistence.py; the actual MTASC compile is covered
+unit-tested in test_game_persistence.py; the actual compile is covered
 separately (test_build_compile.py); the Build & Install Tk flow is exercised
 manually.
 

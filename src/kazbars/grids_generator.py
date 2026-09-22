@@ -31,7 +31,7 @@ CUSTOM_ICON_LINKAGE = {
     5077889: "IcoSlow60",  # Ice Cloak L
 }
 
-# MTASC caps every class at 32 KB of bytecode. The grid configs and buff
+# as2c caps every class at 32 KB of bytecode. The grid configs and buff
 # lookups are packed into KazBarsData1..N, each built from whole units up to
 # this many source chars. Measured AVM1 density is ~0.6 byte per source char
 # and the pessimistic bound (no push merging) is 1.0, so 24K chars keeps at
@@ -215,8 +215,8 @@ class CodeGenerator:
         tokens filled — the class calls `KazBarsData.init()`), `KazBarsData.as`
         (init + feature blocks, calling each chunk in turn), then
         `KazBarsData1..N.as` — the grid configs and buff lookups packed under
-        DATA_CHUNK_BUDGET per class so no profile hits MTASC's per-class
-        bytecode cap. MTASC binds file name == class name."""
+        DATA_CHUNK_BUDGET per class so no profile hits as2c's per-class
+        bytecode cap. as2c binds file name == class name."""
         # Archive keys are stable across a rebuild only within one call —
         # reset here so re-using a CodeGenerator instance can't leak collision
         # suffixes from a previous run into this one.
@@ -392,7 +392,7 @@ class CodeGenerator:
 
     def _data_chunk_class(self, n, units):
         """One `KazBarsData<n>` class filling `d` with a run of units. `i` is
-        declared unconditionally — MTASC rejects an assignment to an
+        declared unconditionally — as2c rejects an assignment to an
         undeclared var, an unused local is fine."""
         body = "\n".join(units)
         return f"""class KazBarsData{n} {{

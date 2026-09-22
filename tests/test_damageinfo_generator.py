@@ -1,6 +1,6 @@
 """Tests for damageinfo_generator — bake correctness + regex↔AS2 coupling.
 
-No MTASC here (the compile is covered by a separate gated integration check). These
+No compiler here (the compile is covered by a separate integration check). These
 run anywhere: they assert every bake-map pattern still matches the shipped AS2 source
 (so an AS2 constant rename fails CI, not silently in-game) and that offsets bake to the
 expected final values.
@@ -89,7 +89,7 @@ def test_content_scale_applies_per_content_factor():
 
 
 # --------------------------------------------------------------------------- #
-# Bake correctness (no MTASC)
+# Bake correctness (no compile)
 # --------------------------------------------------------------------------- #
 def _bake(tmp_path, settings):
     out = tmp_path / "__Packages"

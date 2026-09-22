@@ -1,7 +1,7 @@
 // KazBarsModule.as - The lifecycle the core drives every optional module
 // through (console, cast timer, stopwatch, inspect panel). The core holds them
 // in one `modules` array and dispatches through this type alone, so a build
-// that gates a module out leaves no dangling reference behind — and MTASC
+// that gates a module out leaves no dangling reference behind — and the compiler
 // checks each stub against the contract instead of the template's call sites
 // discovering a drifted name at runtime.
 //

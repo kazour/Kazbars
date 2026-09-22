@@ -1,5 +1,5 @@
 // KazBarsSlot.as - Slot Creation & Management Helper
-// Extracted to stay under MTASC 32KB per-class bytecode limit
+// Extracted to stay under the compiler's 32KB per-class bytecode limit
 class KazBarsSlot {
     private var rootClip:MovieClip;
     private static var NATIVE_SIZE:Number = 64;

@@ -3,7 +3,7 @@
 Only the parts that touch disk rather than Tk: the Damage Numbers ride-along
 that Repair performs, which has to put the mod back after a game patch restored
 the stock DamageInfo.swf. The bake is monkeypatched — this is
-about the decision and the commit, not about MTASC (test_damageinfo_generator.py
+about the decision and the commit, not about the compile (test_damageinfo_generator.py
 covers that). The dialog/toast orchestration around it is exercised manually.
 
 Run: `pytest tests/test_game_folder.py` (from repo root).

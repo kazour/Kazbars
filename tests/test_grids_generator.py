@@ -3,7 +3,7 @@ Tests for `grids_generator.CodeGenerator` — the optional buff-discovery
 console toggle (`include_console`).
 
 When `include_console=False` the generated AS2 must contain no `console`
-references and no `KazBarsConsole` references — otherwise MTASC would
+references and no `KazBarsConsole` references — otherwise as2c would
 fail to resolve the missing class.
 
 When `include_console=True` the generator must emit the original console
@@ -115,7 +115,7 @@ def test_console_off_emits_no_console_refs():
     # `console` (lowercase) is the member name; `KazBarsConsole` is the class.
     assert "KazBarsConsole" not in main_code, (
         "include_console=False must not reference KazBarsConsole class — "
-        "MTASC would fail to resolve it."
+        "as2c would fail to resolve it."
     )
     # The substring "console" appears in many unrelated words; restrict to
     # the meaningful tokens that would make AS2 fail.
@@ -181,7 +181,7 @@ def _cast_cfg():
 
 def test_cast_off_emits_no_cast_refs():
     """No cast_config (or both sides off) must reference KazBarsCastTimer —
-    MTASC would otherwise fail to resolve the class — and leave no raw tokens."""
+    as2c would otherwise fail to resolve the class — and leave no raw tokens."""
     gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0", cast_config=None)
     main_code, data_code = gen.generate()
     assert not gen.include_cast_timer
@@ -246,7 +246,7 @@ def test_cast_on_emits_hooks_and_data():
 
 def test_stopwatch_off_emits_no_refs():
     """No stopwatch_config (or enabled=False) must reference KazBarsStopwatch —
-    MTASC would otherwise fail to resolve the class — and leave no raw tokens."""
+    as2c would otherwise fail to resolve the class — and leave no raw tokens."""
     gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0", stopwatch_config=None)
     main_code, data_code = gen.generate()
     assert not gen.include_stopwatch
@@ -322,7 +322,7 @@ def test_extras_positions_project_to_the_build_resolution():
 
 def test_inspect_off_emits_no_refs():
     """No inspect_config (or enabled=False) must reference KazBarsInspect —
-    MTASC would otherwise fail to resolve the class — and leave no raw tokens."""
+    as2c would otherwise fail to resolve the class — and leave no raw tokens."""
     gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0", inspect_config=None)
     main_code, data_code = gen.generate()
     assert not gen.include_inspect
@@ -587,7 +587,7 @@ def test_stub_archive_keys_present():
 
 
 def test_sanitize_id_folds_non_ascii_to_a_valid_as2_identifier():
-    # isalnum() alone accepts non-ASCII letters (e.g. CJK), which MTASC's
+    # isalnum() alone accepts non-ASCII letters (e.g. CJK), which as2c's
     # identifier grammar does not — sanitize_id must fold those to "_" too.
     gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0")
     safe = gen.sanitize_id("Grid ünïcodé 日本")
@@ -672,7 +672,7 @@ def test_unknown_refs_are_skipped_at_emit_not_crashed_on():
 # ============================================================================
 # DATA CLASS CHUNKING
 # ============================================================================
-# MTASC caps every class at 32 KB of bytecode, so the grid configs and buff
+# as2c caps every class at 32 KB of bytecode, so the grid configs and buff
 # lookups are packed into KazBarsData1..N under DATA_CHUNK_BUDGET chars each.
 # test_build_compile pins the cap itself; these pin the packing and the shape.
 

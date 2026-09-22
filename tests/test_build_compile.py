@@ -82,7 +82,7 @@ def test_grid_id_with_quote_newline_backslash_still_compiles():
 
 def test_non_ascii_grid_name_still_compiles():
     # Without the isascii() guard, sanitize_id lets non-ASCII letters (e.g.
-    # CJK) through into the AS2 identifier and MTASC rejects it.
+    # CJK) through into the AS2 identifier and as2c rejects it.
     ok, msg, _ = _compile([_grid("Grid ünïcodé 日本")])
     assert ok, msg
 
@@ -139,7 +139,7 @@ def test_stopwatch_feature_compiles():
 
 
 def test_inspect_feature_compiles():
-    # Doubles as the 32 KB-bytecode canary for the single-class stub: MTASC
+    # Doubles as the 32 KB-bytecode canary for the single-class stub: as2c
     # hard-fails a class over the limit, so exit-0 here proves headroom.
     ins = {"enabled": True, "fx": 40 / 1920, "fy": 240 / 1080, "fontSize": 12,
            "startCollapsed": True}
@@ -149,7 +149,7 @@ def test_inspect_feature_compiles():
 
 def test_shared_panel_font_at_a_non_default_size_compiles():
     # d.PF is emitted into every build and both stubs now resolve their whole
-    # layout from it, so a non-12 size has to reach MTASC intact — including the
+    # layout from it, so a non-12 size has to reach as2c intact — including the
     # log-entry font tag, whose size is spliced into an AS2 string literal.
     ok, msg, _ = _compile(
         [_grid()],

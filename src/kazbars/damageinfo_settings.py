@@ -3,7 +3,7 @@
 The settings model is *offset-from-game-default*: each tunable stores an offset
 (default ``0`` ⇒ unchanged) that the generator adds to the stock game value, then
 regex-rewrites the named AS2 constant in a copy of the lean ``DamageInfo`` source
-before MTASC compiles it. ``GLOBAL_SETTINGS`` is the single source of truth for both
+before as2c compiles it. ``GLOBAL_SETTINGS`` is the single source of truth for both
 the UI (ranges, labels, tooltips) and the bake (target file + regex pattern); it must
 stay in lockstep with the constants declared in ``assets/damageinfo/src``. The
 ``test_damageinfo_generator`` regex-coupling test guards that lockstep.

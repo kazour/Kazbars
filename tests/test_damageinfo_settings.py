@@ -1,7 +1,7 @@
 """Tests for damageinfo_settings — schema, validation, presets, the
 PROFILE_SECTION contract.
 
-Pure-data layer (no Tk, no MTASC). Mirrors test_deeps_settings.
+Pure-data layer (no Tk, no compiler). Mirrors test_deeps_settings.
 """
 
 import re

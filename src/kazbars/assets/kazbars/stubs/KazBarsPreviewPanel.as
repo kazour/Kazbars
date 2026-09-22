@@ -24,7 +24,7 @@ class KazBarsPreviewPanel extends KazBarsPanel {
     // The one call that flows back to the core (the contract note atop
     // KazBarsPanel): owner.previewToggle(key, shown), routed from an extra
     // row's checkbox. Typed, not an interface — KazBars is generated into the
-    // same compile unit, so MTASC checks the call for free.
+    // same compile unit, so the compiler checks the call for free.
     private var owner:KazBars;
     private var titleTF:TextField;
     // Three fixed groups [{label, rows}]; a row is {obj, key, label, checked,
@@ -352,7 +352,7 @@ class KazBarsPreviewPanel extends KazBarsPanel {
 
     // Base box/tick/hit plus this panel's label: its width is a parameter, not
     // the console's fixed 80 — a grid id gets the rest of its column. Its own
-    // name because MTASC will not override the base makeCheckbox with a
+    // name because the compiler will not override the base makeCheckbox with a
     // different signature.
     private function makeRowCheckbox(name:String, x:Number, y:Number, label:String,
                                      checked:Boolean, labelW:Number, hitW:Number):MovieClip {

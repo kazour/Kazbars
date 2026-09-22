@@ -151,7 +151,7 @@ def test_console_log_entry_font_keeps_its_face_and_reproduces_size_11():
 def test_stub_self_initialises_instead_of_bailing_on_a_null_config(stub):
     # Neither stub is configured before it builds today, so copying the
     # stopwatch's `if (cfg == null) return;` would leave every constant NaN --
-    # and MTASC would still compile it.
+    # and as2c would still compile it.
     src = _source(stub)
     assert 'if (cfg == null) cfg = {};' in src
     assert 'if (cfg == null) return;' not in src

@@ -5,7 +5,7 @@ generated classes and the shipped stubs must keep their ``KazBars``-prefixed
 names: a Python-side rename compiles cleanly and then silently fails to bind
 in-game, and undoing it needs a Flash CS6 re-export of ``base.fla``/``base.swf``.
 
-Pure text assertions -- no MTASC, no ``base.swf``, so this runs on any platform.
+Pure text assertions -- no compile, no ``base.swf``, so this runs on any platform.
 ``test_grids_generator.py`` already covers the Console/CastTimer/Stopwatch/Inspect
 stubs behaviourally; the names checked here are the ones nothing else pins.
 See docs/architecture.md -> Build pipeline.

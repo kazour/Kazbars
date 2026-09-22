@@ -1,4 +1,4 @@
-// Stub class for MTASC compilation - extends game engine intrinsic
+// Stub class for as2c compilation - extends game engine intrinsic
 class com.GameInterface.Utils extends com.GameInterface.UtilsBase
 {
    function Utils()
