@@ -5,8 +5,9 @@ The following parts are not KazBars's own work and keep their own terms.
 
 ## as2c / MTASC — ActionScript 2 compiler
 
-KazBars compiles its grids with [as2c](https://github.com/kazour/as2c) (GPL-2.0-or-later), a
-Python port of MTASC 1.14 that also carries MTASC's `std/` and `std8/` class headers. MTASC is
+KazBars compiles its grids with as2c (GPL-2.0-or-later), a Python port of MTASC 1.14 that
+also carries MTASC's `std/` and `std8/` class headers. Its source ships in the KazBars
+repository under `src/as2c/` (<https://github.com/kazour/Kazbars>). MTASC is
 © 2004–2008 Nicolas Cannasse / Motion-Twin, GNU GPL version 2 or later; its source code is at
 <https://github.com/ncannasse/mtasc>. The SWF files the compiler produces are not covered by
 its license.

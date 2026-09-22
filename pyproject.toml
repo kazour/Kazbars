@@ -40,7 +40,7 @@ Changelog = "https://github.com/kazour/Kazbars/blob/main/docs/CHANGELOG.md"
 path = "src/kazbars/__init__.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/kazbars"]
+packages = ["src/kazbars", "src/as2c"]
 
 [tool.ruff]
 line-length = 100
@@ -66,6 +66,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["B"]
+"src/as2c/**" = ["N818"]   # vendored compiler: exception names mirror MTASC's (Failure, Overflow, ...)
 
 [tool.ruff.format]
 quote-style = "double"
