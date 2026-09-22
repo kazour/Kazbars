@@ -45,7 +45,7 @@
 | `src/kazbars/first_launch.py` | 406 |
 | `src/kazbars/focus_watcher.py` | 85 |
 | `src/kazbars/foreground.py` | 111 |
-| `src/kazbars/game_folder.py` | 417 |
+| `src/kazbars/game_folder.py` | 430 |
 | `src/kazbars/game_persistence.py` | 608 |
 | `src/kazbars/game_resolution.py` | 115 |
 | `src/kazbars/grid_dialogs.py` | 908 |
@@ -77,7 +77,7 @@
 | `src/kazbars/ui_components.py` | 677 |
 | `src/kazbars/ui_forms.py` | 460 |
 | `src/kazbars/ui_headers.py` | 197 |
-| `src/kazbars/ui_helpers.py` | 196 |
+| `src/kazbars/ui_helpers.py` | 191 |
 | `src/kazbars/ui_tk_style.py` | 67 |
 | `src/kazbars/ui_widgets.py` | 320 |
 | `src/kazbars/update_check.py` | 64 |
@@ -111,7 +111,7 @@
 | `tests/test_docs_in_sync.py` | 301 |
 | `tests/test_focus_watcher.py` | 96 |
 | `tests/test_foreground.py` | 95 |
-| `tests/test_game_folder.py` | 107 |
+| `tests/test_game_folder.py` | 132 |
 | `tests/test_game_persistence.py` | 748 |
 | `tests/test_grid_model.py` | 212 |
 | `tests/test_grids_generator.py` | 751 |

@@ -31,10 +31,10 @@ from .ui_forms import ColorSwatch, create_card, labeled_spinbox
 from .ui_headers import create_dialog_header, create_tip_bar
 from .ui_helpers import (
     BTN_DIALOG,
-    CAST_TIMER_ACCENT,
     FONT_BODY,
     FONT_SMALL,
     GRID_PREVIEW_PX,
+    MODULE_COLORS,
     PAD_ROW,
     PAD_SMALL,
     PAD_TAB,
@@ -84,7 +84,7 @@ def open_cast_timer_dialog(app):
     dialog.transient(app)
     dialog.grab_set()
 
-    create_dialog_header(dialog, "Cast Timer", CAST_TIMER_ACCENT, width=_WIDTH)
+    create_dialog_header(dialog, "Cast Timer", MODULE_COLORS['grids'], width=_WIDTH)
     create_tip_bar(dialog, "A cast-time readout for you and your target. "
                            "Apply, then Build & Install to see it.")
 

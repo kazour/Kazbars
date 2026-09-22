@@ -28,7 +28,13 @@ def refresh_game_path_label(app):
             text="(not set)", foreground=THEME_COLORS['muted'])
         add_tooltip(app._game_path_label, "Click to choose your Age of Conan folder")
     else:
-        display = format_game_path(app.game_path)
+        # The status bar has more room than format_game_path's default budget
+        # assumes (measured: even the deepest of first_launch's
+        # COMMON_INSTALL_PATHS, a Steam install six segments deep, fits the
+        # bottom bar in full at the window's 950px minimum width) — widen it
+        # here so a typical Program Files / Steam install shows whole instead
+        # of collapsing to drive-and-leaf.
+        display = format_game_path(app.game_path, max_parts=6)
         exists = Path(app.game_path).is_dir()
         text = display if exists else f"{display} ⚠"
         app._game_path_label.configure(
@@ -39,13 +45,20 @@ def refresh_game_path_label(app):
     update_build_state(app)
 
 
-def format_game_path(path):
-    """Compact display: 'F:\\...\\Age of Conan' for long paths."""
+def format_game_path(path, max_parts=3):
+    """Compact display: 'F:\\...\\Age of Conan' for long paths.
+
+    `max_parts` is the deepest path this returns in full — callers with more
+    room than the build-summary screen's default (the status bar) pass a
+    higher one.
+    """
     resolved = Path(path)
     parts = resolved.parts
-    if len(parts) <= 3:
+    if len(parts) <= max_parts:
         return str(resolved)
-    return f"{parts[0]}\\...\\{parts[-1]}"
+    # parts[0] is the drive root and already ends in a separator ('C:\\'),
+    # so only one more goes before '...' or the display doubles it up.
+    return f"{parts[0]}...\\{parts[-1]}"
 
 
 def change_game_folder(app):
