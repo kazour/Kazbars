@@ -1,12 +1,12 @@
 """
 KazBars — Extras shortcuts row.
 
-Four toggle cards pinned above the grid list — one per SWF-build extra, in
-Extras-menu order (Cast timer, Damage numbers, Inspect panel, Stopwatch) so
-the row and the menu read as the same list. Each card shows whether its
-feature ships in the next Build & Install and flips the same profile-document
-section its Extras dialog writes (autosaved by the profile store;
-`apply_document` resyncs the cards on every profile switch). Configuration
+Four toggle cards along the bottom of the Grids tab, beside Build & Install —
+one per SWF-build extra, in Extras-menu order (Cast timer, Damage numbers,
+Inspect panel, Stopwatch) so the row and the menu read as the same list. Each
+card shows whether its feature ships in the next Build & Install and flips the
+same profile-document section its Extras dialog writes (autosaved by the
+profile store; `apply_document` resyncs the cards on every profile switch). Configuration
 stays in the dialogs, which push `refresh()` back through
 `GridsPanel.refresh_extras_shortcuts()` on Apply.
 

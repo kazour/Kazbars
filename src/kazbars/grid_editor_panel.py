@@ -28,7 +28,7 @@ from .ui_forms import (
     position_entry,
 )
 from .ui_helpers import (
-    BTN_MEDIUM,
+    CARD_STRIPE_PX,
     FONT_BODY_LG,
     FONT_SMALL,
     FONT_SMALL_BOLD,
@@ -72,20 +72,35 @@ class GridEditorPanel(ttk.Frame):
 
         grid_type = grid_config.get('type', 'player')
         self._accent_color = GRID_TYPE_COLORS.get(grid_type, GRID_TYPE_COLORS['player'])
-        self._resting_border_color = self._accent_color
 
+        self._resting_border_color = TK_COLORS['border']
         self._card = tk.Frame(self,
-                               highlightbackground=self._accent_color,
-                               highlightcolor=self._accent_color,
+                               highlightbackground=self._resting_border_color,
+                               highlightcolor=self._resting_border_color,
                                highlightthickness=1)
         card = self._card
         card.pack(fill='x')
 
+        # Player/target identity lives on one 3px edge, not a full bright
+        # outline — a column of cards reads as a list, not a stack of boxes.
+        # Canvas, not Frame: an empty tk.Frame can repaint in the theme bg.
+        # BOTH sizes must be explicit — the defaults are 378x265, and fill='y'
+        # stretches the canvas without shrinking what it asks the card for.
+        self._stripe = tk.Canvas(card, width=CARD_STRIPE_PX, height=1,
+                                 highlightthickness=0, bg=self._accent_color)
+        self._stripe.pack(side='left', fill='y')
+
         self.drag_handle = ttk.Label(card, text=" ☰ ", font=FONT_BODY_LG,
-                                      foreground=THEME_COLORS['muted'], cursor='fleur')
+                                      foreground=THEME_COLORS['muted'], cursor='fleur',
+                                      takefocus=True)
         self.drag_handle.pack(side='left', fill='y', padx=(PAD_MICRO, 0))
-        bind_label_hover_colors(self.drag_handle, THEME_COLORS['muted'], THEME_COLORS['heading'])
-        add_tooltip(self.drag_handle, "Drag to reorder")
+        self._handle_hovered = False
+        self._handle_focused = False
+        self.drag_handle.bind('<Enter>', lambda e: self._paint_drag_handle(hover=True))
+        self.drag_handle.bind('<Leave>', lambda e: self._paint_drag_handle(hover=False))
+        self.drag_handle.bind('<FocusIn>', lambda e: self._paint_drag_handle(focus=True))
+        self.drag_handle.bind('<FocusOut>', lambda e: self._paint_drag_handle(focus=False))
+        add_tooltip(self.drag_handle, "Drag to reorder — or Tab here, then Alt+↑/↓")
 
         self.section = CollapsibleSection(
             card, title=grid_config.get('id', 'Grid'),
@@ -116,6 +131,18 @@ class GridEditorPanel(ttk.Frame):
         self._apply_enabled_styling(self.enabled_var.get())
 
         bind_card_events(card, lambda: self._resting_border_color)
+
+    def _paint_drag_handle(self, *, hover=None, focus=None):
+        """Hover and keyboard focus both light the ☰ handle, and either one alone
+        keeps it lit — moving the mouse off a focused handle must not erase the
+        only cue that Alt+↑/↓ is armed."""
+        if hover is not None:
+            self._handle_hovered = hover
+        if focus is not None:
+            self._handle_focused = focus
+        lit = self._handle_hovered or self._handle_focused
+        self.drag_handle.configure(
+            foreground=THEME_COLORS['heading'] if lit else THEME_COLORS['muted'])
 
     def _build_header_widgets(self):
         """Pack right-side header controls: × delete, Enabled toggle, X/Y, mode button."""
@@ -153,7 +180,7 @@ class GridEditorPanel(ttk.Frame):
                        label_color=THEME_COLORS['muted'], padx=(PAD_MICRO, 0))
 
         ttk.Button(header, text="Tracked Buffs...",
-                   command=self._on_mode_btn_click, width=BTN_MEDIUM,
+                   command=self._on_mode_btn_click,
                    bootstyle='info-outline').pack(side='right', padx=(0, PAD_LF))  # type: ignore[call-arg]
 
     def _build_top_row(self, parent):
@@ -506,13 +533,13 @@ class GridEditorPanel(ttk.Frame):
     def _apply_enabled_styling(self, enabled):
         """Drain the grid's identity colors when it's excluded from the build.
 
-        Title, badge, and accent strips drop to greys; the card frame border
-        falls back from the player/target accent to the neutral border. The
-        Enabled toggle is the affordance — this is the visual consequence.
+        Title, badge, and accent strips drop to greys; the left stripe falls
+        back from the player/target accent to the neutral border color (the
+        card outline is already neutral and stays put for hover). The Enabled
+        toggle is the affordance — this is the visual consequence.
         """
-        self._resting_border_color = self._accent_color if enabled else TK_COLORS['border']
-        self._card.configure(highlightbackground=self._resting_border_color,
-                             highlightcolor=self._resting_border_color)
+        self._stripe.configure(
+            bg=self._accent_color if enabled else TK_COLORS['border'])
         self.section.set_dimmed(not enabled)
 
     def _on_timers_clicked(self):

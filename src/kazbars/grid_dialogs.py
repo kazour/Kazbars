@@ -19,6 +19,7 @@ from .ui_headers import create_dialog_header
 from .ui_helpers import (
     _RETRO_COLORS,
     BTN_DIALOG,
+    BTN_MEDIUM,
     FONT_FORM_LABEL,
     FONT_SECTION,
     FONT_SMALL,
@@ -47,7 +48,8 @@ from .ui_tk_style import style_tk_listbox
 from .ui_widgets import app_toast, blend_alpha, debounced_callback
 from .window_position import bind_window_position_save, restore_window_position
 
-ADD_GRID_WIZARD_SIZE = (460, 600)
+ADD_GRID_WIZARD_SIZE = (460, 549)   # measured content height; the dialog is fixed-size,
+                                    # so anything smaller clips the button row
 BUFF_SELECTOR_SIZE = (800, 600)
 BUFF_SELECTOR_MIN = (640, 400)
 SLOT_ASSIGNMENT_SIZE = (620, 520)
@@ -188,13 +190,14 @@ class AddGridWizard(tk.Toplevel):
         self._preset_buttons = []
         for label, r, c in [("H-bar 1x10", 1, 10), ("V-bar 10x1", 10, 1),
                              ("Grid 3x3", 3, 3), ("Single 1x1", 1, 1)]:
-            btn = ttk.Button(preset_frame, text=label, width=11, bootstyle='info-outline',
+            btn = ttk.Button(preset_frame, text=label, width=BTN_MEDIUM, bootstyle='info-outline',
                              command=lambda r=r, c=c: self.apply_preset(r, c))
             btn.pack(side='left', padx=PAD_MICRO)
             self._preset_buttons.append(btn)
 
         self.warning_var = tk.StringVar(value="")
-        ttk.Label(frame, textvariable=self.warning_var, foreground=THEME_COLORS['danger']).pack(pady=PAD_BUTTON_GAP)
+        ttk.Label(frame, textvariable=self.warning_var,
+                  foreground=THEME_COLORS['danger_text']).pack(pady=PAD_BUTTON_GAP)
 
         btn_frame = ttk.Frame(frame)
         btn_frame.pack(pady=PAD_TAB)

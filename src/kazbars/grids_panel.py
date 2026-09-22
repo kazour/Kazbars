@@ -103,13 +103,16 @@ class GridsPanel(ttk.Frame):
 
         # Extras shortcuts — a child of self (not _normal_view) packed once
         # right here, so the row stays on screen in the zero-grids empty state
-        # too. The state widgets pack after it and land below; the tip bar
-        # anchors `before` it.
+        # too. `side='bottom'` before the state widgets claims the bottom strip
+        # next to Build & Install, so off-by-default add-ons never push the
+        # grids down the page; the state widgets take what is left, and the tip
+        # bar still anchors `before` it (pack order, not position).
         self.extras_row = None
         self._build_status_lbl = None
         if self.app is not None:
             self.extras_row = ExtrasShortcutsRow(self, self.app)
-            self.extras_row.pack(fill='x', padx=PAD_TAB, pady=(PAD_XS, 0))
+            self.extras_row.pack(side='bottom', fill='x', padx=PAD_TAB,
+                                 pady=(PAD_XS, 0))
             # In-game status line under the cards — packed by
             # refresh_build_status() once a build has been recorded.
             self._build_status_lbl = ttk.Label(self, font=FONT_SMALL,
@@ -387,8 +390,10 @@ class GridsPanel(ttk.Frame):
             text = f"In game: {name}"
             fg = THEME_COLORS['muted']
         self._build_status_lbl.configure(text=text, foreground=fg)
-        self._build_status_lbl.pack(fill='x', padx=PAD_TAB, pady=(PAD_XS, 0),
-                                    after=self.extras_row)
+        # `after` is pack order; with side='bottom' that lands it directly
+        # above the extras tiles, under the cards it describes.
+        self._build_status_lbl.pack(side='bottom', fill='x', padx=PAD_TAB,
+                                    pady=(PAD_XS, 0), after=self.extras_row)
 
     def _update_tip(self):
         """Update step guide state and show/hide the tip panel."""
@@ -657,6 +662,18 @@ class GridsPanel(ttk.Frame):
                 fill='x', padx=PAD_LIST_ITEM, pady=PAD_ROW)
         panel.pack(fill='x', pady=(0, PAD_ROW), padx=PAD_SMALL)
         self._drag_manager.bind_handle(panel.drag_handle, index, panel_widget=panel)
+        panel.drag_handle.bind('<Alt-Up>', lambda e, i=index: self._move_grid(i, -1))
+        panel.drag_handle.bind('<Alt-Down>', lambda e, i=index: self._move_grid(i, 1))
+
+    def _move_grid(self, index, delta):
+        """Keyboard equivalent of dragging the ☰ handle. Clamps at both ends
+        (no wrap) and moves focus with the grid, so Alt+↓ can be repeated to
+        walk a card down the list."""
+        new_index = index + delta
+        if 0 <= new_index < len(self.grid_panels):
+            self._reorder_grid(index, new_index)
+            self.grid_panels[new_index].drag_handle.focus_set()
+        return 'break'
 
     def _reorder_grid(self, old_index, new_index):
         """Move a grid from old_index to new_index and repack panels."""

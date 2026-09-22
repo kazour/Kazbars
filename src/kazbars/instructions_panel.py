@@ -371,7 +371,7 @@ SECTIONS: list[_Section] = [
               'marked blocks in its config files, backed up beside them. ', None),
              ('Close the game and the patcher before your first build.', _DANGER),
              (' After that, rebuild anytime and /reloadui.', None)],
-            'A quiet status line under the extras cards reads "In game: '
+            'A quiet status line above the extras cards reads "In game: '
             '<profile>" and turns orange when the game no longer matches '
             '— a different profile installed, an edit since the last build, '
             'or a changed game resolution. It never blocks you; it just '
@@ -523,8 +523,11 @@ SECTIONS: list[_Section] = [
                  (', then ', None),
                  ('Build & Install', _SUCCESS),
                  ('. Cancel, Escape or the X discard.', None)],
-                'The toggle cards above the grid list flip the same switches. '
-                'Configuring stays in the dialogs.',
+                [('The four cards at the bottom of the Grids tab, just '
+                  'above ', None),
+                 ('Build & Install', _SUCCESS),
+                 (', flip the same switches. Configuring stays in the '
+                  'dialogs.', None)],
             ]),
             _sub('One text size, four panels', [
                 'Stopwatch, inspect panel, buff console and control panel '

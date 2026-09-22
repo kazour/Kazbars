@@ -80,6 +80,7 @@ PAD_SECTION_GAP = 20      # Visual separation between button groups
 
 # Canvas-drawn geometry — pixel sizes for canvases (mini-previews, step badges).
 # Distinct from PAD_*: these size canvases, not widget padding.
+CARD_STRIPE_PX = 3             # Grid-card left identity stripe (player/target accent)
 GRID_PREVIEW_PX = 80           # Mini preview canvas inside each editor card
 STEP_BADGE_PX = 20             # Numbered step badge in the tip bar
 CELL_PX = 10                   # Default mini-grid cell side

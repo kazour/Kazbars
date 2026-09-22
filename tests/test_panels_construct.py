@@ -308,3 +308,193 @@ def test_save_now_captures_mid_typing_edit(app):
     card.gap_var.set(7)  # typed value, no commit event fired
     app._save_now()
     assert _stored_grid(app, idx)['gap'] == 7
+
+
+# ============================================================================
+# FIRST-LAUNCH PRE-FILL (rides the same app instance)
+# ============================================================================
+# The dialog never calls wait_window, so it can be opened, inspected and
+# destroyed inline. It does grab_set — every case releases the grab.
+
+def _widgets(root, cls):
+    """Every `cls` widget under `root`, depth-first."""
+    out = []
+    for w in root.winfo_children():
+        if isinstance(w, cls):
+            out.append(w)
+        out.extend(_widgets(w, cls))
+    return out
+
+
+def _open_first_launch(app, monkeypatch, paths):
+    from tkinter import ttk
+
+    from kazbars import first_launch
+    monkeypatch.setattr(first_launch, 'COMMON_INSTALL_PATHS', [str(p) for p in paths])
+    first_launch.show_first_launch_dialog(
+        app, 'KazBars', lambda p: None, lambda r: None,
+        on_resolution_set=lambda r: None, default_profile_exists=True,
+        on_start_empty=lambda: None)
+    app.update()
+    dialog = next(w for w in app.winfo_children()
+                  if isinstance(w, tk.Toplevel) and w.title() == 'Welcome to KazBars')
+    entry = _widgets(dialog, ttk.Entry)[0]
+    buttons = {b.cget('text'): b for b in _widgets(dialog, ttk.Button)}
+    texts = {str(lbl.cget('text')) for lbl in _widgets(dialog, ttk.Label)}
+    return dialog, entry, buttons, texts
+
+
+GATE_HINT = 'Set your game folder above to start.'
+
+
+def test_first_launch_prefills_single_install(app, monkeypatch):
+    dialog, entry, buttons, texts = _open_first_launch(
+        app, monkeypatch, [app.game_path])
+    try:
+        assert entry.get() == str(app.game_path)
+        assert str(buttons['Load Defaults'].cget('state')) == 'normal'
+        assert str(buttons['Start Empty'].cget('state')) == 'normal'
+        assert GATE_HINT not in texts
+    finally:
+        dialog.grab_release()
+        dialog.destroy()
+        app.update()
+
+
+def test_first_launch_leaves_ambiguous_install_blank(app, monkeypatch, tmp_path):
+    second = tmp_path / 'AoC2'
+    (second / 'Data' / 'Gui' / 'Default').mkdir(parents=True)
+    dialog, entry, buttons, texts = _open_first_launch(
+        app, monkeypatch, [app.game_path, second])
+    try:
+        assert entry.get() == ''
+        assert str(buttons['Load Defaults'].cget('state')) == 'disabled'
+        assert str(buttons['Start Empty'].cget('state')) == 'disabled'
+        assert GATE_HINT in texts
+    finally:
+        dialog.grab_release()
+        dialog.destroy()
+        app.update()
+
+
+# ============================================================================
+# BUFF-DB AUTOSAVE SEAM (rides the same app instance)
+# ============================================================================
+# There is no Save button: every confirmed edit must be on disk before the
+# next one. A failed write is the only path that leaves the panel dirty.
+
+SEAM_BUFF = {'name': 'SeamAutosave', 'ids': [99000001], 'category': 'Misc',
+             'type': 'buff', 'stacking': False}
+
+
+def _user_delta(app):
+    from kazbars import userdata
+    from kazbars.buff_db_layers import DeltaStore
+    return DeltaStore(userdata.database_user_path()).load()
+
+
+def test_db_change_autosaves(app):
+    db = app.db_panel
+    db.database.add_buff(dict(SEAM_BUFF))
+    assert db._after_db_change() is True
+    names = {b['name'] for b in _user_delta(app)['buffs']}
+    assert 'SeamAutosave' in names
+    assert db.modified is False
+
+
+def test_db_autosave_failure_keeps_dirty(app, monkeypatch):
+    from ttkbootstrap.dialogs import Messagebox
+    db = app.db_panel
+    monkeypatch.setattr(db._delta_store, 'save',
+                        lambda delta: (_ for _ in ()).throw(OSError('disk full')))
+    monkeypatch.setattr(Messagebox, 'show_error', lambda *a, **k: None)
+    # False is what suppresses the caller's "Added: X" toast — a green success
+    # line behind the error dialog would tell the user the opposite of the truth.
+    assert db._after_db_change() is False
+    assert db.modified is True
+    monkeypatch.undo()
+    db.save()  # leave the panel clean for the module teardown guard
+    assert db.modified is False
+
+
+def test_db_toolbar_has_no_save_button(app):
+    from tkinter import ttk
+    labels = {str(b.cget('text')) for b in _widgets(app.db_panel, ttk.Button)}
+    assert 'Save Database' not in labels
+    assert {'Add', 'Edit', 'Delete', 'Import...', 'Export...'} <= labels
+    for b in _widgets(app.db_panel, ttk.Button):
+        if str(b.cget('text')) in ('Import...', 'Export...'):
+            assert 'info' in str(b.cget('style')) and 'Outline' in str(b.cget('style'))
+
+
+# ============================================================================
+# KEYBOARD + CARD CHROME (rides the same app instance)
+# ============================================================================
+
+def test_alt_arrow_moves_grid(app):
+    gp = app.grids_panel
+    _add_seam_grid(app, 'SeamMoveA')
+    _, last = _add_seam_grid(app, 'SeamMoveB')
+
+    gp._move_grid(last, -1)
+    app.update()
+    assert _stored_grid(app, last - 1)['id'] == 'SeamMoveB'
+    assert _stored_grid(app, last)['id'] == 'SeamMoveA'
+    # Focus-follows-the-grid is /smoke's to confirm: focus_set is a no-op while
+    # the fixture's app is withdrawn. What is checkable here is that the repack
+    # re-bound the keys at the new indices.
+    for handle in (gp.grid_panels[last - 1].drag_handle,
+                   gp.grid_panels[last].drag_handle):
+        assert handle.bind('<Alt-Up>') and handle.bind('<Alt-Down>')
+
+    before = [g['id'] for g in app.profile_store.get_section('grids')['grids']]
+    gp._move_grid(0, -1)  # clamps at the top edge
+    assert [g['id'] for g in app.profile_store.get_section('grids')['grids']] == before
+
+
+@pytest.mark.parametrize('method,attr', [('_open_deeps_panel', 'deeps_panel'),
+                                         ('_open_boss_timer', 'boss_timer_panel')])
+def test_escape_hides_monitor_window(app, method, attr):
+    getattr(app, method)()
+    app.update()
+    window = getattr(app, attr)
+    assert window.bind('<Escape>')
+    window.event_generate('<Escape>')
+    app.update()
+    assert window.state() == 'withdrawn'
+
+
+def test_grid_card_stripe(app):
+    from kazbars.ui_helpers import GRID_TYPE_COLORS, TK_COLORS
+    card, _ = _add_seam_grid(app, 'SeamStripe')
+    assert str(card._stripe.cget('bg')) == GRID_TYPE_COLORS['player']
+    assert str(card._card.cget('highlightbackground')) == TK_COLORS['border']
+
+    # The stripe must never drive the card's height: a tk.Canvas with no
+    # explicit height asks for 7c (265px), which fill='y' does not shrink, and
+    # one collapsed card would then fill the whole list.
+    app.update_idletasks()
+    assert card._card.winfo_reqheight() < 100
+
+    card.enabled_var.set(False)
+    card._on_enabled_toggled()
+    app.update()
+    assert str(card._stripe.cget('bg')) == TK_COLORS['border']
+    assert str(card._card.cget('highlightbackground')) == TK_COLORS['border']
+
+
+def test_drag_handle_stays_lit_while_focused(app):
+    """Hover and focus are independent inputs: mousing off a focused handle
+    must not erase the only cue that Alt+↑/↓ is armed."""
+    from kazbars.ui_helpers import THEME_COLORS
+    card, _ = _add_seam_grid(app, 'SeamHandle')
+    card._paint_drag_handle(focus=True)
+    card._paint_drag_handle(hover=True)
+    card._paint_drag_handle(hover=False)
+    assert str(card.drag_handle.cget('foreground')) == THEME_COLORS['heading']
+    card._paint_drag_handle(focus=False)
+    assert str(card.drag_handle.cget('foreground')) == THEME_COLORS['muted']
+
+
+def test_extras_row_packed_at_bottom(app):
+    assert app.grids_panel.extras_row.pack_info()['side'] == 'bottom'
