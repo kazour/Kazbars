@@ -10,6 +10,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **KazBars is now licensed under the GNU GPL v2 or later.** Nothing changes in how you use it — anyone may copy, modify, and share it under the same terms. Third-party parts keep their own terms; see [THIRD_PARTY.md](../THIRD_PARTY.md).
 - **Builds no longer run a separate compiler program.** KazBars compiles your grids itself instead of shelling out to a bundled `mtasc.exe`, which is gone from the download. Build & Install works exactly the same otherwise.
+- **The Database tab has no Save button — buff edits save themselves.** Every add, edit, delete, import and category rename is written to disk the moment you confirm it, so an interrupted session can't lose buff work.
+- **First launch fills in your game folder when there's only one.** When exactly one Age of Conan install is found on the PC, the path is already in the box with "Load Defaults" ready to press. Two or more, or none, and nothing is assumed — a line under the buttons says what's missing. "Set up later" at the bottom now reads as the link it always was.
+- **The four extras cards moved to the bottom of the Grids tab**, next to Build & Install, so the grid list starts at the top of the page.
+- **Grid cards are calmer.** A grid's player/target colour is now a stripe down the card's left edge instead of a full coloured outline.
+
+### Fixed
+
+- **Esc closes more windows.** It closes the Game Resolution dialog, the settings backup dialog and the welcome dialog (the same as "Set up later" — a game folder you typed is still kept), and hides the Deeps and Ethram-Fal Live Tracker windows without stopping their monitoring. Enter applies in the resolution dialog.
+- **Grids can be reordered from the keyboard.** Tab to a grid card's ☰ handle, then Alt+↑ / Alt+↓ moves it one place.
+- **Two rough edges in the Add Grid wizard.** The "Exceeds available slots" warning was too dark to read against its background, and an empty band sat below the buttons.
+- **The "Tracked Buffs..." button shows its whole label** instead of clipping on each grid card.
 
 ## [3.1.1] — 2026-08-31
 
