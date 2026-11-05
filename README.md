@@ -64,7 +64,7 @@ Positioning happens in-game: press Ctrl+Shift+Alt for preview mode and drag grid
 
 If the game ever patches (it hasn't in years), run the official patcher once, then **Game ▸ Repair game install** — KazBars re-registers itself and restores your saved positions.
 
-Once you know the flow, make it yours: `+ Add Grid` for your own layouts, then `Tracked Buffs...` to pick what each one watches. A grid holds up to **64 slots** (16 for an overhead grid), with no cap across grids. Overhead grids sit against each head by an anchor that depends on your game's field of view — if they look off, nudge Right and Up in **Game ▸ Game resolution…** and rebuild.
+Once you know the flow, make it yours: `+ Add Grid` for your own layouts, then click a grid's preview to pick what it watches (on a static grid, click a slot). A grid holds up to **64 slots** (16 for an overhead grid), with no cap across grids. Overhead grids sit against each head by an anchor that depends on your game's field of view — if they look off, nudge Right and Up in **Game ▸ Game resolution…** and rebuild.
 
 Sharing a layout: File ▸ Export profile… writes one `.kazbars.json` file, with any custom buffs it references baked in — the recipient doesn't need those buffs in their own database first. File ▸ Import profile… reads one back.
 

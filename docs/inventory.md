@@ -52,7 +52,7 @@
 | `src/kazbars/game_persistence.py` | 608 |
 | `src/kazbars/game_resolution.py` | 160 |
 | `src/kazbars/grid_dialogs.py` | 622 |
-| `src/kazbars/grid_editor_panel.py` | 1021 |
+| `src/kazbars/grid_editor_panel.py` | 1022 |
 | `src/kazbars/grid_model.py` | 380 |
 | `src/kazbars/grid_preview.py` | 274 |
 | `src/kazbars/grid_preview_canvas.py` | 195 |
@@ -61,7 +61,7 @@
 | `src/kazbars/inspect.py` | 79 |
 | `src/kazbars/inspect_catalog.py` | 618 |
 | `src/kazbars/inspect_panel.py` | 393 |
-| `src/kazbars/instructions_panel.py` | 1352 |
+| `src/kazbars/instructions_panel.py` | 1400 |
 | `src/kazbars/live_tracker_panel.py` | 521 |
 | `src/kazbars/live_tracker_settings.py` | 175 |
 | `src/kazbars/onslaught.py` | 204 |

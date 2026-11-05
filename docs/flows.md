@@ -618,3 +618,21 @@ Steps:
 5. `_apply()` — src/kazbars/onslaught_panel.py — re-validates the whole config via `onslaught.validate_config`, writes the section via `ProfileStore.set_section` (debounced autosave, Flow 3), resyncs the main-screen extras card (`refresh_extras_shortcuts()`), toasts — "No changes to apply" (info) when nothing moved, "Onslaught tracker saved — Build & Install to apply" when `onslaught.ships` (enabled with at least one display), "Onslaught tracker shows nothing — the next build leaves it out" (warning) when enabled with none, else "Onslaught tracker off — next build removes it" — and destroys the dialog.
 
 End state: the profile document's `onslaught` section reflects the choices (autosaved; travels with the profile). Nothing is applied in-game yet — on the next Build & Install (Flow 1, steps 8–10) `include_onslaught` compiles `KazBarsOnslaught` and `KazBarsOnsScan`, and `_onslaught_data_block` bakes `d.ONS`: the board's and the alerts' first-session spots (fixed fractions; both are placed in preview and remembered by the archive), `panel_fs(overlay.size, scale)`, the displays, `alertMs`, `d.ONS.watch` (the watched names per kind via `onslaught.names_of` — bosses, skulls and minis from the catalog, the camps with `camps`, the user's names as minis), the AoE helpers, the heal buffs and the per-playfield facts from `onslaught.INSTANCES`. In game the tracker does nothing outside the two Onslaught instances (Skull Gate, Kuthchemes): `KazBarsOnsScan` finds the watched mobs as they spawn, and the board lists them by tier with their health, the wave line and timer, the defended ally's health, spawn alerts and the AoE warning. It is a HUD element (mouse-transparent, placed only in preview); anchors and the master switch persist via the module config archive (`onpx`/`onpy`/`onax`/`onay`/`onv`).
+
+---
+
+## 36. assign / clear a static slot from the grid card
+
+Trigger: On a static-mode `GridEditorPanel`, the user clicks a cell of the to-scale preview (or arrows to it and presses Enter/space) to assign; right-clicks it, or presses Delete on it, to clear
+
+Steps:
+1. `GridPreview._activate()` — src/kazbars/grid_preview_canvas.py — `_on_click` (or Enter/space) lands on the cell under the pointer or the keyboard focus and calls the card's `on_pick(slot)`; an empty spot between cells does nothing
+2. `GridEditorPanel._on_pick()` — src/kazbars/grid_editor_panel.py — routes a slot index to `edit_slot()` (`None` is the dynamic grid's `edit_whitelist()`, Flow 5)
+3. `edit_slot()` — src/kazbars/grid_editor_panel.py — flushes the widgets via `save_to_config()`; opens `BuffSelectorDialog` titled "Slot N Buffs" on the slot's refs (`grid_preview.slot_ids`); a cancel leaves everything untouched (the dialog's own steps: Flow 5, steps 3–6)
+4. `_write_slot()` — src/kazbars/grid_editor_panel.py — writes `slotAssignments[str(slot)]` (an empty result drops the key) and has `GridPreview.repaint_slot()` repaint only that cell
+5. `_buffs_changed()` — src/kazbars/grid_editor_panel.py — `update_labels()` refreshes the summary and names line, then the card's `on_whitelist_changed` fires — `GridsPanel._on_card_buffs_changed()` — src/kazbars/grids_panel.py — which refreshes the step guide and calls `_mark_modified()` (the edit reaches the profile store and autosaves, Flow 3)
+6. `GridPreview._clear()` — src/kazbars/grid_preview_canvas.py — right-click (`_on_right_click`) or Delete on a static cell that holds buffs calls the card's `on_clear(slot)`; an empty cell does nothing
+7. `clear_slot()` — src/kazbars/grid_editor_panel.py — remembers the slot's refs in `_cleared` (entries older than 8 s are dropped), empties it with `_write_slot()`, runs `_buffs_changed()` (step 5), and raises an 8 s toast "Cleared slot N — click to undo" whose click runs `_undo_clear()`
+8. `_undo_clear()` — src/kazbars/grid_editor_panel.py — refills every slot cleared while the toast showed that is still empty (a slot filled again meanwhile keeps what it holds now) with `_write_slot()`, then `_buffs_changed()`
+
+End state: `grid_config['slotAssignments']` holds the slot's new refs, or no key for a cleared slot; the cell, summary and names line show it; the edit is marked modified and autosaved (Flow 3). Refs a slot picked from the dialog are written as stored (`entry['ids'][0]`; unresolved refs kept inert, as in Flow 5)

@@ -95,8 +95,9 @@ SECTIONS: list[_Section] = [
                 'is a good first grid.',
             ]),
             _sub('3. Choose which buffs to track', [
-                'Click Tracked Buffs... and pick from the database. Only '
-                'selected buffs appear in the grid.',
+                "Click the grid's preview and pick from the database. Only "
+                'selected buffs appear in the grid. On a static grid, click '
+                'a slot instead.',
             ]),
             _sub('4. Build and install', [
                 [('Click ', None),
@@ -269,6 +270,43 @@ SECTIONS: list[_Section] = [
     },
     {
         'cat': 'Grids',
+        'id': 'grid-card',
+        'title': 'The Grid Card',
+        'body': [
+            'Each grid is a card in the Grids tab. Open or closed, it shows '
+            'the grid drawn to scale and a line naming the buffs it holds. '
+            'The chevron opens its settings.',
+            _sub('The preview', [
+                'Icons are drawn at two-thirds of their in-game size. A grid '
+                'too big for the card steps down to a smaller scale, and the '
+                'title line says so: "shown at 1:2", for example.',
+                'Shape, Size, Gap and Fill redraw it as you change them. A '
+                'disabled grid draws grey. The preset cards on an empty '
+                'Grids tab are drawn the same way.',
+                "It is also where you choose the grid's buffs: click the "
+                'preview, or a slot on a static grid.',
+                _link('Tracked Buffs', 'tracked-buffs'),
+            ]),
+            _sub('The buffs line', [
+                'Under the preview: the buffs the grid holds, ending in '
+                '"+ 3 more" when they do not all fit. Hover it for the full '
+                'list.',
+            ]),
+            _sub('The title line', [
+                'Move…, Enabled, ▲ ▼ and × sit at the right. ▲ ▼ move the '
+                'card one place up or down the list, greyed at the ends. '
+                'Dragging the ☰ handle does the same, and so does Alt+↑ / '
+                'Alt+↓ once you Tab to it.',
+            ]),
+            _sub('Settings', [
+                'Position (X and Y, floating grids only), the shape, Size, '
+                'Gap, Timers, Fill and the rest.',
+                _link('Grid Display Options', 'display-options'),
+            ]),
+        ],
+    },
+    {
+        'cat': 'Grids',
         'id': 'modes',
         'title': 'Dynamic vs Static Mode',
         'body': [
@@ -297,12 +335,20 @@ SECTIONS: list[_Section] = [
         'body': [
             "How you pick buffs depends on the grid's mode.",
             _sub('Dynamic mode', [
-                'A list of buff names the grid watches for. Only listed buffs '
-                'appear; an empty list shows nothing.',
+                'A list of buff names the grid watches for. Click the '
+                "grid's preview (or Tab to it and press Enter) to pick from "
+                'the database. Only listed buffs appear; an empty list shows '
+                'nothing.',
             ]),
             _sub('Static mode', [
-                'Assign buffs to each slot by position. Unassigned slots stay '
-                'empty; if several share a slot, the most recent wins.',
+                "Click a slot's cell in the preview to choose that slot's "
+                'buffs. The picker is titled with the slot, like "Slot 3 '
+                'Buffs". Empty slots stay empty; if several buffs share a '
+                'slot, the most recent wins.',
+                'Right-click a slot to clear it. A toast says "click to '
+                'undo" for 8 seconds.',
+                'From the keyboard: Tab to the preview, arrows move between '
+                'slots, Enter opens the picker, Delete clears the slot.',
             ]),
             _sub("A tracked buff your database doesn't have", [
                 "An imported profile (or a buff a database update dropped) "
@@ -316,7 +362,8 @@ SECTIONS: list[_Section] = [
             _sub('A grid with nothing to track', [
                 'A dynamic grid with no Tracked Buffs, or a static grid with '
                 "nothing in its slots, isn't built. It stays in your profile "
-                'and ships once you give it something.',
+                'and ships once you give it something. Its card says so '
+                'under the preview.',
             ]),
         ],
     },
@@ -534,8 +581,9 @@ SECTIONS: list[_Section] = [
                 'size. With many grids it shrinks itself to stay on screen.',
             ]),
             _sub('X/Y in the app', [
-                'The X/Y on a floating grid only seed a first-ever session. '
-                'Once you drag in-game, the dragged spot wins.',
+                "The X/Y under Position in a floating grid's settings only "
+                'seed a first-ever session. Once you drag in-game, the '
+                'dragged spot wins.',
             ]),
         ],
     },

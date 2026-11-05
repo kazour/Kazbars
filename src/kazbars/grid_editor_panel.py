@@ -75,15 +75,16 @@ from .ui_widgets import (
 _CLEAR_UNDO_S = 8
 # The names line's width before the card is first laid out.
 _NAMES_FALLBACK_W = 600
-_names_font = None
 
 
-def _measure(text):
-    """Pixel width of `text` in the names line's font (one Font for every card)."""
-    global _names_font
-    if _names_font is None:
-        _names_font = tkfont.Font(font=FONT_SMALL)
-    return _names_font.measure(text)
+def _names_measure(widget):
+    """`measure(text)` in the names line's font: one Font per Tk root, shared
+    by every card under it."""
+    root = widget._root()
+    font = getattr(root, '_kz_names_font', None)
+    if font is None:
+        font = root._kz_names_font = tkfont.Font(root=root, font=FONT_SMALL)
+    return font.measure
 
 
 class GridEditorPanel(ttk.Frame):
@@ -690,7 +691,7 @@ class GridEditorPanel(ttk.Frame):
         width = self.section.body.winfo_width()
         self._names_w = width
         self.names_var.set(grid_preview.names_line(
-            self._names, _measure, width if width > 1 else _NAMES_FALLBACK_W))
+            self._names, _names_measure(self), width if width > 1 else _NAMES_FALLBACK_W))
 
     def _on_body_resized(self, event):
         if event.width != self._names_w:
