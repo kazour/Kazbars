@@ -577,6 +577,50 @@ def test_escape_hides_monitor_window(app, method, attr):
     assert window.state() == 'withdrawn'
 
 
+def test_grid_preview_draws_once_and_repaints_in_place(app):
+    from types import SimpleNamespace
+
+    from kazbars.grid_preview_canvas import GridPreview
+    from kazbars.ui_helpers import GRID_TYPE_COLORS, THEME_COLORS
+    picked, cleared = [], []
+    preview = GridPreview(app, accent=GRID_TYPE_COLORS['player'], on_pick=picked.append,
+                          on_clear=cleared.append, tip_for=lambda i: f'slot {i}')
+    try:
+        cfg = {'slotMode': 'static', 'rows': 8, 'cols': 8, 'gap': -1,
+               'fillDirection': 'TL-BR', 'slotAssignments': {'9': [1]}}
+        preview.set_config(cfg, 48, True)
+        items = preview.find_all()
+        assert len(items) == 192
+        assert preview.ratio > 3  # 8 rows step down to fit
+
+        painted = []
+        real = preview.repaint_slot
+        preview.repaint_slot = lambda i: (painted.append(i), real(i))
+        x0, y0, *_ = preview.layout.rects[9]
+        # The fixture's app is withdrawn, so a generated pointer event never
+        # lands; the handlers take the event as Tk hands it over.
+        at = SimpleNamespace(x=x0 + 2, y=y0 + 2)
+        preview._on_motion(at)
+        assert sorted(painted) == [-1, 9]  # nothing was hot: one real repaint
+        rect = preview.find_withtag('slot_9&&rect')
+        assert preview.itemcget(rect, 'outline') == THEME_COLORS['heading']
+        painted.clear()
+
+        preview.set_config(dict(cfg, slotAssignments={}), 48, False)
+        assert preview.find_all() == items, "same geometry, no new items"
+        assert len(painted) == 64
+
+        preview.set_config(dict(cfg, slotAssignments={'9': [1]}), 48, True)
+        preview._on_click(at)
+        preview._on_right_click(at)
+        assert (picked, cleared) == ([9], [9])
+
+        preview.set_config(dict(cfg, rows=2, cols=2), 48, True)
+        assert len(preview.find_all()) == 12, "a new shape rebuilds"
+    finally:
+        preview.destroy()
+
+
 def test_grid_card_stripe(app):
     from kazbars.ui_helpers import GRID_TYPE_COLORS, TK_COLORS
     card, _ = _add_seam_grid(app, 'SeamStripe')

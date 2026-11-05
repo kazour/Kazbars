@@ -175,6 +175,14 @@ def add_tooltip(widget, text):
     widget._kz_tooltip = _InAppToolTip(widget, text)
 
 
+def refresh_tooltip(widget):
+    """Hide a widget's tooltip and show it again after the usual delay — for
+    a canvas whose tip names the item under the pointer as it moves."""
+    tip = getattr(widget, '_kz_tooltip', None)
+    if tip is not None:
+        tip._schedule()
+
+
 class _InAppToolTip:
     """Tooltip rendered as a tk.Frame inside the root window, clamped to app bounds."""
 
