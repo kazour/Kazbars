@@ -21,8 +21,8 @@ from .app_popups import show_close_game_required_dialog
 from .build_loading import BuildLoadingScreen
 from .cast_timer import is_enabled as cast_is_enabled
 from .cast_timer import validate_config as validate_cast_config
-from .grid_model import get_game_resolution_or_default
-from .grids_generator import MAX_TOTAL_SLOTS, unresolved_refs
+from .grid_model import MAX_GRID_SLOTS, get_game_resolution_or_default
+from .grids_generator import unresolved_refs
 from .profile_document import build_signature
 from .ui_helpers import THEME_COLORS
 from .ui_widgets import app_toast, confirm, flash_status_bar
@@ -67,7 +67,10 @@ def build(app):
     )
 
     grids = app.grids_panel.get_profile_data()
-    total_slots = app.grids_panel.get_total_slots()
+    oversized = next((g for g in grids if g['rows'] * g['cols'] > MAX_GRID_SLOTS), None)
+    oversized_msg = '' if oversized is None else (
+        f"Grid '{oversized['id']}' has {oversized['rows'] * oversized['cols']} slots; "
+        f"a grid holds at most {MAX_GRID_SLOTS}.\n\nReduce its rows or columns.")
 
     di_settings = dict(app.profile_store.get_section('damage_numbers'))
     di_enabled = bool(di_settings.get('enabled'))
@@ -86,8 +89,7 @@ def build(app):
     stopwatch_config = dict(app.profile_store.get_section('stopwatch'))
     inspect_config = dict(app.profile_store.get_section('inspect'))
     any_extra = (
-        bool(app.settings.get('build_console', False))
-        or cast_is_enabled(cast_config)
+        cast_is_enabled(cast_config)
         or bool(stopwatch_config.get('enabled'))
         or bool(inspect_config.get('enabled'))
         or di_enabled
@@ -99,9 +101,7 @@ def build(app):
          "Set your Age of Conan folder from the bottom bar."),
         (not grids and not any_extra,
          "Nothing to build.\n\nAdd a grid or enable an extra first."),
-        (total_slots > MAX_TOTAL_SLOTS,
-         f"Total slots ({total_slots}) exceeds maximum ({MAX_TOTAL_SLOTS}).\n\n"
-         "Remove some grids or reduce grid sizes."),
+        (oversized is not None, oversized_msg),
         (di_enabled and not di_assets_ok,
          "Damage Numbers is enabled but its files are missing.\n\n"
          "Re-download KazBars to restore them."),
@@ -170,11 +170,11 @@ def build(app):
         'database': app.database,
         'assets_path': app.assets_path,
         'app_version': app.app_version,
-        'include_console': bool(app.settings.get('build_console', False)),
         'cast_config': cast_config,
         'stopwatch_config': stopwatch_config,
         'inspect_config': inspect_config,
-        'panel_font_size': app.settings.get('panel_font_size'),
+        'overlay': dict(app.profile_store.get_section('overlay')),
+        'anchor': (app.settings.get('anchor_side'), app.settings.get('anchor_up')),
         'game_resolution': get_game_resolution_or_default(),
         'game_path': app.game_path,
         'di_enabled': di_enabled,
@@ -223,10 +223,11 @@ def _build_worker(app, loading, ctx):
         started = time.monotonic()
         staging_dir, compile_result = compile_to_staging(
             ctx['grids'], ctx['database'], ctx['assets_path'], ctx['app_version'],
-            include_console=ctx['include_console'], cast_config=ctx['cast_config'],
+            cast_config=ctx['cast_config'],
             stopwatch_config=ctx['stopwatch_config'],
             inspect_config=ctx['inspect_config'],
-            panel_font_size=ctx['panel_font_size'],
+            overlay=ctx['overlay'],
+            anchor=ctx['anchor'],
             game_resolution=ctx['game_resolution'],
         )
         if not compile_result[0]:

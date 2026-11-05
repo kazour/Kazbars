@@ -116,6 +116,7 @@ def apply_document(app):
         # No dialog: inert refs are visible as greyed rows in the buff
         # selector, and the build summary reports the skipped count.
         logger.info("Unresolved buff refs (kept, skipped at build): %s", missing_by_grid)
+    app.grids_panel.load_overlay()
 
     if bt := app._boss_timer_if_alive():
         bt.load_profile_data(store.get_section('boss_timer'))

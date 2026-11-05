@@ -1,64 +1,80 @@
 """
-Tests for `grids_generator.CodeGenerator` — the optional buff-discovery
-console toggle (`include_console`).
+Tests for `grids_generator.CodeGenerator` — the AS2 text a build bakes.
 
-When `include_console=False` the generated AS2 must contain no `console`
-references and no `KazBarsConsole` references — otherwise as2c would
-fail to resolve the missing class.
-
-When `include_console=True` the generator must emit the original console
-hooks: instantiation in the constructor, the two log calls in
-SlotPBuffAdd / SlotTBuffAdd, plus the preview-mode wiring.
+Covers which grids ship, one grid's unit (sizes from the overlay model, timer
+style, Applied by me, its id set as `[id, fact code, …]` pairs), the fact codes
+themselves (type, stack level, stacking family), the data blocks (`d.PF`,
+`d.CAST`, `d.SW`, `d.INS`), the template's feature gates, the module registry
+and preview-panel rows, archive keys, inert refs, and the data-class chunking.
+No compiler runs here (test_build_compile does that).
 
 Run: `pytest tests/test_grids_generator.py` (from repo root).
 """
 
 import re
 
+import pytest
+
 from kazbars.buff_database import BuffDatabase
+from kazbars.grid_model import create_default_grid, validate_grid
 from kazbars.grids_generator import (
     DATA_CHUNK_BUDGET,
     CodeGenerator,
+    _apply_feature_gates,
     _pack_units,
     escape_as2_string,
+    fact_code,
+    grid_ships,
+    sanitize_id,
+    unresolved_refs,
 )
 from kazbars.paths import KAZBARS_ASSETS
 
-
-def _minimal_grid():
-    return {
-        "id": "TestGrid",
-        "enabled": True,
-        "type": "player",
-        "rows": 1,
-        "cols": 1,
-        "iconSize": 32,
-        "gap": 0,
-        "fx": 0.0,
-        "fy": 0.0,
-        "slotMode": "dynamic",
-        "showTimers": False,
-        "timerFontSize": 12,
-        "timerFlashThreshold": 5,
-        "timerYOffset": 0,
-        "stackFontSize": 10,
-        "enableFlashing": False,
-        "fillDirection": "LR",
-        "sortOrder": "longest",
-        "layout": "buffFirst",
-        "whitelist": [],
-    }
+# Tome of Epithur (Necro): a plain buff, ids 222609 + 222610.
+BUFF = 222609
+# Ethereal Lash 1-4: a stacking debuff, ids 4281285, 4281287, 4281288, 4281289.
+LASH = 4281285
 
 
-def _load_db():
-    db = BuffDatabase()
-    db_path = KAZBARS_ASSETS / "Database.json"
-    if db_path.exists():
-        db.load(db_path)
-    else:
-        db.buffs = []
-        db._rebuild_indexes()
-    return db
+def _grid(**kw):
+    """A validated dynamic player grid tracking BUFF (so it ships)."""
+    return validate_grid({**create_default_grid(grid_id="G", rows=1, cols=2),
+                          "whitelist": [BUFF], **kw})
+
+
+_DB = None
+
+
+def _db():
+    global _DB
+    if _DB is None:
+        _DB = BuffDatabase()
+        _DB.load(KAZBARS_ASSETS / "Database.json")
+    return _DB
+
+
+def _gen(grids=None, **kw):
+    return CodeGenerator([_grid()] if grids is None else grids, _db(), "0.0.0", **kw)
+
+
+def _num(text, name):
+    return int(re.search(rf"\b{name}: (-?\d+)", text).group(1))
+
+
+def _block(text, name):
+    return next(line.strip() for line in text.splitlines()
+                if line.strip().startswith(f"d.{name} = {{"))
+
+
+def _codes(data, vid="G_0"):
+    line = re.search(rf"var {vid}_ids:Array = \[([^\]]*)\];", data).group(1)
+    nums = [int(n) for n in line.split(", ")]
+    return list(zip(nums[0::2], nums[1::2]))
+
+
+# --------------------------------------------------------------------------
+# Escaping and positions
+# --------------------------------------------------------------------------
 
 
 def test_escape_as2_string_escapes_quotes_newlines_backslashes():
@@ -70,610 +86,406 @@ def test_escape_as2_string_escapes_quotes_newlines_backslashes():
 
 
 def test_grid_id_with_quote_is_escaped_in_output():
-    grid = _minimal_grid()
-    grid["id"] = 'My"Grid'
-    main, data = CodeGenerator([grid], _load_db(), "0.0.0").generate()
-    combined = main + data
-    # The quote is escaped, keeping the AS2 string literal well-formed...
-    assert 'My\\"Grid' in combined
-    # ...and the raw, literal-breaking form never appears.
-    assert 'My"Grid' not in combined
+    main, data = _gen([_grid(id='My"Grid')]).generate()
+    assert 'My\\"Grid' in main + data
+    assert 'My"Grid' not in main + data
+
+
+def test_grid_id_with_newline_does_not_inject():
+    main, data = _gen([_grid(id="X\ninjected")]).generate()
+    assert "X\\ninjected" in main + data
+    assert "X\ninjected" not in main + data
 
 
 def test_positions_project_to_the_build_resolution():
-    grid = _minimal_grid()
-    grid["fx"], grid["fy"] = 0.5, 0.85
-    _, data_1080 = CodeGenerator(
-        [grid], _load_db(), "0.0.0", game_resolution=(1920, 1080)).generate()
+    grid = _grid(fx=0.5, fy=0.85)
+    _, data_1080 = _gen([grid], game_resolution=(1920, 1080)).generate()
     assert "x: 960," in data_1080 and "y: 918," in data_1080
-    _, data_4k = CodeGenerator(
-        [grid], _load_db(), "0.0.0", game_resolution=(3840, 2160)).generate()
+    _, data_4k = _gen([grid], game_resolution=(3840, 2160)).generate()
     assert "x: 1920," in data_4k and "y: 1836," in data_4k
 
 
 def test_positions_default_resolution_when_none_given():
-    grid = _minimal_grid()
-    grid["fx"], grid["fy"] = 1.0, 1.0
-    _, data = CodeGenerator([grid], _load_db(), "0.0.0").generate()
-    assert "x: 1920," in data and "y: 1080," in data  # DEFAULT_GAME_RESOLUTION
-
-
-def test_grid_id_with_newline_does_not_inject():
-    grid = _minimal_grid()
-    grid["id"] = "X\ninjected"
-    main, data = CodeGenerator([grid], _load_db(), "0.0.0").generate()
-    combined = main + data
-    assert "X\\ninjected" in combined  # escaped to backslash-n
-    assert "X\ninjected" not in combined  # no raw newline survives
-
-
-def test_console_off_emits_no_console_refs():
-    gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0", include_console=False)
-    main_code, _ = gen.generate()
-
-    # The class name and identifier are namespaced in case-sensitive AS2.
-    # `console` (lowercase) is the member name; `KazBarsConsole` is the class.
-    assert "KazBarsConsole" not in main_code, (
-        "include_console=False must not reference KazBarsConsole class — "
-        "as2c would fail to resolve it."
-    )
-    # The substring "console" appears in many unrelated words; restrict to
-    # the meaningful tokens that would make AS2 fail.
-    assert "console." not in main_code
-    assert "consolePinned" not in main_code
-    # Template tokens must all be substituted away.
-    assert "{{CONSOLE_" not in main_code
-
-
-def test_console_on_emits_console_hooks():
-    gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0", include_console=True)
-    main_code, _ = gen.generate()
-
-    # Instantiation
-    assert "private var console:KazBarsConsole;" in main_code
-    assert "console = new KazBarsConsole(rootClip);" in main_code
-    # The pin is gone — the control panel is the master switch now.
-    assert "consolePinned" not in main_code
-
-    # The two inline call sites left to the gate; every lifecycle call now
-    # runs off the ungated module registry, which never names a stub.
-    assert "console.logPlayer(buff.m_Name, bid)" in main_code
-    assert "console.logTarget(buff.m_Name, bid)" in main_code
-    assert "modules.push(console);" in main_code
-
-    # Persistence lives wholly inside the stub: no inline archive writes.
-    assert 'config.ReplaceEntry("console_pin"' not in main_code
-    assert 'config.ReplaceEntry("cnv"' not in main_code
-
-    # No leftover tokens
-    assert "{{CONSOLE_" not in main_code
-
-
-def test_console_default_is_off():
-    """Belt-and-suspenders: the default in CodeGenerator must be opt-in."""
-    gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0")
-    main_code, _ = gen.generate()
-    assert "KazBarsConsole" not in main_code
+    _, data = _gen([_grid(fx=1.0, fy=1.0)]).generate()
+    assert "x: 1920," in data and "y: 1080," in data
 
 
 # --------------------------------------------------------------------------
-# Cast-timer overlay toggle (include_cast_timer, derived from cast_config)
+# Which grids ship
 # --------------------------------------------------------------------------
 
 
-def _cast_cfg():
-    # Fraction positions chosen to project to 900/600/560 px at the default
-    # 1920×1080 build resolution.
-    return {
-        "enabled": True,
-        "enableP": True,
-        "enableT": True,
-        "playerFx": 900 / 1920,
-        "playerFy": 600 / 1080,
-        "targetFx": 900 / 1920,
-        "targetFy": 560 / 1080,
-        "bold": True,
-        "fontSize": 18,
-        "display": "both",
-        "color": "FF8800",
-    }
+def test_only_grids_that_track_something_ship():
+    assert grid_ships(_grid())
+    assert not grid_ships(_grid(enabled=False))
+    assert not grid_ships(_grid(whitelist=[]))
+    static = dict(_grid(), slotMode="static", whitelist=[])
+    assert not grid_ships(static)
+    assert grid_ships(dict(static, slotAssignments={"1": [BUFF]}))
+    assert not grid_ships(dict(static, slotAssignments={"2": [BUFF]})), "outside the 1x2 shape"
+    assert not grid_ships(dict(static, slotAssignments={"0": []}))
+    assert not grid_ships(dict(static, slotAssignments={"x": [BUFF]}))
+
+
+def test_an_empty_grid_is_left_out_as_it_is_and_the_header_counts_what_ships():
+    empty = _grid(id="Empty", whitelist=[])
+    gen = _gen([_grid(), empty])
+    main, data = gen.generate()
+    assert "// Grids: 1" in data
+    assert '"Empty"' not in data
+    assert empty["enabled"] is True, "never turned off"
+
+
+# --------------------------------------------------------------------------
+# One grid's unit
+# --------------------------------------------------------------------------
+
+
+def test_the_default_size_bakes_a_48px_grid_and_12pt_text():
+    _, data = _gen().generate()
+    assert (_num(data, "iconSize"), _num(data, "timerFont"), _num(data, "stackFont")) == (48, 12, 12)
+
+
+def test_the_base_size_and_the_grid_scale_move_the_sizes_in_proportion():
+    _, data = _gen([_grid(scale=150)], overlay={"size": 24}).generate()
+    assert (_num(data, "iconSize"), _num(data, "timerFont"), _num(data, "stackFont")) == (144, 36, 36)
+    _, data = _gen([_grid(scale=50)], overlay={"size": 10}).generate()
+    assert (_num(data, "iconSize"), _num(data, "timerFont"), _num(data, "stackFont")) == (20, 9, 9)
+
+
+def test_a_base_size_that_is_not_a_choice_bakes_as_twelve():
+    _, data = _gen(overlay={"size": 15, "font": "Comic Sans"}).generate()
+    assert _num(data, "iconSize") == 48
+    assert 'face: "Arial"' in data
+
+
+def test_the_unit_keeps_its_key_order():
+    _, data = _gen().generate()
+    order = ["id", "key", "type", "rows", "cols", "iconSize", "gap", "x", "y", "slotMode",
+             "fillDir", "sortOrder", "layout", "timerStyle", "timerFont",
+             "timerFlashThreshold", "timerYOffset", "stackFont", "enableFlashing"]
+    positions = [data.index(f"            {k}: ") for k in order]
+    assert positions == sorted(positions)
+    assert "showTimers" not in data
+
+
+def test_the_timer_style_is_baked_where_show_timers_was():
+    _, data = _gen([_grid(timerStyle="bar")]).generate()
+    assert '            layout: "buffFirst",\n            timerStyle: "bar",\n            timerFont: ' in data
+
+
+def test_applied_by_me_is_baked_last_and_only_when_true():
+    _, plain = _gen().generate()
+    assert "selfCastOnly" not in plain
+    _, dynamic = _gen([_grid(selfCastOnly=True)]).generate()
+    assert "            enableFlashing: true,\n            selfCastOnly: true\n        };" in dynamic
+    static = dict(_grid(selfCastOnly=True), slotMode="static", slotAssignments={"0": [BUFF]})
+    _, fixed = _gen([static]).generate()
+    assert ("            enableFlashing: true,\n            selfCastOnly: true,\n"
+            "            slots: {}\n        };") in fixed
+
+
+def test_a_dynamic_grid_bakes_its_id_set_as_pairs_read_by_a_loop():
+    _, data = _gen().generate()
+    assert '\n        d.WL["G"] = {};' in data
+    assert _codes(data) == [(222609, 1), (222610, 1)]
+    assert 'd.WL["G"][G_0_ids[i]] = G_0_ids[i + 1];\n            i += 2;' in data
+    assert "d.ISDEB" not in data and "d.BUFFTYPE" not in data and "d.STACK_LEVEL" not in data
+
+
+def test_a_static_grid_bakes_its_slots_and_every_slot_id_in_its_set():
+    grid = dict(_grid(), slotMode="static", rows=1, cols=2, whitelist=[],
+                slotAssignments={"0": [BUFF], "1": LASH})
+    _, data = _gen([grid]).generate()
+    assert "G_0.slots[0] = [222609, 222610];" in data
+    assert "G_0.slots[1] = [4281285, 4281287, 4281288, 4281289];" in data
+    assert [bid for bid, _ in _codes(data)] == [222609, 222610, 4281285, 4281287, 4281288, 4281289]
+
+
+# --------------------------------------------------------------------------
+# Fact codes
+# --------------------------------------------------------------------------
+
+
+def test_fact_code_packs_type_level_and_family():
+    assert fact_code("buff", None) == 1
+    assert fact_code("debuff", None) == 2
+    assert fact_code("misc", None) == 3
+    assert fact_code("whatever", None) == 1
+    assert fact_code("debuff", (3, 1)) == 2 | 3 << 2 | 1 << 12
+    assert fact_code("buff", (5000, 2)) == 1 | 1023 << 2 | 2 << 12, "the level caps at 1023"
+    assert fact_code("buff", (-4, 0)) == 1
+
+
+def test_every_level_of_a_stacking_entry_carries_one_family_and_its_own_level():
+    _, data = _gen([_grid(whitelist=[LASH])]).generate()
+    got = [(bid, code >> 2 & 1023, code >> 12, code & 3) for bid, code in _codes(data)]
+    assert got == [(4281285, 1, 1, 2), (4281287, 2, 1, 2), (4281288, 3, 1, 2), (4281289, 4, 1, 2)]
+
+
+def test_an_id_that_does_not_stack_carries_no_level_and_no_family():
+    _, data = _gen().generate()
+    assert all(code >> 2 == 0 and code & 3 > 0 for _, code in _codes(data))
+
+
+def test_families_are_numbered_by_their_lowest_id_in_the_grid():
+    db = BuffDatabase()
+    db.buffs = [
+        {"name": "High", "ids": [900, 901], "type": "buff", "stacking": True},
+        {"name": "Low", "ids": [100, 101], "type": "debuff", "stacking": True},
+        {"name": "Plain", "ids": [500], "type": "misc"},
+    ]
+    db._rebuild_indexes()
+    grid = _grid(whitelist=[900, 100, 500])
+    _, data = CodeGenerator([grid], db, "0.0.0").generate()
+    families = {bid: code >> 12 for bid, code in _codes(data)}
+    assert families == {100: 1, 101: 1, 500: 0, 900: 2, 901: 2}
+
+
+def test_stack_labels_are_per_grid():
+    # Two grids on one stacking entry: each numbers its own families from 1.
+    grids = [_grid(id="A", whitelist=[BUFF, LASH]), _grid(id="B", whitelist=[LASH])]
+    _, data = _gen(grids).generate()
+    assert {code >> 12 for _, code in _codes(data, "A_0")} == {0, 1}
+    assert {code >> 12 for _, code in _codes(data, "B_1")} == {1}
+
+
+def test_custom_icons_follow_the_grids_once_each():
+    grids = [_grid(id="A", whitelist=[5077953]), _grid(id="B", whitelist=[5077953])]
+    _, data = _gen(grids).generate()
+    assert data.count('d.CUSTOMICON[5077953] = "IcoSlow30";') == 1
+    assert data.index("d.CUSTOMICON[5077953]") > data.rindex("d.CFG.grids.push(")
+
+
+# --------------------------------------------------------------------------
+# Data blocks
+# --------------------------------------------------------------------------
+
+
+def test_the_panel_block_carries_base_size_face_version_and_anchor():
+    main, data = _gen().generate()
+    assert _block(data, "PF") == 'd.PF = {fontSize: 12, face: "Arial", version: "0.0.0", side: 389, up: -13};'
+    assert "ppanel.configure(d.PF);" in main
+    _, data = _gen(overlay={"size": 16, "font": "Verdana"}, anchor=(-40, 120)).generate()
+    assert _block(data, "PF") == ('d.PF = {fontSize: 16, face: "_StandardFont", version: "0.0.0", '
+                                  'side: -40, up: 120};')
+    _, data = _gen(overlay={"size": 12, "font": "Roboto"}).generate()
+    assert 'face: "Arial"' in _block(data, "PF"), "a baked face is spliced in as Arial"
+
+
+def _cast_cfg(**kw):
+    return dict({"enabled": True, "enableP": True, "enableT": True,
+                 "playerFx": 900 / 1920, "playerFy": 600 / 1080,
+                 "targetFx": 900 / 1920, "targetFy": 560 / 1080,
+                 "bold": True, "display": "both", "color": "FF8800"}, **kw)
 
 
 def test_cast_off_emits_no_cast_refs():
-    """No cast_config (or both sides off) must reference KazBarsCastTimer —
-    as2c would otherwise fail to resolve the class — and leave no raw tokens."""
-    gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0", cast_config=None)
-    main_code, data_code = gen.generate()
+    gen = _gen(cast_config=None)
+    main, data = gen.generate()
     assert not gen.include_cast_timer
-    assert "KazBarsCastTimer" not in main_code
-    assert "castTimer" not in main_code
-    assert "{{CAST_" not in main_code
-    assert "d.CAST" not in data_code
-
-
-def test_cast_disabled_config_is_off():
-    """Master off (or both sides off) must not switch the feature on."""
-    gen = CodeGenerator(
-        [_minimal_grid()], _load_db(), "0.0.0",
-        cast_config={"enabled": False, "enableP": True, "enableT": True},
-    )
-    main_code, _ = gen.generate()
-    assert not gen.include_cast_timer
-    assert "KazBarsCastTimer" not in main_code
-
-    gen = CodeGenerator(
-        [_minimal_grid()], _load_db(), "0.0.0",
-        cast_config={"enabled": True, "enableP": False, "enableT": False},
-    )
-    assert not gen.include_cast_timer
+    assert "KazBarsCastTimer" not in main and "castTimer" not in main
+    assert "d.CAST" not in data
+    assert not _gen(cast_config={"enabled": False, "enableP": True}).include_cast_timer
+    assert not _gen(cast_config={"enabled": True}).include_cast_timer
 
 
 def test_cast_on_emits_hooks_and_data():
-    gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0", cast_config=_cast_cfg())
-    main_code, data_code = gen.generate()
-    assert gen.include_cast_timer
-
-    # Instantiation + configure
-    assert "private var castTimer:KazBarsCastTimer;" in main_code
-    assert "castTimer = new KazBarsCastTimer(rootClip);" in main_code
-    assert "castTimer.configure(d.CAST);" in main_code
-
-    # Registration (the lifecycle itself runs off the ungated registry) plus
-    # the feeds, which are the cast timer's own and stay gated.
-    assert "modules.push(castTimer);" in main_code
-    assert "castTimer.connectPlayer(m_Player);" in main_code
-    assert "castTimer.setTarget(m_Target);" in main_code
-    assert "castTimer.disconnectPlayer();" in main_code
-
-    # Data block — fractions project to px at the default build resolution;
-    # color must be a numeric hex literal (Number() else NaN); font is fixed
-    # to Arial in the stub, so only bold is emitted.
-    assert "d.CAST = {" in data_code
-    assert "playerX: 900, playerY: 600, targetX: 900, targetY: 560" in data_code
-    assert "color: 0xFF8800" in data_code
-    assert "bold: true" in data_code
-    assert 'display: "both"' in data_code
-    assert "font:" not in data_code
-
-    # No leftover tokens
-    assert "{{CAST_" not in main_code
+    gen = _gen(cast_config=_cast_cfg())
+    main, data = gen.generate()
+    assert "castTimer = new KazBarsCastTimer(rootClip);" in main
+    assert "castTimer.configure(d.CAST, world, clock);" in main
+    assert "modules.push(castTimer);" in main
+    assert _block(data, "CAST") == (
+        "d.CAST = {enableP: true, enableT: true, playerX: 900, playerY: 600, "
+        "targetX: 900, targetY: 560, bold: true, fontSize: 15, display: \"both\", "
+        "color: 0xFF8800};")
 
 
-# --------------------------------------------------------------------------
-# In-game stopwatch toggle (include_stopwatch, derived from stopwatch_config)
-# --------------------------------------------------------------------------
+def test_the_cast_timer_takes_the_title_role_of_its_scaled_size():
+    _, data = _gen(cast_config=_cast_cfg(scale=50), overlay={"size": 24}).generate()
+    assert _num(_block(data, "CAST"), "fontSize") == 15
 
 
 def test_stopwatch_off_emits_no_refs():
-    """No stopwatch_config (or enabled=False) must reference KazBarsStopwatch —
-    as2c would otherwise fail to resolve the class — and leave no raw tokens."""
-    gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0", stopwatch_config=None)
-    main_code, data_code = gen.generate()
+    gen = _gen(stopwatch_config=None)
+    main, data = gen.generate()
     assert not gen.include_stopwatch
-    assert "KazBarsStopwatch" not in main_code
-    assert "stopwatch" not in main_code
-    assert "{{SW_" not in main_code
-    assert "d.SW" not in data_code
-
-
-def test_stopwatch_disabled_config_is_off():
-    gen = CodeGenerator(
-        [_minimal_grid()], _load_db(), "0.0.0",
-        stopwatch_config={"enabled": False, "fx": 0.1, "fy": 0.1},
-    )
-    main_code, _ = gen.generate()
-    assert not gen.include_stopwatch
-    assert "KazBarsStopwatch" not in main_code
+    assert "KazBarsStopwatch" not in main and "stopwatch" not in main
+    assert "d.SW" not in data
 
 
 def test_stopwatch_on_emits_hooks_and_data():
-    gen = CodeGenerator(
-        [_minimal_grid()], _load_db(), "0.0.0",
-        stopwatch_config={"enabled": True, "fx": 750 / 1920, "fy": 410 / 1080,
-                          "fontSize": 16, "startCollapsed": True},
-    )
-    main_code, data_code = gen.generate()
-    assert gen.include_stopwatch
-
-    # Instantiation + configure
-    assert "private var stopwatch:KazBarsStopwatch;" in main_code
-    assert "stopwatch = new KazBarsStopwatch(rootClip);" in main_code
-    assert "stopwatch.configure(d.SW);" in main_code
-
-    # Registration is the whole hook: the stopwatch has no feed of its own,
-    # so the registry drives every lifecycle call.
-    assert "modules.push(stopwatch);" in main_code
-
-    # Data block — the fraction position projects to px at the default build
-    # resolution; a fontSize of its own overrides the shared panel size
-    assert "d.SW = {x: 750, y: 410, fontSize: 16, collapsed: true};" in data_code
-
-    # No leftover tokens
-    assert "{{SW_" not in main_code
-
-
-def test_stopwatch_without_its_own_size_follows_the_shared_one():
-    gen = CodeGenerator(
-        [_minimal_grid()], _load_db(), "0.0.0",
-        stopwatch_config={"enabled": True, "fx": 750 / 1920, "fy": 410 / 1080,
-                          "fontSize": None},
-        panel_font_size=20,
-    )
-    _, data_code = gen.generate()
-    assert "d.SW = {x: 750, y: 410, fontSize: 20, collapsed: false};" in data_code
+    gen = _gen(stopwatch_config={"enabled": True, "fx": 750 / 1920, "fy": 410 / 1080,
+                                 "scale": 150, "startCollapsed": True})
+    main, data = gen.generate()
+    assert "stopwatch = new KazBarsStopwatch(rootClip);" in main
+    assert "stopwatch.configure(d.SW);" in main
+    assert "modules.push(stopwatch);" in main
+    assert _block(data, "SW") == "d.SW = {x: 750, y: 410, fontSize: 18, collapsed: true};"
 
 
 def test_extras_positions_project_to_the_build_resolution():
-    """Same section, different target resolution → proportionally moved px
-    (the whole point of storing extras positions as fractions)."""
-    gen = CodeGenerator(
-        [_minimal_grid()], _load_db(), "0.0.0",
-        stopwatch_config={"enabled": True, "fx": 0.5, "fy": 0.5},
-        game_resolution=(2560, 1440),
-    )
-    _, data_code = gen.generate()
-    assert "d.SW = {x: 1280, y: 720," in data_code
-
-
-# --------------------------------------------------------------------------
-# Target inspect panel toggle (include_inspect, derived from inspect_config)
-# --------------------------------------------------------------------------
+    gen = _gen(stopwatch_config={"enabled": True, "fx": 0.5, "fy": 0.5},
+               game_resolution=(2560, 1440))
+    _, data = gen.generate()
+    assert "d.SW = {x: 1280, y: 720," in data
 
 
 def test_inspect_off_emits_no_refs():
-    """No inspect_config (or enabled=False) must reference KazBarsInspect —
-    as2c would otherwise fail to resolve the class — and leave no raw tokens."""
-    gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0", inspect_config=None)
-    main_code, data_code = gen.generate()
+    gen = _gen(inspect_config=None)
+    main, data = gen.generate()
     assert not gen.include_inspect
-    assert "KazBarsInspect" not in main_code
-    assert "inspect" not in main_code
-    assert "{{INS_" not in main_code
-    assert "d.INS" not in data_code
-
-
-def test_inspect_disabled_config_is_off():
-    gen = CodeGenerator(
-        [_minimal_grid()], _load_db(), "0.0.0",
-        inspect_config={"enabled": False, "fx": 0.1, "fy": 0.1},
-    )
-    main_code, _ = gen.generate()
-    assert not gen.include_inspect
-    assert "KazBarsInspect" not in main_code
+    assert "KazBarsInspect" not in main and "inspect" not in main
+    assert "d.INS" not in data
 
 
 def test_inspect_on_emits_hooks_and_data():
-    gen = CodeGenerator(
-        [_minimal_grid()], _load_db(), "0.0.0",
-        inspect_config={"enabled": True, "fx": 40 / 1920, "fy": 240 / 1080,
-                        "fontSize": 14, "startCollapsed": True, "showPvp": True,
-                        "showPerks": False},
-    )
-    main_code, data_code = gen.generate()
-    assert gen.include_inspect
-
-    # Instantiation + configure
-    assert "private var inspect:KazBarsInspect;" in main_code
-    assert "inspect = new KazBarsInspect(rootClip);" in main_code
-    assert "inspect.configure(d.INS);" in main_code
-
-    # Registration (the lifecycle runs off the ungated registry) plus the
-    # target feed, which is the inspect panel's own and stays gated.
-    assert "modules.push(inspect);" in main_code
-    assert "inspect.setSubject(tid);" in main_code
-
-    # Data block — the fraction position projects to px at the default build
-    # resolution; a fontSize of its own overrides the shared panel size
-    assert ("d.INS = {x: 40, y: 240, fontSize: 14, collapsed: true, "
-            "showPvp: true, showPerks: false};" in data_code)
-
-    # No leftover tokens
-    assert "{{INS_" not in main_code
-
-
-def test_inspect_without_its_own_size_follows_the_shared_one():
-    gen = CodeGenerator(
-        [_minimal_grid()], _load_db(), "0.0.0",
-        inspect_config={"enabled": True, "fx": 40 / 1920, "fy": 240 / 1080,
-                        "fontSize": None},
-        panel_font_size=20,
-    )
-    _, data_code = gen.generate()
-    assert ("d.INS = {x: 40, y: 240, fontSize: 20, collapsed: false, "
-            "showPvp: true, showPerks: true};" in data_code)
+    gen = _gen(inspect_config={"enabled": True, "fx": 40 / 1920, "fy": 240 / 1080,
+                               "scale": 50, "startCollapsed": True})
+    main, data = gen.generate()
+    assert "inspect = new KazBarsInspect(rootClip);" in main
+    assert "inspect.configure(d.INS, world, clock);" in main
+    assert "modules.push(inspect);" in main
+    assert _block(data, "INS").startswith("d.INS = {x: 40, y: 240, fontSize: 8, collapsed: true")
 
 
 # --------------------------------------------------------------------------
-# Preview-mode control panel (KazBarsPreviewPanel — unconditional; the extra
-# rows and their dispatch arms are gated per extra)
+# Template gates, registry, preview panel
 # --------------------------------------------------------------------------
 
 
-def _all_extras_gen():
-    return CodeGenerator(
-        [_minimal_grid()], _load_db(), "0.0.0",
-        include_console=True,
-        cast_config=_cast_cfg(),
-        stopwatch_config={"enabled": True, "fx": 750 / 1920, "fy": 410 / 1080},
-        inspect_config={"enabled": True, "fx": 40 / 1920, "fy": 240 / 1080},
-    )
+def test_feature_gates_strip_markers_and_refuse_template_bugs():
+    template = "a\n//#if X  // why\nb\n//#end\nc"
+    assert _apply_feature_gates(template, {"X": True}) == "a\nb\nc"
+    assert _apply_feature_gates(template, {"X": False}) == "a\nc"
+    for bad, flags in (("//#if Y\n//#end", {"X": True}),
+                       ("//#if X\n//#if X\n//#end", {"X": True}),
+                       ("//#end", {}),
+                       ("//#if X\n", {"X": True})):
+        with pytest.raises(ValueError):
+            _apply_feature_gates(bad, flags)
 
 
-def test_preview_panel_always_emitted():
-    """The panel compiles into every build, extras or not."""
-    gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0")
-    main_code, _ = gen.generate()
-
-    assert "private var ppanel:KazBarsPreviewPanel;" in main_code
-    assert "ppanel = new KazBarsPreviewPanel(this, rootClip);" in main_code
-
-    # Rows are collected on every preview entry, panel shown last (topmost).
-    assert "ppanel.begin();" in main_code
-    assert "ppanel.addGrid(obj);" in main_code
-    assert "ppanel.show();" in main_code
-    assert "public function previewToggle(key:String, shown:Boolean):Void {" in main_code
-
-    # Teardown from both paths (exitPreview + cleanup); the panel's own
-    # persistence is written once, inside saveAll, which both persist paths
-    # (exitPreview + OnModuleDeactivated) call.
-    assert main_code.count("ppanel.destroy();") == 2
-    assert main_code.count("ppanel.saveState(config);") == 1
-    assert main_code.count("saveAll();") == 2
-    assert main_code.count("loadAll();") == 1
-    assert "ppanel.loadState(config);" in main_code
-
-    assert "{{PP_" not in main_code
+def test_every_template_flag_is_one_the_generator_sets():
+    template = (KAZBARS_ASSETS / "KazBars.as.template").read_text(encoding="utf-8")
+    used = set(re.findall(r"^//#if (\w+)", template, re.M))
+    assert used == {"CONSOLE", "CONBUFFS", "CONCASTS", "CAST", "INS", "ONS", "PLATE", "SW"}
 
 
-def test_shared_panel_font_is_always_emitted_and_configured():
-    """`d.PF` is unconditional — the control panel compiles into every build, so
-    a mistake here breaks every build rather than only console-enabled ones. Its
-    identifiers must also stay clear of the bare 'stopwatch'/'inspect' substrings
-    the off-path tests assert against the whole generated class."""
-    main_code, data_code = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0").generate()
-    assert 'd.PF = {fontSize: 12, version: "0.0.0"};' in data_code
-    assert "ppanel.configure(d.PF);" in main_code
-    assert "console.configure(d.PF);" not in main_code
-
-    gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0",
-                        include_console=True, panel_font_size=20)
-    main_code, data_code = gen.generate()
-    assert 'd.PF = {fontSize: 20, version: "0.0.0"};' in data_code
-    assert "console.configure(d.PF);" in main_code
-
-
-def test_shared_panel_font_is_clamped():
-    def size_of(value):
-        return CodeGenerator([_minimal_grid()], _load_db(), "0.0.0",
-                             panel_font_size=value).panel_font_size
-
-    assert size_of(None) == 12
-    assert size_of("garbage") == 12
-    assert size_of(2) == 8
-    assert size_of(99) == 48
-
-
-def test_preview_panel_no_extras_has_no_extra_rows():
-    """With nothing compiled in, the registry is empty, so the ungated previewOn
-    and dispatcher loops run over nothing, and the gated addExtra lines are
-    stripped — the check that nothing was left dangling is that no stub is
-    registered, named or given a row."""
-    main_code, _ = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0").generate()
-    assert "modules.push(" not in main_code
-    assert "ppanel.addExtra(" not in main_code
-    for stub in ("KazBarsConsole", "KazBarsCastTimer", "KazBarsStopwatch",
-                 "KazBarsInspect"):
-        assert stub not in main_code
+def test_with_nothing_on_no_module_stub_is_named():
+    main, _ = _gen().generate()
+    assert main.count("modules.push(") == 1
+    assert "modules.push(grids);" in main
+    assert "ppanel.addExtra(" not in main
+    for stub in ("KazBarsConsole", "KazBarsCastTimer", "KazBarsStopwatch", "KazBarsInspect",
+                 "KazBarsOnslaught", "KazBarsOverhead", "KazBarsConBuffs", "KazBarsConCasts"):
+        assert stub not in main, stub
 
 
 def test_module_registry_emits_every_lifecycle_call_once():
-    """The registry loops are ungated: each lifecycle call runs off the typed
-    `m` exactly once, module or no module. A loop dropped here still compiles
-    and fails silently in-game (overlays never detached, state never saved)."""
-    main_code, _ = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0").generate()
+    main, _ = _gen().generate()
     for call in ("m.create();", "m.previewOn();", "m.previewOff();",
                  "m.cleanup();", "m.loadState(config);", "m.saveState(config);"):
-        assert main_code.count(call) == 1, call
+        assert main.count(call) == 1, call
 
 
 def test_preview_keys_are_distinct():
-    """previewToggle matches rows on the key string with no break, so two stubs
-    sharing a key would flip together on one checkbox."""
     keys = {}
     for stub in sorted((KAZBARS_ASSETS / "stubs").glob("*.as")):
         m = re.search(r'previewKey\(\):String \{ return "(\w+)"; \}',
                       stub.read_text(encoding="utf-8"))
         if m:
             keys[stub.name] = m.group(1)
-    assert len(keys) == 4, keys
+    assert set(keys) == {"KazBarsCastTimer.as", "KazBarsConsole.as", "KazBarsInspect.as",
+                         "KazBarsOnslaught.as", "KazBarsStopwatch.as"}, keys
     assert len(set(keys.values())) == len(keys), keys
 
 
-def test_preview_panel_rows_and_dispatch_all_extras():
-    main_code, _ = _all_extras_gen().generate()
-
-    # One row per compiled-in extra, each seeded from that module's live state
-    # and labelled by it — added explicitly in the panel's Tools display order
-    # (Cast Timer, Inspect Panel, Buff Console, Stopwatch), decoupled from the
-    # registration order.
-    extras = [
-        "ppanel.addExtra(castTimer.previewLabel(), castTimer.previewKey(), castTimer.isActive());",
-        "ppanel.addExtra(inspect.previewLabel(), inspect.previewKey(), inspect.isActive());",
-        "ppanel.addExtra(console.previewLabel(), console.previewKey(), console.isActive());",
-        "ppanel.addExtra(stopwatch.previewLabel(), stopwatch.previewKey(), stopwatch.isActive());",
-    ]
-    idxs = [main_code.index(line) for line in extras]
+def test_preview_panel_rows_follow_the_tools_order_not_the_z_order():
+    gen = _gen(cast_config=_cast_cfg(),
+               stopwatch_config={"enabled": True},
+               inspect_config={"enabled": True})
+    main, _ = gen.generate()
+    rows = [f"ppanel.addExtra({m}.previewLabel(), {m}.previewKey(), {m}.isActive());"
+            for m in ("castTimer", "inspect", "stopwatch")]
+    idxs = [main.index(row) for row in rows]
     assert idxs == sorted(idxs)
-
-    # Registration order is z-order (console topmost), untouched by the row
-    # order above; rows are still added before the panel is built (which is
-    # what puts it topmost).
-    assert (main_code.index("modules.push(stopwatch);")
-            < main_code.index("modules.push(inspect);")
-            < main_code.index("modules.push(castTimer);")
-            < main_code.index("modules.push(console);"))
-    assert main_code.index("ppanel.addExtra(") < main_code.index("ppanel.show();")
-
-    # One dispatcher for every row, matched on the module's own key.
-    assert 'if (m.previewKey() == key) m.setActive(shown);' in main_code
-
-    # Nothing is restored on the way out of preview any more — a check is the
-    # setting, and the pin it replaced is gone.
-    assert "setShown" not in main_code
-    assert "consolePinned" not in main_code
-
-    assert "{{PP_" not in main_code
-    assert "{{SW_" not in main_code
-
-
-def test_preview_panel_row_gated_per_extra():
-    """A row only appears for an extra that is actually compiled in."""
-    gen = CodeGenerator(
-        [_minimal_grid()], _load_db(), "0.0.0",
-        stopwatch_config={"enabled": True, "fx": 750 / 1920, "fy": 410 / 1080},
-    )
-    main_code, _ = gen.generate()
-    assert main_code.count("modules.push(") == 1
-    assert "modules.push(stopwatch);" in main_code
-
-
-def test_grid_shown_is_master_switch():
-    """A grid row flips a persisted `shown` flag the normal-mode writers honor,
-    and preview shows what normal mode would (no blanket force-show)."""
-    main_code, _ = _all_extras_gen().generate()
-
-    assert "dirty: true, shown: true" in main_code
-    assert 'config.FindEntry("gk_" + gk + "_v")' in main_code
-    # Written once, in saveAll, keyed like the positions beside it — both
-    # persist paths reach it from there.
-    assert main_code.count(
-        'config.ReplaceEntry("gk_" + gk + "_v", grids[i].shown ? 1 : 0);') == 1
-
-    assert "obj.mc._visible = obj.shown;" in main_code
-    assert "obj.mc._visible = obj.shown && disp.length > 0;" in main_code
-    assert "obj.mc._visible = obj.shown && hasAny;" in main_code
-
-
-def test_console_master_switch_defaults_active():
-    """A fresh archive opens the console at login; the archived master switch
-    (cnv) is honoured inside the stub's loadState on activation."""
-    main_code, _ = _all_extras_gen().generate()
-
-    assert main_code.index("m.create();") < main_code.index(
-        "SignalClientCharacterAlive")
-    assert main_code.index("m.create();") < main_code.index("loadAll();")
-    assert "console_pin" not in main_code
+    assert (main.index("modules.push(grids);") < main.index("modules.push(inspect);")
+            < main.index("modules.push(castTimer);") < main.index("modules.push(stopwatch);"))
+    assert main.index("ppanel.addExtra(") < main.index("ppanel.show();")
+    assert "if (m.previewKey() == key) m.setActive(shown);" in main
 
 
 def test_stub_archive_keys_present():
-    """The per-stub master switches live inside the stubs, where generator
-    output can't show them."""
     stubs = KAZBARS_ASSETS / "stubs"
-    pairs = (
-        ("KazBarsStopwatch.as", "swv"),
-        ("KazBarsInspect.as", "inv"),
-        ("KazBarsCastTimer.as", "ctv"),
-        ("KazBarsConsole.as", "cnv"),
-    )
-    for name, key in pairs:
+    for name, key in (("KazBarsStopwatch.as", "swv"), ("KazBarsInspect.as", "inv"),
+                      ("KazBarsCastTimer.as", "ctv"), ("KazBarsConsole.as", "cnv"),
+                      ("KazBarsOnslaught.as", "onv")):
         src = (stubs / name).read_text(encoding="utf-8")
         assert f'FindEntry("{key}")' in src, f"{name} never reads {key}"
         assert f'ReplaceEntry("{key}"' in src, f"{name} never writes {key}"
 
 
 # --------------------------------------------------------------------------
-# Archive keys: ASCII sanitization + collision dedup
+# Archive keys
 # --------------------------------------------------------------------------
 
 
 def test_sanitize_id_folds_non_ascii_to_a_valid_as2_identifier():
-    # isalnum() alone accepts non-ASCII letters (e.g. CJK), which as2c's
-    # identifier grammar does not — sanitize_id must fold those to "_" too.
-    gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0")
-    safe = gen.sanitize_id("Grid ünïcodé 日本")
-    assert safe.isascii()
-    assert safe.isidentifier()
+    safe = sanitize_id("Grid ünïcodé 日本")
+    assert safe.isascii() and safe.isidentifier()
+    assert sanitize_id("") == "Grid"
+    assert sanitize_id("3x3") == "_3x3"
 
 
 def test_archive_key_dedupes_grids_that_sanitize_the_same():
-    grids = [dict(_minimal_grid(), id="a-b"), dict(_minimal_grid(), id="a b")]
-    _, data = CodeGenerator(grids, _load_db(), "0.0.0").generate()
+    _, data = _gen([_grid(id="a-b"), _grid(id="a b")]).generate()
     assert 'key: "a_b"' in data
     assert 'key: "a_b_2"' in data
 
 
-def test_resolve_grid_accepts_a_bare_scalar_slot_assignment():
-    # A hand-edited or imported profile can carry one known id instead of a
-    # list — _resolve_grid must not crash trying to iterate over it.
-    db = _load_db()
-    known = _known_primary_id(db)
-    gen = CodeGenerator([_minimal_grid()], db, "0.0.0")
-    grid = dict(_minimal_grid(), slotAssignments={"0": known})
-    resolved = gen._resolve_grid(grid)
-    assert resolved["slotAssignments"]["0"] == gen._expand_primary_ids([known])
-
-
-def test_resolve_grid_tolerates_a_malformed_slot_value():
-    # _as_list wraps a non-list scalar as a single-element list, so a
-    # thoroughly malformed value (an unhashable object, not the documented
-    # int/str scalar) reaches database.by_id.get() as that element — must
-    # skip it like any other unknown ref, not raise.
-    gen = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0")
-    grid = dict(_minimal_grid(), slotAssignments={"0": {"nested": "object"}})
-    resolved = gen._resolve_grid(grid)
-    assert resolved["slotAssignments"]["0"] == []
-
-
 # --------------------------------------------------------------------------
-# Inert refs: unresolved_refs (the build-summary count) + emit-time skip
+# Inert refs
 # --------------------------------------------------------------------------
 
 
-def _known_primary_id(db):
-    return db.buffs[0]["ids"][0]
+def test_a_bare_scalar_slot_assignment_resolves_like_a_list():
+    grid = dict(_grid(), slotMode="static", slotAssignments={"0": BUFF})
+    _, data = _gen([grid]).generate()
+    assert "G_0.slots[0] = [222609, 222610];" in data
+
+
+def test_a_malformed_slot_value_is_skipped_not_raised():
+    grid = dict(_grid(), slotMode="static",
+                slotAssignments={"0": {"nested": "object"}, "1": [BUFF]})
+    _, data = _gen([grid]).generate()
+    assert "G_0.slots[0]" not in data
+    assert "G_0.slots[1] = [222609, 222610];" in data
 
 
 def test_unresolved_refs_counts_unknown_ids_and_names_once():
-    from kazbars.grids_generator import unresolved_refs
-    db = _load_db()
-    known = _known_primary_id(db)
     grids = [
-        dict(_minimal_grid(), whitelist=[known, 99999901, "Ghost Buff"]),
-        dict(_minimal_grid(), id="G2", slotMode="static",
+        _grid(whitelist=[BUFF, 99999901, "Ghost Buff"]),
+        dict(_grid(id="G2"), slotMode="static",
              slotAssignments={"0": [99999901], "1": "Ghost Buff", "2": []}),
     ]
-    # Deduped across grids and across whitelist/slot forms, resolvable skipped.
-    assert unresolved_refs(grids, db) == [99999901, "Ghost Buff"]
-
-
-def test_unresolved_refs_ignores_disabled_grids():
-    from kazbars.grids_generator import unresolved_refs
-    grids = [dict(_minimal_grid(), enabled=False, whitelist=[99999901])]
-    assert unresolved_refs(grids, _load_db()) == []
-
-
-def test_unresolved_refs_empty_when_everything_resolves():
-    from kazbars.grids_generator import unresolved_refs
-    db = _load_db()
-    grids = [dict(_minimal_grid(), whitelist=[_known_primary_id(db)])]
-    assert unresolved_refs(grids, db) == []
+    assert unresolved_refs(grids, _db()) == [99999901, "Ghost Buff"]
+    assert unresolved_refs([_grid(enabled=False, whitelist=[99999901])], _db()) == []
+    assert unresolved_refs([_grid()], _db()) == []
 
 
 def test_unknown_refs_are_skipped_at_emit_not_crashed_on():
-    """An inert int or legacy-name ref must vanish from the emitted tables —
-    and never raise — exactly what unresolved_refs predicted for the summary."""
-    db = _load_db()
-    grid = dict(_minimal_grid(), whitelist=[_known_primary_id(db), 99999901, "Ghost Buff"])
-    main_code, data_code = CodeGenerator([grid], db, "0.0.0").generate()
-    assert "99999901" not in main_code + data_code
-    assert "Ghost Buff" not in main_code + data_code
+    main, data = _gen([_grid(whitelist=[BUFF, 99999901, "Ghost Buff"])]).generate()
+    assert "99999901" not in main + data
+    assert "Ghost Buff" not in main + data
 
 
 # ============================================================================
 # DATA CLASS CHUNKING
 # ============================================================================
-# as2c caps every class at 32 KB of bytecode, so the grid configs and buff
-# lookups are packed into KazBarsData1..N under DATA_CHUNK_BUDGET chars each.
+# as2c caps every class at 32 KB of bytecode, so the grid configs and custom
+# icons are packed into KazBarsData1..N under DATA_CHUNK_BUDGET chars each.
 # test_build_compile pins the cap itself; these pin the packing and the shape.
 
 
@@ -691,11 +503,10 @@ def _big_setup(n_ids=1200, n_grids=12):
     db._rebuild_indexes()
     per = n_ids // n_grids
     grids = [
-        dict(_minimal_grid(), id=f"Grid {k}",
-             whitelist=[5_000_000 + n for n in range(k * per, (k + 1) * per)])
+        _grid(id=f"Grid {k}", whitelist=[5_000_000 + n for n in range(k * per, (k + 1) * per)])
         for k in range(n_grids)
     ]
-    grids.append(dict(_minimal_grid(), id="Static", slotMode="static",
+    grids.append(dict(_grid(id="Static"), slotMode="static", whitelist=[],
                       slotAssignments={"0": [6_000_001]}))
     return grids, db
 
@@ -713,13 +524,11 @@ def test_generate_files_splits_a_large_profile_into_consecutive_data_classes():
     gen = CodeGenerator(grids, db, "0.0.0")
     files = gen.generate_files()
     n = len(files) - 2
-    assert n >= 3
+    assert n >= 2
     assert [name for name, _ in files] == (
         ["KazBars.as", "KazBarsData.as"] + [f"KazBarsData{k}.as" for k in range(1, n + 1)])
-    # init() calls every chunk once, in order
     assert re.findall(r"KazBarsData(\d+)\.fill\(d\);", files[1][1]) == [
         str(k) for k in range(1, n + 1)]
-    # each chunk file declares the class its name binds to, within budget
     gen._used_keys = set()
     longest = max(len(u) for u in gen._data_units())
     for name, src in files[2:]:
@@ -728,24 +537,23 @@ def test_generate_files_splits_a_large_profile_into_consecutive_data_classes():
         assert len(body) <= max(DATA_CHUNK_BUDGET, longest)
 
 
-def test_chunked_data_keeps_grid_order_and_lookups_after_the_grids():
+def test_chunked_data_keeps_grid_order_and_each_grid_its_own_set():
     grids, db = _big_setup()
     _, data = CodeGenerator(grids, db, "0.0.0").generate()
     assert re.findall(r"d\.CFG\.grids\.push\((\w+)\);", data) == (
         [f"Grid_{k}_{k}" for k in range(12)] + ["Static_12"])
     assert "Static_12.slots[0] = [6000001, 6000002, 6000003];" in data
-    last_grid = data.rindex("d.CFG.grids.push(")
-    assert data.index("d.STACK_LEVEL[6000001] = 1;") > last_grid
-    assert data.index("d.STACK_LEVEL[6000003] = 3;") > last_grid
-    assert data.count("d.ISDEB[") == 1200 + 3
+    levels = [(bid, code >> 2 & 1023) for bid, code in _codes(data, "Static_12")]
+    assert levels == [(6000001, 1), (6000002, 2), (6000003, 3)]
+    assert sum(len(_codes(data, f"Grid_{k}_{k}")) for k in range(12)) == 1200
     assert data.count("class KazBarsData") == data.count(".fill(d);") + 1
 
 
 def test_generate_files_is_three_files_for_a_small_profile_and_two_for_none():
-    small = CodeGenerator([_minimal_grid()], _load_db(), "0.0.0").generate_files()
+    small = _gen().generate_files()
     assert [name for name, _ in small] == ["KazBars.as", "KazBarsData.as", "KazBarsData1.as"]
     assert "KazBarsData1.fill(d);" in small[1][1]
-    empty = CodeGenerator([], _load_db(), "0.0.0").generate_files()
+    empty = _gen([]).generate_files()
     assert [name for name, _ in empty] == ["KazBars.as", "KazBarsData.as"]
     assert ".fill(" not in empty[1][1]
     assert "return d;" in empty[1][1]

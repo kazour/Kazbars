@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 from ttkbootstrap.dialogs import Messagebox
 
-from .grid_model import MAX_TOTAL_SLOTS, create_default_grid, default_grid_name
+from .grid_model import MAX_GRID_SLOTS, create_default_grid, default_grid_name
 from .settings_manager import get_setting, set_setting
 from .ui_headers import create_dialog_header
 from .ui_helpers import (
@@ -83,7 +83,7 @@ def _section(parent, text):
 class AddGridWizard(tk.Toplevel):
     """Dialog wizard for creating a new grid with type, size, and mode options."""
 
-    def __init__(self, parent, existing_ids, current_total_slots, name_in_use):
+    def __init__(self, parent, existing_ids, name_in_use):
         super().__init__(parent)
         self.withdraw()
         self.title("Add New Grid")
@@ -95,8 +95,7 @@ class AddGridWizard(tk.Toplevel):
         # One owner for the uniqueness rule (grids_panel._grid_name_in_use);
         # existing_ids stays for the default-name suggestion only.
         self.name_in_use = name_in_use
-        self.current_total_slots = current_total_slots
-        self.available_slots = MAX_TOTAL_SLOTS - current_total_slots
+        self.available_slots = MAX_GRID_SLOTS
         self.result = None
         self.parent = parent
 
@@ -125,7 +124,7 @@ class AddGridWizard(tk.Toplevel):
         frame = ttk.Frame(self, padding=PAD_INNER)
         frame.pack(fill='both', expand=True)
 
-        self.avail_label = ttk.Label(frame, text=f"Available slots: {self.available_slots} of {MAX_TOTAL_SLOTS}",
+        self.avail_label = ttk.Label(frame, text=f"A grid holds up to {MAX_GRID_SLOTS} slots",
                                      font=FONT_SMALL, foreground=THEME_COLORS['info_value'])
         self.avail_label.pack(pady=(0, PAD_LF))
 
@@ -301,13 +300,11 @@ class AddGridWizard(tk.Toplevel):
             else:
                 shape = f"Grid ({rows}x{cols} = {total} slots)"
 
-        remaining = self.available_slots - total
-        if remaining >= 0:
-            self.shape_var.set(f"{shape}  \u00b7  {remaining} remaining")
+        self.shape_var.set(shape)
+        if total <= self.available_slots:
             self.warning_var.set("")
         else:
-            self.shape_var.set(shape)
-            self.warning_var.set(f"Exceeds available slots by {-remaining}!")
+            self.warning_var.set(f"A grid holds at most {self.available_slots} slots")
 
     def on_create(self):
         grid_id = self.id_var.get().strip()
@@ -324,7 +321,7 @@ class AddGridWizard(tk.Toplevel):
         total = rows * cols
 
         if total > self.available_slots:
-            app_toast(self.parent, f"Only {self.available_slots} slots available. Reduce rows or columns.", 'warning')
+            app_toast(self.parent, f"A grid holds at most {self.available_slots} slots. Reduce rows or columns.", 'warning')
             return
 
         self.result = create_default_grid(

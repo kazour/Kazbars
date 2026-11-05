@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "content_version": 33,
-  "min_app_version": "3.0.0",
-  "notes": "Default profile moves to the document format (schema 2); requires KazBars 3.0.0",
+  "content_version": 34,
+  "min_app_version": "3.2.0",
+  "notes": "Default profile moves to the overlay size model (schema 3); requires KazBars 3.2.0",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
@@ -10,7 +10,7 @@
     },
     "Default.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.json",
-      "sha256": "5913a7894b49d4d1a2d546ca769eafc5dd0941902559a4c4391eb2d80b268019"
+      "sha256": "6a0c8b6ea35bc898f6f1e8b5af79e58851c4cb69aac1518a0e2c8d1e1f35a998"
     }
   }
 }

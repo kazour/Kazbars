@@ -285,11 +285,34 @@ def _stored_grid(app, index):
 def test_spinbox_commit_reaches_profile_store(app):
     from tkinter import ttk
     card, idx = _add_seam_grid(app, 'SeamSpin')
-    card.icon_var.set(77)
-    spin = _find_widget(card, ttk.Spinbox, card.icon_var)
+    card.gap_var.set(7)
+    spin = _find_widget(card, ttk.Spinbox, card.gap_var)
     assert spin is not None
     spin.event_generate('<FocusOut>')  # the clamp + on_change commit path
-    assert _stored_grid(app, idx)['iconSize'] == 77
+    assert _stored_grid(app, idx)['gap'] == 7
+
+
+def _find_scale(root):
+    from tkinter import ttk
+    for w in root.winfo_children():
+        if isinstance(w, ttk.Scale):
+            return w
+        found = _find_scale(w)
+        if found is not None:
+            return found
+    return None
+
+
+def test_size_slider_commits_on_release_only(app):
+    card, idx = _add_seam_grid(app, 'SeamSize')
+    scale = _find_scale(card)
+    assert scale is not None
+    scale.set(152.6)  # a drag: snapped to 155, nothing written yet
+    app.update()
+    assert card.scale_var.get() == 155
+    assert card.grid_config['scale'] == 100
+    scale.event_generate('<ButtonRelease-1>')
+    assert _stored_grid(app, idx)['scale'] == 155
 
 
 def test_combobox_selection_reaches_profile_store(app):

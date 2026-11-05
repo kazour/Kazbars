@@ -9,7 +9,6 @@ from tkinter import ttk
 
 logger = logging.getLogger(__name__)
 
-from ttkbootstrap.dialogs import Messagebox
 
 from .extras_shortcuts import ExtrasShortcutsRow
 from .grid_dialogs import AddGridWizard
@@ -17,13 +16,13 @@ from .grid_editor_panel import (
     GridEditorPanel,
 )
 from .grid_model import (
-    MAX_TOTAL_SLOTS,
     create_default_grid,
     dedupe_grid_ids,
     default_grid_name,
     get_game_resolution_or_default,
     validate_grid,
 )
+from .overlay import DEFAULT_SIZE, FONT_CHOICES, SIZE_CHOICES, font_label
 from .profile_document import build_signature
 from .settings_manager import get_setting
 from .ui_components import (
@@ -98,10 +97,7 @@ class GridsPanel(ttk.Frame):
         toolbar.pack(fill='x', padx=PAD_TAB, pady=PAD_SMALL)
         ttk.Button(toolbar, text="+ Add Grid", command=self.add_grid,
                    width=BTN_MEDIUM).pack(side='left', padx=PAD_BUTTON_GAP)
-        self.slot_count_label = tk.StringVar(value=f"0 / {MAX_TOTAL_SLOTS} slots")
-        self._slot_count_lbl = ttk.Label(toolbar, textvariable=self.slot_count_label,
-                                          font=FONT_BODY, foreground=THEME_COLORS['muted'])
-        self._slot_count_lbl.pack(side='right')
+        self._build_overlay_row(toolbar)
 
         self._build_tip_bar()
 
@@ -136,6 +132,58 @@ class GridsPanel(ttk.Frame):
             self.grids_canvas, self.grids_frame, self._reorder_grid)
 
         self._empty_state = self._build_empty_state()
+
+    def _build_overlay_row(self, toolbar):
+        """`Overlay: [size] Font: [face]` — the profile-wide base size every
+        in-game size derives from, and the face of every text KazBars.swf
+        draws. Written to the `overlay` section on selection."""
+        self._size_labels = {size: label for size, label in SIZE_CHOICES}
+        self._size_by_label = {label: size for size, label in SIZE_CHOICES}
+        self._font_by_label = {font_label(f): f for f in FONT_CHOICES}
+        self._overlay_font_var = tk.StringVar()
+        font_combo = ttk.Combobox(toolbar, textvariable=self._overlay_font_var,
+                                  values=list(self._font_by_label), width=22, state='readonly')
+        font_combo.pack(side='right')
+        font_combo.bind('<<ComboboxSelected>>', lambda _e: self._on_overlay_changed())
+        add_tooltip(font_combo, "The font of everything KazBars draws in game")
+        ttk.Label(toolbar, text="Font:", font=FONT_BODY,
+                  foreground=THEME_COLORS['muted']).pack(side='right', padx=(PAD_TAB, PAD_XS))
+        self._overlay_size_var = tk.StringVar()
+        size_combo = ttk.Combobox(toolbar, textvariable=self._overlay_size_var,
+                                  values=list(self._size_by_label), width=20, state='readonly')
+        size_combo.pack(side='right')
+        size_combo.bind('<<ComboboxSelected>>', lambda _e: self._on_overlay_changed())
+        add_tooltip(size_combo,
+                    "The base size of everything KazBars draws in game. Each grid and "
+                    "panel has its own Size, a percent of this.")
+        ttk.Label(toolbar, text="Overlay:", font=FONT_BODY,
+                  foreground=THEME_COLORS['muted']).pack(side='right', padx=(0, PAD_XS))
+
+    def _overlay(self):
+        store = self.app.profile_store if self.app is not None else None
+        return store.get_section('overlay') if store is not None else {}
+
+    def base_size(self):
+        """The profile's overlay size (the grid cards' Size hints read it live)."""
+        return self._overlay().get('size', DEFAULT_SIZE)
+
+    def load_overlay(self):
+        """Show the loaded profile's overlay size and font, and redraw every
+        card's Size hint (profile switch, first-launch seeding)."""
+        overlay = self._overlay()
+        self._overlay_size_var.set(self._size_labels.get(overlay.get('size', DEFAULT_SIZE), ''))
+        self._overlay_font_var.set(font_label(overlay.get('font', 'Arial')))
+        for panel in self.grid_panels:
+            panel.refresh_size_hint()
+
+    def _on_overlay_changed(self):
+        size = self._size_by_label.get(self._overlay_size_var.get(), DEFAULT_SIZE)
+        font = self._font_by_label.get(self._overlay_font_var.get(), 'Arial')
+        if self.app is not None and self.app.profile_store is not None:
+            self.app.profile_store.update_section('overlay', {'size': size, 'font': font})
+        for panel in self.grid_panels:
+            panel.refresh_size_hint()
+        self.refresh_build_status()
 
     def _build_tip_bar(self):
         """Build the contextual next-step guide (tip bar) shown above grids/empty state."""
@@ -537,26 +585,6 @@ class GridsPanel(ttk.Frame):
         self.refresh_panels()
         return missing_by_grid
 
-    def get_total_slots(self):
-        """Return total slot count across all grids."""
-        return sum(g['rows'] * g['cols'] for g in self.grids)
-
-    def _update_slot_counter(self):
-        total = self.get_total_slots()
-        pct = total / MAX_TOTAL_SLOTS
-        base = f"{total} / {MAX_TOTAL_SLOTS} slots"
-        if pct >= 0.95:
-            color = THEME_COLORS['danger_text']
-            text = f"! {base}"
-        elif pct >= 0.80:
-            color = THEME_COLORS['warning']
-            text = base
-        else:
-            color = THEME_COLORS['muted']
-            text = base
-        self.slot_count_label.set(text)
-        self._slot_count_lbl.configure(foreground=color)
-
     def save_settings(self):
         """Persist all panel UI values back to grid configs."""
         for panel in self.grid_panels:
@@ -565,11 +593,7 @@ class GridsPanel(ttk.Frame):
     def add_grid(self):
         """Open AddGridWizard dialog."""
         existing_ids = {g['id'] for g in self.grids}
-        current_slots = self.get_total_slots()
-        if current_slots >= MAX_TOTAL_SLOTS:
-            Messagebox.show_warning(f"Maximum {MAX_TOTAL_SLOTS} total slots reached.\n\nRemove a grid or reduce grid sizes to free up slots.", title="Slot Limit")
-            return
-        wizard = AddGridWizard(self.winfo_toplevel(), existing_ids, current_slots,
+        wizard = AddGridWizard(self.winfo_toplevel(), existing_ids,
                                name_in_use=self._grid_name_in_use)
         self.winfo_toplevel().wait_window(wizard)
         if wizard.result:
@@ -600,17 +624,14 @@ class GridsPanel(ttk.Frame):
 
         A profile loaded since the delete invalidates the undo — reinserting would
         drop the old profile's grid into the new one. Re-check the insert
-        invariants too: grids added since the delete may have taken the name
-        (names key the AS2 whitelist tables) or the slot budget."""
+        invariant too: a grid added since the delete may have taken the name
+        (names key the AS2 whitelist tables)."""
         if generation != self._profile_generation:
             app_toast(self, "Undo expired — a different profile was loaded", 'info', 4)
             return
         if any(g.get('id') == grid.get('id') for g in self.grids):
             app_toast(self, f"Can't undo — a grid named '{grid.get('id')}' exists now",
                       'warning', 4)
-            return
-        if self.get_total_slots() + grid['rows'] * grid['cols'] > MAX_TOTAL_SLOTS:
-            app_toast(self, "Can't undo — not enough free slots", 'warning', 4)
             return
         index = min(index, len(self.grids))
         self.save_settings()  # flush live cards before the rebuild
@@ -648,7 +669,7 @@ class GridsPanel(ttk.Frame):
             panel = GridEditorPanel(
                 self.grids_frame, self.database, grid_config,
                 on_delete=self.delete_grid, initially_open=(i == expand_index),
-                get_total_slots=self.get_total_slots,
+                get_base_size=self.base_size,
                 on_resize=self._on_grid_resized,
                 on_whitelist_changed=self._on_card_buffs_changed,
                 name_in_use=self._grid_name_in_use,
@@ -657,7 +678,6 @@ class GridsPanel(ttk.Frame):
             self.grid_panels.append(panel)
             self._attach_panel(panel, i)
 
-        self._update_slot_counter()
         self._update_tip()
 
     def _attach_panel(self, panel, index):
@@ -710,7 +730,6 @@ class GridsPanel(ttk.Frame):
         return any(g is not exclude_config and g.get('id') == name for g in self.grids)
 
     def _on_grid_resized(self):
-        self._update_slot_counter()
         self._mark_modified()
 
     def _on_card_buffs_changed(self):

@@ -1,5 +1,5 @@
 {
-  "schema": 2,
+  "schema": 3,
   "id": "00000000",
   "name": "Default",
   "authored_at": [
@@ -15,14 +15,10 @@
           "type": "player",
           "rows": 3,
           "cols": 4,
-          "iconSize": 48,
           "gap": -2,
           "slotMode": "dynamic",
-          "showTimers": true,
-          "timerFontSize": 17,
           "timerFlashThreshold": 6,
           "timerYOffset": -4,
-          "stackFontSize": 16,
           "enableFlashing": true,
           "fillDirection": "TL-BR",
           "sortOrder": "longest",
@@ -179,7 +175,9 @@
           ],
           "slotAssignments": {},
           "fx": 0.32447916666666665,
-          "fy": 0.5555555555555556
+          "fy": 0.5555555555555556,
+          "scale": 100,
+          "timerStyle": "digits"
         },
         {
           "id": "Target Buffs",
@@ -187,14 +185,10 @@
           "type": "target",
           "rows": 3,
           "cols": 4,
-          "iconSize": 48,
           "gap": -2,
           "slotMode": "dynamic",
-          "showTimers": true,
-          "timerFontSize": 17,
           "timerFlashThreshold": 6,
           "timerYOffset": -4,
-          "stackFontSize": 16,
           "enableFlashing": true,
           "fillDirection": "TL-BR",
           "sortOrder": "longest",
@@ -341,25 +335,29 @@
           ],
           "slotAssignments": {},
           "fx": 0.5796875,
-          "fy": 0.5555555555555556
+          "fy": 0.5555555555555556,
+          "scale": 100,
+          "timerStyle": "digits"
         }
       ]
+    },
+    "overlay": {
+      "size": 12,
+      "font": "Arial"
     },
     "stopwatch": {
       "enabled": false,
       "fx": 0.1890625,
       "fy": 0.008333333333333333,
-      "fontSize": null,
+      "scale": 100,
       "startCollapsed": true
     },
     "inspect": {
       "enabled": false,
       "fx": 0.6661458333333333,
       "fy": 0.008333333333333333,
-      "fontSize": null,
-      "startCollapsed": true,
-      "showPvp": false,
-      "showPerks": false
+      "scale": 100,
+      "startCollapsed": true
     },
     "cast_timer": {
       "enabled": false,
@@ -370,7 +368,7 @@
       "targetFx": 0.628125,
       "targetFy": 0.7407407407407407,
       "bold": false,
-      "fontSize": 12,
+      "scale": 80,
       "display": "elapsed",
       "color": "FFFFFF"
     },

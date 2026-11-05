@@ -2,25 +2,16 @@
 KazBars — Target inspect panel dialog.
 
 Extras-menu settings for the in-game target inspect panel (KazBarsInspect
-stub): the build gate, the baked default position, the baked font size, and
-the start-collapsed flag. It also hosts two settings that are not the inspect
-panel's own, for the same "these belong together" reason: the buff-discovery
-console's build gate (flat prefs key `build_console`), and the text size the
-four in-game panels share (flat prefs key `panel_font_size`) — the console and
-the preview control panel have no dialog of their own to host either.
-The panel's own settings read/write the profile document's `inspect` section
-(data layer: `inspect.py`; the store autosaves); the two ride-along settings
-stay machine-local prefs keys, so Apply is a two-store write. Positions are
-stored as fractions of the game resolution; the X/Y fields display projected
-px at the current resolution (the grid editor convention) so the
-drag-in-game → copy-the-coordinates workflow keeps working. The build bakes
-the values into the generated SWF.
+stub): the build gate, the baked default position, its Size (a percent of the
+profile's overlay size, hinted in pt) and the start-collapsed flag. Reads/writes
+the profile document's `inspect` section (data layer: `inspect.py`; the store
+autosaves). Positions are stored as fractions of the game resolution; the X/Y
+fields display projected px at the current resolution (the grid editor
+convention). The build bakes the values into the generated SWF.
 Functions take the KazBarsApp instance as first arg.
 
 Layout follows the Damage Numbers panel conventions: tip bar under the header,
-a master gate row above titled cards, and the inspect panel's own controls
-greying with the gate. The shared text size and the console gate stay live —
-they are independent settings that only ride along on this dialog's Apply.
+a master gate row above titled cards, and every control greying with the gate.
 """
 
 import tkinter as tk
@@ -28,7 +19,8 @@ from tkinter import ttk
 
 from .grid_model import get_game_resolution_or_default, project_px, unproject_px
 from .inspect import validate_config
-from .ui_forms import create_card, labeled_spinbox
+from .overlay_size import panel_fs
+from .ui_forms import create_card, labeled_spinbox, size_slider
 from .ui_headers import create_dialog_header, create_tip_bar
 from .ui_helpers import (
     BTN_DIALOG,
@@ -46,7 +38,7 @@ from .ui_widgets import add_tooltip, app_toast
 from .window_position import bind_window_position_save, restore_window_position
 
 _WIDTH = 470
-_HEIGHT = 640
+_HEIGHT = 380
 
 
 def open_inspect_dialog(app):
@@ -79,8 +71,7 @@ def open_inspect_dialog(app):
     create_tip_bar(dialog, "Your target's combat sheet, in-game. "
                            "Apply, then Build & Install to see it.")
 
-    # Master gate row above the cards; the inspect panel's own controls grey
-    # when it's off (the shared size + console are independent and stay live).
+    # Master gate row above the cards; everything below greys when it's off.
     enabled_var = tk.BooleanVar(value=cfg['enabled'])
     master = ttk.Frame(dialog)
     master.pack(fill='x', padx=PAD_TAB, pady=(0, PAD_XS))
@@ -131,49 +122,17 @@ def open_inspect_dialog(app):
     gated.append(labeled_spinbox(pos_row, "Y ", y_var, from_=0, to=game_h,
                                  width=6, label_sink=sink))
 
-    size_card = create_card(content, "Text size")
+    size_card = create_card(content, "Size")
     size_card.pack(fill='x', pady=(0, PAD_ROW))
-    ttk.Label(
-        size_card,
-        text="One size for all four in-game panels — stopwatch, inspect panel,\n"
-             "buff console and control panel. It's set here because the last two\n"
-             "have no dialog of their own.",
-        font=FONT_SMALL, foreground=THEME_COLORS['muted'], justify='left'
-    ).pack(anchor='w', pady=(0, PAD_XS))
-
-    shared_before = app.settings.get('panel_font_size')
-    shared_var = tk.IntVar(value=shared_before)
-    shared_row = ttk.Frame(size_card)
-    shared_row.pack(anchor='w', pady=(0, PAD_XS))
-    shared_spin = labeled_spinbox(shared_row, "All panels ", shared_var,
-                                  from_=8, to=48, width=6)
-    add_tooltip(shared_spin,
-                "Each panel scales as one piece, collapsed bars included, so they "
-                "keep matching at any size.")
-
-    # fontSize is None when the panel follows the shared size. The spinbox still
-    # shows a number so unticking the box has somewhere to start from.
-    follow_var = tk.BooleanVar(value=cfg['fontSize'] is None)
-    follow_cb = ttk.Checkbutton(size_card, text="Use the shared size for this panel",
-                                variable=follow_var)
-    follow_cb.pack(anchor='w', pady=(0, PAD_XS))
-    add_tooltip(follow_cb,
-                "Untick to make the inspect panel bigger or smaller than the rest.")
-    gated.append(follow_cb)
-
-    size_var = tk.IntVar(value=shared_before if cfg['fontSize'] is None else cfg['fontSize'])
+    base = app.profile_store.get_section('overlay')['size']
     size_row = ttk.Frame(size_card)
     size_row.pack(anchor='w')
-    size_spin = labeled_spinbox(size_row, "Inspect panel only ", size_var,
-                                from_=8, to=48, width=6, label_sink=sink)
-    add_tooltip(size_spin,
-                "This panel's own size, used instead of the shared one.")
-
-    def _sync_size_override(*_):
-        on = enabled_var.get() and not follow_var.get()
-        size_spin.configure(state='normal' if on else 'disabled')
-
-    follow_var.trace_add('write', _sync_size_override)
+    size_scale, size_var, _ = size_slider(
+        size_row, cfg['scale'], lambda p: f"{panel_fs(base, p)} pt text",
+        tooltip="A percent of the overlay size (Overlay, top of the Grids tab). "
+                "The whole panel scales with it, collapsed bar included.",
+        label_sink=sink)
+    gated.append(size_scale)
 
     behavior_card = create_card(content, "Behavior")
     behavior_card.pack(fill='x', pady=(0, PAD_ROW))
@@ -186,40 +145,6 @@ def open_inspect_dialog(app):
                 "+ button in-game to expand.")
     gated.append(collapsed_cb)
 
-    sections_card = create_card(content, "Sections")
-    sections_card.pack(fill='x', pady=(0, PAD_ROW))
-    pvp_var = tk.BooleanVar(value=cfg['showPvp'])
-    pvp_cb = ttk.Checkbutton(sections_card, text="Show the PvP section",
-                             variable=pvp_var)
-    pvp_cb.pack(anchor='w', pady=(0, PAD_XS))
-    add_tooltip(pvp_cb,
-                "PvP armor, protections, spell damage, combat rating and "
-                "kills / deaths — shown on player targets only.")
-    gated.append(pvp_cb)
-    perks_var = tk.BooleanVar(value=cfg['showPerks'])
-    perks_cb = ttk.Checkbutton(sections_card, text="Track slotted perks",
-                               variable=perks_var)
-    perks_cb.pack(anchor='w')
-    add_tooltip(perks_cb,
-                "Adds a row of buff icons at the bottom of the panel showing "
-                "the AA perks detected on a player target — each player can "
-                "slot up to six.")
-    gated.append(perks_cb)
-
-    console_card = create_card(content, "Console")
-    console_card.pack(fill='x', pady=(0, PAD_ROW))
-    console_before = bool(app.settings.get('build_console', False))
-    console_var = tk.BooleanVar(value=console_before)
-    console_cb = ttk.Checkbutton(console_card,
-                                 text="Include the buff-discovery console in builds",
-                                 variable=console_var)
-    console_cb.pack(anchor='w')
-    add_tooltip(console_cb,
-                "Adds an in-game window that logs every buff and debuff on you "
-                "and your target with its buff ID — the ID you need to track "
-                "something the database doesn't carry. Opens in preview mode "
-                "(Shift+Ctrl+Alt).")
-
     _register_dim(*sink)
 
     def _sync_enabled(*_):
@@ -228,20 +153,9 @@ def open_inspect_dialog(app):
             widget.configure(state='normal' if on else 'disabled')
         for lbl, normal_fg in dim_labels:
             lbl.configure(foreground=normal_fg if on else TK_COLORS['dim_text'])
-        # The follow gate re-applies on top of the master (as the exemplar's
-        # shadow gate), covering the size spinbox in both directions.
-        _sync_size_override()
 
     enable_cb.configure(command=_sync_enabled)
     _sync_enabled()
-
-    def _read(var, default):
-        # An emptied spinbox makes IntVar.get() raise before validate_config
-        # can clamp it — fall back to the loaded value.
-        try:
-            return var.get()
-        except tk.TclError:
-            return default
 
     def _read_frac(var, frac, extent):
         # Position fields carry projected px; typed overshoot clamps to the
@@ -254,39 +168,21 @@ def open_inspect_dialog(app):
         return unproject_px(px, extent)
 
     def _apply():
-        shared = _read(shared_var, shared_before)
         new_cfg = validate_config({
             'enabled': enabled_var.get(),
             'fx': _read_frac(x_var, cfg['fx'], game_w),
             'fy': _read_frac(y_var, cfg['fy'], game_h),
-            # Checked means "no opinion" — never the number left in the disabled
-            # spinbox, or unticking once would freeze the panel off the shared value.
-            'fontSize': None if follow_var.get() else _read(size_var, shared),
+            'scale': size_var.get(),
             'startCollapsed': collapsed_var.get(),
-            'showPvp': pvp_var.get(),
-            'showPerks': perks_var.get(),
         })
-        # Two stores on one Apply: the ride-along settings are machine-local
-        # prefs, the panel's own config is a profile section (autosaved).
-        app.settings.set('panel_font_size', shared)
-        app.settings.set('build_console', console_var.get())
-        app.settings.save()
         app.profile_store.set_section('inspect', new_cfg)
         app.grids_panel.refresh_extras_shortcuts()
-        # Three separate settings live in this dialog, so name whichever moved
-        # rather than reporting an inspect save that isn't one — and a bare
-        # Apply with nothing moved says so instead of claiming a console save.
-        if new_cfg != cfg:
-            if new_cfg['enabled']:
-                app_toast(app, "Inspect panel saved — Build & Install to apply", 'success')
-            else:
-                app_toast(app, "Inspect panel off — next build removes it", 'info')
-        elif shared != shared_before:
-            app_toast(app, "Panel text size saved — Build & Install to apply", 'success')
-        elif console_var.get() != console_before:
-            app_toast(app, "Console saved — Build & Install to apply", 'success')
-        else:
+        if new_cfg == cfg:
             app_toast(app, "No changes to apply", 'info')
+        elif new_cfg['enabled']:
+            app_toast(app, "Inspect panel saved — Build & Install to apply", 'success')
+        else:
+            app_toast(app, "Inspect panel off — next build removes it", 'info')
         dialog.destroy()
 
     ttk.Button(footer, text="Apply", bootstyle="success",

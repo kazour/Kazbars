@@ -6,14 +6,13 @@ showing player/target cast time): the build gate, the two baked positions, and
 the shared text style. Reads/writes the profile document's `cast_timer`
 section (data layer: `cast_timer.py`; the store autosaves). Positions are
 stored as fractions of the game resolution; the X/Y fields display projected
-px at the current resolution (the grid editor convention) so the
-drag-in-game → copy-the-coordinates workflow keeps working. The build bakes
+px at the current resolution (the grid editor convention). The build bakes
 the values into the generated SWF.
 Functions take the KazBarsApp instance as first arg.
 
-Font is fixed to Arial — the only face embedded in base.swf (see cast_timer.py) —
-so the dialog offers Bold rather than a family picker, and the sample preview
-draws in Arial to match what the overlay will render.
+The face is the profile's overlay font (Grids tab), so the dialog offers Bold
+and a Size (a percent of the overlay size, hinted in pt) rather than a family
+picker; the sample preview draws in Arial at the baked size.
 
 Layout follows the Damage Numbers panel conventions: tip bar under the header,
 a master gate row above titled cards, and every control + static label greying
@@ -27,7 +26,8 @@ from tkinter import ttk
 
 from .cast_timer import validate_config
 from .grid_model import get_game_resolution_or_default, project_px, unproject_px
-from .ui_forms import ColorSwatch, create_card, labeled_spinbox
+from .overlay_size import cast_fs
+from .ui_forms import ColorSwatch, create_card, labeled_spinbox, size_slider
 from .ui_headers import create_dialog_header, create_tip_bar
 from .ui_helpers import (
     BTN_DIALOG,
@@ -161,21 +161,18 @@ def open_cast_timer_dialog(app):
     preview.pack(side='right', padx=(PAD_XS, 0))
 
     bold_var = tk.BooleanVar(value=cfg['bold'])
-    size_var = tk.IntVar(value=cfg['fontSize'])
+    base = app.profile_store.get_section('overlay')['size']
     display_var = tk.StringVar(value=_DISPLAY_TO_LABEL.get(cfg['display'], "Both"))
     color = [cfg['color']]  # boxed so the swatch callback can rebind it
 
     def _redraw_preview(*_args):
-        """Draw the timer text as the overlay will render it — Arial, chosen
-        colour/size/weight — shrinking to fit the square so a 48px sample still
-        reads as one line. Dims with the master gate so the sample never looks
-        live on a disabled dialog."""
+        """Draw the timer text as the overlay will render it — the baked size,
+        chosen colour/weight — shrinking to fit the square so a large sample
+        still reads as one line. Dims with the master gate so the sample never
+        looks live on a disabled dialog."""
         preview.delete("sample")
         sample = _SAMPLES.get(_LABEL_TO_DISPLAY.get(display_var.get(), "both"), "1.2 / 2.5")
-        try:
-            size = int(size_var.get())
-        except (ValueError, tk.TclError):
-            size = cfg['fontSize']
+        size = cast_fs(base, size_var.get())
         font = tkfont.Font(family="Arial", size=size,
                            weight="bold" if bold_var.get() else "normal")
         while size > 7 and font.measure(sample) > GRID_PREVIEW_PX - 8:
@@ -192,10 +189,13 @@ def open_cast_timer_dialog(app):
 
     size_row = ttk.Frame(style_col)
     size_row.pack(anchor='w', pady=(0, PAD_XS))
-    gated.append(labeled_spinbox(
-        size_row, "Font size ", size_var, from_=8, to=48, width=6,
-        tooltip="Timer text size in pixels.",
-        on_change=_redraw_preview, label_sink=sink))
+    size_scale, size_var, _ = size_slider(
+        size_row, cfg['scale'], lambda p: f"{cast_fs(base, p)} pt",
+        on_commit=_redraw_preview, length=100,
+        tooltip="Timer text size, a percent of the overlay size (Overlay, top "
+                "of the Grids tab).",
+        label_sink=sink)
+    gated.append(size_scale)
 
     show_row = ttk.Frame(style_col)
     show_row.pack(anchor='w', pady=(0, PAD_XS))
@@ -242,14 +242,6 @@ def open_cast_timer_dialog(app):
     enable_cb.configure(command=_sync_enabled)
     _sync_enabled()
 
-    def _read(var, default):
-        # An emptied spinbox makes IntVar.get() raise before validate_config
-        # can clamp it — fall back to the loaded value.
-        try:
-            return var.get()
-        except tk.TclError:
-            return default
-
     def _read_frac(var, frac, extent):
         # Position fields carry projected px; typed overshoot clamps to the
         # screen edge (the grid editor convention), then unprojects back to
@@ -273,7 +265,7 @@ def open_cast_timer_dialog(app):
             'targetFx': _read_frac(tx_var, cfg['targetFx'], game_w),
             'targetFy': _read_frac(ty_var, cfg['targetFy'], game_h),
             'bold': bold_var.get(),
-            'fontSize': _read(size_var, cfg['fontSize']),
+            'scale': size_var.get(),
             'display': _LABEL_TO_DISPLAY.get(display_var.get(), "both"),
             'color': color[0],
         })

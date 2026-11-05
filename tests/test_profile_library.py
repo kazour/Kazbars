@@ -14,7 +14,7 @@ import os
 
 import pytest
 
-from kazbars import grid_model
+from kazbars import grid_model, overlay
 from kazbars.profile_document import (
     DocumentError,
     SectionRegistry,
@@ -237,33 +237,35 @@ def test_slugify_windows_safe():
     assert slugify("Bear  Shaman") == "Bear Shaman"
 
 
-def test_template_instantiation_stamps_seed_sizes_for_the_screen(tmp_path):
+def test_template_instantiation_sets_the_overlay_size_for_the_screen(tmp_path):
     # A template authored at 1080p instantiated on a 4K screen: positions are
-    # fractions and stay put, the three px sizes get restamped for the tier.
+    # fractions and stay put, the overlay size every in-game size derives
+    # from is set for the screen's height; the grids' own scale is untouched.
     reg = SectionRegistry()
     reg.register(grid_model.PROFILE_SECTION)
+    reg.register(overlay.PROFILE_SECTION)
     profiles = tmp_path / "profiles"
     profiles.mkdir()
     lib = ProfileLibrary(profiles, reg)
 
     template = new_document(reg, "Default", (1920, 1080))
     authored = grid_model.create_default_grid()
-    authored.update({"iconSize": 48, "timerFontSize": 17, "stackFontSize": 16})
     template["modules"]["grids"]["grids"] = [authored]
     lib.template_paths = (_write_raw(tmp_path, "default.json", template),)
 
     seeded = lib.create_from_template("My Setup", (3840, 2160))
     assert seeded is not None
+    assert seeded["modules"]["overlay"] == {"size": 24, "font": "Arial"}
     grid = seeded["modules"]["grids"]["grids"][0]
-    assert (grid["iconSize"], grid["timerFontSize"], grid["stackFontSize"]) == (64, 23, 21)
+    assert grid["scale"] == 100
     assert grid["fx"] == authored["fx"]  # fractions never rescale
 
-    # Same template on a 1080p screen keeps what it was authored with.
-    lib2 = ProfileLibrary(profiles, reg)
-    lib2.template_paths = lib.template_paths
-    small = lib2.create_from_template("Small", (1920, 1080))
-    assert small is not None
-    assert small["modules"]["grids"]["grids"][0]["iconSize"] == 48
+    for height, size in ((1080, 12), (1440, 16)):
+        lib_n = ProfileLibrary(profiles, reg)
+        lib_n.template_paths = lib.template_paths
+        doc = lib_n.create_from_template(f"At {height}", (1920, height))
+        assert doc is not None
+        assert doc["modules"]["overlay"]["size"] == size
 
 
 def test_template_without_a_grids_section_still_instantiates(lib, tmp_path):

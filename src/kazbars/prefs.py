@@ -19,7 +19,7 @@ import logging
 from typing import Any
 
 from . import CONTENT_BASELINE_VERSION
-from .settings_core import Field, Migration, Schema, Store, nullable_int
+from .settings_core import Field, Migration, Schema, Store
 from .userdata import PREFS_FILENAME
 
 logger = logging.getLogger(__name__)
@@ -111,26 +111,8 @@ def _validate_last_patch(value: Any) -> dict:
     return out
 
 
-# The four in-game panels — stopwatch, inspect, buff console, preview control
-# panel — are one visual family and share one text size. Stopwatch and Inspect
-# may override it from their own dialogs; the console and control panel have no
-# dialog to host an override, which is exactly the gap the shared value closes.
+# The v1 → v2 rung's default for the shared panel text size it lifted.
 _PANEL_FONT_DEFAULT = 12
-_PANEL_FONT_MIN = 8
-_PANEL_FONT_MAX = 48
-
-_coerce_panel_font = nullable_int(min=_PANEL_FONT_MIN, max=_PANEL_FONT_MAX)
-
-
-def validate_panel_font_size(value: Any) -> int:
-    """Clamp a shared panel text size to the 8–48 range; None/garbage → 12.
-
-    `app.settings` already coerces the stored key through the same `Field`; this
-    is for the consumers that take the value as an argument (the code generator
-    bakes it into the SWF) and cannot assume it came from a validated Store.
-    """
-    size = _coerce_panel_font(value)
-    return _PANEL_FONT_DEFAULT if size is None else int(size)
 
 
 def _stored_font_size(section: Any) -> Any:
@@ -150,8 +132,9 @@ def _upgrade_panel_font(data: dict) -> dict:
 
     Runs on the raw dict before `validate_all`. The stopwatch/inspect configs
     later moved into the profile document, so the sub-dicts this rung rewrites
-    are dropped as undeclared keys — its surviving effect is the lifted
-    `panel_font_size`. Frozen history; the body stays as written.
+    are dropped as undeclared keys, and `panel_font_size` itself later retired
+    for the profile's overlay size, so `validate_all` now erases everything this
+    rung writes. Frozen history; the body stays as written.
     """
     sizes = {name: _stored_font_size(data.get(name)) for name in ("inspect", "stopwatch")}
     shared = _PANEL_FONT_DEFAULT if sizes["inspect"] is None else sizes["inspect"]
@@ -162,6 +145,11 @@ def _upgrade_panel_font(data: dict) -> dict:
             data[name] = {**section, "fontSize": None}
     return data
 
+
+ANCHOR_SIDE_DEFAULT = 389
+ANCHOR_UP_DEFAULT = -13
+ANCHOR_MIN = -2000
+ANCHOR_MAX = 2000
 
 PREFS_SCHEMA = Schema(
     PREFS_FILENAME,
@@ -178,14 +166,12 @@ PREFS_SCHEMA = Schema(
         "active_profile": Field(None),
         "has_built_before": Field(False, kind="bool"),
         "desktop_shortcut_offered": Field(False, kind="bool"),
-        "build_console": Field(False, kind="bool"),
-        # Shared text size for the four in-game panels (see _upgrade_panel_font).
-        # Stopwatch/inspect fall back to it whenever their own fontSize is None.
-        # Machine-local on purpose: it tracks the monitor, not the loadout —
-        # the three extras configs themselves live in the profile document.
-        "panel_font_size": Field(
-            _PANEL_FONT_DEFAULT, kind="int", min=_PANEL_FONT_MIN, max=_PANEL_FONT_MAX
-        ),
+        # Where an overhead grid sits against a character's reported point:
+        # px at a 1440 px stage times metres of camera distance, sideways and
+        # up (baked into d.PF.side / d.PF.up, read by KazBarsRelations). The
+        # game's field of view decides it, so it is this PC's, never a profile's.
+        "anchor_side": Field(ANCHOR_SIDE_DEFAULT, kind="int", min=ANCHOR_MIN, max=ANCHOR_MAX),
+        "anchor_up": Field(ANCHOR_UP_DEFAULT, kind="int", min=ANCHOR_MIN, max=ANCHOR_MAX),
         # OTA reference content (Phase 4). content_version is the authoritative
         # comparison key (vs the server manifest); it defaults to the shipped
         # baseline so a fresh install knows it's current and fires no first-run OTA.

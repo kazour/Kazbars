@@ -24,9 +24,9 @@ def _load_db() -> dict:
 
 
 def _load_default_profile() -> dict:
-    """The grids section of the document-format (schema 2) stock profile."""
+    """The grids section of the document-format (schema 3) stock profile."""
     doc = json.loads((KAZBARS_ASSETS / "Default.json").read_text(encoding="utf-8"))
-    assert doc["schema"] == 2 and doc["id"]
+    assert doc["schema"] == 3 and doc["id"]
     return doc["modules"]["grids"]
 
 

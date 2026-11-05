@@ -14,18 +14,21 @@ from .grid_dialogs import BuffSelectorDialog, SlotAssignmentDialog
 from .grid_model import (
     CLAMP_SPECS,
     MAX_COLS,
+    MAX_GRID_SLOTS,
     MAX_ROWS,
-    MAX_TOTAL_SLOTS,
     get_game_resolution_or_default,
     project_px,
     unproject_px,
 )
+from .overlay import DEFAULT_SIZE
+from .overlay_size import grid_metrics
 from .ui_collapsible import CollapsibleSection
 from .ui_forms import (
     draw_grid_cells,
     labeled_combobox,
     labeled_spinbox,
     position_entry,
+    size_slider,
 )
 from .ui_helpers import (
     CARD_STRIPE_PX,
@@ -58,13 +61,15 @@ class GridEditorPanel(ttk.Frame):
     """A collapsible grid editor card."""
 
     def __init__(self, parent, database, grid_config, on_delete=None, initially_open=False,
-                 get_total_slots=None, on_resize=None, on_whitelist_changed=None,
+                 get_base_size=None, on_resize=None, on_whitelist_changed=None,
                  name_in_use=None, on_edit=None):
         super().__init__(parent)
         self.database = database
         self.grid_config = grid_config
         self.on_delete = on_delete
-        self._get_total_slots = get_total_slots
+        # The profile's overlay size, read live: the Size hint follows the
+        # Grids toolbar's Overlay dropdown.
+        self._get_base_size = get_base_size or (lambda: DEFAULT_SIZE)
         self._on_resize = on_resize
         self._on_whitelist_changed = on_whitelist_changed
         self._name_in_use = name_in_use
@@ -125,6 +130,7 @@ class GridEditorPanel(ttk.Frame):
 
         self._build_top_row(settings_col)
         self._build_icon_row(settings_col)
+        self._build_timer_row(settings_col)
         self._build_info_and_dynamic(settings_col)
 
         self.load_from_config()
@@ -203,67 +209,60 @@ class GridEditorPanel(ttk.Frame):
         self._rows_var = tk.StringVar(value=str(cfg.get('rows', 1)))
         labeled_spinbox(
             top_row, "Rows:", self._rows_var, from_=1, to=MAX_ROWS, width=4,
-            tooltip="Grid rows (height). Total slots across all grids cannot exceed 64.",
+            tooltip=f"Grid rows (height). A grid holds up to {MAX_GRID_SLOTS} slots.",
             on_change=lambda: self._on_dimension_changed('rows'),
             label_color=THEME_COLORS['muted'], padx=(PAD_MICRO, PAD_MID),
         )
         self._cols_var = tk.StringVar(value=str(cfg.get('cols', 5)))
         labeled_spinbox(
             top_row, "Cols:", self._cols_var, from_=1, to=MAX_COLS, width=4,
-            tooltip="Grid columns (width). Total slots across all grids cannot exceed 64.",
+            tooltip=f"Grid columns (width). A grid holds up to {MAX_GRID_SLOTS} slots.",
             on_change=lambda: self._on_dimension_changed('cols'),
             label_color=THEME_COLORS['muted'], padx=(PAD_MICRO, 0),
         )
 
     def _build_icon_row(self, parent):
-        """Pack icon size, gap, stack font, and the Timers / Flash toggle groups."""
+        """Pack the Size slider (with its icon-size hint) and the gap."""
         icon_row = ttk.Frame(parent)
         icon_row.pack(fill='x', pady=(0, PAD_ROW))
-        self.icon_var = tk.IntVar()
-        labeled_spinbox(icon_row, "Icon:", self.icon_var, from_=8, to=128, width=3,
-            tooltip="Size of each buff icon in pixels (8-128)",
-            on_change=self._notify_edit,
-            padx=(PAD_BUTTON_GAP, PAD_TAB))
+        _, self.scale_var, self._refresh_size = size_slider(
+            icon_row, self.grid_config.get('scale', 100),
+            lambda p: f"{grid_metrics(self._get_base_size(), p).icon} px icons",
+            on_commit=self._notify_edit,
+            tooltip="Icon, timer and stack size, as a percent of the overlay size "
+                    "(Overlay, top of the Grids tab)",
+            padx=PAD_TAB)
+        ttk.Separator(icon_row, orient='vertical').pack(side='left', fill='y', padx=PAD_XS)
         self.gap_var = tk.IntVar()
         labeled_spinbox(icon_row, "Gap:", self.gap_var, from_=-5, to=10, width=3,
             tooltip="Space between icons (-5 = overlapping, 0 = touching, 10 = spaced out)",
             on_change=self._notify_edit,
             padx=(PAD_BUTTON_GAP, PAD_MID))
 
-        ttk.Separator(icon_row, orient='vertical').pack(side='left', fill='y', padx=PAD_XS)
-        self.stack_font_var = tk.IntVar()
-        labeled_spinbox(icon_row, "Stack Font:", self.stack_font_var, from_=8, to=24, width=2,
-            tooltip="Font size for stack counter at top-right of icons (8-24)",
-            on_change=self._notify_edit,
+    def refresh_size_hint(self):
+        """The overlay size changed under this card: redraw the Size hint."""
+        self._refresh_size()
+
+    def _build_timer_row(self, parent):
+        """Pack the Timers style + Y offset, the Flash group and Applied by me."""
+        timer_row = ttk.Frame(parent)
+        timer_row.pack(fill='x', pady=(0, PAD_ROW))
+        self.timer_style_var = tk.StringVar()
+        labeled_combobox(timer_row, "Timers:", self.timer_style_var,
+            [label for _, label, _ in _TIMER_OPTIONS], width=6,
+            tooltip=lambda: _TIMER_DESCRIPTIONS.get(self.timer_style_var.get(),
+                                                    "How each icon shows its time left"),
+            on_change=self._on_timers_clicked,
             padx=(PAD_BUTTON_GAP, PAD_MID))
-
-        timer_group = ttk.Frame(icon_row)
-        timer_group.pack(side='left')
-        ttk.Separator(timer_group, orient='vertical').pack(side='left', fill='y', padx=PAD_XS)
-        self.timers_var = tk.BooleanVar()
-        timers_cb = ttk.Checkbutton(timer_group, text="Timers",
-                                     variable=self.timers_var,
-                                     bootstyle="success-round-toggle",  # type: ignore[call-arg]
-                                     command=self._on_timers_clicked)
-        timers_cb.pack(side='left', padx=(0, PAD_MID))
-        add_tooltip(timers_cb, "Display remaining duration below each buff icon")
-
-        self._timer_options_frame = ttk.Frame(timer_group)
-        self._timer_options_frame.pack(side='left')
-        self.timer_font_var = tk.IntVar()
-        labeled_spinbox(self._timer_options_frame, "Font:", self.timer_font_var,
-            from_=8, to=24, width=2,
-            tooltip="Font size for timer text below icons (8-24)",
-            on_change=self._notify_edit,
-            padx=(PAD_BUTTON_GAP, PAD_TAB))
+        self._timer_offset_labels: list = []
         self.timer_y_offset_var = tk.IntVar()
-        labeled_spinbox(self._timer_options_frame, "Y Offset:", self.timer_y_offset_var,
+        self._timer_offset_spin = labeled_spinbox(timer_row, "Y Offset:", self.timer_y_offset_var,
             from_=-10, to=10, width=3,
-            tooltip="Shift timer text up/down relative to the icon (-10 to 10)",
+            tooltip="Shift the timer digits up/down relative to the icon (-10 to 10)",
             on_change=self._notify_edit,
-            padx=(PAD_BUTTON_GAP, PAD_MID))
+            padx=(PAD_BUTTON_GAP, PAD_MID), label_sink=self._timer_offset_labels)
 
-        flash_group = ttk.Frame(icon_row)
+        flash_group = ttk.Frame(timer_row)
         flash_group.pack(side='left')
         ttk.Separator(flash_group, orient='vertical').pack(side='left', fill='y', padx=PAD_XS)
         self.flashing_var = tk.BooleanVar()
@@ -285,6 +284,14 @@ class GridEditorPanel(ttk.Frame):
         ttk.Label(self._flash_threshold_frame, text="s",
                   foreground=THEME_COLORS['muted'],
                   font=FONT_SMALL).pack(side='left')
+
+        ttk.Separator(timer_row, orient='vertical').pack(side='left', fill='y', padx=PAD_XS)
+        self.self_cast_var = tk.BooleanVar()
+        self_cast_cb = ttk.Checkbutton(timer_row, text="Applied by me",
+                                       variable=self.self_cast_var,
+                                       command=self._notify_edit)
+        self_cast_cb.pack(side='left')
+        add_tooltip(self_cast_cb, "Show an effect only while you are the one who applied it")
 
     def _build_info_and_dynamic(self, parent):
         """Pack whitelist/slot summary row and the Fill/Sort/Group dynamic options."""
@@ -338,14 +345,15 @@ class GridEditorPanel(ttk.Frame):
         game_w, game_h = get_game_resolution_or_default()
         self.x_var.set(str(project_px(cfg.get('fx', 100 / 1920), game_w)))
         self.y_var.set(str(project_px(cfg.get('fy', 400 / 1080), game_h)))
-        self.icon_var.set(cfg.get('iconSize', 56))
+        self.scale_var.set(cfg.get('scale', 100))
+        self._refresh_size()
         self.gap_var.set(max(-5, min(cfg.get('gap', -1), 10)))
-        self.timers_var.set(cfg.get('showTimers', True))
-        self.stack_font_var.set(cfg.get('stackFontSize', 14))
-        self.timer_font_var.set(cfg.get('timerFontSize', 18))
+        self.timer_style_var.set(_TIMER_LABEL_BY_CODE.get(cfg.get('timerStyle', 'digits'),
+                                                           _TIMER_LABEL_BY_CODE['digits']))
         self.flash_threshold_var.set(cfg.get('timerFlashThreshold', 6))
         self.timer_y_offset_var.set(cfg.get('timerYOffset', 0))
         self.flashing_var.set(cfg.get('enableFlashing', True))
+        self.self_cast_var.set(cfg.get('selfCastOnly') is True)
         self._on_timers_toggled()
         self._on_flash_toggled()
         self.fill_var.set(_FILL_LABEL_BY_CODE.get(cfg.get('fillDirection', 'LR'),
@@ -409,9 +417,7 @@ class GridEditorPanel(ttk.Frame):
         self.grid_config['enabled'] = self.enabled_var.get()
         var_map = {
             'rows': self._rows_var, 'cols': self._cols_var,
-            'iconSize': self.icon_var, 'gap': self.gap_var,
-            'stackFontSize': self.stack_font_var,
-            'timerFontSize': self.timer_font_var,
+            'scale': self.scale_var, 'gap': self.gap_var,
             'timerFlashThreshold': self.flash_threshold_var,
             'timerYOffset': self.timer_y_offset_var,
         }
@@ -432,8 +438,14 @@ class GridEditorPanel(ttk.Frame):
             except (ValueError, tk.TclError):
                 px = project_px(self.grid_config.get(key, 0.0), extent)
             self.grid_config[key] = unproject_px(px, extent)
-        self.grid_config['showTimers'] = self.timers_var.get()
+        self.grid_config['timerStyle'] = _TIMER_CODE_BY_LABEL.get(
+            self.timer_style_var.get(), self.grid_config.get('timerStyle', 'digits'))
         self.grid_config['enableFlashing'] = self.flashing_var.get()
+        # Written only when on, so a grid that never set it saves unchanged.
+        if self.self_cast_var.get():
+            self.grid_config['selfCastOnly'] = True
+        else:
+            self.grid_config.pop('selfCastOnly', None)
         self.grid_config['fillDirection'] = _FILL_CODE_BY_LABEL.get(
             self.fill_var.get(), self.grid_config.get('fillDirection', 'LR'))
         self.grid_config['sortOrder'] = _SORT_CODE_BY_LABEL.get(
@@ -543,16 +555,18 @@ class GridEditorPanel(ttk.Frame):
         self.section.set_dimmed(not enabled)
 
     def _on_timers_clicked(self):
-        """Checkbutton handler — load_from_config calls _on_timers_toggled
+        """Timers dropdown handler — load_from_config calls _on_timers_toggled
         directly so a profile load never arms the autosaver."""
         self._on_timers_toggled()
         self._notify_edit()
 
     def _on_timers_toggled(self):
-        if self.timers_var.get():
-            self._timer_options_frame.pack(side='left')
-        else:
-            self._timer_options_frame.pack_forget()
+        """The Y offset moves the digits only, so it is greyed for Bar and Off."""
+        digits = _TIMER_CODE_BY_LABEL.get(self.timer_style_var.get()) == 'digits'
+        self._timer_offset_spin.configure(state='normal' if digits else 'disabled')
+        fg = '' if digits else TK_COLORS['dim_text']
+        for lbl in self._timer_offset_labels:
+            lbl.configure(foreground=fg)
 
     def _on_flash_clicked(self):
         self._on_flash_toggled()
@@ -574,12 +588,11 @@ class GridEditorPanel(ttk.Frame):
             return
         old_val = self.grid_config.get(dim, 1)
         other_dim = self.grid_config.get('cols' if dim == 'rows' else 'rows', 1)
-        if self._get_total_slots:
-            old_total = old_val * other_dim
-            other_slots = self._get_total_slots() - old_total
-            if other_slots + new_val * other_dim > MAX_TOTAL_SLOTS:
-                new_val = max(1, (MAX_TOTAL_SLOTS - other_slots) // other_dim)
-                var.set(str(new_val))
+        if new_val * other_dim > MAX_GRID_SLOTS:
+            new_val = max(1, MAX_GRID_SLOTS // other_dim)
+            var.set(str(new_val))
+            app_toast(self, f"A grid holds at most {MAX_GRID_SLOTS} slots", 'info',
+                      key='grid_resize')
         new_rows = new_val if dim == 'rows' else other_dim
         new_cols = other_dim if dim == 'rows' else new_val
         self._apply_dimension_change(new_rows, new_cols, old_val * other_dim)
@@ -691,6 +704,16 @@ _FILL_OPTIONS = [
 _FILL_LABEL_BY_CODE = {code: label for code, label, _ in _FILL_OPTIONS}
 _FILL_CODE_BY_LABEL = {label: code for code, label, _ in _FILL_OPTIONS}
 _FILL_DESCRIPTIONS = {label: desc for _, label, desc in _FILL_OPTIONS}
+
+_TIMER_OPTIONS = [
+    # (persisted code, user-facing label, tooltip description)
+    ('digits', 'Digits', 'Seconds left, under each icon'),
+    ('bar',    'Bar',    'A line inside the icon\'s bottom edge that shrinks as time runs out'),
+    ('off',    'Off',    'No timer'),
+]
+_TIMER_LABEL_BY_CODE = {code: label for code, label, _ in _TIMER_OPTIONS}
+_TIMER_CODE_BY_LABEL = {label: code for code, label, _ in _TIMER_OPTIONS}
+_TIMER_DESCRIPTIONS = {label: desc for _, label, desc in _TIMER_OPTIONS}
 
 _LAYOUT_OPTIONS = [
     ('buffFirst',   'Buffs first'),

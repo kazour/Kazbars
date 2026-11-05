@@ -5,6 +5,7 @@ Constants, validation specs, and default grid configuration.
 
 import copy
 
+from .overlay_size import SCALE_DEFAULT, SCALE_MAX, SCALE_MIN
 from .profile_document import LANE_BUILD
 from .profile_document import SectionSpec as ProfileSectionSpec
 from .settings_core import Field, Schema
@@ -12,42 +13,40 @@ from .settings_core import Field, Schema
 # ============================================================================
 # CONSTANTS
 # ============================================================================
-MAX_TOTAL_SLOTS = 64
+# A grid's own slot limit (rows x cols): the card's cell preview and the slot
+# picker stay readable. There is no total across grids — in game a slot that
+# shows nothing costs nothing (slots are made lazily).
+MAX_GRID_SLOTS = 64
 MAX_ROWS = 64
 MAX_COLS = 64
 
 DEFAULT_GAME_RESOLUTION = (1920, 1080)
 
-# Declarative validation specs: key → (default, min, max)
+# Declarative validation specs: key → (default, min, max). A grid has no pixel
+# or point size of its own: `scale` is a percent of the profile's overlay size
+# and the generator derives icon, timer and stack sizes from it
+# (overlay_size.grid_metrics).
 CLAMP_SPECS = {
     'rows': (1, 1, MAX_ROWS), 'cols': (10, 1, MAX_COLS),
-    'iconSize': (56, 8, 128), 'gap': (-1, -5, 10),
-    'timerFontSize': (18, 8, 48), 'timerFlashThreshold': (6, 0, 11),
+    'scale': (SCALE_DEFAULT, SCALE_MIN, SCALE_MAX), 'gap': (-1, -5, 10),
+    'timerFlashThreshold': (6, 0, 11),
     'timerYOffset': (-3, -10, 10),
-    'stackFontSize': (16, 8, 24),
 }
 # Fraction position specs: key → default. Positions are stored as fractions of
 # the game resolution (full floats, clamped to [0.0, 1.0]); pixels exist only
 # at display/emit via project_px/unproject_px, so a document is never rewritten
-# by a resolution change. Sizes stay pixels — icon art has a native size.
+# by a resolution change.
 FRACTION_SPECS = {
     'fx': 100 / 1920,
     'fy': 400 / 1080,
 }
-# Seed sizes per game-resolution tier: (max_height, {key: px}); the last entry
-# is the open-ended top tier. Positions are fractions and need no rescale, but
-# sizes stay px (icon art has a native size), so a template authored at 1080p
-# would seed pin-sized icons on a 1440p or 4K screen. These are the shipped
-# starting points, stamped when a template is instantiated and when first
-# launch re-anchors the seed to the chosen resolution. A later resolution
-# change carries a tuned document across tiers by the tiers' ratio instead
-# (rescale_seed_sizes). The steps are deliberate, not a linear scale of the
-# pixel count: 4K gets 1.33× the 1080p icon, not 2×.
-SEED_SIZE_TIERS = (
-    (1080, {'iconSize': 48, 'timerFontSize': 17, 'stackFontSize': 16}),
-    (1440, {'iconSize': 56, 'timerFontSize': 20, 'stackFontSize': 19}),
-    (None, {'iconSize': 64, 'timerFontSize': 23, 'stackFontSize': 21}),
-)
+# Retired per-grid keys: popped on load so a hand-added one can't zombie along
+# (schema-3 documents never carry them).
+_RETIRED_KEYS = ('iconSize', 'timerFontSize', 'stackFontSize', 'showTimers', 'x', 'y')
+
+# `timerStyle`: `bar` (a line inside the icon's bottom edge that shrinks as time
+# runs out), `digits` (seconds left), `off`.
+TIMER_STYLES = ('bar', 'digits', 'off')
 
 # key → (default, valid_values)
 ENUM_SPECS = {
@@ -56,6 +55,7 @@ ENUM_SPECS = {
     'fillDirection': ('LR', ('LR', 'RL', 'TB', 'BT', 'BL-TR', 'BR-TL', 'TL-BR', 'TR-BL')),
     'sortOrder': ('longest', ('longest', 'shortest', 'application')),
     'layout': ('buffFirst', ('buffFirst', 'debuffFirst', 'mixed')),
+    'timerStyle': ('digits', TIMER_STYLES),
 }
 
 
@@ -80,16 +80,14 @@ def create_default_grid(grid_type="player", rows=1, cols=10, mode="dynamic", gri
         'type': grid_type,
         'rows': rows,
         'cols': cols,
-        'iconSize': 56,
+        'scale': SCALE_DEFAULT,
         'gap': -1,
         'fx': (100 if grid_type == "player" else 300) / 1920,
         'fy': 400 / 1080,
         'slotMode': mode,
-        'showTimers': True,
-        'timerFontSize': 18,
+        'timerStyle': 'digits',
         'timerFlashThreshold': 6,
         'timerYOffset': -3,
-        'stackFontSize': 16,
         'enableFlashing': True,
         'fillDirection': fill_dir,
         'sortOrder': 'longest',
@@ -97,39 +95,6 @@ def create_default_grid(grid_type="player", rows=1, cols=10, mode="dynamic", gri
         'whitelist': [],
         'slotAssignments': {}
     }
-
-
-def seed_sizes_for_height(height):
-    """The shipped icon/timer/stack sizes for a game-resolution height."""
-    for limit, sizes in SEED_SIZE_TIERS:
-        if limit is None or height <= limit:
-            return dict(sizes)
-    return dict(SEED_SIZE_TIERS[-1][1])
-
-
-def apply_seed_sizes(grids, height):
-    """Stamp the height's tier sizes onto every grid, in place. For freshly
-    instantiated templates only — it overwrites whatever the file carried."""
-    sizes = seed_sizes_for_height(height)
-    for grid in grids:
-        grid.update(sizes)
-    return grids
-
-
-def rescale_seed_sizes(grids, old_height, new_height):
-    """Carry every grid's icon/timer/stack size from one resolution tier to
-    another by the tiers' ratio, clamped to CLAMP_SPECS — a grid still on the
-    old seed lands exactly on the new one, a tuned grid keeps its tuning."""
-    old = seed_sizes_for_height(old_height)
-    new = seed_sizes_for_height(new_height)
-    if old == new:
-        return grids
-    for grid in grids:
-        for key, seed in new.items():
-            _, lo, hi = CLAMP_SPECS[key]
-            scaled = round(grid.get(key, old[key]) * seed / old[key])
-            grid[key] = max(lo, min(hi, scaled))
-    return grids
 
 
 def default_grid_name(grid_type, existing_ids):
@@ -144,6 +109,11 @@ def default_grid_name(grid_type, existing_ids):
 def validate_grid(grid):
     """Validate and clamp a grid config on load. Returns sanitized grid."""
     defaults = create_default_grid()
+
+    # `timerStyle`, else the retired `showTimers`: a false reads `off`,
+    # anything else `digits`.
+    if grid.get('timerStyle') not in TIMER_STYLES:
+        grid['timerStyle'] = 'off' if grid.get('showTimers') is False else 'digits'
 
     # Ensure required keys exist
     for key, val in defaults.items():
@@ -161,8 +131,7 @@ def validate_grid(grid):
         grid[key] = max(lo, min(value, hi))
 
     # Fraction positions: full-float clamp to the unit range (NaN → default;
-    # inf lands on the clamp bound). Legacy pixel keys are popped — schema-2
-    # documents never carry them, and a hand-added one must not zombie along.
+    # inf lands on the clamp bound).
     for key, frac_default in FRACTION_SPECS.items():
         try:
             frac = float(grid.get(key, frac_default))
@@ -171,8 +140,8 @@ def validate_grid(grid):
         if frac != frac:
             frac = frac_default
         grid[key] = max(0.0, min(frac, 1.0))
-    grid.pop('x', None)
-    grid.pop('y', None)
+    for key in _RETIRED_KEYS:
+        grid.pop(key, None)
 
     # Validate enums
     for key, (enum_default, valid) in ENUM_SPECS.items():
@@ -180,9 +149,13 @@ def validate_grid(grid):
             grid[key] = enum_default
 
     # Validate booleans
-    for bool_key in ('enabled', 'showTimers', 'enableFlashing'):
+    for bool_key in ('enabled', 'enableFlashing'):
         if not isinstance(grid.get(bool_key), bool):
             grid[bool_key] = defaults[bool_key]
+    # `selfCastOnly`: show an effect only while you are its caster. Written only
+    # when true, so a grid that never set it reads and saves unchanged.
+    if grid.get('selfCastOnly') is not True:
+        grid.pop('selfCastOnly', None)
 
     # Validate grid name/id
     grid_id = str(grid.get('id', '')).strip()

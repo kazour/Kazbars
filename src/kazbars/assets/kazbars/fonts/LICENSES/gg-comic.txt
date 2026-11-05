@@ -1,0 +1,3 @@
+GG Comic (GG Comic Black) is the typeface of GigaUI Ultimate by Giga (GitHub: BooroH), a custom interface for Age of Conan.
+Source: https://github.com/BooroH/GigaUI-Ultimate at commit 9c1ad23f9a6c92d979a365acb372d2004c16dabd, Data/GUI/Customized/Fonts/.
+The repository publishes the font files with the interface and carries no licence file. KazBars includes these faces at the direction of its maintainer, who states that the author ships them openly for Age of Conan interface use.

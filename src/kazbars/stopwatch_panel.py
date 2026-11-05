@@ -2,15 +2,12 @@
 KazBars — In-game stopwatch dialog.
 
 Extras-menu settings for the in-game stopwatch panel (KazBarsStopwatch stub):
-the build gate, the baked default position, the baked font size, and the
-start-collapsed flag. The font size is an *override* of the text size the four
-in-game panels share — the shared value itself is set in the Inspect Panel
-dialog, so there is one control rather than four that can disagree.
+the build gate, the baked default position, its Size (a percent of the
+profile's overlay size, hinted in pt) and the start-collapsed flag.
 Reads/writes the profile document's `stopwatch` section (data layer:
 `stopwatch.py`; the store autosaves). Positions are stored as fractions of the
 game resolution; the X/Y fields display projected px at the current resolution
-(the grid editor convention) so the drag-in-game → copy-the-coordinates
-workflow keeps working. The build bakes the values into the generated SWF.
+(the grid editor convention). The build bakes the values into the generated SWF.
 Functions take the KazBarsApp instance as first arg.
 
 Layout follows the Damage Numbers panel conventions: tip bar under the header,
@@ -22,8 +19,9 @@ import tkinter as tk
 from tkinter import ttk
 
 from .grid_model import get_game_resolution_or_default, project_px, unproject_px
+from .overlay_size import panel_fs
 from .stopwatch import validate_config
-from .ui_forms import create_card, labeled_spinbox
+from .ui_forms import create_card, labeled_spinbox, size_slider
 from .ui_headers import create_dialog_header, create_tip_bar
 from .ui_helpers import (
     BTN_DIALOG,
@@ -41,7 +39,7 @@ from .ui_widgets import add_tooltip, app_toast
 from .window_position import bind_window_position_save, restore_window_position
 
 _WIDTH = 470
-_HEIGHT = 415
+_HEIGHT = 380
 
 
 def open_stopwatch_dialog(app):
@@ -124,37 +122,17 @@ def open_stopwatch_dialog(app):
     gated.append(labeled_spinbox(pos_row, "Y ", y_var, from_=0, to=game_h,
                                  width=6, label_sink=sink))
 
-    size_card = create_card(content, "Text size")
+    size_card = create_card(content, "Size")
     size_card.pack(fill='x', pady=(0, PAD_ROW))
-    # fontSize is None when the panel follows the shared size. The spinbox still
-    # shows a number so unticking the box has somewhere to start from. The shared
-    # size itself is set in the Inspect Panel dialog (decision: one control, and
-    # the console and control panel have no dialog to host it).
-    shared = app.settings.get('panel_font_size')
-    follow_var = tk.BooleanVar(value=cfg['fontSize'] is None)
-    follow_cb = ttk.Checkbutton(size_card, text="Use the shared size for this panel",
-                                variable=follow_var)
-    follow_cb.pack(anchor='w', pady=(0, PAD_XS))
-    add_tooltip(follow_cb,
-                "Extras ▸ Inspect panel… sets the text size all four in-game "
-                "panels share. Untick to make the stopwatch bigger or smaller "
-                "than the rest.")
-    gated.append(follow_cb)
-
-    size_var = tk.IntVar(value=shared if cfg['fontSize'] is None else cfg['fontSize'])
+    base = app.profile_store.get_section('overlay')['size']
     size_row = ttk.Frame(size_card)
     size_row.pack(anchor='w')
-    size_spin = labeled_spinbox(size_row, "Stopwatch only ", size_var,
-                                from_=8, to=48, width=6, label_sink=sink)
-    add_tooltip(size_spin,
-                "This panel's own size, used instead of the shared one. The whole "
-                "panel scales with it, collapsed bar included.")
-
-    def _sync_size_override(*_):
-        on = enabled_var.get() and not follow_var.get()
-        size_spin.configure(state='normal' if on else 'disabled')
-
-    follow_var.trace_add('write', _sync_size_override)
+    size_scale, size_var, _ = size_slider(
+        size_row, cfg['scale'], lambda p: f"{panel_fs(base, p)} pt text",
+        tooltip="A percent of the overlay size (Overlay, top of the Grids tab). "
+                "The whole panel scales with it, collapsed bar included.",
+        label_sink=sink)
+    gated.append(size_scale)
 
     behavior_card = create_card(content, "Behavior")
     behavior_card.pack(fill='x', pady=(0, PAD_ROW))
@@ -175,20 +153,9 @@ def open_stopwatch_dialog(app):
             widget.configure(state='normal' if on else 'disabled')
         for lbl, normal_fg in dim_labels:
             lbl.configure(foreground=normal_fg if on else TK_COLORS['dim_text'])
-        # The follow gate re-applies on top of the master (as the exemplar's
-        # shadow gate), covering the size spinbox in both directions.
-        _sync_size_override()
 
     enable_cb.configure(command=_sync_enabled)
     _sync_enabled()
-
-    def _read(var, default):
-        # An emptied spinbox makes IntVar.get() raise before validate_config
-        # can clamp it — fall back to the loaded value.
-        try:
-            return var.get()
-        except tk.TclError:
-            return default
 
     def _read_frac(var, frac, extent):
         # Position fields carry projected px; typed overshoot clamps to the
@@ -205,9 +172,7 @@ def open_stopwatch_dialog(app):
             'enabled': enabled_var.get(),
             'fx': _read_frac(x_var, cfg['fx'], game_w),
             'fy': _read_frac(y_var, cfg['fy'], game_h),
-            # Checked means "no opinion" — never the number left in the disabled
-            # spinbox, or unticking once would freeze the panel off the shared value.
-            'fontSize': None if follow_var.get() else _read(size_var, shared),
+            'scale': size_var.get(),
             'startCollapsed': collapsed_var.get(),
         })
         app.profile_store.set_section('stopwatch', new_cfg)

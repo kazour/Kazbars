@@ -1,123 +1,86 @@
+// KazBars - the host: the shared runtime (KazBarsClock, KazBarsWorld), the module registry, preview mode, the
+// archive and SlotAlive. Every module, the grids included, is reached through the KazBarsModule lifecycle and World;
+// a build that gates one out drops its lines here and nothing else.
 class KazBars {
 
-
     private var rootClip:MovieClip;
-    private var m_Player:Object;
-    private var m_Target:Object;
     private var config:Object;
-    private var playerBuffs:Array;
-    private var targetBuffs:Array;
-    private var buffIndexCache:Object;
-    private var grids:Array;
-    private var timerInterval:Number;
-    private var frameActive:Boolean;
-    private var frameCount:Number;
-    private var TCACHE:Object;
+    private var clock:KazBarsClock;
+    private var world:KazBarsWorld;
+    private var grids:KazBarsGrids;
     private var previewMode:Boolean;
     private var previewArmed:Boolean;
+    private var down:Boolean;     // cleaned up by a deactivation, not yet built again
     private var lastShiftDown:Number;
     private var lastCtrlDown:Number;
     private var lastAltDown:Number;
-    private var C_BUFF:Number;
-    private var C_DEBUFF:Number;
-    private var C_BG:Number;
-    private var CFG:Object;
-    private var WL:Object;
-    private var ISDEB:Object;
-    private var BUFFTYPE:Object;
-    private var STACK_LEVEL:Object;
-    private var CUSTOMICON:Object;
 
-    // OPTIMIZATION: Alpha flash lookup table (100 pre-calculated values)
-    private var AFLASH:Array;
-
-    // OPTIMIZATION: Reusable arrays to reduce GC
-    private var _tempBuffs:Array;
-    private var _tempDebuffs:Array;
-    private var _tempMisc:Array;
-
-    // HELPER CLASSES: Preview, Slot, PreviewPanel, and (optional) Console (32KB bytecode limit workaround)
 //#if CONSOLE
     private var console:KazBarsConsole;
 //#end
-    private var slot:KazBarsSlot;
     private var ppanel:KazBarsPreviewPanel;
 //#if CAST
     private var castTimer:KazBarsCastTimer;
 //#end
-//#if SW
-    private var stopwatch:KazBarsStopwatch;
-//#end
 //#if INS
     private var inspect:KazBarsInspect;
 //#end
+//#if ONS
+    private var onslaught:KazBarsOnslaught;
+//#end
+//#if SW
+    private var stopwatch:KazBarsStopwatch;
+//#end
+//#if PLATE
+    private var overhead:KazBarsOverhead;
+//#end
 
-    // Every optional module compiled into this build, in control-panel row
-    // order. The core reaches them ONLY through the KazBarsModule lifecycle,
-    // so a build that gates one out drops its push and nothing else.
+    // Every module compiled into this build, in registration (z) order.
     private var modules:Array;
 
-    // Key listener reference for proper cleanup
     private var keyListener:Object;
 
 
     public function KazBars(root:MovieClip) {
         rootClip = root;
-        playerBuffs = new Array();
-        targetBuffs = new Array();
-        grids = new Array();
         modules = new Array();
-        buffIndexCache = {player: {}, target: {}};
-        frameActive = false;
-        frameCount = 0;
         previewMode = false;
         previewArmed = true;
+        down = false;
         lastShiftDown = 0;
         lastCtrlDown = 0;
         lastAltDown = 0;
-        C_BUFF = 0x666666;
-        C_DEBUFF = 0x8B0000;
-        C_BG = 0x000000;
-        TCACHE = {};
-        var i:Number = 0;
-        while (i <= 99) { TCACHE[i] = String(i); i++; }
+        clock = new KazBarsClock(rootClip);
+        var d:Object = KazBarsData.init();
+        world = new KazBarsWorld(clock, d);
 
-        // OPTIMIZATION: Pre-calculate alpha flash values (100 entries)
-        // Replaces Math.sin() calls every frame with array lookup
-        AFLASH = new Array();
-        var j:Number = 0;
-        while (j < 100) {
-            var phase:Number = (j / 100) * 6.28318;
-            AFLASH[j] = 33 + (Math.sin(phase) + 1) * 33.5;
-            j++;
-        }
-
-        // OPTIMIZATION: Reusable arrays to reduce garbage collection
-        _tempBuffs = new Array();
-        _tempDebuffs = new Array();
-        _tempMisc = new Array();
-
-        // HELPER CLASSES: slot manager and control panel (console added if enabled at build time)
 //#if CONSOLE
         console = new KazBarsConsole(rootClip);
 //#end
-        slot = new KazBarsSlot(rootClip);
+        grids = new KazBarsGrids(rootClip);
         ppanel = new KazBarsPreviewPanel(this, rootClip);
 //#if CAST
         castTimer = new KazBarsCastTimer(rootClip);
 //#end
+//#if INS
+        inspect = new KazBarsInspect(rootClip);
+//#end
+//#if ONS
+        onslaught = new KazBarsOnslaught(rootClip);
+//#end
 //#if SW
         stopwatch = new KazBarsStopwatch(rootClip);
 //#end
-//#if INS
-        inspect = new KazBarsInspect(rootClip);
+//#if PLATE
+        overhead = new KazBarsOverhead(rootClip);
 //#end
 
         // Registration order is z-order: onLoad builds in this order, so later
         // modules stack above earlier ones (the console on top). The control
         // panel's row order is enterPreview()'s addExtra sequence, not this.
-//#if SW
-        modules.push(stopwatch);
+        modules.push(grids);
+//#if PLATE
+        modules.push(overhead);
 //#end
 //#if INS
         modules.push(inspect);
@@ -125,670 +88,46 @@ class KazBars {
 //#if CAST
         modules.push(castTimer);
 //#end
+//#if ONS  // its host clip is made in create(), so its anchors keep this slot, under the console
+        modules.push(onslaught);
+//#end
+//#if SW
+        modules.push(stopwatch);
+//#end
 //#if CONSOLE
         modules.push(console);
 //#end
 
-        initConfig();
-    }
-
-
-    private function initConfig():Void {
-        var d:Object = KazBarsData.init();
-        CFG = d.CFG;
-        WL = d.WL;
-        ISDEB = d.ISDEB;
-        BUFFTYPE = d.BUFFTYPE;
-        STACK_LEVEL = d.STACK_LEVEL;
-        CUSTOMICON = d.CUSTOMICON;
         ppanel.configure(d.PF);
+        grids.configure(d, world, clock);
+//#if PLATE
+        overhead.configure(d, world, clock);
+//#end
 //#if CONSOLE  // the control panel's configure above is never gated; the console's follows its build gate
-        console.configure(d.PF);
+        console.configure(d.CON);
+//#end
+//#if CONBUFFS  // each console tab is its own class under its own gate; the console orders them by d.CON.tabs
+        console.add(new KazBarsConBuffs());
+//#end
+//#if CONCASTS
+        console.add(new KazBarsConCasts());
+//#end
+//#if CONSOLE
+        console.follow(world);
 //#end
 //#if CAST
-        castTimer.configure(d.CAST);
+        castTimer.configure(d.CAST, world, clock);
+//#end
+//#if INS
+        inspect.configure(d.INS, world, clock);
+//#end
+//#if ONS
+        onslaught.configure(d.ONS, world, clock);
 //#end
 //#if SW
         stopwatch.configure(d.SW);
 //#end
-//#if INS
-        inspect.configure(d.INS);
-//#end
     }
-
-    private function createAllGrids():Void {
-        var i:Number = 0;
-        while (i < CFG.grids.length) {
-            var g:Object = createGrid(CFG.grids[i], i);
-            if (g != null) grids.push(g);
-            i++;
-        }
-    }
-
-    private function createGrid(cfg:Object, idx:Number):Object {
-        var mc:MovieClip = rootClip.createEmptyMovieClip("g_" + idx, rootClip.getNextHighestDepth());
-        if (mc == null) return null;
-        var total:Number = cfg.rows * cfg.cols;
-        var slots:Array = new Array();
-        var loaders:Array = new Array();
-        var loading:Array = new Array();
-        var s:Number = 0;
-        while (s < total) {
-            slots.push(createSlot(mc, s, cfg));
-            loaders[s] = new MovieClipLoader();
-            loaders[s].addListener(this);
-            loading[s] = false;
-            s++;
-        }
-        mc._x = cfg.x;
-        mc._y = cfg.y;
-        mc._visible = false;
-        var obj:Object = {
-            mc: mc, cfg: cfg, slots: slots, loaders: loaders,
-            loading: loading, display: new Array(), dirty: true, shown: true
-        };
-        createCallbacks(obj, idx);
-        return obj;
-    }
-
-    private function createSlot(p:MovieClip, idx:Number, cfg:Object):MovieClip {
-        // PRE-DRAWN: Use BuffSlot symbol from library (default, will swap if needed)
-        var s:MovieClip = p.attachMovie("BuffSlot", "s" + idx, p.getNextHighestDepth());
-        if (s == null) {
-            s = p.createEmptyMovieClip("s" + idx, p.getNextHighestDepth());
-            s.createEmptyMovieClip("m_icon", s.getNextHighestDepth());
-        }
-        var sz:Number = cfg.iconSize;
-        var scale:Number = (sz / 64) * 100;
-        s._xscale = s._yscale = scale;
-        if (cfg.showTimers) slot.createTimerTF(s, cfg.timerFont, cfg.timerYOffset);
-        slot.createStackTF(s, cfg.stackFont);
-        posSlot(s, idx, cfg);
-        s._visible = false;
-        s._idx = idx;
-        s._sz = sz;
-        s._fs = cfg.timerFont;
-        s._sfs = cfg.stackFont;
-        s._lastIco = null;
-        s._lastSec = null;
-        s._buff = null;
-        s._slotType = null;
-        return s;
-    }
-
-    private function posSlot(s:MovieClip, idx:Number, cfg:Object):Void {
-        var step:Number = cfg.iconSize + cfg.gap;
-        var r:Number, c:Number;
-        if (cfg.rows == 1) {
-            r = 0;
-            c = (cfg.fillDir == "RL") ? (cfg.cols - 1 - idx) : idx;
-        } else if (cfg.cols == 1) {
-            c = 0;
-            r = (cfg.fillDir == "BT") ? (cfg.rows - 1 - idx) : idx;
-        } else {
-            var br:Number = Math.floor(idx / cfg.cols);
-            var bc:Number = idx % cfg.cols;
-            if (cfg.fillDir == "TL-BR") { r = br; c = bc; }
-            else if (cfg.fillDir == "TR-BL") { r = br; c = cfg.cols - 1 - bc; }
-            else if (cfg.fillDir == "BL-TR") { r = cfg.rows - 1 - br; c = bc; }
-            else if (cfg.fillDir == "BR-TL") { r = cfg.rows - 1 - br; c = cfg.cols - 1 - bc; }
-            else { r = br; c = bc; }
-        }
-        s._x = c * step;
-        s._y = r * step;
-    }
-
-    private function createCallbacks(obj:Object, gIdx:Number):Void {
-        var total:Number = obj.cfg.rows * obj.cfg.cols;
-        var i:Number = 0;
-        while (i < total) { obj["cb" + i] = createCB(obj, i); i++; }
-    }
-
-    private function createCB(obj:Object, si:Number):Function {
-        var self:KazBars = this;
-        return function(url:String, ok:Boolean):Void { self.onIconLoad(obj, si, url, ok); };
-    }
-
-    private function onIconLoad(obj:Object, si:Number, url:String, ok:Boolean):Void {
-        if (obj == null || obj.loading == null) return;
-        obj.loading[si] = false;
-        if (ok && url != null && url.length > 0) {
-            var s:MovieClip = obj.slots[si];
-            if (s != null && s._visible && s.m_icon != null && s._buff != null) {
-                try { obj.loaders[si].loadClip(url, s.m_icon); } catch (e:Object) {}
-            }
-        }
-    }
-
-    // Attaches a baked symbol from base.swf (per-buff custom icons, or the shared IcoNull fallback)
-    // as a SLOT-level sibling at dynamic depth 8. The slot's authored art (bg/icoMask/m_icon/frame)
-    // is timeline content in the negative reserved depth range, so depth 8 sits above all of it;
-    // timer/stack text use depths 10-13 (KazBarsSlot) to stay above the icon. Scaleform paints
-    // nothing for content attached into the clip-depth-masked m_icon, so we attach as a sibling and
-    // bake the rounded crop into the art (no runtime mask).
-    private function attachBaked(obj:Object, si:Number, s:MovieClip, sym:String):Void {
-        if (s._lastIco == sym && s.cust != null) return;
-        s._lastIco = sym;
-        obj.loading[si] = false;
-        try { s.m_icon.unloadMovie(); } catch (e:Object) {}
-        s.m_icon._visible = true;
-        if (s.cust != null) s.cust.removeMovieClip();
-        s.attachMovie(sym, "cust", 8);
-    }
-
-    private function loadIcon(obj:Object, si:Number, entry:Object):Void {
-        if (entry == null) return;
-        var s:MovieClip = obj.slots[si];
-        if (s == null || s.m_icon == null) return;
-
-        // 1. Explicit per-buff baked icon (ice-gem slows AoC serves with a null icon).
-        var sym:String = CUSTOMICON[entry.id];
-        if (sym != null && sym != undefined) { attachBaked(obj, si, s, sym); return; }
-
-        // 2. No game icon at all -> shared IcoNull placeholder (instead of a blank slot).
-        if (entry.buff == null || entry.buff.m_Icon == null) { attachBaked(obj, si, s, "IcoNull"); return; }
-        var inst:Number;
-        try { inst = entry.buff.m_Icon.GetInstance(); } catch (e:Object) { attachBaked(obj, si, s, "IcoNull"); return; }
-        if (inst == null || inst == undefined || inst == 0) { attachBaked(obj, si, s, "IcoNull"); return; }
-
-        // 3. Real game icon -> load from the RDB.
-        if (s._lastIco == inst && s.m_icon._visible) return;
-        obj.loading[si] = false;
-        s._lastIco = inst;
-        obj.loading[si] = true;
-        s.m_icon._visible = false;
-        if (s.cust != null) s.cust.removeMovieClip();
-        try { s.m_icon.unloadMovie(); } catch (e:Object) {}
-        try {
-            com.Utils.ImageLoader.RequestRDBImage(new com.Utils.ID32(1010008, inst), obj, "cb" + si);
-        } catch (e:Object) { obj.loading[si] = false; }
-    }
-
-    public function onLoadInit(mc:MovieClip):Void {
-        if (mc == null) return;
-        try {
-            if (mc._parent == null || !mc._parent._visible) return;
-            mc._xscale = mc._yscale = 100;
-            // Standardize to 64x64 (native symbol size) then parent scaling handles final size
-            var NATIVE_SIZE:Number = 64;
-            var scale:Number = (NATIVE_SIZE * 100) / Math.max(mc._width, mc._height);
-            mc._xscale = mc._yscale = scale;
-            mc.cacheAsBitmap = true;
-            mc._visible = true;
-        } catch (e:Object) {
-            if (mc != null) { mc._xscale = mc._yscale = 100; mc._visible = true; }
-        }
-    }
-
-    private function isTracked(bid:Number, obj:Object):Boolean {
-        var wl:Object = WL[obj.cfg.id];
-        return (wl != null && wl[bid] == true);
-    }
-
-    private function mkEntry(buff:Object):Object {
-        var bid:Number = Number(buff.m_BuffId);
-        var exp:Number = 0;
-        if (buff.m_RemainingTime > 0) exp = getTimer() + buff.m_RemainingTime;
-        var btype:String = BUFFTYPE[bid];
-        if (btype == null || btype == undefined) btype = (ISDEB[bid] == true) ? "debuff" : "buff";
-        return { buff: buff, id: bid, exp: exp, isD: (ISDEB[bid] == true), type: btype, at: getTimer() };
-    }
-
-    private function addPBuff(buff:Object):Void {
-        if (buff == null || buff.m_BuffId == null) return;
-        var bid:Number = Number(buff.m_BuffId);
-        var tracked:Boolean = false;
-        var i:Number = 0;
-        while (i < grids.length) {
-            if (grids[i].cfg.type == "player" && isTracked(bid, grids[i])) { tracked = true; break; }
-            i++;
-        }
-        if (!tracked) return;
-        var entry:Object = mkEntry(buff);
-        var cache:Object = buffIndexCache.player;
-        var idx:Number = cache[bid];
-        if (idx != undefined && idx < playerBuffs.length && playerBuffs[idx] != null && playerBuffs[idx].id == bid) {
-            playerBuffs[idx] = entry;
-        } else {
-            cache[bid] = playerBuffs.length;
-            playerBuffs.push(entry);
-        }
-        markDirty("player");
-        startTimer();
-    }
-
-    private function remPBuff(bid:Number):Void {
-        var cache:Object = buffIndexCache.player;
-        var idx:Number = cache[bid];
-        if (idx != undefined && idx < playerBuffs.length && playerBuffs[idx] != null && playerBuffs[idx].id == bid) {
-            playerBuffs.splice(idx, 1);
-            delete cache[bid];
-            rebuildCache(cache, playerBuffs, idx);
-            markDirty("player");
-        }
-    }
-
-    private function addTBuff(buff:Object):Void {
-        if (buff == null || buff.m_BuffId == null) return;
-        var bid:Number = Number(buff.m_BuffId);
-        var tracked:Boolean = false;
-        var i:Number = 0;
-        while (i < grids.length) {
-            if (grids[i].cfg.type == "target" && isTracked(bid, grids[i])) { tracked = true; break; }
-            i++;
-        }
-        if (!tracked) return;
-        var entry:Object = mkEntry(buff);
-        var cache:Object = buffIndexCache.target;
-        var idx:Number = cache[bid];
-        if (idx != undefined && idx < targetBuffs.length && targetBuffs[idx] != null && targetBuffs[idx].id == bid) {
-            targetBuffs[idx] = entry;
-        } else {
-            cache[bid] = targetBuffs.length;
-            targetBuffs.push(entry);
-        }
-        markDirty("target");
-        startTimer();
-    }
-
-    private function remTBuff(bid:Number):Void {
-        var cache:Object = buffIndexCache.target;
-        var idx:Number = cache[bid];
-        if (idx != undefined && idx < targetBuffs.length && targetBuffs[idx] != null && targetBuffs[idx].id == bid) {
-            targetBuffs.splice(idx, 1);
-            delete cache[bid];
-            rebuildCache(cache, targetBuffs, idx);
-            markDirty("target");
-        }
-    }
-
-    private function rebuildCache(cache:Object, arr:Array, rem:Number):Void {
-        // cache is a plain Object (not an AS2 Array) keyed by slot index — for...in is correct here
-        for (var k:String in cache) { if (cache[k] > rem) cache[k]--; }
-    }
-
-    private function markDirty(t:String):Void {
-        var i:Number = 0;
-        while (i < grids.length) { if (grids[i].cfg.type == t) grids[i].dirty = true; i++; }
-    }
-
-    private function updateGrid(obj:Object):Void {
-        if (!obj.dirty) return;
-        obj.dirty = false;
-        if (obj.cfg.slotMode == "static") updateStatic(obj);
-        else updateDynamic(obj);
-    }
-
-    private function updateDynamic(obj:Object):Void {
-        var src:Array = (obj.cfg.type == "player") ? playerBuffs : targetBuffs;
-
-        // GC OPTIMIZATION: Reuse arrays instead of new Array()
-        _tempBuffs.length = 0;
-        _tempDebuffs.length = 0;
-        _tempMisc.length = 0;
-
-        var i:Number = 0;
-        while (i < src.length) {
-            var e:Object = src[i];
-            if (e != null && isTracked(e.id, obj)) {
-                if (e.type == "misc") _tempMisc.push(e);
-                else if (e.isD) _tempDebuffs.push(e);
-                else _tempBuffs.push(e);
-            }
-            i++;
-        }
-        var now:Number = getTimer();
-        sortArr(_tempMisc, obj.cfg.sortOrder, now);
-        sortArr(_tempBuffs, obj.cfg.sortOrder, now);
-        sortArr(_tempDebuffs, obj.cfg.sortOrder, now);
-        var disp:Array;
-        // Misc always first, then buff/debuff order based on layout
-        if (obj.cfg.layout == "buffFirst") disp = _tempMisc.concat(_tempBuffs).concat(_tempDebuffs);
-        else if (obj.cfg.layout == "debuffFirst") disp = _tempMisc.concat(_tempDebuffs).concat(_tempBuffs);
-        else { disp = _tempMisc.concat(_tempBuffs).concat(_tempDebuffs); sortArr(disp, obj.cfg.sortOrder, now); }
-        var total:Number = obj.cfg.rows * obj.cfg.cols;
-        i = 0;
-        while (i < total) {
-            if (i < disp.length) showSlot(obj, obj.slots[i], disp[i], i);
-            else hideSlot(obj.slots[i]);
-            i++;
-        }
-        obj.display = disp;
-        if (!previewMode) obj.mc._visible = obj.shown && disp.length > 0;
-    }
-
-    private function updateStatic(obj:Object):Void {
-        var src:Array = (obj.cfg.type == "player") ? playerBuffs : targetBuffs;
-        var sa:Object = obj.cfg.slots;
-        var total:Number = obj.cfg.rows * obj.cfg.cols;
-        var disp:Array = new Array();
-        var hasAny:Boolean = false;
-        var i:Number = 0;
-        var s:MovieClip;
-        var ids:Array;
-        var active:Object;
-        var latest:Number;
-        var j:Number;
-        var e:Object;
-        var k:Number;
-        // Forced Engage is the only CC that applies its lock and its immunity in the same
-        // instant, so a shared static slot can't rely on "newest wins" to surface the lock
-        // first. Pin the lock; once it drops, the immunity is the sole remaining match and
-        // takes the slot on its own. Every other CC applies the two sequentially, so lockWins
-        // stays false and the comparison below is the unchanged most-recent-wins rule.
-        var FE_LOCK_ID:Number = 4325954;
-        var isLock:Boolean;
-        var lockWins:Boolean;
-        while (i < total) {
-            s = obj.slots[i];
-            ids = sa[i];
-            if (ids == null || ids.length == 0) { hideSlot(s); disp[i] = null; i++; continue; }
-            active = null;
-            latest = -1;
-            lockWins = false;
-            j = 0;
-            while (j < src.length) {
-                e = src[j];
-                if (e != null) {
-                    k = 0;
-                    while (k < ids.length) {
-                        if (e.id == ids[k]) {
-                            isLock = (e.id == FE_LOCK_ID);
-                            if ((isLock && !lockWins) || (isLock == lockWins && e.at > latest)) {
-                                lockWins = isLock; latest = e.at; active = e;
-                            }
-                            break;
-                        }
-                        k++;
-                    }
-                }
-                j++;
-            }
-            if (active != null) { showSlot(obj, s, active, i); disp[i] = active; hasAny = true; }
-            else { hideSlot(s); disp[i] = null; }
-            i++;
-        }
-        obj.display = disp;
-        if (!previewMode) obj.mc._visible = obj.shown && hasAny;
-    }
-
-    private function sortArr(arr:Array, order:String, now:Number):Void {
-        if (arr.length <= 1) return;
-        if (order == "shortest") {
-            arr.sort(function(a, b) {
-                var ra:Number = (a.exp > 0) ? (a.exp - now) : 999999;
-                var rb:Number = (b.exp > 0) ? (b.exp - now) : 999999;
-                return ra - rb;
-            });
-        } else if (order == "longest") {
-            arr.sort(function(a, b) {
-                var ra:Number = (a.exp > 0) ? (a.exp - now) : 999999;
-                var rb:Number = (b.exp > 0) ? (b.exp - now) : 999999;
-                return rb - ra;
-            });
-        } else {
-            arr.sort(function(a, b) { return a.at - b.at; });
-        }
-    }
-
-    private function showSlot(obj:Object, s:MovieClip, e:Object, si:Number):Void {
-        if (s == null || e == null) return;
-        var slotType:String = "BuffSlot";
-        if (e.type == "misc") slotType = "MiscSlot";
-        else if (e.isD) slotType = "DebuffSlot";
-        s = slot.swapType(obj, s, si, slotType);
-        s._visible = true;
-        s._buff = e;
-        if (s.stk != null) {
-            var stackLvl:Number = STACK_LEVEL[e.id];
-            var stkTxt:String = (stackLvl != null && stackLvl != undefined) ? String(stackLvl) : "";
-            s.stk.text = stkTxt;
-            if (s.stkShadow != null) s.stkShadow.text = stkTxt;
-        }
-        loadIcon(obj, si, e);
-    }
-
-    private function hideSlot(s:MovieClip):Void {
-        if (s == null) return;
-        s._visible = false;
-        s._buff = null;
-        s._lastIco = null;
-        s._lastSec = null;
-        if (s.tmr != null) s.tmr.text = "";
-        if (s.tmrShadow != null) s.tmrShadow.text = "";
-        if (s.stk != null) s.stk.text = "";
-        if (s.stkShadow != null) s.stkShadow.text = "";
-        if (s.cust != null) s.cust.removeMovieClip();
-        if (s.m_icon != null) { s.m_icon._visible = false; try { s.m_icon.unloadMovie(); } catch (e:Object) {} }
-    }
-
-    private function startTimer():Void {
-        if (timerInterval == null || timerInterval == undefined) {
-            var self:KazBars = this;
-            timerInterval = setInterval(function() { self.tick(); }, 100);
-        }
-        if (!frameActive) {
-            frameActive = true;
-            var self2:KazBars = this;
-            rootClip.onEnterFrame = function() { self2.frame(); };
-        }
-    }
-
-    private function stopTimer():Void {
-        if (timerInterval != null) { clearInterval(timerInterval); timerInterval = null; }
-        frameActive = false;
-        rootClip.onEnterFrame = null;
-    }
-
-    private function tick():Void {
-        var now:Number = getTimer();
-
-        // SMART EXPIRY: Early exit if no buffs
-        if (playerBuffs.length > 0) checkExpiry(playerBuffs, buffIndexCache.player, now, "player");
-        if (targetBuffs.length > 0) checkExpiry(targetBuffs, buffIndexCache.target, now, "target");
-
-        var i:Number = 0;
-        while (i < grids.length) { updateGrid(grids[i]); i++; }
-        if (playerBuffs.length == 0 && targetBuffs.length == 0) stopTimer();
-    }
-
-    private function hideAllGrids():Void {
-        var i:Number = 0;
-        while (i < grids.length) {
-            if (grids[i].mc != null) grids[i].mc._visible = false;
-            i++;
-        }
-        playerBuffs = new Array();
-        targetBuffs = new Array();
-        buffIndexCache = {player: {}, target: {}};
-    }
-
-    private function checkExpiry(arr:Array, cache:Object, now:Number, t:String):Void {
-        var i:Number = arr.length - 1;
-        while (i >= 0) {
-            var e:Object = arr[i];
-            if (e != null && e.exp > 0 && e.exp <= now) {
-                arr.splice(i, 1);
-                delete cache[e.id];
-                rebuildCache(cache, arr, i);
-                markDirty(t);
-            }
-            i--;
-        }
-    }
-
-    private function frame():Void {
-        if (!frameActive) return;
-        frameCount = (frameCount + 1) % 32768;
-        if (frameCount % 3 != 0) return;
-        animate();
-    }
-
-    private function animate():Void {
-        var now:Number = getTimer();
-        var i:Number = 0;
-        var obj:Object;
-        var j:Number;
-        var s:MovieClip;
-        while (i < grids.length) {
-            obj = grids[i];
-
-            // GRID VISIBILITY CULLING: Skip if grid not visible or empty
-            if (!obj.mc._visible || obj.display.length == 0) {
-                i++;
-                continue;
-            }
-
-            j = 0;
-            while (j < obj.slots.length) {
-                s = obj.slots[j];
-                if (s != null && s._visible && s._buff != null) animSlot(obj, s, s._buff, j, now);
-                j++;
-            }
-            i++;
-        }
-    }
-
-    private function animSlot(obj:Object, s:MovieClip, e:Object, si:Number, now:Number):Void {
-        var rem:Number = (e.exp > 0) ? (e.exp - now) : 0;
-        if (rem < 0) rem = 0;
-        var threshold:Number = obj.cfg.timerFlashThreshold * 1000;
-        if (s.tmr != null) {
-            var sec:Number = Math.floor(rem / 1000);
-            if (s._lastSec != sec) {
-                var txt:String = (rem > 0) ? ((TCACHE[sec] != null) ? TCACHE[sec] : String(sec)) : "";
-                s.tmr.text = txt;
-                if (s.tmrShadow != null) s.tmrShadow.text = txt;
-                s._lastSec = sec;
-            }
-            s.tmr.textColor = (rem > 0 && rem <= threshold) ? 0xFF3333 : 0xFFFFFF;
-        }
-        if (s.m_icon != null && !s.m_icon._visible) loadIcon(obj, si, e);
-        // Baked custom icons live in s.cust (m_icon is empty for them), so flash that; otherwise
-        // flash the RDB-icon container m_icon, falling back to the slot itself.
-        var tgt:MovieClip = (s.cust != null) ? s.cust : ((s.m_icon != null) ? s.m_icon : s);
-        // PER-GRID FLASHING: Respect enableFlashing config and threshold
-        if (obj.cfg.enableFlashing && rem > 0 && rem <= threshold) {
-            // MATH CACHING: Use pre-calculated alpha lookup instead of Math.sin
-            var flashIdx:Number = Math.floor((now % 1000) / 10);
-            if (flashIdx > 99) flashIdx = 99;
-            tgt._alpha = AFLASH[flashIdx];
-        } else { tgt._alpha = 100; }
-    }
-
-    private function SlotAlive():Void {
-        try {
-            if (m_Player != null) disconnectP(m_Player);
-//#if CAST
-            castTimer.disconnectPlayer();
-//#end
-            playerBuffs = new Array();
-            buffIndexCache.player = {};
-            m_Player = com.GameInterface.Game.Character.GetClientCharacter();
-            if (m_Player != null) {
-                connectP(m_Player);
-//#if CAST
-                castTimer.connectPlayer(m_Player);
-//#end
-                var tgt:Object = m_Player.GetOffensiveTarget();
-                if (tgt != null && tgt.GetType() != _global.Enums.TypeID.e_Type_None) SlotTargetChanged(tgt);
-            }
-        } catch (e:Object) {
-            var self:KazBars = this;
-            setTimeout(function() { self.SlotAlive(); }, 1000);
-        }
-    }
-
-    private function connectP(ch:Object):Void {
-        if (ch == null) return;
-        try {
-            ch.SignalBuffAdded.Connect(SlotPBuffAdd, this);
-            ch.SignalBuffUpdated.Connect(SlotPBuffAdd, this);
-            ch.SignalBuffRemoved.Connect(SlotPBuffRem, this);
-            ch.SignalOffensiveTargetChanged.Connect(SlotTargetChanged, this);
-        } catch (e:Object) {}
-    }
-
-    private function disconnectP(ch:Object):Void {
-        if (ch == null) return;
-        try {
-            ch.SignalBuffAdded.Disconnect(SlotPBuffAdd, this);
-            ch.SignalBuffUpdated.Disconnect(SlotPBuffAdd, this);
-            ch.SignalBuffRemoved.Disconnect(SlotPBuffRem, this);
-            ch.SignalOffensiveTargetChanged.Disconnect(SlotTargetChanged, this);
-        } catch (e:Object) {}
-    }
-
-    private function SlotTargetChanged(tid:Object):Void {
-//#if INS
-        inspect.setSubject(tid);
-//#end
-        if (tid == null || tid.GetType() == _global.Enums.TypeID.e_Type_None) setTarget(null);
-        else setTarget(com.GameInterface.Game.Character.GetCharacter(tid));
-    }
-
-    private function setTarget(ch:Object):Void {
-        try {
-            if (m_Target != null) disconnectT(m_Target);
-            targetBuffs = new Array();
-            buffIndexCache.target = {};
-            m_Target = ch;
-            if (m_Target != null) { connectT(m_Target); loadTBuffs(); }
-//#if CAST
-            castTimer.setTarget(m_Target);
-//#end
-            markDirty("target");
-            var i:Number = 0;
-            while (i < grids.length) { if (grids[i].cfg.type == "target") updateGrid(grids[i]); i++; }
-        } catch (e:Object) { targetBuffs = new Array(); }
-    }
-
-    private function connectT(ch:Object):Void {
-        if (ch == null) return;
-        try {
-            ch.SignalBuffAdded.Connect(SlotTBuffAdd, this);
-            ch.SignalBuffUpdated.Connect(SlotTBuffAdd, this);
-            ch.SignalBuffRemoved.Connect(SlotTBuffRem, this);
-        } catch (e:Object) {}
-    }
-
-    private function disconnectT(ch:Object):Void {
-        if (ch == null) return;
-        try {
-            ch.SignalBuffAdded.Disconnect(SlotTBuffAdd, this);
-            ch.SignalBuffUpdated.Disconnect(SlotTBuffAdd, this);
-            ch.SignalBuffRemoved.Disconnect(SlotTBuffRem, this);
-        } catch (e:Object) {}
-    }
-
-    private function loadTBuffs():Void {
-        if (m_Target == null || m_Target.m_BuffList == null) return;
-        // m_BuffList is a game-provided Object keyed by buff ID (not an AS2 Array) — for...in is correct here
-        try { for (var k:String in m_Target.m_BuffList) { var buff:Object = m_Target.m_BuffList[k]; if (buff != null) addTBuff(buff); } } catch (e:Object) {}
-    }
-
-    private function SlotPBuffAdd(bid:Number):Void {
-        if (m_Player != null && m_Player.m_BuffList != null && m_Player.m_BuffList[bid] != null) {
-            var buff:Object = m_Player.m_BuffList[bid];
-            addPBuff(buff);
-//#if CONSOLE
-            if (console.isActive() && buff.m_Name != null) console.logPlayer(buff.m_Name, bid);
-//#end
-        }
-    }
-
-    private function SlotTBuffAdd(bid:Number):Void {
-        if (m_Target != null && m_Target.m_BuffList != null && m_Target.m_BuffList[bid] != null) {
-            var buff:Object = m_Target.m_BuffList[bid];
-            addTBuff(buff);
-//#if CONSOLE
-            if (console.isActive() && buff.m_Name != null) console.logTarget(buff.m_Name, bid);
-//#end
-        }
-    }
-
-    private function SlotPBuffRem(bid:Number):Void { remPBuff(bid); }
-    private function SlotTBuffRem(bid:Number):Void { remTBuff(bid); }
 
     private function handleKeyDown():Void {
         // Recency window, not Key.isDown: alt-tab leaves modifiers stuck-down in Flash.
@@ -811,16 +150,6 @@ class KazBars {
         if (previewMode) return;
         previewMode = true;
         ppanel.begin();
-        var i:Number = 0;
-        while (i < grids.length) {
-            var obj:Object = grids[i];
-            obj.mc._visible = obj.shown;
-            var j:Number = 0;
-            while (j < obj.slots.length) { obj.slots[j]._visible = true; j++; }
-            KazBarsPreview.createOverlay(obj);
-            ppanel.addGrid(obj);
-            i++;
-        }
         // previewOn runs first and must leave module state alone -- a display
         // dresses itself for dragging, no more.
         var mi:Number = 0;
@@ -829,6 +158,8 @@ class KazBars {
             m.previewOn();
             mi++;
         }
+        var i:Number;
+        for (i = 0; i < grids.views.length; i++) ppanel.addGrid(grids.views[i]);
         // Explicit adds, not a modules loop: this sequence IS the panel's Tools
         // row order, decoupled from the registration order above (which is
         // z-order). Each row is seeded from what its module is doing right now,
@@ -838,6 +169,9 @@ class KazBars {
 //#end
 //#if INS
         ppanel.addExtra(inspect.previewLabel(), inspect.previewKey(), inspect.isActive());
+//#end
+//#if ONS
+        ppanel.addExtra(onslaught.previewLabel(), onslaught.previewKey(), onslaught.isActive());
 //#end
 //#if CONSOLE
         ppanel.addExtra(console.previewLabel(), console.previewKey(), console.isActive());
@@ -853,9 +187,8 @@ class KazBars {
         if (!previewMode) return;
         previewMode = false;
         saveAll();
-        // Panel first — its position is already captured. Nothing is restored on
-        // the way out: the checks are the settings now, and the final loop
-        // re-applies each grid's shown flag.
+        // Panel first -- its position is already captured. Nothing is restored
+        // on the way out: the checks are the settings now.
         ppanel.destroy();
         var mi:Number = 0;
         while (mi < modules.length) {
@@ -863,11 +196,9 @@ class KazBars {
             m.previewOff();
             mi++;
         }
-        var i:Number = 0;
-        while (i < grids.length) { KazBarsPreview.detach(grids[i].mc); grids[i].dirty = true; updateGrid(grids[i]); i++; }
     }
 
-    // Named dispatcher for the control panel's extra rows — the checkbox knows
+    // Named dispatcher for the control panel's extra rows -- the checkbox knows
     // a key, each stub has its own idea of what hiding means.
     public function previewToggle(key:String, shown:Boolean):Void {
         var mi:Number = 0;
@@ -879,8 +210,8 @@ class KazBars {
     }
 
     private function cleanup():Void {
-        stopTimer();
         previewMode = false;
+        down = true;
         if (keyListener != null) { Key.removeListener(keyListener); keyListener = null; }
         ppanel.destroy();
         var mi:Number = 0;
@@ -889,38 +220,22 @@ class KazBars {
             m.cleanup();
             mi++;
         }
-        playerBuffs = new Array();
-        targetBuffs = new Array();
-        buffIndexCache = {player: {}, target: {}};
-        var i:Number = 0;
-        while (i < grids.length) {
-            var obj:Object = grids[i];
-            KazBarsPreview.detach(obj.mc);
-            var j:Number = 0;
-            while (j < obj.loaders.length) { if (obj.loaders[j] != null) { obj.loaders[j].removeListener(this); obj.loaders[j] = null; } j++; }
-            if (obj.mc != null) obj.mc.removeMovieClip();
-            i++;
-        }
-        grids = new Array();
+        world.stop();
+        clock.stop();
     }
 
     public function onLoad():Void {
+        down = false;
         Stage.showMenu = false;
-        // Clean up previous state if onLoad is called again (double-init protection)
+        // Double-init protection: each module's create() cleans up after itself.
         if (keyListener != null) Key.removeListener(keyListener);
-        if (grids.length > 0) {
-            var c:Number = 0;
-            while (c < grids.length) { if (grids[c].mc != null) grids[c].mc.removeMovieClip(); c++; }
-            grids = new Array();
-        }
         var self:KazBars = this;
         keyListener = {};
         keyListener.onKeyDown = function() { self.handleKeyDown(); };
         keyListener.onKeyUp = function() { self.handleKeyUp(); };
         Key.addListener(keyListener);
-        createAllGrids();
         // Every module builds now, in whatever state it opens at login by
-        // default — what a first-ever session gets, before any archived state
+        // default -- what a first-ever session gets, before any archived state
         // exists to say otherwise. loadAll reconciles once it arrives.
         var mi:Number = 0;
         while (mi < modules.length) {
@@ -929,43 +244,18 @@ class KazBars {
             mi++;
         }
         try {
-            com.GameInterface.Game.CharacterBase.SignalClientCharacterAlive.Connect(SlotAlive, this);
-            m_Player = com.GameInterface.Game.Character.GetClientCharacter();
-            if (m_Player != null) SlotAlive();
+            com.GameInterface.Game.CharacterBase.SignalClientCharacterAlive.Connect(world.start, world);
+            if (com.GameInterface.Game.Character.GetClientCharacter() != null) world.start();
         } catch (e:Object) {}
     }
 
     // The archive, read and written in one place each. Both persist paths
     // (preview exit and deactivate) call saveAll, so a new key can be forgotten
-    // on one side, not three.
+    // on one side, not three. A module's own loadState owns its whole archive
+    // dance: its keys, then whatever rebuild they imply.
     private function loadAll():Void {
         if (config == null) return;
-        var i:Number = 0;
-        while (i < grids.length) {
-            // Keyed on the grid's own stable id, not its position in the
-            // array — a reorder or delete elsewhere in the library must not
-            // hand one grid's archived spot to a different one.
-            var gk:String = grids[i].cfg.key;
-            var gx:Object = config.FindEntry("gk_" + gk + "_x");
-            var gy:Object = config.FindEntry("gk_" + gk + "_y");
-            if (gx !== undefined && gy !== undefined) {
-                grids[i].mc._x = KazBarsPanel.clampPos(Number(gx), Stage.width - grids[i].mc._width);
-                grids[i].mc._y = KazBarsPanel.clampPos(Number(gy), Stage.height - grids[i].mc._height);
-            }
-            // Hiding directly covers the window where SlotAlive already
-            // painted a grid before the archive arrived; the show side needs
-            // nothing, since updateGrid honors shown from here on.
-            var gs:Object = config.FindEntry("gk_" + gk + "_v");
-            if (gs !== undefined) {
-                grids[i].shown = (gs == 1);
-                if (!grids[i].shown) grids[i].mc._visible = false;
-            }
-            i++;
-        }
         ppanel.loadState(config);
-        // A module's own loadState owns its whole archive dance: its keys, then
-        // whatever rebuild the archived spot, fold and master switch imply —
-        // the onLoad build above ran before any of that arrived.
         var mi:Number = 0;
         while (mi < modules.length) {
             var m:KazBarsModule = modules[mi];
@@ -976,14 +266,6 @@ class KazBars {
 
     private function saveAll():Void {
         if (config == null) return;
-        var i:Number = 0;
-        while (i < grids.length) {
-            var gk:String = grids[i].cfg.key;
-            config.ReplaceEntry("gk_" + gk + "_x", grids[i].mc._x);
-            config.ReplaceEntry("gk_" + gk + "_y", grids[i].mc._y);
-            config.ReplaceEntry("gk_" + gk + "_v", grids[i].shown ? 1 : 0);
-            i++;
-        }
         ppanel.saveState(config);
         var mi:Number = 0;
         while (mi < modules.length) {
@@ -993,17 +275,18 @@ class KazBars {
         }
     }
 
+    // An activation after a deactivation that kept this file loaded finds every module cleaned up: it builds them
+    // again, as a load would (onLoad), before the archive places them.
     public function OnModuleActivated(archive:Object):Void {
         config = archive;
+        if (down) onLoad();
         loadAll();
     }
 
     public function OnModuleDeactivated():Object {
         saveAll();
+        try { com.GameInterface.Game.CharacterBase.SignalClientCharacterAlive.Disconnect(world.start, world); } catch (e:Object) {}
         cleanup();
-        try { com.GameInterface.Game.CharacterBase.SignalClientCharacterAlive.Disconnect(SlotAlive, this); } catch (e:Object) {}
-        if (m_Player != null) { disconnectP(m_Player); m_Player = null; }
-        if (m_Target != null) { disconnectT(m_Target); m_Target = null; }
         return config;
     }
 

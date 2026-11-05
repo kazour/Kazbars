@@ -10,6 +10,7 @@ and Live Tracker config panels.
 import tkinter as tk
 from tkinter import ttk
 
+from .overlay_size import SCALE_MAX, SCALE_MIN, snap_scale
 from .ui_helpers import (
     CELL_GAP,
     CELL_PX,
@@ -428,6 +429,68 @@ def create_slider_row(parent, label_text, from_, to, initial, suffix, on_drag, o
     if label_sink is not None:
         label_sink.extend((desc_label, value_label))
     return scale, value_label
+
+
+def size_slider(parent, initial, hint, on_commit=None, *, label="Size:", length=120,
+                label_font=FONT_FORM_LABEL, label_color=None, tooltip=None, padx=0,
+                label_sink=None):
+    """Inline `label · slider · "N %" · hint` for a module's `scale`: a percent
+    of the profile's overlay size, 50-200 in steps of 5 (`snap_scale`).
+
+    `hint(p)` names what p means on screen ("48 px icons", "12 pt") and is
+    redrawn as the slider moves. `on_commit()` fires on button/key release
+    when the value moved, so a drag is one write. Returns `(scale, var,
+    refresh)`: `var` is the IntVar holding the snapped value; after setting it
+    (a profile load) or when the overlay size changes under it, call
+    `refresh()` to move the thumb and redraw. `label_sink`, when given a list,
+    receives the three labels so a caller can grey them with the scale."""
+    var = tk.IntVar(value=snap_scale(int(initial)))
+    lbl = ttk.Label(parent, text=label, font=label_font)
+    if label_color:
+        lbl.configure(foreground=label_color)
+    lbl.pack(side="left")
+    value_label = ttk.Label(parent, font=FONT_SMALL, foreground=THEME_COLORS["muted"],
+                            width=5, anchor="e")
+    hint_label = ttk.Label(parent, font=FONT_SMALL, foreground=THEME_COLORS["muted"])
+
+    def _show():
+        p = var.get()
+        value_label.configure(text=f"{p} %")
+        hint_label.configure(text=hint(p))
+
+    def _drag(raw):
+        p = snap_scale(round(float(raw)))
+        if p != var.get():
+            var.set(p)
+            _show()
+
+    scale = ttk.Scale(parent, from_=SCALE_MIN, to=SCALE_MAX, value=var.get(),
+                      orient="horizontal", length=length, command=_drag)
+    scale.pack(side="left", padx=(PAD_XS, 0))
+    value_label.pack(side="left")
+    hint_label.pack(side="left", padx=(PAD_XS, padx))
+
+    committed = [var.get()]
+
+    def refresh():
+        committed[0] = var.get()
+        scale.set(committed[0])
+        _show()
+
+    def _commit(_e=None):
+        scale.set(var.get())
+        if on_commit is not None and var.get() != committed[0]:
+            committed[0] = var.get()
+            on_commit()
+
+    scale.bind("<ButtonRelease-1>", _commit)
+    scale.bind("<KeyRelease>", _commit)
+    if tooltip:
+        add_tooltip(scale, tooltip)
+    if label_sink is not None:
+        label_sink.extend((lbl, value_label, hint_label))
+    _show()
+    return scale, var, refresh
 
 
 def toggle_button_state(

@@ -19,8 +19,7 @@ from kazbars.profile_document import LANE_BUILD
 def test_defaults_disabled():
     cfg = get_default_config()
     assert cfg["enabled"] is False
-    # None = follow the shared panel_font_size; a number is a deliberate override.
-    assert cfg["fontSize"] is None
+    assert cfg["scale"] == 100
     # A fresh copy, not the shared module dict.
     cfg["enabled"] = True
     assert INSPECT_DEFAULTS["enabled"] is False
@@ -54,18 +53,18 @@ def test_legacy_px_position_keys_are_dropped():
     assert out["fx"] == INSPECT_DEFAULTS["fx"]
 
 
-def test_validate_clamps_font_size():
-    assert validate_config({"fontSize": 4})["fontSize"] == 8
-    assert validate_config({"fontSize": 99})["fontSize"] == 48
-    assert validate_config({"fontSize": 16})["fontSize"] == 16
+def test_validate_clamps_scale():
+    # A percent of the overlay size: int()-coerced, clamped to 50-200.
+    assert validate_config({"scale": 4})["scale"] == 50
+    assert validate_config({"scale": 999})["scale"] == 200
+    assert validate_config({"scale": 135})["scale"] == 135
+    assert validate_config({"scale": "120"})["scale"] == 120
+    assert validate_config({})["scale"] == 100
+    assert validate_config({"scale": float("inf")})["scale"] == 100
 
 
-def test_font_size_override_can_be_cleared():
-    # An emptied or absent override means "follow the shared size", and has to
-    # survive a save/load round trip as None rather than snapping back to 12.
-    assert validate_config({"fontSize": None})["fontSize"] is None
-    assert validate_config({"fontSize": ""})["fontSize"] is None
-    assert validate_config({})["fontSize"] is None
+def test_the_retired_font_size_is_dropped():
+    assert "fontSize" not in validate_config({"fontSize": 16})
 
 
 def test_start_collapsed_defaults_off_and_coerces():
@@ -76,21 +75,17 @@ def test_start_collapsed_defaults_off_and_coerces():
 
 
 def test_validate_bad_values_fall_back():
-    out = validate_config({"fx": "garbage", "fy": None, "enabled": 1, "fontSize": "big"})
+    out = validate_config({"fx": "garbage", "fy": None, "enabled": 1, "scale": "big"})
     assert out["fx"] == INSPECT_DEFAULTS["fx"]
     assert out["fy"] == INSPECT_DEFAULTS["fy"]
     assert out["enabled"] is True
-    assert out["fontSize"] == INSPECT_DEFAULTS["fontSize"]
+    assert out["scale"] == INSPECT_DEFAULTS["scale"]
 
 
-def test_section_toggles_default_on_and_coerce():
-    cfg = get_default_config()
-    assert cfg["showPvp"] is True
-    assert cfg["showPerks"] is True
-    assert validate_config({"showPvp": 0})["showPvp"] is False
-    assert validate_config({"showPerks": 0})["showPerks"] is False
-    assert validate_config({"showPerks": "garbage"})["showPerks"] is True
-
+def test_the_retired_section_toggles_are_dropped():
+    # PvP is a tab in game and a player target always shows its perks.
+    cfg = validate_config({"showPvp": False, "showPerks": False})
+    assert "showPvp" not in cfg and "showPerks" not in cfg
 
 def test_validate_non_dict_returns_defaults():
     assert validate_config(None) == INSPECT_DEFAULTS

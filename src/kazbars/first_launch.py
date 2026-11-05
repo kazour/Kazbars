@@ -11,7 +11,8 @@ from ttkbootstrap.dialogs import Messagebox
 
 from . import game_folder, update_orchestrator
 from .app_popups import show_welcome_popup
-from .grid_model import apply_seed_sizes, parse_resolution
+from .grid_model import parse_resolution
+from .overlay import size_for_height
 from .ui_headers import create_dialog_header
 from .ui_helpers import (
     BTN_SMALL,
@@ -354,25 +355,23 @@ def run_first_launch(app, app_name):
         game_folder.save_game_path(app)
         game_folder.refresh_game_path_label(app)
 
-    def _restamp_seed_sizes(resolution_str):
-        """Re-stamp the seed's icon/timer/stack sizes for the resolution the
-        user just picked. Startup seeded the library before this dialog opened,
-        so those px sizes came from the pre-dialog default — positions need no
-        rescale (fractions), sizes do. Only ever the pristine seed."""
+    def _seed_overlay_size(resolution_str):
+        """Set the seed's overlay size for the resolution the user just
+        picked. Startup seeded the library before this dialog opened, so its
+        size came from the pre-dialog default — positions need nothing
+        (fractions), the base size every in-game size derives from does. Only
+        ever the pristine seed."""
         parsed = parse_resolution(resolution_str)
-        grids = app.grids_panel.grids
-        if not parsed or not grids:
-            return grids
-        apply_seed_sizes(grids, parsed[1])
-        app.grids_panel.load_profile_data(grids)
-        app._on_grids_edited()
-        return app.grids_panel.grids
+        if parsed:
+            app.profile_store.update_section('overlay', {'size': size_for_height(parsed[1])})
+            app.grids_panel.load_overlay()
 
     def on_load_default(resolution_str):
-        # Positions are fractions and fit any resolution as-is; sizes are px,
-        # so the seed's icon/font sizes get re-stamped for the chosen one.
+        # Positions are fractions and fit any resolution as-is; the overlay
+        # size is set for the chosen one.
         _save_resolution(resolution_str)
-        grids = _restamp_seed_sizes(resolution_str)
+        _seed_overlay_size(resolution_str)
+        grids = app.grids_panel.grids
         welcome_data['grid_count'] = len(grids)
         welcome_data['enabled_count'] = sum(1 for g in grids if g.get('enabled', True))
         welcome_data['resolution'] = None

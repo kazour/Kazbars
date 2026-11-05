@@ -26,6 +26,7 @@ from kazbars import (
     grid_model,
     inspect,
     live_tracker_settings,
+    overlay,
     profile_io,
     stopwatch,
     update_orchestrator,
@@ -133,6 +134,7 @@ class KazBarsApp(ttkb.Window):
         # only app.py collects them.
         self.registry = SectionRegistry()
         self.registry.register(grid_model.PROFILE_SECTION)
+        self.registry.register(overlay.PROFILE_SECTION)
         self.registry.register(live_tracker_settings.PROFILE_SECTION)
         self.registry.register(deeps_settings.PROFILE_SECTION)
         # The three baked extras: this registration order is the document's

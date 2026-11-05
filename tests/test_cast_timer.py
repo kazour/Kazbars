@@ -73,14 +73,14 @@ def test_clamp_positions_and_size():
             "playerFy": 99.0,
             "targetFx": 1.0001,
             "targetFy": -0.0001,
-            "fontSize": 999,
+            "scale": 999,
         }
     )
     assert out["playerFx"] == 0.0
     assert out["playerFy"] == 1.0
     assert out["targetFx"] == 1.0
     assert out["targetFy"] == 0.0
-    assert out["fontSize"] == 48
+    assert out["scale"] == 200
     # In-range fractions store as full floats, unrounded.
     assert validate_config({"playerFx": 0.4739583})["playerFx"] == 0.4739583
 
@@ -93,8 +93,8 @@ def test_legacy_px_position_keys_are_dropped():
 
 
 def test_invalid_numeric_falls_back_to_default():
-    out = validate_config({"fontSize": "huge", "playerFx": "x"})
-    assert out["fontSize"] == CAST_TIMER_DEFAULTS["fontSize"]
+    out = validate_config({"scale": "huge", "playerFx": "x"})
+    assert out["scale"] == CAST_TIMER_DEFAULTS["scale"]
     assert out["playerFx"] == CAST_TIMER_DEFAULTS["playerFx"]
 
 

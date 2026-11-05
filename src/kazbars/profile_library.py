@@ -24,7 +24,7 @@ import logging
 import re
 from pathlib import Path
 
-from .grid_model import apply_seed_sizes
+from .overlay import size_for_height
 from .profile_document import (
     DocumentError,
     SectionRegistry,
@@ -153,18 +153,18 @@ class ProfileLibrary:
         fresh id, given name, the template's own authored_at (its coordinates
         were authored at that resolution). None if no template validates.
 
-        Grid positions are fractions and land proportionally on any screen, but
-        sizes are px — so the grids get `authored_at`'s tier sizes stamped on
-        instantiation, which is the one moment no user edit can be lost."""
+        Grid positions are fractions and land proportionally on any screen;
+        the overlay size (which every in-game size derives from) is set for
+        `authored_at`'s height on instantiation, the one moment no user edit
+        can be lost."""
         template = self._load_template()
         if template is None:
             return None
         doc = copy.deepcopy(template)
         doc['id'] = mint_id()
         doc['name'] = str(name).strip() or SEED_NAME
-        grids = doc['modules'].get('grids', {}).get('grids')
-        if grids:
-            apply_seed_sizes(grids, authored_at[1])
+        overlay = doc['modules'].setdefault('overlay', {})
+        overlay['size'] = size_for_height(authored_at[1])
         return doc if self.write(doc) else None
 
     def _load_template(self) -> dict | None:

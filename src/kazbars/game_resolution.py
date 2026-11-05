@@ -1,20 +1,21 @@
 """
 KazBars — Game resolution dialog.
 
-UI + persistence for the user's game resolution. Positions are stored as
-fractions, so picking a new resolution moves nothing in the document — the
-editor's pixel fields and the next build simply project against the new
-size. Functions take the KazBarsApp instance as first arg.
+UI + persistence for the user's game resolution and the overhead anchor.
+Positions are stored as fractions and sizes as a percent of the profile's
+overlay size, so picking a new resolution changes nothing in the document —
+the editor's pixel fields and the next build simply project against the new
+size. The overhead anchor (where an overhead grid sits against a character's
+reported point) depends on this PC's field of view, so it is a pref, never
+profile data. Functions take the KazBarsApp instance as first arg.
 """
 
 import tkinter as tk
 from tkinter import ttk
 
-from .grid_model import (
-    get_game_resolution_or_default,
-    parse_resolution,
-    rescale_seed_sizes,
-)
+from .grid_model import get_game_resolution_or_default, parse_resolution
+from .prefs import ANCHOR_MAX, ANCHOR_MIN
+from .ui_forms import position_entry
 from .ui_headers import create_dialog_header
 from .ui_helpers import (
     BTN_SMALL,
@@ -35,9 +36,9 @@ COMMON_RESOLUTIONS = ["1920x1080", "2560x1440", "3840x2160"]
 
 
 def change_game_resolution(app):
-    """Open the modal resolution picker. On confirm, carry every grid's px
-    sizes to the new resolution's tier, persist the setting, and rebuild the
-    editor panels (positions are fractions and need nothing)."""
+    """Open the modal resolution picker. On confirm, persist the resolution
+    and the overhead anchor and rebuild the editor panels (positions are
+    fractions and sizes a percent, so the document needs nothing)."""
     current_w, current_h = get_game_resolution_or_default()
     current = f"{current_w}x{current_h}"
 
@@ -54,7 +55,7 @@ def change_game_resolution(app):
     dialog.transient(app)
     dialog.grab_set()
 
-    restore_window_position(dialog, 'game_resolution', 380, 240, app, resizable=False)
+    restore_window_position(dialog, 'game_resolution', 380, 330, app, resizable=False)
 
     create_dialog_header(dialog, "Game Resolution",
                          MODULE_COLORS['grids'], width=380)
@@ -66,8 +67,7 @@ def change_game_resolution(app):
               font=FONT_SECTION, foreground=THEME_COLORS['heading']
               ).pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
     ttk.Label(content,
-              text="Grids keep their screen-relative positions; icon and\n"
-                   "font sizes step with the resolution.",
+              text="Grids keep their screen-relative positions and sizes.",
               font=FONT_SMALL, foreground=THEME_COLORS['muted']
               ).pack(anchor='w', pady=(0, PAD_XS))
 
@@ -76,23 +76,41 @@ def change_game_resolution(app):
                              width=14, font=FONT_BODY)
     res_combo.pack(anchor='w', pady=(0, PAD_SMALL))
 
+    ttk.Label(content, text="Overhead anchor",
+              font=FONT_SECTION, foreground=THEME_COLORS['heading']
+              ).pack(anchor='w', pady=(PAD_SMALL, PAD_XS))
+    ttk.Label(content,
+              text="Where overhead grids sit against a character's head, in px at\n"
+                   "a 1440 px tall screen per metre away. This PC only.",
+              font=FONT_SMALL, foreground=THEME_COLORS['muted']
+              ).pack(anchor='w', pady=(0, PAD_XS))
+    anchor_row = ttk.Frame(content)
+    anchor_row.pack(anchor='w', pady=(0, PAD_SMALL))
+    side_var = tk.StringVar(value=str(app.settings.get('anchor_side')))
+    up_var = tk.StringVar(value=str(app.settings.get('anchor_up')))
+    position_entry(anchor_row, "Right:", side_var, lo=ANCHOR_MIN, hi=ANCHOR_MAX,
+                   tooltip="Positive moves overhead grids right, negative left",
+                   label_color=THEME_COLORS['muted'], padx=(PAD_XS, PAD_TAB))
+    position_entry(anchor_row, "Up:", up_var, lo=ANCHOR_MIN, hi=ANCHOR_MAX,
+                   tooltip="Positive moves overhead grids up, negative down",
+                   label_color=THEME_COLORS['muted'], padx=(PAD_XS, 0))
+
     btns = ttk.Frame(content)
     btns.pack(fill='x', pady=(PAD_SMALL, 0))
 
     def _apply():
+        _apply_anchor(app, side_var.get(), up_var.get())
         new_res = parse_resolution(res_var.get())
         if not new_res:
             dialog.destroy()
             return
         new_w, new_h = new_res
         if (new_w, new_h) != (current_w, current_h):
-            # Positions are fractions — nothing in the document moves; the px
-            # sizes step by the tier ratio. Flush the widgets at the OLD
-            # resolution first (their px unprojects against it), rescale, then
-            # persist and rebuild so every pixel field re-projects at the new
-            # one, and mirror the resized grids into the document.
+            # Positions are fractions — nothing in the document moves. Flush
+            # the widgets at the OLD resolution first (their px unprojects
+            # against it), then persist and rebuild so every pixel field
+            # re-projects at the new one.
             app.grids_panel.save_settings()
-            rescale_seed_sizes(app.grids_panel.grids, current_h, new_h)
             app.settings.set('game_resolution', [new_w, new_h])
             app.settings.save()
             app.grids_panel.refresh_panels()
@@ -113,3 +131,20 @@ def change_game_resolution(app):
     dialog.bind('<Escape>', lambda e: dialog.destroy())
     dialog.bind('<Return>', lambda e: _apply())
     res_combo.focus_set()
+
+
+def _apply_anchor(app, side_text, up_text):
+    """Persist the overhead anchor fields (clamped like the pref); a change
+    owes a rebuild, so say so."""
+    changed = False
+    for key, text in (('anchor_side', side_text), ('anchor_up', up_text)):
+        try:
+            value = max(ANCHOR_MIN, min(int(text), ANCHOR_MAX))
+        except ValueError:
+            continue
+        if value != app.settings.get(key):
+            app.settings.set(key, value)
+            changed = True
+    if changed:
+        app.settings.save()
+        app_toast(app, "Overhead anchor saved — Build & Install to apply", 'info')

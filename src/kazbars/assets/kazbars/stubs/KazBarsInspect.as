@@ -1,48 +1,34 @@
-// KazBarsInspect.as - Target inspect panel: a combat sheet for the current
-// target in the visual language of the game's default inspect window.
-// Runtime-drawn chrome + dynamic text fields (Arial resolves against the faces
-// embedded in base.swf), so it needs no new symbols. Plate and collapse
-// primitives inherit from KazBarsPanel.
+// KazBarsInspect.as - The Inspect Panel: a combat sheet for your target in the visual language of the game's own
+// inspect window. A HUD module on the shared runtime: World names the target (onTarget), the clock runs the poll (one
+// 250 ms task, on only while there is a subject and the panel is shown, so idle costs nothing), and the subject's
+// KazBarsEffects carries its perk buffs (watched by the perk ids alone, and only on a player). Runtime-drawn chrome
+// and device-font text fields, so it needs no symbols; plate and fold come from KazBarsPanel.
 //
-// Reading rules are measured engine behaviour, not style: gear and rating ids
-// never fire SignalStatChanged and signal-time reads race the server, so the
-// 250 ms GetStat poll is the data path; 3 clean passes settle before the panel
-// shows; id 1 + id 54 collapsing together is the logout/zone teardown burst,
-// not data. Every synthesis constant below is level-invariant (confirmed
-// in game across the full 1-86 range), so the %-decodes show for every
-// target regardless of level.
+// The sheet is the baked groups (d.INS.groups, rows, watch: the user's rows, or the Default sheet), each a header, a
+// label column and a value column; every id read and every formula lives in KazBarsInspectRows (eng). This class
+// drives the poll, lays the groups out and repaints only the columns whose text changed (the writes are the cost).
 //
-// The PvP section and the Perks row are baked config gates (showPvp /
-// showPerks). The Perks row shows the slotted AA perk buffs detected on a
-// player target's buff list as game icons, RDB-loaded through the same
-// ImageLoader path the grids use; a player slots at most 6 (2 General,
-// 2 Archetype, 2 Class — some Class perks cost both slots). Hovering an icon
-// names it from a baked table, hit-tested off a Mouse listener rather than
-// rollover handlers — see hoverTick().
+// The PvP tab: a PvP glyph in the title strip (a player target, expanded) swaps the sheet for the PvP view (d.INS.pvp:
+// the game's PvP Combat tab less its taps, then the record lines), sections with column titles whose lines split at
+// the rating into two columns, a negative value red as the game draws it. The view polls its own ids (pvp.ids); the
+// pick is kept in the archive (inp). Its sections are groups like the sheet's, marked by their column list (c).
 //
-// Positioning mirrors the grids and the cast timer, not the stopwatch: this is
-// a HUD element, so it is mouse-transparent in normal play and is dragged only
-// in preview mode, through the shared overlay in KazBarsPreview. X/Y, font size
-// and collapsed state baked into config are the first-session defaults; drag +
-// collapse persist via the archive (inx/iny/inc, master switch inv). All
-// geometry derives from fontSize.
+// Perks: a player target's slotted AA perks, at most six (2 General, 2 Archetype, 2 Class; some Class perks take both
+// slots), as RDB icons in the game's colour-coded pairs. Hovering one names it, off a Mouse listener that is on only
+// while the row is on screen (rollover handlers would put the slots in button mode and take the clicks).
 //
-// Driven from KazBars: create() in onLoad, setSubject() from
-// SlotTargetChanged (first statement, so clears and raw tids both arrive),
-// loadState()/saveState() from the module archive, previewOn()/previewOff()
-// from the shared preview, cleanup() on deactivate.
+// A HUD element: mouse-transparent in normal play but for the fold and PvP glyphs, dragged only in preview through the shared
+// overlay (KazBarsPreview). X/Y and the fold state baked into config are the first session's; the archive keeps inx,
+// iny, inc, inp and the master switch inv. Every size is Math.round(FS x ratio). Every engine call sits in a try.
 class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
 
     // Config (set by configure())
     private var START_X:Number;
     private var START_Y:Number;
     private var START_COLLAPSED:Boolean;
-    private var SHOW_PVP:Boolean;
-    private var SHOW_PERKS:Boolean;
 
-    // Geometry beyond the base set — every value is Math.round(FS x ratio),
-    // so the panel scales as one piece.
-    private var LABEL_W:Number;   // 8.6   label column
+    // Geometry beyond the base set, each Math.round(FS x ratio).
+    private var LABEL_W:Number;   // 8.6   label column (widened to the widest baked label)
     private var COL_GAP:Number;   // 0.85  label -> value gap
     private var VALUE_W:Number;   // 12.0  value column
     private var NAME_GAP:Number;  // 0.5   name -> first section header
@@ -51,116 +37,115 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
     private var ROWS_GAP:Number;  // 0.4   rule -> first stat row
     private var ICO:Number;       // 2.4   perk icon box
     private var ICO_GAP:Number;   // 0.35  gap between perk icons
-    private var TIP_PAD:Number;   // 0.3   perk-name chip padding, and its gap
-                                  //       above the icon row
-    private var W:Number;         // 2xPAD + LABEL_W + COL_GAP + VALUE_W
+    private var TIP_PAD:Number;   // 0.3   perk-name chip padding, and its gap above the icon row
+    private var COLA:Number;      // 5.5   a PvP section's first column -> its second
+    private var TAB_W:Number;     // 2.4   the PvP glyph's box
+    private var W:Number;         // 2 x PAD + LABEL_W + COL_GAP + VALUE_W
 
     // UI
-    private var body:MovieClip;
-    private var panelVis:Boolean;     // mirrors panelClip._visible; hoverTick
-                                      // asks every mouse move
+    private var body:MovieClip;       // everything under the name strip: folding is one _visible
+    private var panelVis:Boolean;     // mirrors panelClip._visible
     private var fullH:Number;
+    private var footH:Number;         // the taller view's fullH on a player: what preview places and a load clamps
     private var nameTF:TextField;
     private var collTF:TextField;     // the collapsed bar's whole content
-    private var pveHdrTF:TextField;
-    private var pvpHdrTF:TextField;
-    private var pveLabTF:TextField;
-    private var pveValTF:TextField;
-    private var pvpLabTF:TextField;
-    private var pvpValTF:TextField;
-    private var m_ruleA:Number;   // rule offsets from the last layout pass,
-    private var m_ruleB:Number;   // replayed on collapse; -1 = not on screen
-    private var m_ruleC:Number;   // perks-section rule, same replay contract
+
+    // The stat model, and one section per group: index g on every array below is GROUPS[g].
+    private var eng:KazBarsInspectRows;
+    private var GROUPS:Array;         // [{n: name, p: player-only, c: column titles (a PvP section only)}, ...]
+    private var gRows:Array;          // each group's baked rows
+    private var hdrTF:Array;
+    private var labTF:Array;
+    private var valTF:Array;
+    private var val2TF:Array;         // a PvP section's second column, null where it has one
+    private var colTF:Array;          // a PvP section's column titles
+    private var grpOn:Array;          // shown this pass
+    private var lastVal:Array;        // the text each value column holds
+    private var ruleY:Array;          // each header's rule from the last layout, -1 off
+    private var m_ruleC:Number;       // the perks header's rule, the same way
     private var perksHdrTF:TextField;
-    private var perkSlots:Array;      // 6 boxes, each with an m_icon child
+    private var perkSlots:Array;      // 6 boxes, each with hold.m_icon
     private var perkLoaders:Array;    // one MovieClipLoader per slot
     private var perksShown:Boolean;
-    private var perkRowY:Number;      // icon row top from the last layout
-                                      // pass; hoverTick's hit test
-    private var tipMC:MovieClip;      // perk-name chip, hidden until hovered
+    private var perkRowY:Number;      // the icon row's top from the last layout: the hover's hit test
+    private var tipMC:MovieClip;      // the perk-name chip, hidden until hovered
     private var tipTF:TextField;
-    private var tipSlot:Number;       // slot the chip is drawn for, -1 = none
-    private var mouseLsnr:Object;     // hover source; see hoverTick()
+    private var tipSlot:Number;       // the slot the chip is drawn for, -1 none
+    private var mouseLsnr:Object;     // the hover source, while the perk row is on screen
+    private var tabBtn:MovieClip;     // the PvP glyph
+    private var pvpOn:Boolean;        // the PvP tab is picked
 
-    // Subject / poll state
-    private var m_Subject:Object;
+    // Runtime
+    private var w:KazBarsWorld;
+    private var kP:Object;            // the poll task
+    private var fx:KazBarsEffects;    // the subject's effects while its perks are watched
+    private var fxVer:Number;         // fx.ver the perks were last read at
+
+    // Subject and poll state
+    private var m_Subject:Object;     // the target's Character, null none
+    private var subjN:Number;         // its instance id, 0 none
     private var subjName:String;
-    private var subjKey:String;
     private var subjIsPlayer:Number;  // 1 player, 0 not, -1 unanswered
-    private var subjPlayer:Boolean;   // the isPlayer() gate, settled once a
-                                      // pass — six call sites ask it
-    private var aaOn:Boolean;         // +100-all-attrs AA visible on subject
-    private var curPerks:Array;       // detected perks, table order, capped at 6
-    private var curPerkRanks:Array;   // the same six slots as ranks, for names
-    private var iconInst:Object;      // "i<buffId>" -> icon instance; static
-                                      // game data, so read once not per pass
-    private var pollIv:Number;
-    private var curV:Object;      // stat id -> settled mode-2 value
-    private var m1Str:Number;     // raw mode-1 804 / 814 — the pre-%-multiplier
-    private var m1Dex:Number;     // attribute sum, CDI attr term only
+    private var curPerks:Array;       // the six slots' icon instances, -1 empty
+    private var curPerkRanks:Array;   // the same slots as ranks, for the names
+    private var iconInst:Object;      // "i<buffId>" -> icon instance: static game data, read once
     private var haveFull:Boolean;
     private var warmup:Number;
+    private var hasCdi:Boolean;       // a sheet row is the Combat Rating (the PvP view always carries it)
+    private var nextWeapon:Number;    // getTimer() of the next weapon read: 3 s after a read, 0.5 s after a miss
     private var previewMode:Boolean;
     private var active:Boolean;
-    private var pvpShown:Boolean;
 
-    // Render cache — assign only on change; TextField.text writes are the
-    // expensive part and most 250 ms passes change nothing
+    // Render cache: assign only on change
     private var lastName:String;
-    private var lastPve:String;
-    private var lastPvp:String;
     private var lastPerks:String;
 
-    private var watchIds:Array;
-    private var gateIds:Array;
-    private var SPELL_IDS:Array;
+    private var watchIds:Array;       // what an expanded pass reads (d.INS.watch)
+    private var PVP_IDS:Array;        // what it reads on the PvP view (d.INS.pvp.ids)
+    private var GATE:Array;           // what a folded pass reads: the teardown gate's two ids
     private var CLASS_NAMES:Object;
-    private var AA_BUFF_ID:Number;
     private var PERK_IDS:Object;      // "i<buffId>" -> display rank
+    private var PERK_FX:Object;       // buffId -> true: the Effects filter
     private var PERK_GEN_MAX:Number;  // last General rank
     private var PERK_ARCH_MAX:Number; // last Archetype rank
-    private var PERK_2SLOT:Object;    // "r<rank>" -> costs both class slots
-    private var PERK_NAMES:Array;     // rank -> perk name, for the hover chip
-    private var PERK_EDGE:Array;      // per-slot-pair border colour
-    private var PERK_FILL:Array;      // per-slot-pair plate colour
-    private var DASH:String;
+    private var PERK_2SLOT:Object;    // "r<rank>" -> takes both class slots
+    private var PERK_NAMES:Array;     // rank -> perk name, for the chip
+    private var PERK_EDGE:Array;      // per-pair border colour
+    private var PERK_FILL:Array;      // per-pair plate colour
 
     public function KazBarsInspect(root:MovieClip) {
         super(root);
         m_Subject = null;
+        subjN = 0;
         subjName = "";
-        subjKey = "";
-        curV = {};
-        m1Str = 0;
-        m1Dex = 0;
+        subjIsPlayer = -1;
         iconInst = {};
-        subjPlayer = false;
         panelVis = false;
         perkRowY = 0;
         haveFull = false;
         warmup = 0;
+        hasCdi = false;
+        nextWeapon = 0;
         previewMode = false;
         active = true;
-        pvpShown = false;
         lastName = "";
-        lastPve = "";
-        lastPvp = "";
-        aaOn = false;
-        curPerks = new Array();
-        curPerkRanks = new Array();
+        curPerks = [];
+        curPerkRanks = [];
         lastPerks = "";
         perksShown = false;
         tipSlot = -1;
-        DASH = String.fromCharCode(8212);
         fullH = 0;
-        subjIsPlayer = -1;
-        // The baked tables — perk pool, names, class map, watch list — live in
-        // KazBarsInspectData beside their measurement notes, the KazBarsData
-        // arrangement; docs/inspect-panel.md is their contract.
+        footH = 0;
+        fxVer = -1;
+        pvpOn = false;
+        GATE = [1, 54];
+        // The measured tables (perk pool, names, class map) live in KazBarsInspectData beside their notes; the stat
+        // model and its formatters in KazBarsInspectRows.
         var d:Object = KazBarsInspectData.init();
-        SPELL_IDS = d.spellIds;
-        AA_BUFF_ID = Number(d.aaBuffId);
+        eng = new KazBarsInspectRows(d);
         PERK_IDS = d.perkIds;
+        PERK_FX = {};
+        for (var k:String in PERK_IDS) PERK_FX[k.substring(1)] = true;
         PERK_GEN_MAX = Number(d.perkGenMax);
         PERK_ARCH_MAX = Number(d.perkArchMax);
         PERK_2SLOT = d.perk2Slot;
@@ -168,26 +153,21 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         PERK_EDGE = d.perkEdge;
         PERK_FILL = d.perkFill;
         CLASS_NAMES = d.classNames;
-        watchIds = d.watchIds;
-        gateIds = d.gateIds;
     }
 
     // =========================================================================
     // Setup
     // =========================================================================
 
-    public function configure(cfg:Object):Void {
-        if (cfg == null) return;
+    public function configure(cfg:Object, world:KazBarsWorld, clock:KazBarsClock):Void {
+        w = world;
+        kP = clock.add(pollTick, this, 250, true, 0);
+        world.onTarget(onTarget, this);
         START_X = Number(cfg.x);
         START_Y = Number(cfg.y);
         START_COLLAPSED = (cfg.collapsed == true);
-        SHOW_PVP = (cfg.showPvp != false);
-        SHOW_PERKS = (cfg.showPerks != false);
-        // COLL_* from the base put the collapsed bar — a labelled bar, not a
-        // folded sheet — beside the stopwatch's own at any size (190x24 at
-        // the default FS 12).
+        // COLL_* from the base make the collapsed bar the family's at any size.
         applyBaseSize(Number(cfg.fontSize));
-        LEAD = Math.round(FS * 0.15);
         LABEL_W = Math.round(FS * 8.6);
         COL_GAP = Math.round(FS * 0.85);
         VALUE_W = Math.round(FS * 12);
@@ -198,11 +178,43 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         ICO = Math.round(FS * 2.4);
         ICO_GAP = Math.round(FS * 0.35);
         TIP_PAD = Math.round(FS * 0.3);
+        COLA = Math.round(FS * 5.5);
+        TAB_W = Math.round(FS * 2.4);
         W = PAD * 2 + LABEL_W + COL_GAP + VALUE_W;
+
+        // `watch` is a method every AS2 object has, so the member is read by name.
+        watchIds = cfg["watch"];
+        PVP_IDS = cfg.pvp.ids;
+        GROUPS = [];
+        gRows = [];
+        grpOn = [];
+        lastVal = [];
+        ruleY = [];
+        hasCdi = false;
+        addView(cfg.groups, cfg.rows, false);
+        addView(cfg.pvp.groups, cfg.pvp.rows, true);
     }
 
-    // The sheet's fields are multiline, no wrap — set here once so every field
-    // the panel (or a base widget) builds carries the flavour.
+    // A view's groups after the ones already held, each row into its group (g indexes the view's own groups).
+    private function addView(gs:Array, rows:Array, pvp:Boolean):Void {
+        var base:Number = GROUPS.length;
+        var g:Number;
+        for (g = 0; g < gs.length; g++) {
+            GROUPS.push(pvp ? {n: gs[g].n, p: true, c: gs[g].c} : gs[g]);
+            gRows.push([]);
+            grpOn.push(false);
+            lastVal.push("");
+            ruleY.push(-1);
+        }
+        for (var i:Number = 0; i < rows.length; i++) {
+            var r:Object = rows[i];
+            g = Number(r.g);
+            if (g >= 0 && g < gs.length) gRows[base + g].push(r);
+            if (!pvp && r.f == "cdi") hasCdi = true;
+        }
+    }
+
+    // The sheet's fields are multiline, no wrap: set here once so every field the panel builds carries it.
     private function makeTF(parent:MovieClip, id:String, x:Number, y:Number, w:Number,
                             h:Number, size:Number, bold:Boolean, col:Number,
                             align:String):TextField {
@@ -212,13 +224,8 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         return tf;
     }
 
+    // Runs again on the same instance when the host loads again, so it removes what a previous run left.
     public function create():Void {
-        // The host re-runs onLoad on this same instance; without this the old
-        // interval and clip both leak.
-        if (pollIv != null) {
-            clearInterval(pollIv);
-            pollIv = null;
-        }
         if (mouseLsnr != null) {
             Mouse.removeListener(mouseLsnr);
             mouseLsnr = null;
@@ -227,70 +234,82 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         panelClip = rootClip.createEmptyMovieClip("kbInspect", rootClip.getNextHighestDepth());
         panelClip._x = START_X;
         panelClip._y = START_Y;
+        stageOn(true);
         panelClip._visible = false;
         panelVis = false;
-
         collapsed = START_COLLAPSED;
 
         chrome = panelClip.createEmptyMovieClip("chrome", panelClip.getNextHighestDepth());
-        // Everything below the name strip, so collapsing is one _visible toggle.
         body = panelClip.createEmptyMovieClip("body", panelClip.getNextHighestDepth());
 
-        nameTF = makeTF(panelClip, "name", PAD,
-                        Math.floor((TITLE_H - Math.round(NAME_FS * 1.4)) / 2),
-                        W - PAD * 2 - BTN, Math.round(NAME_FS * 1.4),
-                        NAME_FS, true, 0xF7A22B, "left");
-        // Collapsed, the bar carries a static label and nothing else — no
-        // target name, so no reason for a pass to read one. Its own field
-        // rather than a re-formatted name strip: a TextFormat swap per fold
-        // would have to be re-applied to the text every time.
+        // One header, label column and value column per group. Labels are written once: absent data renders as
+        // the dash rather than dropping a line, so layout() runs again only when a group shows or hides.
+        hdrTF = [];
+        labTF = [];
+        valTF = [];
+        val2TF = [];
+        colTF = [];
+        var g:Number;
+        var k:Number;
+        for (g = 0; g < GROUPS.length; g++) {
+            var h:TextField = makeTF(body, "hdr" + g, PAD, 0, LABEL_W, LINE, FS, true, 0xF7A22B, "left");
+            h.autoSize = "left";
+            h.text = String(GROUPS[g].n);
+            hdrTF.push(h);
+            var lab:TextField = makeTF(body, "lab" + g, PAD, 0, LABEL_W, LINE, FS, false, 0xC8C0B0, "left");
+            var val:TextField = makeTF(body, "val" + g, 0, 0, VALUE_W, LINE, FS, false, 0x7AC142, "left");
+            lab.autoSize = "left";
+            val.autoSize = "left";
+            lab.text = KazBarsInspectRows.labels(gRows[g]);
+            labTF.push(lab);
+            valTF.push(val);
+            // A PvP section: its column titles on the header's line (dim, like the game's), a second value column.
+            var cols:Array = [];
+            var c:Array = GROUPS[g].c;
+            for (k = 0; c != undefined && k < c.length; k++) {
+                var ct:TextField = makeTF(body, "col" + g + "_" + k, 0, 0, COLA, LINE, FS, false, 0x7F786C, "left");
+                ct.autoSize = "left";
+                ct.text = String(c[k]);
+                cols.push(ct);
+            }
+            colTF.push(cols);
+            val2TF.push((c != undefined && c.length > 1)
+                ? makeTF(body, "vb" + g, 0, 0, VALUE_W, LINE, FS, false, 0x7AC142, "left") : null);
+            if (val2TF[g] != null) val2TF[g].autoSize = "left";
+            // The cache outlives a reload: seed the fresh fields from it, or assign-on-change leaves them blank.
+            show(g, lastVal[g]);
+        }
+
+        // The label column is as wide as the widest label baked, never narrower than the ratio: a picked row list
+        // can carry names the ratio was never sized for, and an overrun paints through the value beside it.
+        for (g = 0; g < labTF.length; g++) {
+            if (labTF[g]._width > LABEL_W) LABEL_W = Math.ceil(labTF[g]._width);
+        }
+        W = PAD * 2 + LABEL_W + COL_GAP + VALUE_W;
+        var vx:Number = PAD + LABEL_W + COL_GAP;
+        for (g = 0; g < valTF.length; g++) {
+            valTF[g]._x = vx;
+            if (val2TF[g] != null) val2TF[g]._x = vx + COLA;
+            for (k = 0; k < colTF[g].length; k++) colTF[g][k]._x = vx + k * COLA;
+        }
+
+        nameTF = makeTF(panelClip, "name", PAD, Math.floor((TITLE_H - NAME_H) / 2), W - PAD * 2 - BTN - TAB_W,
+                        NAME_H, NAME_FS, true, 0xF7A22B, "left");
+        nameTF.text = lastName;
+        // Folded, the bar is a static label and nothing else, so no pass reads a name for it.
         collTF = makeCollapsedLabel("Inspect");
         collTF._visible = false;
-        pveHdrTF = makeTF(body, "pveHdr", PAD, 0, LABEL_W, Math.round(FS * 1.4),
-                          FS, true, 0xF7A22B, "left");
-        pveHdrTF.autoSize = "left";
-        pveHdrTF.text = "PvE";
-        pvpHdrTF = makeTF(body, "pvpHdr", PAD, 0, LABEL_W, Math.round(FS * 1.4),
-                          FS, true, 0xF7A22B, "left");
-        pvpHdrTF.autoSize = "left";
-        pvpHdrTF.text = "PvP";
 
-        pveLabTF = makeTF(body, "pveLab", PAD, 0, LABEL_W, 10, FS, false, 0xC8C0B0, "left");
-        pveValTF = makeTF(body, "pveVal", PAD + LABEL_W + COL_GAP, 0, VALUE_W, 10,
-                          FS, false, 0x7AC142, "left");
-        pvpLabTF = makeTF(body, "pvpLab", PAD, 0, LABEL_W, 10, FS, false, 0xC8C0B0, "left");
-        pvpValTF = makeTF(body, "pvpVal", PAD + LABEL_W + COL_GAP, 0, VALUE_W, 10,
-                          FS, false, 0x7AC142, "left");
-        pveLabTF.autoSize = "left";
-        pveValTF.autoSize = "left";
-        pvpLabTF.autoSize = "left";
-        pvpValTF.autoSize = "left";
-
-        // Assigned once: absent data renders as the dash rather than dropping
-        // a row, so layout() re-runs only on the PvP-visibility flip.
-        pveLabTF.text = "Health\nArmor\nHoly Prot\nUnholy Prot\nCold Prot\nElec Prot\nFire Prot"
-                      + "\nCritigation Chance\nCritigation Amount\nHeal Rating\nBonus Spell Dmg"
-                      + "\nCombat Rating\nWeapon Dmg M/R\nCritical Chance\nCritical Damage"
-                      + "\nTenacity\nFerocity";
-        pvpLabTF.text = "Armor\nHoly Prot\nUnholy Prot\nCold Prot\nElec Prot\nFire Prot"
-                      + "\nBonus Spell Dmg\nCombat Rating\nKills / Deaths";
-
-        perksHdrTF = makeTF(body, "perksHdr", PAD, 0, LABEL_W, Math.round(FS * 1.4),
-                            FS, true, 0xF7A22B, "left");
+        perksHdrTF = makeTF(body, "perksHdr", PAD, 0, LABEL_W, LINE, FS, true, 0xF7A22B, "left");
         perksHdrTF.autoSize = "left";
         perksHdrTF.text = "Perks";
 
-        // Six slot boxes (the game's perk cap); an empty hairline box is the
-        // row's em dash. Three levels on purpose: the box draws on the
-        // unscaled slot, `hold` carries the scale, and the icon loads into
-        // hold.m_icon. loadClip REPLACES its target clip and onLoadInit then
-        // normalizes the arrival to 64x64 — so any scale set on the target
-        // itself is overwritten, and the scale has to live on the parent.
-        // Inset by 1 so the icon sits inside the border rather than over it.
-        perkSlots = new Array();
-        perkLoaders = new Array();
-        var pi:Number = 0;
-        while (pi < 6) {
+        // Six slot boxes; an empty box is the row's dash. Three levels: the box draws on the slot, `hold` carries
+        // the scale, the icon loads into hold.m_icon (loadClip replaces its target and onLoadInit normalizes it to
+        // 64x64, so a scale on the target itself would be lost). Inset by 1 to sit inside the border.
+        perkSlots = [];
+        perkLoaders = [];
+        for (var pi:Number = 0; pi < 6; pi++) {
             var ps:MovieClip = body.createEmptyMovieClip("perk" + pi, body.getNextHighestDepth());
             ps._x = PAD + pi * (ICO + ICO_GAP);
             var pair:Number = Math.floor(pi / 2);
@@ -308,43 +327,32 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
             perkLoaders.push(new MovieClipLoader());
             perkLoaders[pi].addListener(this);
             this["pcb" + pi] = mkPerkCB(pi);
-            pi++;
         }
-        // The clips are fresh even when the render cache is warm.
         lastPerks = "";
 
-        // Re-seed from the cache: on a re-onLoad it is still warm, so
-        // assign-on-change would write nothing and leave these blank.
-        nameTF.text = lastName;
-        pveValTF.text = lastPve;
-        pvpValTF.text = lastPvp;
-
         makeCollapseBtn();
+        // The PvP glyph, left of the fold glyph: bold Body like it, lit while the tab is picked.
+        tabBtn = panelClip.createEmptyMovieClip("btnPvp", panelClip.getNextHighestDepth());
+        tabBtn._self = this;
+        tabBtn.useHandCursor = true;
+        var tl:TextField = makeTF(tabBtn, "label", 0, 0, TAB_W, LINE, FS, true, tabCol(), "center");
+        tl.text = "PvP";
+        tabBtn._x = W - PAD - BTN - TAB_W;
+        tabBtn._y = Math.floor((TITLE_H - LINE) / 2);
+        tabBtn.onRelease = function() { this._self.togglePvp(); };
+        tabBtn.onRollOver = function() { this.label.textColor = 0xF7A22B; };
+        tabBtn.onRollOut = function() { this.label.textColor = this._self.tabCol(); };
 
-        // Perk-name chip, drawn last so it sits over the row it names. Opaque
-        // where the plate is 90 — it lands on top of icons and a rule.
+        // The perk-name chip, drawn last so it sits over the row it names; opaque, it lands on icons and a rule.
         tipMC = panelClip.createEmptyMovieClip("perkTip", panelClip.getNextHighestDepth());
         tipMC._visible = false;
-        tipTF = makeTF(tipMC, "label", TIP_PAD, TIP_PAD, LABEL_W, Math.round(FS * 1.4),
-                       FS, false, 0xC8C0B0, "left");
+        tipTF = makeTF(tipMC, "label", TIP_PAD, TIP_PAD, LABEL_W, LINE, FS, false, 0xC8C0B0, "left");
         tipTF.autoSize = "left";
         tipSlot = -1;
-        // The hover source is a Mouse listener, NOT rollover handlers on the
-        // slots: button handlers put a clip in button mode, and the row would
-        // then swallow left clicks the way a whole-plate drag would. The fold
-        // button and this hover are the panel's only interactive surfaces.
-        // With the row baked off it is never installed at all — otherwise it
-        // runs on every mouse move for a row that cannot render.
-        if (SHOW_PERKS) {
-            var selfM:KazBarsInspect = this;
-            mouseLsnr = {onMouseMove: function() { selfM.hoverTick(); }};
-            Mouse.addListener(mouseLsnr);
-        }
 
+        measureFoot();
         layout();
-
-        var self:KazBarsInspect = this;
-        pollIv = setInterval(function() { self.pollTick(); }, 250);
+        sync();
     }
 
     // =========================================================================
@@ -353,74 +361,81 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
 
     private function layout():Void {
         if (panelClip == null) return;
-        var y:Number = TITLE_H + NAME_GAP;
-
-        pveHdrTF._y = y;
-        y += pveHdrTF._height + RULE_GAP;
-        var rule1:Number = y;
-        y += 1 + ROWS_GAP;
-        pveLabTF._y = y;
-        pveValTF._y = y;
-        y += pveLabTF._height;
-
-        var rule2:Number = -1;
-        pvpHdrTF._visible = pvpShown;
-        pvpLabTF._visible = pvpShown;
-        pvpValTF._visible = pvpShown;
-        if (pvpShown) {
-            y += SECT_GAP;
-            pvpHdrTF._y = y;
-            y += pvpHdrTF._height + RULE_GAP;
-            rule2 = y;
+        var y:Number = TITLE_H;
+        var first:Boolean = true;
+        for (var g:Number = 0; g < GROUPS.length; g++) {
+            var vis:Boolean = grpOn[g];
+            hdrTF[g]._visible = vis;
+            labTF[g]._visible = vis;
+            valTF[g]._visible = vis;
+            if (val2TF[g] != null) val2TF[g]._visible = vis;
+            var k:Number;
+            for (k = 0; k < colTF[g].length; k++) colTF[g][k]._visible = vis;
+            ruleY[g] = -1;
+            if (!vis) continue;
+            y += first ? NAME_GAP : SECT_GAP;
+            first = false;
+            hdrTF[g]._y = y;
+            for (k = 0; k < colTF[g].length; k++) colTF[g][k]._y = y;
+            y += hdrTF[g]._height + RULE_GAP;
+            ruleY[g] = y;
             y += 1 + ROWS_GAP;
-            pvpLabTF._y = y;
-            pvpValTF._y = y;
-            y += pvpLabTF._height;
+            labTF[g]._y = y;
+            valTF[g]._y = y;
+            if (val2TF[g] != null) val2TF[g]._y = y;
+            y += labTF[g]._height;
         }
-
-        var rule3:Number = -1;
+        m_ruleC = -1;
         perksHdrTF._visible = perksShown;
-        var pi:Number = 0;
-        while (pi < perkSlots.length) { perkSlots[pi]._visible = perksShown; pi++; }
+        var pi:Number;
+        for (pi = 0; pi < perkSlots.length; pi++) perkSlots[pi]._visible = perksShown;
         if (perksShown) {
-            y += SECT_GAP;
+            y += first ? NAME_GAP : SECT_GAP;
             perksHdrTF._y = y;
             y += perksHdrTF._height + RULE_GAP;
-            rule3 = y;
+            m_ruleC = y;
             y += 1 + ROWS_GAP;
-            pi = 0;
-            while (pi < perkSlots.length) { perkSlots[pi]._y = y; pi++; }
-            perkRowY = y;   // hoverTick hit-tests against this, not the clip
+            for (pi = 0; pi < perkSlots.length; pi++) perkSlots[pi]._y = y;
+            perkRowY = y;
             y += ICO;
         }
         fullH = y + PAD;
-        m_ruleA = rule1;
-        m_ruleB = rule2;
-        m_ruleC = rule3;
-
         applyCollapsed();
+    }
+
+    // Each view laid out as a player gets it, the taller kept: the PvP glyph swaps the view in play, so a plate placed
+    // on one must leave room for the other. Leaves nothing shown, as create() found it.
+    private function measureFoot():Void {
+        var keep:Boolean = pvpOn;
+        var g:Number;
+        footH = 0;
+        perksShown = true;
+        for (var k:Number = 0; k < 2; k++) {
+            pvpOn = (k == 1);
+            for (g = 0; g < GROUPS.length; g++) grpOn[g] = want(g, true);
+            layout();
+            if (fullH > footH) footH = fullH;
+        }
+        pvpOn = keep;
+        for (g = 0; g < GROUPS.length; g++) grpOn[g] = false;
+        perksShown = false;
     }
 
     public function toggleCollapsed():Void {
         super.toggleCollapsed();
-        // Collapsed passes read the title ids only, so an expand has nothing
-        // to paint from — take the full pass now rather than show a quarter
-        // second of the sheet the panel was folded on.
+        // A folded pass reads the gate ids only, so an expand has nothing to paint from: a full pass now, not a
+        // quarter second of the sheet the panel was folded on.
         if (!collapsed && m_Subject != null) pollTick();
     }
 
-    // The effective fold. Preview renders the sheet at full size whatever
-    // the flag says: the plate IS the drag target, and the bar is too small
-    // to aim at. The flag itself is untouched, so exiting preview folds it
-    // back — and the top-left anchor means the position does not shift
-    // either way.
+    // The fold in effect. Preview shows the whole sheet whatever the flag says: the plate is the drag target and the
+    // bar too small to aim at. The flag is untouched, so leaving preview folds it back, at the same top-left.
     private function folded():Boolean {
         return collapsed && !previewMode;
     }
 
-    // The two states are different plates, not one plate at two heights: the
-    // sheet at W x fullH, and a labelled bar at COLL_W x COLL_H. The fold
-    // button moves to whichever plate is on screen.
+    // Two plates, not one at two heights: the sheet at W x fullH and a labelled bar at COLL_W x COLL_H. The glyph
+    // moves to whichever is on screen.
     private function applyCollapsed():Void {
         if (panelClip == null) return;
         hideTip();
@@ -431,515 +446,231 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         collapseBtn.label.text = eff ? "+" : "-";
         curW = eff ? COLL_W : W;
         curH = eff ? COLL_H : fullH;
-        var pad:Number = eff ? COLL_PAD : PAD;
-        collapseBtn._x = curW - pad - BTN;
-        collapseBtn._y = Math.floor(((eff ? COLL_H : TITLE_H) - BTN) / 2);
-        drawChrome(curW, curH, eff ? -1 : m_ruleA, eff ? -1 : m_ruleB,
-                   eff ? -1 : m_ruleC);
-    }
-
-    private function drawChrome(w:Number, h:Number, rule1:Number, rule2:Number,
-                                rule3:Number):Void {
-        drawPlate(w, h);
-        // Title separator (expanded only — collapsed the bar IS the title
-        // line), then the section-header rules; a negative offset means that
-        // section is off screen (collapsed, or a target with no PvP block).
-        if (h > COLL_H) {
+        seatCollapseBtn(curW - (eff ? COLL_PAD : PAD) - BTN, eff ? COLL_H : TITLE_H);
+        tabBtn._visible = !eff && perksShown;
+        nameTF._width = W - PAD * 2 - BTN - (tabBtn._visible ? TAB_W : 0);
+        drawPlate(curW, curH);
+        // The title rule and the section rules, expanded only (a group not shown has no rule).
+        if (!eff) {
             hairline(PAD, TITLE_H, W - PAD, TITLE_H);
+            for (var g:Number = 0; g < ruleY.length; g++) {
+                if (ruleY[g] >= 0) hairline(PAD, ruleY[g], W - PAD, ruleY[g]);
+            }
+            if (m_ruleC >= 0) hairline(PAD, m_ruleC, W - PAD, m_ruleC);
         }
-        if (rule1 >= 0) {
-            hairline(PAD, rule1, W - PAD, rule1);
-        }
-        if (rule2 >= 0) {
-            hairline(PAD, rule2, W - PAD, rule2);
-        }
-        if (rule3 >= 0) {
-            hairline(PAD, rule3, W - PAD, rule3);
-        }
+        listen();
     }
 
     // =========================================================================
-    // Subject (Character first, Dynel wrapper fallback)
+    // Subject: World's target
     // =========================================================================
 
-    // Takes the raw tid, so clears and non-Character dynels both arrive here.
-    public function setSubject(tid:Object):Void {
-        var isNull:Boolean = (tid == null);
-        try {
-            if (!isNull && tid.GetType != undefined && tid.GetType() == _global.Enums.TypeID.e_Type_None) isNull = true;
-        } catch (e:Object) { isNull = true; }
-        if (isNull) {
-            m_Subject = null;
-            subjIsPlayer = -1;
-            resetScan();
-            updateVisibility();
+    // World tells a new target, null for none, and the same one again when it fetched a fresh Character for it.
+    public function onTarget(t:Object):Void {
+        var n:Number = (t != null) ? w.tn : 0;
+        if (n > 0 && n == subjN) {
+            m_Subject = t;
+            subjName = nameOf(t);
             return;
         }
-        var subj:Object = resolveTarget(tid);
-        if (subj == null) {
-            m_Subject = null;
-            subjIsPlayer = -1;
-            resetScan();
-            updateVisibility();
+        unwatchFx();
+        if (!(n > 0)) {
+            forget();
             return;
         }
-        var k:String = keyOf(subj);
-        if (m_Subject != null && k == subjKey) {
-            m_Subject = subj;   // same entity re-targeted: keep the warm cache
-            return;
+        m_Subject = t;
+        subjN = n;
+        subjName = nameOf(t);
+        subjIsPlayer = -1;
+        var id:Object = w.tid;
+        if (id != null && id.IsPlayer != undefined) {
+            try { subjIsPlayer = (id.IsPlayer() == true) ? 1 : 0; } catch (e:Object) {}
         }
-        m_Subject = subj;
-        subjKey = k;
-        subjName = safeName(subj);
-        subjIsPlayer = classify(tid, subj);
         resetScan();
+        watchFx();
+        sync();
         updateVisibility();
     }
 
-    // ID32 carries the engine's own classifiers. -1 means it never answered.
-    private function classify(tid:Object, subj:Object):Number {
-        var id:Object = tid;
-        if (id == null || id.IsPlayer == undefined) {
-            id = null;
-            try { id = subj.GetID(); } catch (e:Object) { id = null; }
-        }
-        if (id != null && id.IsPlayer != undefined) {
-            try { return (id.IsPlayer() == true) ? 1 : 0; } catch (e2:Object) {}
-        }
-        return -1;
+    // No subject: the target cleared, or the logout and zone burst let it go.
+    private function forget():Void {
+        unwatchFx();
+        m_Subject = null;
+        subjN = 0;
+        subjName = "";
+        subjIsPlayer = -1;
+        resetScan();
+        sync();
+        updateVisibility();
     }
 
-    private function resolveTarget(tid:Object):Object {
-        if (tid == null) return null;
-        var ch:Object = null;
-        try {
-            ch = com.GameInterface.Game.Character.GetCharacter(tid);
-        } catch (e:Object) { ch = null; }
-        if (ch == null || ch.GetStat == undefined) {
-            try {
-                var dy:Object = com.GameInterface.Game.Dynel.GetDynel(tid);
-                if (dy != null && dy.GetStat != undefined) return dy;
-            } catch (e2:Object) {}
-            if (ch != null && ch.GetStat == undefined) return null;
-        }
-        return ch;
+    // Perks are a player's: a mob's buff list is never walked for them, nor anyone's while the panel is off.
+    private function watchFx():Void {
+        if (fx != null || !active || !(subjN > 0) || subjIsPlayer == 0) return;
+        fx = w.effects(subjN);
+        fxVer = -1;
+        if (fx != null) fx.watch("ins", PERK_FX, null);
     }
 
-    private function keyOf(obj:Object):String {
-        try {
-            var id:Object = obj.GetID();
-            return String(id.GetType()) + ":" + String(id.GetInstance());
-        } catch (e:Object) {}
-        return "n:" + safeName(obj);
+    private function unwatchFx():Void {
+        if (fx != null) fx.unwatch("ins");
+        fx = null;
     }
 
-    private function safeName(obj:Object):String {
-        try { return String(obj.GetName()); } catch (e:Object) { return "?"; }
+    private function nameOf(t:Object):String {
+        try { return String(t.GetName()); } catch (e:Object) {}
+        return "?";
+    }
+
+    // The poll runs while there is a subject to read and the panel is shown.
+    private function sync():Void {
+        if (kP == null) return;
+        if (active && m_Subject != null && panelClip != null) w.clock.go(kP);
+        else w.clock.off(kP);
     }
 
     private function resetScan():Void {
         haveFull = false;
         warmup = 0;
-        curV = {};
-        m1Str = 0;
-        m1Dex = 0;
-        subjPlayer = false;
-        aaOn = false;
-        curPerks = new Array();
-        curPerkRanks = new Array();
+        nextWeapon = 0;
+        fxVer = -1;
+        eng.reset();
+        curPerks = [];
+        curPerkRanks = [];
         lastName = "";
-        lastPve = "";
-        lastPvp = "";
-        // Unloads the icons as well as resetting the key: a new subject with
-        // no perks renders the same empty key the cache already holds, so
-        // clearing the string alone would strand the old subject's icons.
+        var g:Number;
+        for (g = 0; g < GROUPS.length; g++) lastVal[g] = "";
+        // Unloads the icons too: a new subject with no perks renders the key the cache already holds, so clearing
+        // the key alone would strand the old subject's icons.
         clearPerkSlots();
-        // Preview keeps the plate on screen with no subject, and nothing
-        // repaints until one settles: blank what the caches just forgot.
-        if (previewMode) {
-            nameTF.text = "";
-            pveValTF.text = "";
-            pvpValTF.text = "";
-        }
+        // Preview keeps the plate up with no subject and nothing repaints until one settles: blank what the cache
+        // just forgot.
+        if (previewMode && nameTF != null) blank();
+    }
+
+    private function blank():Void {
+        nameTF.text = "";
+        for (var g:Number = 0; g < GROUPS.length; g++) show(g, "");
     }
 
     // =========================================================================
-    // Poll — the whole watch list every pass; the poll IS the settle re-read
+    // Poll: the whole watch list every pass; the poll is the settle re-read
     // =========================================================================
 
     public function pollTick():Void {
-        if (!active) return;
         if (m_Subject == null) return;
-
-        // Logout/zone collapses every id to 0 in one burst; id 1 and id 54
-        // going together is that burst, not a stat change.
-        if (haveFull && gv(1) != 0 && gv(54) != 0) {
+        // Logout and zoning take every id to 0 in one burst; max HP and level going together is that, not a change.
+        if (haveFull && eng.gv(1) != 0 && eng.gv(54) != 0) {
             var t1 = null;
             var t54 = null;
             try { t1 = m_Subject.GetStat(1, 2); t54 = m_Subject.GetStat(54, 2); } catch (eT:Object) {}
-            var z1:Boolean = (t1 == null || t1 == undefined || t1 == 0);
-            var z54:Boolean = (t54 == null || t54 == undefined || t54 == 0);
-            if (z1 && z54) {
-                // Drop the dead handle: keeping it lets the warm-up count
-                // three null passes and re-show a phantom all-dash sheet.
-                m_Subject = null;
-                subjKey = "";
-                subjName = "";
-                subjIsPlayer = -1;
-                resetScan();
-                updateVisibility();
+            if ((t1 == null || t1 == 0) && (t54 == null || t54 == 0)) {
+                forget();
                 return;
             }
         }
-
-        // Collapsed reads the teardown gate's two ids only; expanding runs a
-        // full pass at once (toggleCollapsed), so the sheet is never stale.
-        // Preview reads the full list whatever the fold state is — it shows the
-        // sheet, so retargeting under the overlay has to fill it.
+        // Folded, the gate's two ids; preview shows the sheet whatever the fold, so it reads the whole list. The PvP
+        // view reads its own.
         var eff:Boolean = folded();
-        var ids:Array = eff ? gateIds : watchIds;
-        var i:Number = 0;
-        while (i < ids.length) {
-            var sid:Number = Number(ids[i]);
-            var v = null;
-            try { v = m_Subject.GetStat(sid, 2); } catch (e:Object) {}
-            curV[sid] = v;
-            i++;
-        }
+        var ids:Array = eff ? GATE : viewIds();
+        readIds(ids);
         if (!eff) {
-            subjPlayer = evalPlayer();
-            // Mode-1 side-reads: the CDI attr term uses the PRE-multiplier
-            // attribute sum — mode 2 is post %-multiplier (a x1.05 Dex feat
-            // moved m2 by 97x1.05 while m1 moved by the item's flat 97).
-            var r1 = null;
-            try { r1 = m_Subject.GetStat(804, 1); } catch (e1a:Object) {}
-            m1Str = Number(r1);
-            if (isNaN(m1Str)) m1Str = 0;
-            r1 = null;
-            try { r1 = m_Subject.GetStat(814, 1); } catch (e1b:Object) {}
-            m1Dex = Number(r1);
-            if (isNaN(m1Dex)) m1Dex = 0;
-            // The buff-list pass: the AA's presence corrects the CDI attr
-            // term, and any known perk buff feeds the Perks row. Both are
-            // player-only — the AA rides an attribute term that is zero
-            // without attributes, and the row is player-gated — so nothing
-            // else walks the list. Bosses carry the longest buff lists in
-            // the game and not one entry of one is ever ours.
-            if (subjPlayer) {
-                var aa:Boolean = false;
-                var pk:Array = new Array();
-                try {
-                    var bl:Object = m_Subject.m_BuffList;
-                    if (bl != null) {
-                        for (var bk:String in bl) {
-                            var bb:Object = bl[bk];
-                            if (bb == null) continue;
-                            if (bb.m_BuffId == AA_BUFF_ID) {
-                                aa = true;
-                                if (!SHOW_PERKS) break;
-                            }
-                            if (SHOW_PERKS) {
-                                var bkey:String = "i" + bb.m_BuffId;
-                                var rank = PERK_IDS[bkey];
-                                if (rank != undefined) {
-                                    // A buff's icon never changes, so the
-                                    // engine answers this once per id per
-                                    // session rather than 4x a second.
-                                    var pin:Number = Number(iconInst[bkey]);
-                                    if (isNaN(pin)) {
-                                        pin = 0;
-                                        try { pin = Number(bb.m_Icon.GetInstance()); } catch (eIc:Object) {}
-                                        if (isNaN(pin)) pin = 0;
-                                        if (pin > 0) iconInst[bkey] = pin;
-                                    }
-                                    pk.push({r: Number(rank), inst: pin});
-                                }
-                            }
-                        }
-                    }
-                } catch (eBL:Object) {}
-                aaOn = aa;
-                if (SHOW_PERKS) {
-                    var placed:Object = placePerks(pk);
-                    curPerks = placed.inst;
-                    curPerkRanks = placed.rank;
-                }
+            eng.subjPlayer = eng.evalPlayer(subjIsPlayer);
+            // Both lists carry the player gate, so the verdict is this pass's; when it flips the view (an expand
+            // after a fold, a player's attributes decoding late), the view render() draws reads its own ids now.
+            if (viewIds() != ids) {
+                ids = viewIds();
+                readIds(ids);
+            }
+            if (eng.subjPlayer && fx != null && fx.ver != fxVer) {
+                fxVer = fx.ver;
+                readPerks();
             }
         }
         if (!haveFull) {
-            // ~750 ms: login/zone/retarget repopulation settles inside it.
+            // ~750 ms: a login, zone or retarget repopulates inside it.
             warmup++;
             if (warmup < 3) return;
             haveFull = true;
         }
+        // After the warm-up on purpose: before it the stat cache (148) and the target's inventory are still
+        // filling, and a read then would commit a wrong family for 3 s.
+        if (!eff && (hasCdi || ids == PVP_IDS)) readWeapon();
         render();
     }
 
-    // =========================================================================
-    // Stat access + sheet syntheses (field-measured at level 80, level-invariant)
-    // =========================================================================
-
-    // Keyed by the raw id: a full render asks this ~195 times, and building
-    // a key string per ask was the panel's largest source of AVM1 garbage.
-    private function gv(sid:Number):Number {
-        var v = curV[sid];
-        if (v == null || v == undefined) return 0;
-        var n:Number = Number(v);
-        if (isNaN(n)) return 0;
-        return n;
+    // The ids the view on screen reads: the PvP view's on a player with the tab picked, else the sheet's.
+    private function viewIds():Array {
+        return (pvpOn && (eng.subjPlayer || previewMode)) ? PVP_IDS : watchIds;
     }
 
-    private function has(sid:Number):Boolean {
-        return gv(sid) != 0;
-    }
-
-    // attribute sheet value from the x10+10 encoding; 0 = absent (mobs)
-    private function attrSheet(sid:Number):Number {
-        var r:Number = gv(sid);
-        if (r == 0) return 0;
-        return Math.round((r - 10) / 10);
-    }
-
-    // mode-1 attribute: the pre-%-multiplier additive sum, same encoding
-    private function attrM1(raw:Number):Number {
-        if (raw == 0) return 0;
-        return Math.round((raw - 10) / 10);
-    }
-
-    // Gates the PvP block, the Perks row, the title's class name and every
-    // player-only line; both signals must agree. IsPlayer() is measured
-    // truthful on players but never sampled on a mob, so it vetoes rather
-    // than confirms alone. Attributes must be DECODED — raw, an NPC template
-    // carrying them at base reads 10, which put a PvP block on city guards.
-    // Settled once a pass into subjPlayer: six call sites ask, and each ask
-    // is four stat decodes.
-    private function evalPlayer():Boolean {
-        var hasAttrs:Boolean = attrSheet(804) > 4 || attrSheet(808) > 4
-                            || attrSheet(810) > 4 || attrSheet(814) > 4;
-        if (subjIsPlayer >= 0) return (subjIsPlayer == 1) && hasAttrs;
-        return hasAttrs;
-    }
-
-    // linear rating law: effect% = classBase + rating/36.6
-    private function pctOf(r:Number):Number {
-        return Math.round(r / 36.6 * 10) / 10;
-    }
-
-    // linear v/a to 50%, then 100 - 5000/(50 + v/a); a = 219.6 armor,
-    // 73.7 protection. Negative stat space floors at 0%.
-    private function mitCurve(v:Number, a:Number):Number {
-        if (v <= 0) return 0;
-        var q:Number = v / a;
-        return (q <= 50) ? q : (100 - 5000 / (50 + q));
-    }
-
-    // displayed % = base mit + invul x (1 - mit), where the per-type invul
-    // column = per-type id + 911 (the all-type component)
-    private function sheetMit(baseMit:Number, invulId:Number):Number {
-        var inv:Number = gv(invulId) + gv(911);
-        return Math.round((baseMit + inv * (1 - baseMit / 100)) * 10) / 10;
-    }
-
-    // floor(comp x (1 + BonusArmor% 450)) + 2 x Str
-    private function armorTotal():Number {
-        return Math.floor(gv(448) * (1 + gv(450) / 100)) + 2 * attrSheet(804);
-    }
-
-    // school comp + floor(flat 451 x (1 + BonusProt% 334)) + attr/2
-    // (Int for Cold/Elec/Fire, Wis for Holy/Unholy)
-    private function protTotal(schoolId:Number, attrId:Number):Number {
-        return gv(schoolId) + Math.floor(gv(451) * (1 + gv(334) / 100)) + Math.floor(attrSheet(attrId) / 2);
-    }
-
-    // The equipped weapon type is unreadable; characters stack their own
-    // school's CR, so the largest component is it.
-    private function gearSchoolCR():Number {
-        var ids:Array = [866, 867, 868, 869, 870, 871, 872, 873];
-        var best:Number = 0;
-        var i:Number = 0;
-        while (i < ids.length) {
-            var v:Number = gv(Number(ids[i]));
-            if (v > best) best = v;
-            i++;
+    private function readIds(ids:Array):Void {
+        for (var i:Number = 0; i < ids.length; i++) {
+            var sid:Number = Number(ids[i]);
+            var v = null;
+            try { v = m_Subject.GetStat(sid, 2); } catch (e:Object) {}
+            eng.curV[sid] = v;
         }
-        return best;
     }
 
-    // 3 x Str (Dex for the dagger class 34 and Rangers 39 — both named by
-    // the sheet's own tooltip) + untyped 875 + equipped-school CR + every
-    // typed magic CR; the PvP tab adds 225 on top. The attr term uses the
-    // MODE-1 attribute (the pre-%-multiplier sum — the sheet's own basis,
-    // two chars digit-exact) minus the +100-all-attrs AA (Immeasurable
-    // Empowerment) when the subject's buff list shows it — the AA is
-    // bugged in-game and never feeds this rating. Flat attr buffs other
-    // than the AA still inflate the term.
-    private function cdiPvE():Number {
-        var c:Number = gv(67);
-        var att:Number = (c == 34 || c == 39) ? attrM1(m1Dex) : attrM1(m1Str);
-        if (aaOn) att -= 100;
-        if (att < 0) att = 0;
-        return 3 * att + gv(875) + gearSchoolCR() + gv(162) + gv(1007) + gv(1008) + gv(1009) + gv(1010);
-    }
-
-    // =========================================================================
-    // Line builders — "Rating (Effect%)", dash when absent
-    // =========================================================================
-
-    private function fmt1(n:Number):String {
-        var r:Number = Math.round(n * 10) / 10;
-        var s:String = String(r);
-        if (s.indexOf(".") == -1) s += ".0";
-        return s;
-    }
-
-    private function healthLine():String {
-        if (!has(1) && !has(27)) return DASH;
-        var s:String = gv(27) + " / " + gv(1);
-        if (has(525)) s += " (" + gv(525) + "%)";
-        return s;
-    }
-
-    private function mitLine(v:Number, invulId:Number, a:Number):String {
-        if (v == 0) return DASH;
-        return v + " (" + fmt1(sheetMit(mitCurve(v, a), invulId)) + "%)";
-    }
-
-    // zero-base linear decode (critigation, tenacity)
-    private function pctLine(r:Number):String {
-        if (r == 0) return DASH;
-        return r + " (" + fmt1(pctOf(r)) + "%)";
-    }
-
-    // Rating share only: the sheet's per-character feat/AA base is absent from
-    // stat space and not class-keyed, so inventing one would inflate this.
-    private function critDmgLine():String {
-        return pctLine(gv(711));
-    }
-
-    private function critChanceLine():String {
-        var r:Number = gv(312);
-        if (r == 0) return DASH;
-        var wpnBase:Number = (gv(67) == 34) ? 5 : 2.5;
-        return r + " (" + fmt1(r / 36.6 + wpnBase) + "%)";
-    }
-
-    // Rating + the Celestial Gaze range it buys (the main beneficiary):
-    // 271 + HR x 0.2761 to 292 + HR x 0.2761. Player-only.
-    private function healLine():String {
-        if (!subjPlayer) return DASH;
-        var r:Number = gv(713);
-        if (r == 0) return DASH;
-        return r + " (" + Math.round(271 + r * 0.2761) + "-" + Math.round(292 + r * 0.2761) + ")";
-    }
-
-    // 861 + schoolComponent + round(0.6 x mainAttr) + BaseSpellDamage% 1041.
-    // Main attribute is max(Int, Wis) — priests lead on Wis, mages on Int —
-    // avoiding an unmeasured class table, like the school CR above. Only the
-    // highest school shows: a caster stacks exactly one. The PvP row adds the
-    // per-school gap 226 on top — one value for all schools, the 458 shape.
-    private function spellLine(add:Number):String {
-        if (!subjPlayer) return DASH;
-        // Mana-less classes (Ranger measured; Barbarian predicted) sheet the
-        // whole per-school block at 0 even when 861/1041 carry residue —
-        // max mana 507 is the gate.
-        if (gv(507) == 0) return DASH;
-        var best:Number = 0;
-        var i:Number = 0;
-        while (i < SPELL_IDS.length) {
-            var v:Number = gv(Number(SPELL_IDS[i]));
-            if (v > best) best = v;
-            i++;
+    // The perk buffs the subject's Effects holds, placed into the six slots.
+    private function readPerks():Void {
+        var pk:Array = [];
+        var a:Array = fx.a;
+        for (var i:Number = 0; i < a.length; i++) {
+            var key:String = "i" + a[i].id;
+            var rank = PERK_IDS[key];
+            if (rank == undefined) continue;
+            var pin:Number = Number(iconInst[key]);
+            if (isNaN(pin)) {
+                pin = 0;
+                try { pin = Number(a[i].buff.m_Icon.GetInstance()); } catch (e:Object) {}
+                if (isNaN(pin)) pin = 0;
+                if (pin > 0) iconInst[key] = pin;
+            }
+            pk.push({r: Number(rank), inst: pin});
         }
-        var attr:Number = Math.max(attrSheet(808), attrSheet(810));
-        var total:Number = gv(861) + best + Math.round(attr * 0.6) + gv(1041) + add;
-        if (total == 0) return DASH;
-        return String(total);
+        var placed:Object = placePerks(pk);
+        curPerks = placed.inst;
+        curPerkRanks = placed.rank;
     }
 
-    // Sheet Ferocity = floor(1403/10), the x10-encoded gear component and
-    // nothing else — a char with 1403=0 sheets Ferocity 0 even while the
-    // old base candidate 864 reads 33 (864 is the engine's "Player Flags"
-    // state id, not a rating). Effect is 0.15 x total on all five AOE
-    // surfaces (sheet pair 260 -> 39.0%). Player-only.
-    private function ferLine():String {
-        if (!subjPlayer) return DASH;
-        var t:Number = Math.floor(gv(1403) / 10);
-        if (t == 0) return DASH;
-        return t + " (" + fmt1(t * 0.15) + "%)";
+    // One-handed or two-handed main hand, for the Combat Rating's school. A two-hander sits in position 6 and leaves
+    // the off hand (8) empty while slot bitmask 148 still sets bit 8 (256). Settled full passes only.
+    //  - Bit 64 of 148 clear: no main hand (or not in yet), so no family and no school term: unknown, nothing built.
+    //  - Set, an inventory whose slot 6 is still empty has not filled: unknown, tried again in 500 ms (a throw too).
+    //  - A loaded inventory commits the family, read again at most every 3 s.
+    private function readWeapon():Void {
+        if ((eng.gv(148) & 64) == 0) {
+            eng.twoHand = -1;
+            return;
+        }
+        var now:Number = getTimer();
+        if (now < nextWeapon) return;
+        var th:Number = -1;
+        try {
+            var items = (new com.GameInterface.Inventory(new com.Utils.ID32(101, subjN))).m_Items;
+            var mh = (items != null) ? items[6] : null;
+            if (mh != null) th = (items[8] == null && (eng.gv(148) & 256) != 0) ? 1 : 0;
+        } catch (eW:Object) { th = -1; }
+        eng.twoHand = th;
+        nextWeapon = now + ((th >= 0) ? 3000 : 500);
     }
 
-    // Weapon Damage % pair (1095 melee / 1096 ranged, x100) — the sheet's
-    // Melee/Ranged values verbatim. No synthesis, no gates: stance and
-    // proc swings and Reave-type feat multipliers are already inside the
-    // ids. Dashed only when both are absent.
-    private function wdLine():String {
-        var m:Number = gv(1095);
-        var r:Number = gv(1096);
-        if (m == 0 && r == 0) return DASH;
-        return fmt1(m / 100) + "% / " + fmt1(r / 100) + "%";
-    }
-
-    // rating + flat effect (the sheet's Effect column = the DPS add)
-    private function cdiLine(add:Number):String {
-        var r:Number = cdiPvE();
-        if (r == 0) return DASH;
-        r += add;
-        return r + " (" + Math.round(r / 36.6) + ")";
-    }
-
-    // "Name Class (Level/PvPLevel)". Class only when the player gate agrees
-    // AND id 67 maps (all twelve measured); the level part drops what is
-    // absent, so a mob reads "Name (83)" and a PvP-level-0 player "Name (80)".
+    // "Name Class (Level/PvPLevel)": the class only when the player gate agrees and id 67 maps (all twelve
+    // measured); the level part drops what is absent, so a mob reads "Name (83)".
     private function titleLine():String {
         var s:String = subjName;
-        if (subjPlayer) {
-            var cn:String = CLASS_NAMES["c" + gv(67)];
+        if (eng.subjPlayer) {
+            var cn:String = CLASS_NAMES["c" + eng.gv(67)];
             if (cn != undefined) s += " " + cn;
         }
-        var lvl:Number = gv(54);
+        var lvl:Number = eng.gv(54);
         if (lvl > 0) {
-            var pl:Number = gv(70);
+            var pl:Number = eng.gv(70);
             s += " (" + lvl + ((pl > 0) ? ("/" + pl) : "") + ")";
         }
         return s;
-    }
-
-    private function pveValues():String {
-        var armorVal:Number = (attrSheet(804) > 0) ? armorTotal() : gv(448);
-        var g:Array = new Array();
-        g.push(healthLine());
-        g.push(mitLine(armorVal, 902, 219.6));
-        g.push(mitLine(protTotal(928, 810), 907, 73.7));
-        g.push(mitLine(protTotal(929, 810), 908, 73.7));
-        g.push(mitLine(protTotal(157, 808), 167, 73.7));
-        g.push(mitLine(protTotal(927, 808), 906, 73.7));
-        g.push(mitLine(protTotal(926, 808), 905, 73.7));
-        g.push(pctLine(gv(1000016)));
-        g.push(pctLine(gv(1000018)));
-        g.push(healLine());
-        g.push(spellLine(0));
-        g.push(cdiLine(0));
-        g.push(wdLine());
-        g.push(critChanceLine());
-        g.push(critDmgLine());
-        g.push(pctLine(gv(1000017)));
-        g.push(ferLine());
-        return g.join("\n");
-    }
-
-    private function pvpValues():String {
-        var armorVal:Number = (attrSheet(804) > 0) ? armorTotal() : gv(448);
-        var g:Array = new Array();
-        g.push(mitLine(armorVal + gv(454), 902, 219.6));
-        g.push(mitLine(protTotal(928, 810) + gv(458), 907, 73.7));
-        g.push(mitLine(protTotal(929, 810) + gv(458), 908, 73.7));
-        g.push(mitLine(protTotal(157, 808) + gv(458), 167, 73.7));
-        g.push(mitLine(protTotal(927, 808) + gv(458), 906, 73.7));
-        g.push(mitLine(protTotal(926, 808) + gv(458), 905, 73.7));
-        g.push(spellLine(gv(226)));
-        g.push(cdiLine(gv(225)));
-        g.push(gv(656) + " / " + gv(658));   // 0 / 0 is real data, not absence
-        return g.join("\n");
     }
 
     // =========================================================================
@@ -947,27 +678,21 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
     // =========================================================================
 
     private function render():Void {
-        if (panelClip == null || m_Subject == null || !haveFull) {
+        if (panelClip == null || m_Subject == null || !haveFull || folded()) {
             updateVisibility();
             return;
         }
-        // Collapsed, the bar is a static label — nothing on it moves with the
-        // target, so there is nothing to paint and nothing was read. In preview
-        // the sheet is on screen at full size, so it paints like any other pass.
-        if (folded()) {
-            updateVisibility();
-            return;
+        // Preview keeps every group and the perks, as previewOn laid them out for the overlay, so a pass under it
+        // never resizes the plate being dragged. Live, a player-only group and the perks show on a player only.
+        var player:Boolean = previewMode || eng.subjPlayer;
+        var changed:Boolean = (player != perksShown);
+        var g:Number;
+        for (g = 0; g < GROUPS.length; g++) {
+            if (want(g, player) != grpOn[g]) changed = true;
         }
-        // Preview keeps the baked gates whatever the target allows, the same
-        // ones previewOn laid out and sized the overlay to: a pass under the
-        // overlay must not resize the plate the overlay is drawn over, and a
-        // mob-to-player retarget mid-preview must not grow it out from under
-        // a drag rect that was measured before.
-        var wantPvp:Boolean = (previewMode || subjPlayer) && SHOW_PVP;
-        var wantPerks:Boolean = (previewMode || subjPlayer) && SHOW_PERKS;
-        if (wantPvp != pvpShown || wantPerks != perksShown) {
-            pvpShown = wantPvp;
-            perksShown = wantPerks;
+        if (changed) {
+            for (g = 0; g < GROUPS.length; g++) grpOn[g] = want(g, player);
+            perksShown = player;
             layout();
         }
         var t:String = titleLine();
@@ -975,38 +700,88 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
             lastName = t;
             nameTF.text = t;
         }
-        var s:String = pveValues();
-        if (s != lastPve) {
-            lastPve = s;
-            pveValTF.text = s;
-        }
-        if (pvpShown) {
-            var p:String = pvpValues();
-            if (p != lastPvp) {
-                lastPvp = p;
-                pvpValTF.text = p;
+        for (g = 0; g < GROUPS.length; g++) {
+            if (!grpOn[g]) continue;
+            // A PvP section's lines come split at the rating: a tab between the columns, no brackets.
+            var col:Boolean = (GROUPS[g].c != undefined);
+            if (col) {
+                eng.L = "\t";
+                eng.R = "";
+            }
+            var s:String = eng.values(gRows[g]);
+            if (col) {
+                eng.L = " (";
+                eng.R = ")";
+            }
+            if (s != lastVal[g]) {
+                lastVal[g] = s;
+                show(g, s);
             }
         }
         if (perksShown) renderPerks();
         updateVisibility();
     }
 
+    // Whether group g shows: the view's own (the PvP view on a player with the tab picked, else the sheet), and a
+    // player-only group on a player only.
+    private function want(g:Number, player:Boolean):Boolean {
+        return ((GROUPS[g].c != undefined) == (pvpOn && player)) && (!GROUPS[g].p || player);
+    }
+
+    // A group's values: the sheet's as one column, a PvP section's split into its columns.
+    private function show(g:Number, s:String):Void {
+        if (GROUPS[g].c == undefined) {
+            valTF[g].text = s;
+            return;
+        }
+        var a:Array = s.split("\n");
+        var c0:Array = [];
+        var c1:Array = [];
+        for (var i:Number = 0; i < a.length; i++) {
+            var p:Array = String(a[i]).split("\t");
+            c0.push(p[0]);
+            c1.push((p.length > 1) ? p[1] : "");
+        }
+        tint(valTF[g], c0);
+        if (val2TF[g] != null) tint(val2TF[g], c1);
+    }
+
+    // A column, a negative value red as the game draws it: the field's own format over the whole text, then red
+    // over each line that starts with a minus.
+    private function tint(tf:TextField, l:Array):Void {
+        tf.text = l.join("\n");
+        var f:TextFormat = tf.getNewTextFormat();
+        tf.setTextFormat(f);
+        f.color = 0xE0503C;
+        var at:Number = 0;
+        for (var i:Number = 0; i < l.length; i++) {
+            var n:Number = String(l[i]).length;
+            if (String(l[i]).charAt(0) == "-") tf.setTextFormat(at, at + n, f);
+            at += n + 1;
+        }
+    }
+
+    // The PvP glyph: the other view, read at once (the views poll different ids).
+    public function togglePvp():Void {
+        pvpOn = !pvpOn;
+        if (m_Subject != null) pollTick();
+    }
+
+    public function tabCol():Number {
+        return pvpOn ? 0xF7A22B : 0xA89A86;
+    }
+
     // =========================================================================
-    // Perks row — detected perk buffs as RDB icons in the game's own layout:
-    // three colour-coded slot pairs, General / Archetype / Class
+    // Perks: the game's own layout, three colour-coded pairs (General, Archetype, Class)
     // =========================================================================
 
-    // Returns {inst, rank}, six entries each, -1 for an empty slot. Rank
-    // order in (insertion sort over <= 6 live entries, rank-variant
-    // duplicates collapsing to the first seen), then each perk drops into
-    // its category's own pair the way the game's perk bar lays them out.
-    // 0 is a real value here -- a perk whose buff carries no icon still
-    // holds its slot -- so only -1 means empty. The rank rides along for the
-    // hover chip: the icon instance does not identify the perk.
+    // {inst, rank}, six each, -1 empty. Rank order (insertion sort over at most a few entries, a rank seen twice
+    // kept once), then each perk drops into its category's pair as the game's perk bar lays them out. 0 is a real
+    // instance (a perk with no icon still holds its slot); the rank rides along for the chip.
     private function placePerks(pk:Array):Object {
-        var srt:Array = new Array();
-        var i:Number = 0;
-        while (i < pk.length) {
+        var srt:Array = [];
+        var i:Number;
+        for (i = 0; i < pk.length; i++) {
             var e:Object = pk[i];
             var j:Number = 0;
             var dup:Boolean = false;
@@ -1016,18 +791,14 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
                 j++;
             }
             if (!dup) srt.splice(j, 0, e);
-            i++;
         }
         var out:Array = [-1, -1, -1, -1, -1, -1];
         var rnk:Array = [-1, -1, -1, -1, -1, -1];
-        i = 0;
-        while (i < srt.length) {
+        for (i = 0; i < srt.length; i++) {
             var r:Number = srt[i].r;
             var b:Number = (r <= PERK_GEN_MAX) ? 0 : ((r <= PERK_ARCH_MAX) ? 2 : 4);
-            // A pair holds two; anything beyond that is dropped rather than
-            // spilling into the next category's colour. A two-slot perk
-            // claims both boxes with the same icon, the way the game draws
-            // it -- so it needs both free, or it is just the pair's second.
+            // A pair holds two; more is dropped rather than spilling into the next colour. A two-slot perk takes
+            // both boxes with one icon, as the game draws it, so it needs both free, or it is the pair's second.
             if (out[b] == -1) {
                 out[b] = srt[i].inst;
                 rnk[b] = r;
@@ -1039,24 +810,20 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
                 out[b + 1] = srt[i].inst;
                 rnk[b + 1] = r;
             }
-            i++;
         }
         return {inst: out, rank: rnk};
     }
 
-    // Assign-on-change like the value columns: the joined slot list is the
-    // cache, and only slots whose icon actually changed reload. Ranks are in
-    // the key too — two perks can share one icon, and the chip must not name
-    // the one that left.
+    // Assign-on-change like the columns: the joined slots are the cache, and only a slot whose icon changed loads
+    // again. The ranks are in the key: two perks can share an icon, and the chip must not name the one that left.
     private function renderPerks():Void {
         var key:String = curPerks.join(",") + "|" + curPerkRanks.join(",");
         if (key == lastPerks) return;
         lastPerks = key;
         hideTip();
-        // Pass 1: settle every slot's target instance and drop stale art, so
-        // pass 2 can see the whole row when it decides what to request.
-        var i:Number = 0;
-        while (i < perkSlots.length) {
+        // Pass 1: each slot's instance, stale art dropped, so pass 2 sees the whole row.
+        var i:Number;
+        for (i = 0; i < perkSlots.length; i++) {
             var s:MovieClip = perkSlots[i];
             var inst:Number = Number(curPerks[i]);
             if (isNaN(inst)) inst = -1;
@@ -1067,41 +834,25 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
                 try { s.hold.m_icon.unloadMovie(); } catch (eU:Object) {}
                 s._want = (inst > 0);
             }
-            i++;
         }
-        // Pass 2: one request per DISTINCT instance, one clip per answer.
-        // RequestRDBImage answers a given id once -- a second request for an
-        // id already in flight never calls back -- and a same-tick second
-        // loadClip of one URL double-binds a shared movie def that the
-        // retarget unload then releases twice: a client heap crash, isolated
-        // in-game. So a dup slot KEEPS _want as its pending mark, and
-        // onPerkIcon re-requests the id for it after the first answer lands
-        // (the id is out of flight by then) -- sharers resolve as a chain of
-        // single-clip loads. Dedup is only against instances requested on
-        // THIS pass: a slot that kept its art issued no request, so it
-        // cannot serve a partner that has just come to want the same
-        // instance.
-        var reqd:Array = new Array();
-        i = 0;
-        while (i < perkSlots.length) {
+        // Pass 2: one request per distinct instance, one clip per answer. RequestRDBImage answers an id once (a
+        // second request while it is in flight never calls back), and two loadClips of one URL in one tick
+        // double-bind a movie def the retarget unload then frees twice: a client crash. So a slot sharing an
+        // instance keeps _want, and onPerkIcon requests the id again for it once the first answer is in.
+        var reqd:Array = [];
+        for (i = 0; i < perkSlots.length; i++) {
             var sl:MovieClip = perkSlots[i];
-            if (sl._want) {
-                var dup:Boolean = false;
-                var j:Number = 0;
-                while (j < reqd.length) {
-                    if (reqd[j] == sl._ico) { dup = true; break; }
-                    j++;
-                }
-                if (!dup) {
-                    sl._want = false;
-                    reqd.push(sl._ico);
-                    try {
-                        com.Utils.ImageLoader.RequestRDBImage(
-                            new com.Utils.ID32(1010008, sl._ico), this, "pcb" + i);
-                    } catch (eR:Object) {}
-                }
+            if (!sl._want) continue;
+            var dup:Boolean = false;
+            for (var j:Number = 0; j < reqd.length; j++) {
+                if (reqd[j] == sl._ico) { dup = true; break; }
             }
-            i++;
+            if (dup) continue;
+            sl._want = false;
+            reqd.push(sl._ico);
+            try {
+                com.Utils.ImageLoader.RequestRDBImage(new com.Utils.ID32(1010008, sl._ico), this, "pcb" + i);
+            } catch (eR:Object) {}
         }
     }
 
@@ -1113,78 +864,68 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
     private function onPerkIcon(i:Number, url:String, ok:Boolean):Void {
         var s:MovieClip = (perkSlots != null) ? MovieClip(perkSlots[i]) : null;
         if (s == null || s.hold == null) return;
-        // The slot was cleared (or re-targeted) between request and answer;
-        // only a positive instance was ever requested.
+        // Cleared or retargeted since the request; only a positive instance was ever requested.
         if (!ok || url == null || url.length == 0 || s._ico <= 0) return;
-        // One clip per answer -- NEVER loadClip one URL into two targets in
-        // the same tick: the two binds share one movie def, the retarget
-        // unload releases it twice, and the heap corruption crashes the
-        // client an inspection later (isolated in-game via the serve-one
-        // probe). The partner of a two-slot perk still holds _want, so chain
-        // it: re-issue the request now that this answer took the id out of
-        // flight, and its own callback paints it next.
         try { perkLoaders[i].loadClip(url, s.hold.m_icon); } catch (e:Object) {}
+        // A partner slot still wanting this instance (a two-slot perk) asks again now the id is out of flight.
         var inst:Number = s._ico;
-        var j:Number = 0;
-        while (j < perkSlots.length) {
+        for (var j:Number = 0; j < perkSlots.length; j++) {
             var t:MovieClip = perkSlots[j];
             if (t != null && t._want && t._ico == inst) {
                 t._want = false;
                 try {
-                    com.Utils.ImageLoader.RequestRDBImage(
-                        new com.Utils.ID32(1010008, inst), this, "pcb" + j);
+                    com.Utils.ImageLoader.RequestRDBImage(new com.Utils.ID32(1010008, inst), this, "pcb" + j);
                 } catch (eR:Object) {}
                 break;
             }
-            j++;
         }
     }
 
-    // MovieClipLoader listener: standardize the loaded RDB icon to the 64x64
-    // native size — the slot's m_icon container is pre-scaled to ICO/64, so
-    // the icon lands exactly in the box.
+    // MovieClipLoader listener: the RDB icon at its 64x64 native size; the slot's hold is scaled to the box.
     public function onLoadInit(mc:MovieClip):Void {
         if (mc == null) return;
         try {
             mc._xscale = mc._yscale = 100;
-            var scale:Number = 6400 / Math.max(mc._width, mc._height);
-            mc._xscale = mc._yscale = scale;
+            mc._xscale = mc._yscale = 6400 / Math.max(mc._width, mc._height);
             mc.cacheAsBitmap = true;
         } catch (e:Object) {}
     }
 
     private function clearPerkSlots():Void {
         if (perkSlots == null) return;
-        var i:Number = 0;
-        while (i < perkSlots.length) {
+        for (var i:Number = 0; i < perkSlots.length; i++) {
             var s:MovieClip = perkSlots[i];
             s._ico = -1;
             s._rank = -1;
             s._want = false;
             try { s.hold.m_icon.unloadMovie(); } catch (e:Object) {}
-            i++;
         }
         hideTip();
         lastPerks = "";
     }
 
-    // Hover -> perk name. Driven by mouse movement rather than rollover
-    // handlers so the row stays click-through (create()), and hit-tested
-    // arithmetically in panel space: the boxes are a known pitch from PAD, so
-    // no hitTest call and no dependence on where rootClip sits.
-    public function hoverTick():Void {
-        // Every mouse move, for the life of the module — and in combat the
-        // camera drags the mouse continuously. So: cached AS state first
-        // (the row is off screen for most of a session), and the native
-        // _ymouse / _xmouse reads only for a pointer already in the panel.
-        if (!perksShown || collapsed || previewMode || !panelVis) {
+    // The hover source is on only while the perk row is on screen: in combat the camera drags the mouse all the
+    // time, and a listener for a row that cannot show would run on every move.
+    private function listen():Void {
+        var want:Boolean = perksShown && panelVis && !folded() && !previewMode;
+        if (want == (mouseLsnr != null)) return;
+        if (want) {
+            var self:KazBarsInspect = this;
+            mouseLsnr = {onMouseMove: function() { self.hoverTick(); }};
+            Mouse.addListener(mouseLsnr);
+        } else {
+            Mouse.removeListener(mouseLsnr);
+            mouseLsnr = null;
             hideTip();
-            return;
         }
+    }
+
+    // Hover -> perk name, hit-tested arithmetically in panel space (the boxes sit a known pitch from PAD); the
+    // pointer is read only once it is inside the row's band.
+    public function hoverTick():Void {
         if (panelClip == null || tipMC == null || perkSlots == null) return;
-        var top:Number = perkRowY;
         var my:Number = panelClip._ymouse;
-        if (my < top || my > top + ICO) {
+        if (my < perkRowY || my > perkRowY + ICO) {
             hideTip();
             return;
         }
@@ -1205,8 +946,7 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
             hideTip();
             return;
         }
-        // Redraw only on a slot change; the pointer moves inside a box for
-        // many frames, and renderPerks clears the cache when the row changes.
+        // Drawn again only for another slot; renderPerks clears the cache when the row changes.
         if (tipSlot != i) {
             tipSlot = i;
             tipTF.text = String(PERK_NAMES[r]);
@@ -1218,18 +958,15 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
             tipMC.endFill();
             tipMC.lineStyle(1, 0x4A3B22, 100);
             rectPath(tipMC, 0, 0, tw, th);
-            // Centred over its icon, then clamped inside the plate — the
-            // longest name is wider than a box and the end slots would hang
-            // off the frame.
+            // Centred over its icon, kept inside the plate: the longest name is wider than a box.
             var cx:Number = PAD + i * (ICO + ICO_GAP) + Math.round((ICO - tw) / 2);
             tipMC._x = Math.max(PAD, Math.min(cx, W - PAD - tw));
-            tipMC._y = perkSlots[0]._y - th - TIP_PAD;
+            tipMC._y = perkRowY - th - TIP_PAD;
         }
         tipMC._visible = true;
     }
 
-    // tipSlot >= 0 exactly when the chip is up, so an already-hidden chip
-    // costs one compare rather than two property writes per mouse move.
+    // tipSlot >= 0 exactly while the chip is up, so a hidden chip costs one compare.
     private function hideTip():Void {
         if (tipSlot < 0 || tipMC == null) return;
         tipSlot = -1;
@@ -1239,14 +976,16 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
     public function previewKey():String { return "ins"; }
     public function previewLabel():String { return "Inspect Panel"; }
 
-    // Master switch (preview control panel + archive): folds into the one
-    // visibility gate, so live sheets and the preview sheet both obey it.
+    // The master switch (control panel and archive), folded into the one visibility gate.
     public function isActive():Boolean {
         return active;
     }
 
-    public function setActive(shown:Boolean):Void {
-        active = shown;
+    public function setActive(wantActive:Boolean):Void {
+        active = wantActive;
+        if (active) watchFx();
+        else unwatchFx();
+        sync();
         updateVisibility();
     }
 
@@ -1257,62 +996,52 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
             panelVis = vis;
             panelClip._visible = vis;
         }
-        if (!vis) hideTip();
+        listen();
     }
 
-    // The full-footprint sheet, live or empty: a target with a settled read
-    // renders normally under the overlay (perks included, and a retarget
-    // mid-preview follows), an untargeted panel shows the chrome and labels
-    // with empty values. Sections follow the baked gates rather than what this
-    // target happens to allow, so the footprint is the one being positioned.
+    // The whole footprint, live or empty: a settled target renders under the overlay (and a retarget follows), no
+    // target shows the chrome and labels with empty values. The picked view's every group and the perks show,
+    // whatever the target allows, and the overlay spans the taller view (footH), so the footprint being placed
+    // holds either.
     public function previewOn():Void {
         if (panelClip == null) return;
         previewMode = true;
-        pvpShown = SHOW_PVP;
-        perksShown = SHOW_PERKS;
+        var g:Number;
+        for (g = 0; g < GROUPS.length; g++) grpOn[g] = want(g, true);
+        perksShown = true;
         layout();
-        // The gates just moved under the cache and the fields are rewritten
-        // either way, so nothing may assign-on-change against a stale string.
+        // The gates moved under the cache and every field is written either way.
         lastName = "";
-        lastPve = "";
-        lastPvp = "";
+        for (g = 0; g < GROUPS.length; g++) lastVal[g] = "";
         lastPerks = "";
         if (m_Subject != null && haveFull) {
-            // A full pass, not a render: entering preview folded shows a sheet
-            // whose values were never read (collapsed passes take the gate ids
-            // only), and waiting for the next tick is a quarter second of
-            // dashes.
+            // A full pass, not a render: a sheet entered folded was never read (folded passes take the gate only).
             pollTick();
         } else {
-            nameTF.text = "";
-            pveValTF.text = "";
-            pvpValTF.text = "";
+            blank();
             clearPerkSlots();
         }
         updateVisibility();
-        // Last: the overlay covers the whole plate, so it needs the height
-        // layout() just settled.
-        KazBarsPreview.attach({mc: panelClip, x: 0, y: 0, w: W, h: fullH,
-                               label: "Inspect", color: 0xFF0066});
+        // Last: the overlay covers the plate at the height layout() just settled.
+        KazBarsPreview.attach({mc: panelClip, x: 0, y: 0, w: W, h: footH, label: "Inspect", color: 0xFF0066});
     }
 
     public function previewOff():Void {
         if (panelClip == null) return;
         previewMode = false;
-        // Removed, never hidden: a hidden overlay would still take the clicks
-        // this panel is supposed to let through — the fold button included.
+        // Removed, never hidden: a hidden overlay still takes the clicks this panel lets through.
         KazBarsPreview.detach(panelClip);
-        // Force a live reassign: preview blanked the fields or showed sections
-        // this target does not get.
+        // Preview blanked the fields or showed sections this target does not get: write everything again.
         lastName = "";
-        lastPve = "";
-        lastPvp = "";
+        var g:Number;
+        for (g = 0; g < GROUPS.length; g++) lastVal[g] = "";
         lastPerks = "";
         if (m_Subject != null && haveFull) {
             applyCollapsed();
-            render();
+            // A pass, not a render: preview read the view a player gets, and a mob's sheet has not been read since.
+            pollTick();
         } else {
-            pvpShown = false;
+            for (g = 0; g < GROUPS.length; g++) grpOn[g] = want(g, false);
             perksShown = false;
             layout();
             updateVisibility();
@@ -1320,16 +1049,19 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
     }
 
     // =========================================================================
-    // Persistence (module config archive — permanent for every user)
+    // Persistence (the module archive)
     // =========================================================================
 
     public function loadState(config:Object):Void {
         if (config == null || panelClip == null) return;
         var v:Object = config.FindEntry("inv");
         if (v !== undefined) setActive(v == 1);
-        // Fold state first: the clamp has to measure the plate actually on
-        // screen. Clamping a sheet against the collapsed bar's height let a
-        // saved spot near the bottom edge hang off it.
+        var p:Object = config.FindEntry("inp");
+        if (p !== undefined) {
+            pvpOn = (p == 1);
+            tabBtn.label.textColor = tabCol();
+        }
+        // The fold first: the clamp measures the plate on screen, folded, or else the footprint preview places.
         var c:Object = config.FindEntry("inc");
         if (c !== undefined) {
             collapsed = (c == 1);
@@ -1338,42 +1070,42 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         var x:Object = config.FindEntry("inx");
         var y:Object = config.FindEntry("iny");
         if (x !== undefined && y !== undefined) {
-            panelClip._x = KazBarsPanel.clampPos(Number(x), Stage.width - curW);
-            panelClip._y = KazBarsPanel.clampPos(Number(y), Stage.height - curH);
+            posX = Number(x);
+            posY = Number(y);
+            seat();
         }
     }
 
+    // The fold in effect, or else the footprint preview places.
+    private function seatH():Number {
+        return folded() ? curH : footH;
+    }
+
+    // The spot, not the clamp (KazBarsPanel.seat); a preview drag moved the plate, and that is the spot now.
     public function saveState(config:Object):Void {
         if (config == null || panelClip == null) return;
-        config.ReplaceEntry("inx", panelClip._x);
-        config.ReplaceEntry("iny", panelClip._y);
+        keepSpot();
+        config.ReplaceEntry("inx", posX);
+        config.ReplaceEntry("iny", posY);
         config.ReplaceEntry("inc", collapsed ? 1 : 0);
         config.ReplaceEntry("inv", active ? 1 : 0);
+        config.ReplaceEntry("inp", pvpOn ? 1 : 0);
     }
 
+    // The subject goes (World tells the target again on the next start); World's subscription stays, made once.
     public function cleanup():Void {
-        if (pollIv != null) {
-            clearInterval(pollIv);
-            pollIv = null;
-        }
+        forget();
         if (mouseLsnr != null) {
             Mouse.removeListener(mouseLsnr);
             mouseLsnr = null;
         }
         if (perkLoaders != null) {
-            var i:Number = 0;
-            while (i < perkLoaders.length) {
-                if (perkLoaders[i] != null) {
-                    perkLoaders[i].removeListener(this);
-                    perkLoaders[i] = null;
-                }
-                i++;
-            }
+            for (var i:Number = 0; i < perkLoaders.length; i++) perkLoaders[i].removeListener(this);
             perkLoaders = null;
             perkSlots = null;
         }
-        m_Subject = null;
         previewMode = false;
+        stageOn(false);
         if (panelClip != null) {
             panelClip.removeMovieClip();
             panelClip = null;

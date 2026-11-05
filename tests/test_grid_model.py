@@ -18,24 +18,22 @@ Run: `pytest tests/test_grid_model.py` (from repo root).
 from kazbars.grid_model import (
     CLAMP_SPECS,
     FRACTION_SPECS,
-    SEED_SIZE_TIERS,
-    apply_seed_sizes,
+    MAX_GRID_SLOTS,
+    TIMER_STYLES,
     create_default_grid,
     dedupe_grid_ids,
     project_px,
-    rescale_seed_sizes,
-    seed_sizes_for_height,
     unproject_px,
     validate_grid,
 )
 
 
 def test_junk_numeric_values_fall_back_to_defaults():
-    grid = validate_grid({"rows": None, "cols": "abc", "fx": [], "iconSize": {}})
+    grid = validate_grid({"rows": None, "cols": "abc", "fx": [], "scale": {}})
     assert grid["rows"] == CLAMP_SPECS["rows"][0]
     assert grid["cols"] == CLAMP_SPECS["cols"][0]
     assert grid["fx"] == FRACTION_SPECS["fx"]
-    assert grid["iconSize"] == CLAMP_SPECS["iconSize"][0]
+    assert grid["scale"] == CLAMP_SPECS["scale"][0]
 
 
 def test_fractions_clamp_and_reject_nan_and_pop_legacy_px():
@@ -140,73 +138,38 @@ def test_projection_is_proportional_across_resolutions():
 
 
 # --------------------------------------------------------------------------- #
-# Seed size tiers — px sizes for a template instantiated on a given screen
+# Size, timer style, Applied by me, slot cap
 # --------------------------------------------------------------------------- #
 
-def test_seed_sizes_pick_the_tier_by_height():
-    assert seed_sizes_for_height(1080)["iconSize"] == 48
-    assert seed_sizes_for_height(1440)["iconSize"] == 56
-    assert seed_sizes_for_height(2160)["iconSize"] == 64
-    # Boundaries are inclusive-upper, and the top tier is open-ended.
-    assert seed_sizes_for_height(1081)["iconSize"] == 56
-    assert seed_sizes_for_height(1441)["iconSize"] == 64
-    assert seed_sizes_for_height(4320)["iconSize"] == 64
-    # An ultrawide is keyed on height, so 3440x1440 seeds like any 1440p screen.
-    assert seed_sizes_for_height(1440) == seed_sizes_for_height(1440)
-    # Below the lowest tier still lands on it rather than falling through.
-    assert seed_sizes_for_height(720)["iconSize"] == 48
+def test_scale_clamps_and_the_retired_pixel_sizes_never_zombie():
+    grid = validate_grid({"scale": 999, "iconSize": 64, "timerFontSize": 20,
+                          "stackFontSize": 18, "showTimers": True})
+    assert grid["scale"] == CLAMP_SPECS["scale"][2]
+    assert validate_grid({"scale": 10})["scale"] == CLAMP_SPECS["scale"][1]
+    assert validate_grid({"scale": "junk"})["scale"] == 100
+    for key in ("iconSize", "timerFontSize", "stackFontSize", "showTimers"):
+        assert key not in grid, key
 
 
-def test_every_seed_size_survives_validate_grid():
-    # The tier table must stay inside CLAMP_SPECS or a seeded grid would be
-    # silently clamped on its first load.
-    for _, sizes in SEED_SIZE_TIERS:
-        grid = validate_grid(dict(sizes))
-        for key, value in sizes.items():
-            assert grid[key] == value, key
+def test_timer_style_reads_and_the_retired_key_decides_when_absent():
+    def style(raw):
+        return validate_grid(raw)["timerStyle"]
+    assert style({"timerStyle": "bar"}) == "bar"
+    assert style({"timerStyle": "off"}) == "off"
+    assert style({}) == "digits"
+    assert style({"showTimers": False}) == "off"
+    assert style({"showTimers": True}) == "digits"
+    assert style({"showTimers": 1}) == "digits"
+    assert style({"timerStyle": "BAR", "showTimers": False}) == "off"
+    assert TIMER_STYLES == ("bar", "digits", "off")
 
 
-def test_apply_seed_sizes_overwrites_every_grid_in_place():
-    grids = [create_default_grid(), create_default_grid("target")]
-    returned = apply_seed_sizes(grids, 2160)
-    assert returned is grids
-    for grid in grids:
-        assert grid["iconSize"] == 64
-        assert grid["timerFontSize"] == 23
-        assert grid["stackFontSize"] == 21
-    # Non-size fields are untouched — this only restamps the three px sizes.
-    assert grids[1]["type"] == "target"
+def test_applied_by_me_is_kept_only_when_true():
+    assert "selfCastOnly" not in validate_grid({})
+    assert validate_grid({"selfCastOnly": True})["selfCastOnly"] is True
+    assert "selfCastOnly" not in validate_grid({"selfCastOnly": False})
+    assert "selfCastOnly" not in validate_grid({"selfCastOnly": 1})
 
 
-def test_seed_sizes_are_returned_as_copies():
-    first = seed_sizes_for_height(1080)
-    first["iconSize"] = 999
-    assert seed_sizes_for_height(1080)["iconSize"] == 48
-
-
-def test_rescale_seed_sizes_moves_a_pristine_seed_onto_the_new_tier():
-    grids = apply_seed_sizes([create_default_grid(), create_default_grid("target")], 1080)
-    returned = rescale_seed_sizes(grids, 1080, 2160)
-    assert returned is grids
-    for grid in grids:
-        sizes = {k: grid[k] for k in ("iconSize", "timerFontSize", "stackFontSize")}
-        assert sizes == seed_sizes_for_height(2160)
-
-
-def test_rescale_seed_sizes_keeps_a_tuned_grid_proportional():
-    # 60 px icons on the 48 px tier = 1.25x the seed; on the 56 px tier that is 70.
-    grid = dict(create_default_grid(), iconSize=60, timerFontSize=17, stackFontSize=8)
-    rescale_seed_sizes([grid], 1080, 1440)
-    assert grid["iconSize"] == 70
-    assert grid["timerFontSize"] == 20          # exactly the new seed
-    assert grid["stackFontSize"] == 10          # round(8 * 19 / 16)
-    assert grid["gap"] == create_default_grid()["gap"]   # not a tier size
-
-
-def test_rescale_seed_sizes_clamps_and_noops_within_a_tier():
-    grid = dict(create_default_grid(), iconSize=120)
-    rescale_seed_sizes([grid], 1080, 2160)
-    assert grid["iconSize"] == CLAMP_SPECS["iconSize"][2]      # 160 clamped to 128
-    same = dict(create_default_grid(), iconSize=33)
-    rescale_seed_sizes([same], 1080, 720)                      # both on the 1080 tier
-    assert same["iconSize"] == 33
+def test_the_slot_cap_is_per_grid():
+    assert MAX_GRID_SLOTS == 64

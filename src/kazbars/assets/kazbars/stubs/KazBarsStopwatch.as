@@ -1,6 +1,6 @@
 // KazBarsStopwatch.as - In-game count-up stopwatch panel (Start / Pause / Reset).
-// Runtime-drawn chrome + dynamic text fields (Arial resolves against the faces
-// embedded in base.swf), so it needs no new symbols. Clicks are ordinary
+// Runtime-drawn chrome + dynamic text fields (in the build's face, KazBarsPreview.FACE),
+// so it needs no new symbols. Clicks are ordinary
 // Scaleform GUI input: fullscreen-safe, never steals game focus.
 //
 // Chrome, palette and geometry are the family's, inherited from KazBarsPanel
@@ -10,11 +10,11 @@
 // collapsed bar is FS*15.8 x FS*2 — the same bar the inspect panel folds to —
 // so the two pair at any font size, not just at the default 12.
 //
-// Positioning mirrors the cast timer: the baked X/Y are the defaults a
-// first-ever session starts from (the title bar shows live coordinates while
-// dragging so users can copy them into the app); drag position + collapsed
-// state persist for every user via the module config archive (swx/swy/swc,
-// and the control-panel master switch swv).
+// Positioning: the baked X/Y are the spot a first-ever session starts from;
+// after that the drag position + collapsed state persist for every user via the
+// module config archive (swx/swy/swc, and the control-panel master switch swv).
+// The archived spot is where the user left the plate; it is seated on the stage
+// as it reads now, and seated again when the stage resizes (KazBarsPanel.seat).
 //
 // Driven from KazBars: create() in onLoad, loadState()/saveState() from
 // the module archive, cleanup() on deactivate.
@@ -30,9 +30,7 @@ class KazBarsStopwatch extends KazBarsPanel implements KazBarsModule {
     private var H:Number;         // 8.0   expanded plate
     private var H_COLLAPSED:Number; // 2.0  its collapsed bar
     private var TIME_FS:Number;   // 2.0   time readout font
-    private var NAME_H:Number;    // 1.4x NAME_FS
     private var TIME_H:Number;    // 2.7   time readout field
-    private var BTN_GAP:Number;   // 0.42
     private var BTN_PAD:Number;   // 0.5   button row inset (tighter than PAD)
     // BTN_W is derived here, never the base's 5.0: three equal buttons plus
     // their gaps must land inside the plate at every FS.
@@ -75,14 +73,11 @@ class KazBarsStopwatch extends KazBarsPanel implements KazBarsModule {
         START_Y = Number(cfg.y);
         START_COLLAPSED = (cfg.collapsed == true);
         applyBaseSize(Number(cfg.fontSize));
-        LEAD = Math.round(FS * 0.15);
         W = Math.round(FS * 15.8);
         H = Math.round(FS * 8);
         H_COLLAPSED = Math.round(FS * 2);
         TIME_FS = Math.round(FS * 2);
-        NAME_H = Math.round(NAME_FS * 1.4);
         TIME_H = Math.round(FS * 2.7);
-        BTN_GAP = Math.round(FS * 0.42);
         BTN_PAD = Math.round(FS * 0.5);
         // Derived, never fixed: three equal buttons plus their gaps must land
         // inside the plate at every FS, so the width falls out of the others.
@@ -96,6 +91,7 @@ class KazBarsStopwatch extends KazBarsPanel implements KazBarsModule {
         panelClip = rootClip.createEmptyMovieClip("kbStopwatch", rootClip.getNextHighestDepth());
         panelClip._x = START_X;
         panelClip._y = START_Y;
+        stageOn(true);
         collapsed = START_COLLAPSED;
 
         chrome = panelClip.createEmptyMovieClip("chrome", panelClip.getNextHighestDepth());
@@ -107,10 +103,6 @@ class KazBarsStopwatch extends KazBarsPanel implements KazBarsModule {
         // Separate collapsed label at the base font size, swapped on _visible —
         // the inspect/console convention, so the three collapsed bars match.
         collTF = makeCollapsedLabel("Stopwatch");
-
-        // The readout doubles as a copyable value for pinning a default spot
-        // in the app.
-        makeCoordReadout(0, W - PAD * 2 - BTN, LINE);
 
         // Invisible drag handle over the title band (stops short of the
         // collapse button so it keeps its own press). Redrawn per fold state.
@@ -125,13 +117,10 @@ class KazBarsStopwatch extends KazBarsPanel implements KazBarsModule {
         timeTF.text = lastText;
 
         var by:Number = H - PAD - BTN_H;
-        btnStart = makeButton(m_Body, "btnStart", "Start", BTN_PAD, by,
-                              Math.round(FS * 0.9));
-        btnPause = makeButton(m_Body, "btnPause", "Pause", BTN_PAD + BTN_W + BTN_GAP,
-                              by, Math.round(FS * 0.9));
+        btnStart = makeButton(m_Body, "btnStart", "Start", BTN_PAD, by);
+        btnPause = makeButton(m_Body, "btnPause", "Pause", BTN_PAD + BTN_W + BTN_GAP, by);
         var btnReset:MovieClip = makeButton(m_Body, "btnReset", "Reset",
-                                            BTN_PAD + (BTN_W + BTN_GAP) * 2, by,
-                                            Math.round(FS * 0.9));
+                                            BTN_PAD + (BTN_W + BTN_GAP) * 2, by);
         btnStart.onRelease = function() { this._self.startWatch(); };
         btnPause.onRelease = function() { this._self.pauseWatch(); };
         btnReset.onRelease = function() { this._self.resetWatch(); };
@@ -251,7 +240,7 @@ class KazBarsStopwatch extends KazBarsPanel implements KazBarsModule {
 
     // One plate at two heights — folding keeps the title band and drops the
     // body, and the title swaps to the collapsed label. Everything sitting on
-    // the band — label, readout, button and the drag strip — re-centres on
+    // the band — label, button and the drag strip — re-centres on
     // whichever height is on screen, at the state's own inset. curW/curH feed
     // the base drag clamp.
     private function applyCollapsed():Void {
@@ -264,11 +253,7 @@ class KazBarsStopwatch extends KazBarsPanel implements KazBarsModule {
         collTF._visible = collapsed;
         titleTF._y = Math.floor((TITLE_H - NAME_H) / 2);
         collTF._y = Math.floor((H_COLLAPSED - LINE) / 2);
-        coordTF._x = pad;
-        coordTF._y = Math.floor((band - LINE) / 2);
-        coordTF._width = W - pad * 2 - BTN;
-        collapseBtn._x = W - pad - BTN;
-        collapseBtn._y = Math.floor((band - BTN) / 2);
+        seatCollapseBtn(W - pad - BTN, band);
         dragMC.clear();
         dragMC.beginFill(0, 0);
         rectPath(dragMC, 0, 0, W - pad - BTN, band);
@@ -307,8 +292,8 @@ class KazBarsStopwatch extends KazBarsPanel implements KazBarsModule {
 
     public function loadState(config:Object):Void {
         if (config == null || panelClip == null) return;
-        // Fold state first: the position clamp needs the height actually on
-        // screen, or a saved spot near the bottom snaps up on every relog.
+        // Fold state first: the seat clamp needs the height actually on screen,
+        // or a saved spot near the bottom snaps up on every relog.
         var c:Object = config.FindEntry("swc");
         if (c !== undefined) {
             collapsed = (c == 1);
@@ -319,15 +304,18 @@ class KazBarsStopwatch extends KazBarsPanel implements KazBarsModule {
         var x:Object = config.FindEntry("swx");
         var y:Object = config.FindEntry("swy");
         if (x !== undefined && y !== undefined) {
-            panelClip._x = KazBarsPanel.clampPos(Number(x), Stage.width - W);
-            panelClip._y = KazBarsPanel.clampPos(Number(y), Stage.height - (collapsed ? H_COLLAPSED : H));
+            posX = Number(x);
+            posY = Number(y);
+            seat();
         }
     }
 
+    // The spot, not the clamp (KazBarsPanel.seat): a drag moved the plate, and that is the spot now.
     public function saveState(config:Object):Void {
         if (config == null || panelClip == null) return;
-        config.ReplaceEntry("swx", panelClip._x);
-        config.ReplaceEntry("swy", panelClip._y);
+        keepSpot();
+        config.ReplaceEntry("swx", posX);
+        config.ReplaceEntry("swy", posY);
         config.ReplaceEntry("swc", collapsed ? 1 : 0);
         config.ReplaceEntry("swv", active ? 1 : 0);
     }
@@ -336,6 +324,7 @@ class KazBarsStopwatch extends KazBarsPanel implements KazBarsModule {
         stopDriver();
         running = false;
         paused = false;
+        stageOn(false);
         if (panelClip != null) {
             panelClip.removeMovieClip();
             panelClip = null;

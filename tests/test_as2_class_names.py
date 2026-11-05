@@ -15,6 +15,7 @@ import re
 from pathlib import Path
 
 from kazbars.buff_database import BuffDatabase
+from kazbars.grid_model import validate_grid
 from kazbars.grids_generator import CodeGenerator
 
 ASSETS = Path(__file__).resolve().parents[1] / 'src' / 'kazbars' / 'assets' / 'kazbars'
@@ -44,11 +45,7 @@ def test_every_generated_data_class_keeps_the_prefix():
     # The grid data is packed across KazBarsData1..N. base.swf never
     # bootstraps those, but the whole generated set stays under the prefix
     # so nothing shipped or generated can shadow a game-side class.
-    grid = {
-        'id': 'G', 'type': 'player', 'rows': 1, 'cols': 1, 'iconSize': 32,
-        'gap': 0, 'fx': 0.0, 'fy': 0.0, 'slotMode': 'dynamic', 'showTimers': False,
-        'fillDirection': 'LR', 'sortOrder': 'longest', 'layout': 'buffFirst',
-    }
+    grid = validate_grid({'id': 'G', 'whitelist': [222609]})
     _, data = CodeGenerator([grid], _db(), '0.0.0').generate()
     declared = re.findall(r'^class (\w+) \{', data, re.M)
     assert declared == ['KazBarsData', 'KazBarsData1']
