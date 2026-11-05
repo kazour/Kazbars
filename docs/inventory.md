@@ -57,7 +57,7 @@
 | `src/kazbars/grid_preview.py` | 274 |
 | `src/kazbars/grid_preview_canvas.py` | 195 |
 | `src/kazbars/grids_generator.py` | 790 |
-| `src/kazbars/grids_panel.py` | 901 |
+| `src/kazbars/grids_panel.py` | 921 |
 | `src/kazbars/inspect.py` | 79 |
 | `src/kazbars/inspect_catalog.py` | 618 |
 | `src/kazbars/inspect_panel.py` | 393 |
@@ -86,9 +86,9 @@
 | `src/kazbars/timer_overlay.py` | 372 |
 | `src/kazbars/ui_collapsible.py` | 243 |
 | `src/kazbars/ui_components.py` | 677 |
-| `src/kazbars/ui_forms.py` | 567 |
+| `src/kazbars/ui_forms.py` | 513 |
 | `src/kazbars/ui_headers.py` | 197 |
-| `src/kazbars/ui_helpers.py` | 202 |
+| `src/kazbars/ui_helpers.py` | 199 |
 | `src/kazbars/ui_tk_style.py` | 67 |
 | `src/kazbars/ui_widgets.py` | 328 |
 | `src/kazbars/update_check.py` | 64 |
@@ -142,7 +142,7 @@
 | `tests/test_overlay_rung.py` | 145 |
 | `tests/test_overlay_size.py` | 226 |
 | `tests/test_panel_ratios.py` | 162 |
-| `tests/test_panels_construct.py` | 1043 |
+| `tests/test_panels_construct.py` | 1148 |
 | `tests/test_prefs.py` | 76 |
 | `tests/test_prefs_migration.py` | 68 |
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |

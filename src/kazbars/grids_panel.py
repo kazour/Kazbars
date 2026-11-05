@@ -1,6 +1,7 @@
 """
 KazBars — Grid Editor Panel
-Grid configuration UI: add/edit/delete grids, whitelist editing, slot assignment.
+Grid configuration UI: the class tabs and the list of grid cards (add, delete,
+reorder by drag, Alt+arrows or a card's ▲ ▼), the empty state's presets.
 """
 
 import copy
@@ -11,6 +12,7 @@ from tkinter import ttk
 logger = logging.getLogger(__name__)
 
 
+from . import grid_preview
 from .classes import CLASSES, by_id
 from .extras_shortcuts import ExtrasShortcutsRow
 from .grid_dialogs import AddGridWizard
@@ -28,6 +30,7 @@ from .grid_model import (
 )
 from .grids_generator import free_id
 from .overlay import DEFAULT_SIZE, FONT_CHOICES, SIZE_CHOICES, font_label
+from .overlay_size import grid_metrics
 from .prefs import ANCHOR_SIDE_DEFAULT, ANCHOR_UP_DEFAULT
 from .profile_document import build_signature
 from .settings_manager import get_setting, set_setting
@@ -36,7 +39,6 @@ from .ui_components import (
     create_scrollable_frame,
     scroll_widget_into_view,
 )
-from .ui_forms import draw_band_cells, draw_grid_cells
 from .ui_helpers import (
     BTN_MEDIUM,
     FONT_BODY,
@@ -56,6 +58,8 @@ from .ui_helpers import (
     PRESET_CARD_BAR_SHORT,
     PRESET_CARD_SQUARE,
     PRESET_LABEL_AREA,
+    PREVIEW_RATIO,
+    PREVIEW_SLOT_SPACING,
     STEP_BADGE_PX,
     THEME_COLORS,
     TK_COLORS,
@@ -504,10 +508,13 @@ class GridsPanel(ttk.Frame):
 
     def _redraw_empty_cards(self):
         """Redraw grid shape previews on empty state cards using current type
-        color; an overhead dynamic preset draws as the band it makes."""
+        color; an overhead dynamic preset draws as the band it makes. Drawn
+        like a grid card's preview (`grid_preview.layout`, a new grid's icons),
+        stepped down to fit the card."""
         gtype = self._empty_type_var.get()
         type_color = GRID_TYPE_COLORS[gtype]
         band = is_plate(gtype) and self._empty_mode_var.get() == 'dynamic'
+        icon = grid_metrics(self.base_size(), 100).icon
         for card, rows, cols, card_w, card_h in self._empty_cards:
             card.delete('cells')
             preview_h = card_h - PRESET_LABEL_AREA
@@ -516,10 +523,15 @@ class GridsPanel(ttk.Frame):
                                  anchor='center', fill=type_color,
                                  font=FONT_HEADING, tags='cells')
                 continue
-            if band:
-                draw_band_cells(card, snap_row_cap(cols), rows * cols, type_color, card_w, preview_h)
-            else:
-                draw_grid_cells(card, rows, cols, type_color, card_w, preview_h)
+            lay = grid_preview.layout(
+                rows, cols, icon=icon, gap=-1,
+                band=(snap_row_cap(cols), rows * cols) if band else None,
+                num=PREVIEW_RATIO[0], den=PREVIEW_RATIO[1], spacing=PREVIEW_SLOT_SPACING,
+                max_w=card_w - 2 * PAD_LF, max_h=preview_h - PAD_LF)
+            ox, oy = (card_w - lay.width) // 2, (preview_h - lay.height) // 2
+            for x0, y0, x1, y1 in lay.rects:
+                card.create_rectangle(ox + x0, oy + y0, ox + x1 - 1, oy + y1 - 1, fill=type_color,
+                                      outline=TK_COLORS['separator'], tags='cells')
 
     def _dismiss_tip(self):
         """Dismiss the tip bar permanently for this session."""
@@ -810,6 +822,7 @@ class GridsPanel(ttk.Frame):
                 name_in_use=self._grid_name_in_use,
                 on_edit=self._mark_modified,
                 on_move=self.move_or_copy,
+                on_step=self._step_card,
             )
             self.grid_panels.append(panel)
         self._repack_panels()
@@ -826,6 +839,12 @@ class GridsPanel(ttk.Frame):
         self._drag_manager.bind_handle(panel.drag_handle, index, panel_widget=panel)
         panel.drag_handle.bind('<Alt-Up>', lambda e, i=index: self._move_grid(i, -1))
         panel.drag_handle.bind('<Alt-Down>', lambda e, i=index: self._move_grid(i, 1))
+
+    def _step_card(self, panel, delta):
+        """A card's ▲ / ▼: the same move as Alt+↑/↓ on its handle."""
+        visible = self._visible()
+        n = visible.index(self.grid_panels.index(panel))
+        self._move_grid(n, delta)
 
     def _move_grid(self, index, delta):
         """Keyboard equivalent of dragging the ☰ handle. Clamps at both ends
@@ -864,6 +883,7 @@ class GridsPanel(ttk.Frame):
         visible = self._visible()
         for n, i in enumerate(visible):
             self._attach_panel(self.grid_panels[i], n)
+            self.grid_panels[i].set_step_state(n > 0, n < len(visible) - 1)
         if self.grids and not visible:
             tab = by_id(self._tab_var.get())
             self._tab_empty_lbl.configure(

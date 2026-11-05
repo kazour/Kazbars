@@ -961,6 +961,111 @@ def test_dialogs_confirm_and_focus(app, monkeypatch, method, getter):
     app.update()
 
 
+def _card_for(app, grid):
+    gp = app.grids_panel
+    gp.grids.append(grid)
+    gp.refresh_panels()
+    app.update()
+    return gp.grid_panels[-1]
+
+
+class _FakePicker:
+    """BuffSelectorDialog stand-in: records how it was opened, answers `result`."""
+    opened: list = []
+    result = None
+
+    def __init__(self, parent, database, title, initial_ids=None, layout='mixed'):
+        _FakePicker.opened.append((title, list(initial_ids or [])))
+        self.result = _FakePicker.result
+
+
+def test_a_static_cell_opens_the_picker_on_its_slot_and_repaints_that_cell(app, monkeypatch):
+    from kazbars import grid_editor_panel
+    from kazbars.grid_model import create_default_grid
+    card = _card_for(app, dict(create_default_grid('player', 3, 3, 'static', 'SeamSlots'),
+                               slotAssignments={'4': [11]}))
+    monkeypatch.setattr(grid_editor_panel, 'BuffSelectorDialog', _FakePicker)
+    monkeypatch.setattr(card, 'wait_window', lambda d: None)
+    painted = []
+    real = card.preview.repaint_slot
+    monkeypatch.setattr(card.preview, 'repaint_slot', lambda i: (painted.append(i), real(i)))
+    _FakePicker.opened, _FakePicker.result = [], [21, 22]
+
+    card.preview._activate(4)
+    assert _FakePicker.opened == [('Slot 4 Buffs', [11])]
+    assert card.grid_config['slotAssignments'] == {'4': [21, 22]}
+    assert painted == [4], "only that cell repaints"
+    assert '1 of 9 assigned' in card.section._summary_frame.winfo_children()[0].cget('text')
+    stored = app.profile_store.get_section('grids')['grids'][-1]
+    assert stored['slotAssignments'] == {'4': [21, 22]}
+
+
+def test_a_right_click_clears_a_slot_and_the_toast_puts_it_back(app, monkeypatch):
+    from kazbars import grid_editor_panel
+    from kazbars.grid_model import create_default_grid
+    card = _card_for(app, dict(create_default_grid('target', 2, 2, 'static', 'SeamClear'),
+                               slotAssignments={'0': [7], '3': [8]}))
+    toasts = []
+    monkeypatch.setattr(grid_editor_panel, 'app_toast',
+                        lambda w, msg, *a, **k: toasts.append((msg, k.get('on_click'))))
+    card.preview._clear(0)
+    card.preview._clear(3)
+    assert card.grid_config['slotAssignments'] == {}
+    assert toasts[-1][0] == 'Cleared slot 3 — click to undo'
+    assert grid_editor_panel.grid_preview.empty_nudge(card.grid_config) == card.names_var.get()
+    toasts[-1][1]()  # the toast's click
+    assert card.grid_config['slotAssignments'] == {'0': [7], '3': [8]}
+    rect = card.preview.find_withtag('slot_3&&rect')
+    assert card.preview.itemcget(rect, 'fill') == card._accent_color
+    card.preview._clear(1)  # an empty slot: nothing to clear
+    assert len(toasts) == 2
+
+
+def test_a_tall_grid_says_its_preview_stepped_down(app):
+    from kazbars.grid_model import create_default_grid
+    card = _card_for(app, create_default_grid('player', 6, 6, 'static', 'SeamTall'))
+    summary = card.section._summary_frame.winfo_children()[0].cget('text')
+    assert summary.endswith('· shown at 2:5')
+    assert card.preview.layout.height <= 128
+
+
+def test_a_disabled_card_drains_its_preview(app):
+    from kazbars.grid_model import create_default_grid
+    from kazbars.ui_helpers import TK_COLORS
+    card = _card_for(app, dict(create_default_grid('player', 1, 3, 'dynamic', 'SeamDrain'),
+                               whitelist=[5]))
+    rect = card.preview.find_withtag('slot_0&&rect')
+    assert card.preview.itemcget(rect, 'fill') == card._accent_color
+    card.enabled_var.set(False)
+    card._on_enabled_toggled()
+    assert card.preview.itemcget(rect, 'fill') == TK_COLORS['border']
+    assert card.names_var.get()  # the names line stays
+
+
+def test_a_band_card_redraws_when_its_row_cap_changes(app):
+    from kazbars.grid_model import create_default_grid
+    card = _card_for(app, create_default_grid('friendly', 2, 5, 'dynamic', 'SeamBandDraw'))
+    lay = card.preview.layout
+    assert len(lay.rects) == 10 and lay.rects[0][1] > lay.rects[9][1]  # rows from the bottom
+    card._row_cap_var.set(3)
+    card._on_band_changed()
+    assert card.preview.layout.width < lay.width and len(card.preview.layout.rects) == 10
+
+
+def test_step_arrows_move_a_card_and_grey_at_the_ends(app):
+    from kazbars.ui_helpers import TK_COLORS
+    gp = app.grids_panel
+    _add_seam_grid(app, 'SeamStepA')
+    _add_seam_grid(app, 'SeamStepB')
+    first, last = gp.grid_panels[0], gp.grid_panels[-1]
+    assert not first._step_labels[-1].live and first._step_labels[1].live
+    assert not last._step_labels[1].live
+    assert str(last._step_labels[1].cget('foreground')) == TK_COLORS['menu_disabled_fg']
+    last._on_step(last, -1)
+    ids = [g['id'] for g in app.profile_store.get_section('grids')['grids']]
+    assert ids[-2:] == ['SeamStepB', 'SeamStepA']
+
+
 def test_a_band_card_writes_its_cap_slots_and_overhead_keys(app):
     from kazbars.grid_model import create_default_grid
     gp = app.grids_panel
