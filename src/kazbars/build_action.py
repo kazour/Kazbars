@@ -153,9 +153,9 @@ def build(app):
     if not _declarations_gate(app):
         return
 
-    # Mirror the grid cards into the store (a field mid-typing hasn't fired
-    # on_change yet), then flush, so built == saved and the build signature
-    # hashes what actually gets baked; the summary line names the profile.
+    # Mirror the grid cards into the store, then flush, so built == saved and
+    # the build signature hashes what actually gets baked; the summary line
+    # names the profile.
     profile_name = None
     if app.profile_store is not None:
         app._on_grids_edited()

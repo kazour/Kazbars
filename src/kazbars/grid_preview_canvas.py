@@ -194,7 +194,7 @@ class GridPreview(tk.Canvas):
 
     def _on_click(self, event):
         self.focus_set()
-        i = self._slot_at(event)
+        i = self._slot_at(event) if self._static() else 0
         self._set_hot(i)
         self._activate(i)
 

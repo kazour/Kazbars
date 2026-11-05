@@ -1053,6 +1053,21 @@ def test_an_undo_lands_on_the_card_a_rebuild_put_in_its_place(app, monkeypatch):
     assert app.profile_store.get_section('grids')['grids'][-1]['slotAssignments'] == {'1': [9]}
 
 
+def test_the_draft_previews_what_apply_stores(app):
+    from kazbars.grid_model import create_default_grid
+    card = _card_for(app, create_default_grid('player', 1, 5, 'static', 'SeamDraftFill'))
+    dlg = _settings(card)
+    dlg.rows_var.set('3')
+    dlg.cols_var.set('3')  # typed, no arrow or focus-out: Enter applies it as is
+    assert dlg.draft()['fillDirection'] == 'BL-TR', "a row's LR no longer fits a box"
+    dlg.rows_var.set('10')
+    dlg.cols_var.set('8')
+    assert (dlg.draft()['rows'], dlg.draft()['cols']) == (10, 6), "the slot limit holds"
+    dlg.apply()
+    cfg = card.grid_config
+    assert (cfg['rows'], cfg['cols'], cfg['fillDirection']) == (10, 6, 'BL-TR')
+
+
 def test_applying_a_smaller_shape_trims_slots_with_the_warning(app, monkeypatch):
     from kazbars import grid_editor_panel
     from kazbars.grid_model import create_default_grid

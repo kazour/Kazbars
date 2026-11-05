@@ -31,9 +31,12 @@ from kazbars.grid_model import (
     max_shape,
     max_slots,
     project_px,
+    ref_list,
+    settle_box,
     slot_count,
     snap_row_cap,
     unproject_px,
+    valid_fills,
     validate_grid,
 )
 
@@ -263,3 +266,16 @@ def test_a_new_overhead_grid_is_a_band_or_a_box_with_bar_timers():
     assert create_default_grid("player", 1, 1)["slotMode"] == "static"
     assert snap_row_cap(4) == 5 and snap_row_cap(2) == 3 and snap_row_cap(6) == 7
     assert (BAND_ROW_CAPS, BAND_ROW_CAP_DEFAULT, BAND_SLOTS_DEFAULT) == ((3, 5, 7), 5, 10)
+
+
+def test_a_box_settles_inside_its_limits_with_a_fill_that_fits():
+    assert settle_box(10, 8, 'LR', 'player', False) == (10, 6, 'BL-TR')  # 64 slots
+    assert settle_box(1, 1, 'LR', 'player', True) == (1, 2, 'LR')  # never a dynamic 1x1
+    assert settle_box(1, 1, 'LR', 'player', False) == (1, 1, 'LR')
+    assert settle_box(5, 9, 'TB', 'hostile', False) == (4, 4, 'BL-TR')
+    assert valid_fills(3, 1) == (('TB', 'BT'), 'BT')
+
+
+def test_a_ref_list_reads_a_scalar_as_one_and_drops_empty_entries():
+    assert ref_list(5) == [5] and ref_list(None) == [] and ref_list(0) == []
+    assert ref_list([7, None, '', 0, 8]) == [7, 8]

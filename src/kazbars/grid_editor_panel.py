@@ -22,7 +22,7 @@ from tkinter import ttk
 from . import grid_preview
 from .classes import CLASSES
 from .grid_dialogs import BuffSelectorDialog
-from .grid_model import band_shape, is_band, is_plate, ref_list, valid_fills
+from .grid_model import is_band, is_plate, ref_list, settle_box
 from .grid_preview_canvas import GridPreview
 from .grid_settings_dialog import open_grid_settings
 from .overlay import DEFAULT_SIZE
@@ -56,10 +56,6 @@ from .ui_widgets import (
 _CLEAR_UNDO_S = 8
 # The names line's width before the card is first laid out.
 _NAMES_FALLBACK_W = 600
-# The settings a Grid Settings Apply copies from its draft onto the config.
-_SETTING_KEYS = ('id', 'scale', 'gap', 'timerStyle', 'timerYOffset', 'enableFlashing',
-                 'timerFlashThreshold', 'fx', 'fy', 'plateOffset', 'maxDistance', 'showSelf',
-                 'fillDirection', 'sortOrder', 'layout')
 
 
 def _names_measure(widget):
@@ -252,8 +248,10 @@ class GridEditorPanel(ttk.Frame):
                           cursor='hand2' if live else '', takefocus=live)
 
     def focus_step(self, delta):
-        """Keyboard focus to ▲ (-1) or ▼ (1), after a move by it."""
-        self._step_labels[delta].focus_set()
+        """Keyboard focus to ▲ (-1) or ▼ (1) after a move by it, so Enter
+        repeats; the ☰ handle once the move reached the end and greyed it."""
+        lbl = self._step_labels[delta]
+        (lbl if lbl.live else self.drag_handle).focus_set()  # type: ignore[attr-defined]
 
     def _show_move_menu(self, anchor):
         """Move to / Copy to, each listing All classes and the twelve classes;
@@ -427,7 +425,7 @@ class GridEditorPanel(ttk.Frame):
         self._write_slot(slot, [])
         self._buffs_changed()
         app_toast(self, f"Cleared slot {slot} — click to undo", 'info', _CLEAR_UNDO_S,
-                  key=f'grid-slot-clear-{id(self.grid_config)}', on_click=self._undo_clear)
+                  key=f'grid-slot-clear-{id(self)}', on_click=self._undo_clear)
 
     def _undo_clear(self):
         """Refill the slots still empty since their clear; a slot filled again
@@ -467,47 +465,35 @@ class GridEditorPanel(ttk.Frame):
         return None
 
     def preview_draft(self, draft):
-        """Draw a Grid Settings draft in place of the stored config."""
-        self._refresh_view(draft)
+        """Draw a Grid Settings draft over the stored config."""
+        self._refresh_view(dict(self.grid_config, **draft))
 
     def cancel_draft(self):
         """The dialog closed without Apply: back to the stored config."""
         self._refresh_view()
 
     def apply_settings(self, draft):
-        """Land a Grid Settings draft on the config, then run the rules a
-        shape change has: a band derives its shape from row cap and max slots;
-        a static grid's shrink trims its assignments (restored on a regrow); a
-        dynamic grid is never 1x1; a fill that no longer fits resets."""
+        """Land a Grid Settings draft (the settings it owns) on the config.
+        The shape goes through `settle_box` again — the draft already did, so
+        this guards only a caller that skipped it — and a static grid's change
+        of slot count trims its assignments (restored on a regrow)."""
         cfg = self.grid_config
         old_shape = (cfg.get('rows', 1), cfg.get('cols', 1), cfg.get('rowCap'), cfg.get('maxSlots'))
         old_total = grid_preview.slot_total(cfg)
-        for key in _SETTING_KEYS:
-            if key in draft:
-                cfg[key] = draft[key]
+        cfg.update({k: v for k, v in draft.items() if k != 'selfCastOnly'})
         if draft.get('selfCastOnly') is True:
             cfg['selfCastOnly'] = True
         else:
             cfg.pop('selfCastOnly', None)
-        if self._band:
-            rows, cols = band_shape(draft['rowCap'], draft['maxSlots'])
-            cfg.update(rowCap=draft['rowCap'], maxSlots=draft['maxSlots'],
-                       rows=rows, cols=cols, fillDirection='C')
-        else:
-            rows, cols = draft['rows'], draft['cols']
-            if rows == 1 and cols == 1 and cfg.get('slotMode') == 'dynamic':
-                cols = 2
-                app_toast(self, "Dynamic grids need at least 2 slots, switched to 1×2", 'info',
-                          key='grid_resize')
-            cfg['rows'], cfg['cols'] = rows, cols
+        if not self._band:
+            rows, cols, fill = settle_box(cfg['rows'], cfg['cols'], cfg.get('fillDirection'),
+                                          cfg.get('type', 'player'), cfg.get('slotMode') == 'dynamic')
+            cfg.update(rows=rows, cols=cols, fillDirection=fill)
             if cfg.get('slotMode') == 'static':
                 if rows * cols < old_total:
                     self._trim_slot_assignments(rows * cols)
                 elif rows * cols > old_total:
                     self._restore_orphaned_assignments(rows * cols)
-            codes, default = valid_fills(rows, cols)
-            if cfg.get('fillDirection') not in codes:
-                cfg['fillDirection'] = default
         self._refresh_view()
         new_shape = (cfg['rows'], cfg['cols'], cfg.get('rowCap'), cfg.get('maxSlots'))
         if new_shape != old_shape and self._on_resize:

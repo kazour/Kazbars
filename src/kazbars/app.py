@@ -761,8 +761,7 @@ class KazBarsApp(ttkb.Window):
         self.title(f"{APP_NAME} — {name}")
 
     def _save_now(self):
-        """Ctrl+S: mirror the grid cards into the store (a field mid-typing
-        hasn't fired on_change yet — only arrows/focus-out do), flush, confirm."""
+        """Ctrl+S: mirror the grid cards into the store, flush, confirm."""
         if self.profile_store:
             self._on_grids_edited()
             if self.profile_store.flush():

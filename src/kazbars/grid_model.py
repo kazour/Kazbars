@@ -119,12 +119,29 @@ def valid_fills(rows, cols):
     return ('TL-BR', 'TR-BL', 'BL-TR', 'BR-TL'), 'BL-TR'
 
 
+def settle_box(rows, cols, fill, grid_type, dynamic):
+    """A box grid's (rows, cols, fill) after its shape rules: each side inside
+    its max, the columns giving way to the slot limit, a dynamic grid never
+    1x1 (it becomes 1x2), and a fill that no longer fits the shape falls back
+    to the shape's default. The settings dialog's draft and its Apply both
+    run it, so the preview shows what Apply stores."""
+    max_rows, max_cols = max_shape(grid_type)
+    rows, cols = max(1, min(rows, max_rows)), max(1, min(cols, max_cols))
+    limit = max_slots(grid_type)
+    if rows * cols > limit:
+        cols = max(1, limit // rows)
+    if dynamic and rows == 1 and cols == 1:
+        cols = 2
+    codes, default = valid_fills(rows, cols)
+    return rows, cols, fill if fill in codes else default
+
+
 def ref_list(value):
     """A whitelist or slot-assignment value as a list of buff refs: a bare
     scalar (an imported or hand-edited profile can carry one known id instead
-    of a list) reads as one, nothing as none."""
+    of a list) reads as one, nothing as none, and an empty entry is no ref."""
     if isinstance(value, list):
-        return value
+        return [v for v in value if v]
     return [value] if value else []
 
 

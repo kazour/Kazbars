@@ -13,8 +13,9 @@ preview it drives. Cards, built only where they apply:
 - **Overhead** (overhead grids): Height, Range; Over me (friendly).
 - **Sorting** (dynamic grids): Fill (a band's reads Centred), Sort, Order.
 
-Every change rebuilds a draft (the config with this dialog's values on top)
-and hands it to the card, whose preview draws it live (`preview_draft`).
+Every change rebuilds a draft (the settings this dialog owns, the shape
+already through `grid_model.settle_box`) and hands it to the card, whose
+preview draws it over the config live (`preview_draft`).
 Cancel redraws the card from the stored config (`cancel_draft`); Apply hands
 the draft to `apply_settings`, which lands it and runs the resize rules. The
 dialog never writes the config itself.
@@ -34,6 +35,7 @@ from .grid_model import (
     max_shape,
     max_slots,
     project_px,
+    settle_box,
     unproject_px,
     valid_fills,
 )
@@ -184,17 +186,23 @@ class GridSettingsDialog(tk.Toplevel):
 
     def _place_by_card(self):
         """Under the card, right edges aligned; above it when the screen has
-        no room below. The card's preview stays in view either way."""
+        no room below. The card's preview stays in view either way. Only the
+        position is set: the window keeps sizing to its content (a name hint
+        grows it)."""
         self.update_idletasks()
-        w, h = self.winfo_reqwidth(), self.winfo_reqheight()
         card = self.card
+        top = card.winfo_toplevel()
+        # The frame's title bar sits above the client area winfo_reqheight
+        # measures; the app window wears the same one.
+        bar = max(0, top.winfo_rooty() - top.winfo_y())
+        w, h = self.winfo_reqwidth(), self.winfo_reqheight() + bar
         x = card.winfo_rootx() + card.winfo_width() - w
         below = card.winfo_rooty() + card.winfo_height() + PAD_XS
         y = below
         if clamp_to_screen(x, below, w, h)[1] < below:
             y = card.winfo_rooty() - h - PAD_XS
         x, y = clamp_to_screen(x, y, w, h)
-        self.geometry(f"{w}x{h}+{x}+{y}")
+        self.geometry(f"+{x}+{y}")
 
     # ------------------------------------------------------------------
     # Cards
@@ -377,7 +385,8 @@ class GridSettingsDialog(tk.Toplevel):
                 _int(self.cols_var, self._cfg.get('cols', 1), 1, max_cols))
 
     def _on_shape(self, dim):
-        """Rows or Cols moved: the edited one gives way to the slot limit."""
+        """Rows or Cols moved: the edited one gives way to the slot limit, and
+        a dynamic grid steps off 1x1, each with a toast."""
         rows, cols = self._shape()
         limit = max_slots(self._type)
         if rows * cols > limit:
@@ -388,6 +397,10 @@ class GridSettingsDialog(tk.Toplevel):
                 cols = max(1, limit // rows)
                 self.cols_var.set(str(cols))
             app_toast(self.card, f"A grid holds at most {limit} slots", 'info', key='grid_resize')
+        if not self._static and rows == 1 and cols == 1:
+            self.cols_var.set('2')
+            app_toast(self.card, "Dynamic grids need at least 2 slots, switched to 1×2", 'info',
+                      key='grid_resize')
         if not self._static:
             self._sync_fill_options()
         self._changed()
@@ -424,17 +437,20 @@ class GridSettingsDialog(tk.Toplevel):
     # Draft, Apply, Cancel
     # ------------------------------------------------------------------
     def draft(self):
-        """The config with this dialog's values on top — what Apply would land."""
+        """The settings this dialog owns, as Apply would land them: the shape
+        through `settle_box` (a band's from its row cap and max slots)."""
         cfg = self._cfg
-        out = dict(cfg)
-        out['id'] = self.id_var.get().strip()
+        out = {'id': self.id_var.get().strip()}
         if self._band:
             slots = _int(self.max_slots_var, cfg.get('maxSlots', 10), 1, PLATE_MAX_SLOTS)
             cap = self.row_cap_var.get()
             rows, cols = band_shape(cap, slots)
-            out.update(rowCap=cap, maxSlots=slots, rows=rows, cols=cols)
+            out.update(rowCap=cap, maxSlots=slots, rows=rows, cols=cols, fillDirection='C')
         else:
-            out['rows'], out['cols'] = self._shape()
+            fill = (_FILL_CODE_BY_LABEL.get(self.fill_var.get(), cfg.get('fillDirection'))
+                    if not self._static else cfg.get('fillDirection'))
+            out['rows'], out['cols'], out['fillDirection'] = settle_box(
+                *self._shape(), fill, self._type, not self._static)
         if not self._plate:
             x = _int(self.x_var, self._px0[0], 0, self._res[0])
             y = _int(self.y_var, self._px0[1], 0, self._res[1])
@@ -457,8 +473,6 @@ class GridSettingsDialog(tk.Toplevel):
             if self._type == 'friendly':
                 out['showSelf'] = bool(self.show_self_var.get())
         if not self._static:
-            if not self._band:
-                out['fillDirection'] = _FILL_CODE_BY_LABEL.get(self.fill_var.get(), cfg.get('fillDirection'))
             out['sortOrder'] = _SORT_CODE_BY_LABEL.get(self.sort_var.get(), cfg.get('sortOrder', 'longest'))
             out['layout'] = _LAYOUT_CODE_BY_LABEL.get(self.layout_var.get(), cfg.get('layout', 'buffFirst'))
         return out
