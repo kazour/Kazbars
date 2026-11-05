@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 
 from as2c.swf import TAG_DO_INIT_ACTION, Movie
-from kazbars import damageinfo_settings, grids_generator, inspect_catalog
+from kazbars import damageinfo_settings, grids_generator, inspect_catalog, onslaught
 from kazbars.buff_database import BuffDatabase
 from kazbars.damageinfo_generator import build_damageinfo
 from kazbars.grid_model import create_default_grid, validate_grid
@@ -67,7 +67,8 @@ def _worst_case():
     whitelisting the whole catalog (the per-grid slot cap bounds slots, not the
     ids a grid references), a static grid, ids that need escaping or collide
     once sanitized, a friendly band and a full hostile box, and every module on at its
-    largest (the inspect panel with every catalog row)."""
+    largest (the inspect panel with every catalog row, the onslaught tracker with every
+    display, the camps and 20 custom names at the length cap)."""
     every_primary = [b["ids"][0] for b in _db().buffs]
     grids = [_grid(f"All {k}", cols=8, whitelist=every_primary) for k in range(8)]
     grids += [
@@ -85,6 +86,9 @@ def _worst_case():
         stopwatch_config={"enabled": True, "scale": 200},
         inspect_config={"enabled": True, "scale": 200, "rows": [r.key for r in inspect_catalog.ROWS]},
         console_config={"enabled": True, "scale": 200, "tabs": ["casts", "buffs"]},
+        onslaught_config={"enabled": True, "scale": 200, "camps": True,
+                          "custom": [f"Mob {i:02d} " + "x" * (onslaught.NAME_MAX - 7)
+                                     for i in range(onslaught.CUSTOM_MAX)]},
         overlay={"size": 24, "font": "Arial"},
     )
     return grids, extras
@@ -132,10 +136,8 @@ def test_every_module_class_is_in_the_full_build(builds):
                 "KazBarsWorld", "KazBarsClock", "KazBarsCastTimer", "KazBarsStopwatch",
                 "KazBarsInspect", "KazBarsInspectRows", "KazBarsInspectData", "KazBarsPreviewPanel",
                 "KazBarsOverhead", "KazBarsRelations", "KazBarsConsole", "KazBarsConBuffs",
-                "KazBarsConCasts", "KazBarsConList"):
+                "KazBarsConCasts", "KazBarsConList", "KazBarsOnslaught", "KazBarsOnsScan"):
         assert cls in sizes, cls
-    for cls in ("KazBarsOnslaught",):
-        assert cls not in sizes, f"{cls} is gated off"
 
 
 def test_the_empty_build_carries_no_module_but_the_grids_and_the_panel(builds):

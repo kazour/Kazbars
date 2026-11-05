@@ -9,7 +9,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-from . import inspect_catalog
+from . import inspect_catalog, onslaught
 from .build_utils import compile_as2, resolve_assets_path
 from .cast_timer import is_enabled as cast_is_enabled
 from .cast_timer import validate_config as validate_cast_config
@@ -213,6 +213,7 @@ class CodeGenerator:
         stopwatch_config=None,
         inspect_config=None,
         console_config=None,
+        onslaught_config=None,
         overlay=None,
         anchor=None,
         game_resolution=None,
@@ -247,6 +248,8 @@ class CodeGenerator:
         self.include_inspect = self.inspect_config["enabled"]
         self.console_config = validate_console_config(console_config)
         self.include_console = console_ships(self.console_config)
+        self.onslaught_config = onslaught.validate_config(onslaught_config)
+        self.include_onslaught = onslaught.ships(self.onslaught_config)
 
     def _archive_key(self, grid_id):
         """Stable per-build archive key for a grid's persisted position — a
@@ -433,6 +436,45 @@ class CodeGenerator:
         ids = ", ".join(str(i) for i in inspect_catalog.watch_ids(inspect_catalog.pvp_rows()))
         return f"\n        d.INS.pvp = {{groups: [{groups}], rows: [{rows}], ids: [{ids}]}};"
 
+    def _onslaught_data_block(self):
+        """`d.ONS`: the board's and the alerts' first-load spots (fixed
+        fractions — both are placed in game), the text size and displays;
+        `d.ONS.watch`, one array per kind (`b`, `s`, `m`, `c`), each the watched
+        names of that kind, a kind no display reads left empty (bosses, skulls
+        and minis feed the list and the alerts, camps only the list); the AoE
+        helpers, the heal buffs and the per-playfield facts."""
+        c = self.onslaught_config
+
+        def quoted(names):
+            return ", ".join(f'"{escape_as2_string(n)}"' for n in names)
+
+        def names(kind, wanted):
+            return quoted(onslaught.names_of(c, kind)) if wanted else ""
+
+        listed = c["showList"] or c["showAlerts"]
+        lines = [
+            f"        d.ONS = {{x: {project_px(1560 / 1920, self.game_w)}, "
+            f"y: {project_px(300 / 1080, self.game_h)}, "
+            f"ax: {project_px(960 / 1920, self.game_w)}, ay: {project_px(200 / 1080, self.game_h)}, "
+            f"fontSize: {panel_fs(self.base_size, c['scale'])}, list: {_bool(c['showList'])}, "
+            f"alerts: {_bool(c['showAlerts'])}, wave: {_bool(c['showWave'])}, "
+            f"aoe: {_bool(c['showAoe'])}, ally: {_bool(c['showAlly'])}, "
+            f"alertMs: {c['alertSeconds'] * 1000}}};",
+            "        d.ONS.watch = {",
+            f"            b: [{names(onslaught.BOSS, listed)}],",
+            f"            s: [{names(onslaught.SKULL, listed)}],",
+            f"            m: [{names(onslaught.MINI, listed)}],",
+            f"            c: [{names(onslaught.CAMP, c['showList'])}]",
+            "        };",
+            f"        d.ONS.helpers = [{quoted(onslaught.AOE_HELPERS)}];",
+            f"        d.ONS.heal = [{quoted(onslaught.HEAL_BUFFS)}];",
+            "        d.ONS.pf = {};",
+        ]
+        lines += [f'        d.ONS.pf[{i.playfield}] = {{start: "{escape_as2_string(i.start_hint)}", '
+                  f'spawnMs: {i.spawn_ms}, ally: "{escape_as2_string(i.ally)}", aoe: {_bool(i.aoe)}}};'
+                  for i in onslaught.INSTANCES]
+        return "\n" + "\n".join(lines)
+
     def _console_data_block(self):
         """`d.CON`: the console's text size and its tabs in the strip's order."""
         c = self.console_config
@@ -499,6 +541,8 @@ class CodeGenerator:
             lines.append(self._inspect_data_block())
             lines.append(self._inspect_rows_block())
             lines.append(self._pvp_view_block())
+        if self.include_onslaught:
+            lines.append(self._onslaught_data_block())
         if self.include_console:
             lines.append(self._console_data_block())
 
@@ -592,7 +636,7 @@ class CodeGenerator:
             "CONCASTS": self.include_console and "casts" in self.console_config["tabs"],
             "CAST": self.include_cast_timer,
             "INS": self.include_inspect,
-            "ONS": False,
+            "ONS": self.include_onslaught,
             "PLATE": self.include_overhead,
             "SW": self.include_stopwatch,
         })
@@ -659,6 +703,7 @@ def build_grids(
     stopwatch_config: dict | None = None,
     inspect_config: dict | None = None,
     console_config: dict | None = None,
+    onslaught_config: dict | None = None,
     overlay: dict | None = None,
     anchor: tuple[int, int] | None = None,
     game_resolution: tuple[int, int] | None = None,
@@ -696,6 +741,7 @@ def build_grids(
             stopwatch_config=stopwatch_config,
             inspect_config=inspect_config,
             console_config=console_config,
+            onslaught_config=onslaught_config,
             overlay=overlay,
             anchor=anchor,
             game_resolution=game_resolution,

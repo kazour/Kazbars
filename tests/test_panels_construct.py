@@ -122,6 +122,7 @@ OPENERS = [
     ('_open_inspect_settings', lambda a: a.inspect_dialog),
     ('_open_cast_timer_settings', lambda a: a.cast_timer_dialog),
     ('_open_console_settings', lambda a: a.console_dialog),
+    ('_open_onslaught_settings', lambda a: a.onslaught_dialog),
     ('_show_about', lambda a: a._about_popup),
 ]
 
@@ -694,6 +695,7 @@ EXTRAS_OPENERS = {
     'console': '_open_console_settings',
     'damage_numbers': '_open_damage_numbers',
     'inspect': '_open_inspect_settings',
+    'onslaught': '_open_onslaught_settings',
     'stopwatch': '_open_stopwatch_settings',
 }
 

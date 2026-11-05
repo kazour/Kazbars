@@ -107,6 +107,7 @@ files = [
     "src/kazbars/inspect.py",
     "src/kazbars/inspect_catalog.py",
     "src/kazbars/live_tracker_settings.py",
+    "src/kazbars/onslaught.py",
     "src/kazbars/overlay.py",
     "src/kazbars/overlay_size.py",
     "src/kazbars/paths.py",

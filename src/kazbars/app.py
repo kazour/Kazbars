@@ -27,6 +27,7 @@ from kazbars import (
     grid_model,
     inspect,
     live_tracker_settings,
+    onslaught,
     overlay,
     profile_io,
     stopwatch,
@@ -147,6 +148,7 @@ class KazBarsApp(ttkb.Window):
         self.registry.register(cast_timer.PROFILE_SECTION)
         self.registry.register(damageinfo_settings.PROFILE_SECTION)
         self.registry.register(console.PROFILE_SECTION)
+        self.registry.register(onslaught.PROFILE_SECTION)
         # The XML editors' sparse PATCH-lane overrides — never dispatched on
         # profile switch (profile_io.apply_document only touches BUILD/LIVE).
         self.registry.register(damageinfo_settings.DAMAGE_COLORS_SECTION)
@@ -169,6 +171,7 @@ class KazBarsApp(ttkb.Window):
         self.inspect_dialog = None
         self.cast_timer_dialog = None
         self.console_dialog = None
+        self.onslaught_dialog = None
 
         # One shared focus gate for every overlay: hides them whenever neither
         # KazBars nor AoC owns the foreground window. Overlays register on
@@ -444,6 +447,8 @@ class KazBarsApp(ttkb.Window):
              'command': self._open_damage_numbers},
             {'type': 'command', 'label': 'Inspect panel…',
              'command': self._open_inspect_settings},
+            {'type': 'command', 'label': 'Onslaught tracker…',
+             'command': self._open_onslaught_settings},
             {'type': 'command', 'label': 'Stopwatch…',
              'command': self._open_stopwatch_settings},
         ])
@@ -644,6 +649,11 @@ class KazBarsApp(ttkb.Window):
         """Open the Cast Timer settings dialog (modal)."""
         from .cast_timer_panel import open_cast_timer_dialog
         open_cast_timer_dialog(self)
+
+    def _open_onslaught_settings(self):
+        """Open the Onslaught Tracker settings dialog (Extras ▸ Onslaught tracker…)."""
+        from .onslaught_panel import open_onslaught_dialog
+        open_onslaught_dialog(self)
 
     def _open_console_settings(self):
         """Open the in-game Console settings dialog (Extras ▸ Console…)."""

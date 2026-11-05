@@ -3,8 +3,8 @@ KazBars — Extras shortcuts row.
 
 Toggle cards along the bottom of the Grids tab, beside Build & Install —
 one per SWF-build extra, in Extras-menu order (Cast timer, Console, Damage
-numbers, Inspect panel, Stopwatch) so the row and the menu read as the same
-list. Each
+numbers, Inspect panel, Onslaught tracker, Stopwatch) so the row and the menu
+read as the same list. Each
 card carries two controls, not one: the **card body** opens that feature's
 Extras dialog (the same opener the menu item calls), and the **round switch**
 flips whether it ships in the next Build & Install, writing the same
@@ -22,6 +22,7 @@ Identity comes from the label — the cards rest neutral when off.
 import tkinter as tk
 from tkinter import ttk
 
+from . import onslaught
 from .console import ships as console_ships
 from .ui_helpers import (
     FONT_SECTION,
@@ -49,6 +50,12 @@ def _read_console(app):
     # The console ships only with a tab, so its card says so too.
     store = app.profile_store
     return store is not None and console_ships(store.get_section('console'))
+
+
+def _read_onslaught(app):
+    # The tracker ships only with a display on, so its card says so too.
+    store = app.profile_store
+    return store is not None and onslaught.ships(store.get_section('onslaught'))
 
 
 def _make_section_setter(key, side_flags=()):
@@ -102,6 +109,12 @@ _FEATURES = (
      '_open_inspect_settings',
      lambda app: _read_section(app, 'inspect'),
      _make_section_setter('inspect')),
+    ('onslaught', 'Onslaught tracker', 'next build removes it',
+     'Bosses, waves and spawn alerts in Skull Gate and Kuthchemes. '
+     'Click to open Extras ▸ Onslaught tracker…',
+     '_open_onslaught_settings',
+     _read_onslaught,
+     _make_section_setter('onslaught')),
     ('stopwatch', 'Stopwatch', 'next build removes it',
      'In-game Start / Pause / Reset timer panel. Click to open Extras ▸ Stopwatch…',
      '_open_stopwatch_settings',

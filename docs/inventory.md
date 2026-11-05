@@ -13,15 +13,15 @@
 |---|---:|
 | `src/kazbars/__init__.py` | 11 |
 | `src/kazbars/__main__.py` | 71 |
-| `src/kazbars/app.py` | 842 |
+| `src/kazbars/app.py` | 852 |
 | `src/kazbars/app_popups.py` | 491 |
 | `src/kazbars/boss_timer.py` | 399 |
 | `src/kazbars/buff_database.py` | 189 |
 | `src/kazbars/buff_db_layers.py` | 267 |
 | `src/kazbars/buff_display_editor.py` | 712 |
 | `src/kazbars/buff_xml.py` | 377 |
-| `src/kazbars/build_action.py` | 354 |
-| `src/kazbars/build_executor.py` | 391 |
+| `src/kazbars/build_action.py` | 359 |
+| `src/kazbars/build_executor.py` | 392 |
 | `src/kazbars/build_loading.py` | 521 |
 | `src/kazbars/build_utils.py` | 62 |
 | `src/kazbars/cast_timer.py` | 94 |
@@ -44,7 +44,7 @@
 | `src/kazbars/deeps_rolling_window.py` | 81 |
 | `src/kazbars/deeps_settings.py` | 336 |
 | `src/kazbars/deeps_trackers.py` | 182 |
-| `src/kazbars/extras_shortcuts.py` | 263 |
+| `src/kazbars/extras_shortcuts.py` | 276 |
 | `src/kazbars/first_launch.py` | 405 |
 | `src/kazbars/focus_watcher.py` | 85 |
 | `src/kazbars/foreground.py` | 111 |
@@ -54,7 +54,7 @@
 | `src/kazbars/grid_dialogs.py` | 940 |
 | `src/kazbars/grid_editor_panel.py` | 883 |
 | `src/kazbars/grid_model.py` | 396 |
-| `src/kazbars/grids_generator.py` | 744 |
+| `src/kazbars/grids_generator.py` | 790 |
 | `src/kazbars/grids_panel.py` | 894 |
 | `src/kazbars/inspect.py` | 79 |
 | `src/kazbars/inspect_catalog.py` | 618 |
@@ -62,6 +62,8 @@
 | `src/kazbars/instructions_panel.py` | 1143 |
 | `src/kazbars/live_tracker_panel.py` | 521 |
 | `src/kazbars/live_tracker_settings.py` | 175 |
+| `src/kazbars/onslaught.py` | 204 |
+| `src/kazbars/onslaught_panel.py` | 308 |
 | `src/kazbars/overlay.py` | 122 |
 | `src/kazbars/overlay_engine.py` | 800 |
 | `src/kazbars/overlay_size.py` | 126 |
@@ -98,7 +100,7 @@
 | `tests/test_boss_timer.py` | 151 |
 | `tests/test_buff_db_layers.py` | 266 |
 | `tests/test_buff_xml.py` | 324 |
-| `tests/test_build_compile.py` | 182 |
+| `tests/test_build_compile.py` | 184 |
 | `tests/test_build_executor.py` | 660 |
 | `tests/test_cast_timer.py` | 122 |
 | `tests/test_classes.py` | 59 |
@@ -132,11 +134,12 @@
 | `tests/test_log_name.py` | 22 |
 | `tests/test_manifest.py` | 124 |
 | `tests/test_mypy_gate.py` | 74 |
+| `tests/test_onslaught.py` | 185 |
 | `tests/test_overlay_config.py` | 102 |
 | `tests/test_overlay_rung.py` | 138 |
 | `tests/test_overlay_size.py` | 226 |
 | `tests/test_panel_ratios.py` | 162 |
-| `tests/test_panels_construct.py` | 937 |
+| `tests/test_panels_construct.py` | 939 |
 | `tests/test_prefs.py` | 58 |
 | `tests/test_prefs_migration.py` | 68 |
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |

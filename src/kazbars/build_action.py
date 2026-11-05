@@ -16,7 +16,7 @@ from pathlib import Path
 
 from ttkbootstrap.dialogs import Messagebox
 
-from . import game_folder
+from . import game_folder, onslaught
 from .app_popups import show_close_game_required_dialog
 from .build_loading import BuildLoadingScreen
 from .cast_timer import is_enabled as cast_is_enabled
@@ -83,18 +83,21 @@ def build(app):
     # Extras stand on their own: nothing downstream needs a grid, so an
     # extras-only build is legitimate. Mirrors the generator's include gates —
     # cast through is_enabled on the validated config, stopwatch/inspect off
-    # their own flag. The three configs are profile sections; snapshot-copy
-    # them off the live store dicts here so the worker thread never reads a
-    # dict the main thread could mutate.
+    # their own flag, the console and the onslaught tracker off their ships().
+    # Each config is a profile section; snapshot-copy them off the live store
+    # dicts here so the worker thread never reads a dict the main thread
+    # could mutate.
     cast_config = validate_cast_config(dict(app.profile_store.get_section('cast_timer')))
     stopwatch_config = dict(app.profile_store.get_section('stopwatch'))
     inspect_config = dict(app.profile_store.get_section('inspect'))
     console_config = dict(app.profile_store.get_section('console'))
+    onslaught_config = dict(app.profile_store.get_section('onslaught'))
     any_extra = (
         cast_is_enabled(cast_config)
         or bool(stopwatch_config.get('enabled'))
         or bool(inspect_config.get('enabled'))
         or console_ships(console_config)
+        or onslaught.ships(onslaught_config)
         or di_enabled
     )
 
@@ -177,6 +180,7 @@ def build(app):
         'stopwatch_config': stopwatch_config,
         'inspect_config': inspect_config,
         'console_config': console_config,
+        'onslaught_config': onslaught_config,
         'overlay': dict(app.profile_store.get_section('overlay')),
         'anchor': (app.settings.get('anchor_side'), app.settings.get('anchor_up')),
         'game_resolution': get_game_resolution_or_default(),
@@ -231,6 +235,7 @@ def _build_worker(app, loading, ctx):
             stopwatch_config=ctx['stopwatch_config'],
             inspect_config=ctx['inspect_config'],
             console_config=ctx['console_config'],
+            onslaught_config=ctx['onslaught_config'],
             overlay=ctx['overlay'],
             anchor=ctx['anchor'],
             game_resolution=ctx['game_resolution'],
