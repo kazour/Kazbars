@@ -51,8 +51,8 @@
 | `src/kazbars/game_folder.py` | 430 |
 | `src/kazbars/game_persistence.py` | 608 |
 | `src/kazbars/game_resolution.py` | 160 |
-| `src/kazbars/grid_dialogs.py` | 951 |
-| `src/kazbars/grid_editor_panel.py` | 890 |
+| `src/kazbars/grid_dialogs.py` | 622 |
+| `src/kazbars/grid_editor_panel.py` | 1021 |
 | `src/kazbars/grid_model.py` | 380 |
 | `src/kazbars/grid_preview.py` | 274 |
 | `src/kazbars/grid_preview_canvas.py` | 195 |
@@ -84,9 +84,9 @@
 | `src/kazbars/stopwatch_panel.py` | 209 |
 | `src/kazbars/swf_font.py` | 302 |
 | `src/kazbars/timer_overlay.py` | 372 |
-| `src/kazbars/ui_collapsible.py` | 232 |
+| `src/kazbars/ui_collapsible.py` | 243 |
 | `src/kazbars/ui_components.py` | 677 |
-| `src/kazbars/ui_forms.py` | 562 |
+| `src/kazbars/ui_forms.py` | 567 |
 | `src/kazbars/ui_headers.py` | 197 |
 | `src/kazbars/ui_helpers.py` | 202 |
 | `src/kazbars/ui_tk_style.py` | 67 |

@@ -459,13 +459,14 @@ def create_slider_row(parent, label_text, from_, to, initial, suffix, on_drag, o
 
 def size_slider(parent, initial, hint, on_commit=None, *, label="Size:", length=120,
                 label_font=FONT_FORM_LABEL, label_color=None, tooltip=None, padx=0,
-                label_sink=None):
+                label_sink=None, on_move=None):
     """Inline `label · slider · "N %" · hint` for a module's `scale`: a percent
     of the profile's overlay size, 50-200 in steps of 5 (`snap_scale`).
 
     `hint(p)` names what p means on screen ("48 px icons", "12 pt") and is
     redrawn as the slider moves. `on_commit()` fires on button/key release
-    when the value moved, so a drag is one write. Returns `(scale, var,
+    when the value moved, so a drag is one write; `on_move(p)`, when given,
+    fires on every 5 % step of a drag or key, for a live preview. Returns `(scale, var,
     refresh)`: `var` is the IntVar holding the snapped value; after setting it
     (a profile load) or when the overlay size changes under it, call
     `refresh()` to move the thumb and redraw. `label_sink`, when given a list,
@@ -489,6 +490,8 @@ def size_slider(parent, initial, hint, on_commit=None, *, label="Size:", length=
         if p != var.get():
             var.set(p)
             _show()
+            if on_move is not None:
+                on_move(p)
 
     scale = ttk.Scale(parent, from_=SCALE_MIN, to=SCALE_MAX, value=var.get(),
                       orient="horizontal", length=length, command=_drag)
@@ -515,6 +518,8 @@ def size_slider(parent, initial, hint, on_commit=None, *, label="Size:", length=
         var.set(snap_scale(p))
         scale.set(var.get())
         _show()
+        if on_move is not None:
+            on_move(var.get())
         return "break"
 
     for seq, step in (("<Left>", -SCALE_STEP), ("<Up>", -SCALE_STEP),

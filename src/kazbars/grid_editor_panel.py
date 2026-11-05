@@ -3,15 +3,25 @@
 `GridEditorPanel` is one card in the grids list. The container `GridsPanel`
 (in `grids_panel.py`) creates/destroys these as the grid list changes.
 
+Every card shows, collapsed or not: the title line (name, type, summary;
+Move…, Enabled, ▲ ▼, ×), the grid drawn to scale (`GridPreview`) and the
+names line under it. The preview is where buffs are chosen: a dynamic grid's
+opens the Tracked Buffs picker, a static grid's cell opens it on that slot,
+and a right-click (or Delete) clears a slot with an undo toast. The chevron
+opens the settings form, every change redrawing the preview.
+
 Module-level option maps (`_FILL_*`, `_LAYOUT_*`, `_SORT_*`) are private to
 this module — the container does not read them.
 """
 
+import time
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import ttk
 
+from . import grid_preview
 from .classes import CLASSES
-from .grid_dialogs import BuffSelectorDialog, SlotAssignmentDialog
+from .grid_dialogs import BuffSelectorDialog
 from .grid_model import (
     BAND_ROW_CAPS,
     CLAMP_SPECS,
@@ -25,12 +35,11 @@ from .grid_model import (
     project_px,
     unproject_px,
 )
+from .grid_preview_canvas import GridPreview
 from .overlay import DEFAULT_SIZE
 from .overlay_size import grid_metrics
 from .ui_collapsible import CollapsibleSection
 from .ui_forms import (
-    draw_band_cells,
-    draw_grid_cells,
     labeled_combobox,
     labeled_spinbox,
     position_entry,
@@ -43,15 +52,14 @@ from .ui_helpers import (
     FONT_SMALL,
     FONT_SMALL_BOLD,
     FONT_SYMBOL,
-    GRID_PREVIEW_PX,
     GRID_TYPE_COLORS,
     PAD_BUTTON_GAP,
-    PAD_LF,
     PAD_MICRO,
     PAD_MID,
     PAD_ROW,
     PAD_TAB,
     PAD_XS,
+    PREVIEW_RATIO,
     THEME_COLORS,
     TK_COLORS,
 )
@@ -63,13 +71,27 @@ from .ui_widgets import (
     bind_label_press_effect,
 )
 
+# How long a cleared slot stays undoable — the undo toast's own life.
+_CLEAR_UNDO_S = 8
+# The names line's width before the card is first laid out.
+_NAMES_FALLBACK_W = 600
+_names_font = None
+
+
+def _measure(text):
+    """Pixel width of `text` in the names line's font (one Font for every card)."""
+    global _names_font
+    if _names_font is None:
+        _names_font = tkfont.Font(font=FONT_SMALL)
+    return _names_font.measure(text)
+
 
 class GridEditorPanel(ttk.Frame):
     """A collapsible grid editor card."""
 
     def __init__(self, parent, database, grid_config, on_delete=None, initially_open=False,
                  get_base_size=None, on_resize=None, on_whitelist_changed=None,
-                 name_in_use=None, on_edit=None, on_move=None):
+                 name_in_use=None, on_edit=None, on_move=None, on_step=None):
         super().__init__(parent)
         self.database = database
         self.grid_config = grid_config
@@ -83,6 +105,14 @@ class GridEditorPanel(ttk.Frame):
         self._on_edit = on_edit
         # on_move(card, class_id, copy): Move to… / Copy to… another class tab.
         self._on_move = on_move
+        # on_step(card, delta): ▲ / ▼, one place up or down the listed cards.
+        self._on_step = on_step
+        # Cleared slots still undoable: slot -> (refs, when cleared).
+        self._cleared = {}
+        self._names = []
+        self._names_w = 0
+        self.x_var = tk.StringVar()
+        self.y_var = tk.StringVar()
 
         grid_type = grid_config.get('type', 'player')
         self._accent_color = GRID_TYPE_COLORS.get(grid_type, GRID_TYPE_COLORS['player'])
@@ -124,28 +154,24 @@ class GridEditorPanel(ttk.Frame):
             badge_text=grid_type,
             badge_color=self._accent_color,
             initially_open=initially_open,
+            keep_summary=True,
         )
         self.section.pack(side='left', fill='x', expand=True,
                           padx=PAD_ROW, pady=(PAD_BUTTON_GAP, PAD_ROW))
 
         self._build_header_widgets()
+        self._build_body()
 
-        content_wrapper = ttk.Frame(self.section.content)
-        content_wrapper.pack(fill='x')
-        settings_col = ttk.Frame(content_wrapper)
-        settings_col.pack(side='left', fill='x', expand=True)
-
-        self._preview_canvas = tk.Canvas(
-            content_wrapper, width=GRID_PREVIEW_PX, height=GRID_PREVIEW_PX,
-            bg=TK_COLORS['bg'], highlightthickness=0)
-        self._preview_canvas.pack(side='right', padx=(PAD_XS, 0), pady=PAD_XS)
-
+        settings_col = ttk.Frame(self.section.content)
+        settings_col.pack(fill='x')
+        if not self._plate:
+            self._build_position_row(settings_col)
         self._build_top_row(settings_col)
         self._build_icon_row(settings_col)
         if self._plate:
             self._build_overhead_row(settings_col)
         self._build_timer_row(settings_col)
-        self._build_info_and_dynamic(settings_col)
+        self._build_dynamic_row(settings_col)
 
         self.load_from_config()
         self._apply_enabled_styling(self.enabled_var.get())
@@ -165,10 +191,9 @@ class GridEditorPanel(ttk.Frame):
             foreground=THEME_COLORS['heading'] if lit else THEME_COLORS['muted'])
 
     def _build_header_widgets(self):
-        """Pack right-side header controls: × delete, Enabled toggle, X/Y, mode button."""
-        cfg = self.grid_config
+        """Pack the right-side header controls, left to right: Move…, Enabled,
+        ▲ ▼ and × delete."""
         header = self.section.header_frame
-        max_x, max_y = get_game_resolution_or_default()
 
         self.enabled_var = tk.BooleanVar(value=True)
         delete_label = ttk.Label(header, text="×",
@@ -181,6 +206,10 @@ class GridEditorPanel(ttk.Frame):
         bind_label_hover_colors(delete_label, THEME_COLORS['muted'], THEME_COLORS['danger_text'])
         bind_label_press_effect(delete_label, THEME_COLORS['danger_text'])
         add_tooltip(delete_label, "Delete this grid")
+        self._step_labels = {}
+        for glyph, delta, tip in (("▼", 1, "Move this grid down the list"),
+                                  ("▲", -1, "Move this grid up the list")):
+            self._step_labels[delta] = self._make_step_label(header, glyph, delta, tip)
         if self._on_move is not None:
             move_label = ttk.Label(header, text="Move…", font=FONT_SMALL,
                                    foreground=THEME_COLORS['muted'], cursor='hand2',
@@ -195,24 +224,66 @@ class GridEditorPanel(ttk.Frame):
                         command=self._on_enabled_toggled,
                         bootstyle="success-round-toggle").pack(side='right', padx=(0, PAD_XS))  # type: ignore[call-arg]
 
-        # An overhead grid floats over each character it shows on: no screen position.
-        self.x_var = tk.StringVar(value=str(cfg.get('x', 0)))
-        self.y_var = tk.StringVar(value=str(cfg.get('y', 0)))
-        if not self._plate:
-            pos_frame = ttk.Frame(header)
-            pos_frame.pack(side='right', padx=(0, PAD_LF))
-            position_entry(pos_frame, "X:", self.x_var, lo=0, hi=max_x,
-                           tooltip="Horizontal position on screen (pixels from left edge)",
-                           on_change=self._notify_edit,
-                           label_color=THEME_COLORS['muted'], padx=(PAD_MICRO, PAD_MID))
-            position_entry(pos_frame, "Y:", self.y_var, lo=0, hi=max_y,
-                           tooltip="Vertical position on screen (pixels from top edge)",
-                           on_change=self._notify_edit,
-                           label_color=THEME_COLORS['muted'], padx=(PAD_MICRO, 0))
+    def _make_step_label(self, header, glyph, delta, tip):
+        """▲ or ▼: a glyph label like ×, live unless the card sits at that end
+        of the list (`set_step_state`)."""
+        lbl = ttk.Label(header, text=glyph, font=FONT_SMALL, foreground=THEME_COLORS['muted'],
+                        cursor='hand2', takefocus=True, padding=(PAD_MICRO, PAD_MICRO))
+        lbl.pack(side='right', padx=(PAD_XS, 0))
+        lbl.live = True  # type: ignore[attr-defined]
 
-        ttk.Button(header, text="Tracked Buffs...",
-                   command=self._on_mode_btn_click,
-                   bootstyle='info-outline').pack(side='right', padx=(0, PAD_LF))  # type: ignore[call-arg]
+        def paint(hot):
+            if lbl.live:  # type: ignore[attr-defined]
+                lbl.configure(foreground=THEME_COLORS['heading'] if hot else THEME_COLORS['muted'])
+
+        def fire(_e):
+            if lbl.live and self._on_step is not None:  # type: ignore[attr-defined]
+                self._on_step(self, delta)
+
+        for seq in ('<Button-1>', '<Return>', '<space>'):
+            lbl.bind(seq, fire)
+        for seq, hot in (('<Enter>', True), ('<FocusIn>', True), ('<Leave>', False), ('<FocusOut>', False)):
+            lbl.bind(seq, lambda e, h=hot: paint(h), add='+')
+        add_tooltip(lbl, tip)
+        return lbl
+
+    def set_step_state(self, can_up, can_down):
+        """Grey ▲ at the top of the list and ▼ at the bottom."""
+        for delta, live in ((-1, can_up), (1, can_down)):
+            lbl = self._step_labels[delta]
+            lbl.live = live  # type: ignore[attr-defined]
+            lbl.configure(foreground=THEME_COLORS['muted'] if live else TK_COLORS['menu_disabled_fg'],
+                          cursor='hand2' if live else '', takefocus=live)
+
+    def _build_body(self):
+        """The always-visible part: the to-scale preview and the names line."""
+        body = self.section.body
+        self.preview = GridPreview(body, accent=self._accent_color, on_pick=self._on_pick,
+                                   on_clear=self.clear_slot, tip_for=self._preview_tip)
+        self.preview.pack(anchor='w', pady=(PAD_XS, PAD_MICRO))
+        self.names_var = tk.StringVar()
+        self._names_label = ttk.Label(body, textvariable=self.names_var, font=FONT_SMALL,
+                                      foreground=THEME_COLORS['muted'])
+        self._names_label.pack(anchor='w', fill='x')
+        add_tooltip(self._names_label, self._names_tip)
+        body.bind('<Configure>', self._on_body_resized, add='+')
+
+    def _build_position_row(self, parent):
+        """A screen grid's X / Y (an overhead grid floats over each character
+        it shows on: no screen position)."""
+        max_x, max_y = get_game_resolution_or_default()
+        row = ttk.Frame(parent)
+        row.pack(fill='x', pady=(0, PAD_ROW))
+        ttk.Label(row, text="Position:", font=FONT_SMALL_BOLD,
+                  foreground=THEME_COLORS['body']).pack(side='left', padx=(0, PAD_XS))
+        position_entry(row, "X:", self.x_var, lo=0, hi=max_x,
+                       tooltip="Horizontal position on screen (pixels from left edge)",
+                       on_change=self._notify_edit,
+                       label_color=THEME_COLORS['muted'], padx=(PAD_MICRO, PAD_MID))
+        position_entry(row, "Y:", self.y_var, lo=0, hi=max_y,
+                       tooltip="Vertical position on screen (pixels from top edge)",
+                       on_change=self._notify_edit,
+                       label_color=THEME_COLORS['muted'], padx=(PAD_MICRO, 0))
 
     def _show_move_menu(self, anchor):
         """Move to / Copy to, each listing All classes and the twelve classes;
@@ -320,7 +391,7 @@ class GridEditorPanel(ttk.Frame):
         _, self.scale_var, self._refresh_size = size_slider(
             icon_row, self.grid_config.get('scale', 100),
             lambda p: f"{grid_metrics(self._get_base_size(), p).icon} px icons",
-            on_commit=self._notify_edit,
+            on_commit=self._on_look_edit, on_move=self._on_size_moved,
             tooltip="Icon, timer and stack size, as a percent of the overlay size "
                     "(Overlay, top of the Grids tab)",
             padx=PAD_TAB)
@@ -328,12 +399,14 @@ class GridEditorPanel(ttk.Frame):
         self.gap_var = tk.IntVar()
         labeled_spinbox(icon_row, "Gap:", self.gap_var, from_=-5, to=10, width=3,
             tooltip="Space between icons (-5 = overlapping, 0 = touching, 10 = spaced out)",
-            on_change=self._notify_edit,
+            on_change=self._on_look_edit,
             padx=(PAD_BUTTON_GAP, PAD_MID))
 
     def refresh_size_hint(self):
-        """The overlay size changed under this card: redraw the Size hint."""
+        """The overlay size changed under this card: redraw the Size hint and
+        the preview, which draws the icons at their baked size."""
         self._refresh_size()
+        self._refresh_view()
 
     def _build_timer_row(self, parent):
         """Pack the Timers style + Y offset, the Flash group and Applied by me."""
@@ -381,23 +454,12 @@ class GridEditorPanel(ttk.Frame):
         self.self_cast_var = tk.BooleanVar()
         self_cast_cb = ttk.Checkbutton(timer_row, text="Applied by me",
                                        variable=self.self_cast_var,
-                                       command=self._notify_edit)
+                                       command=self._on_look_edit)
         self_cast_cb.pack(side='left')
         add_tooltip(self_cast_cb, "Show an effect only while you are the one who applied it")
 
-    def _build_info_and_dynamic(self, parent):
-        """Pack whitelist/slot summary row and the Fill/Sort/Group dynamic options."""
-        info_row = ttk.Frame(parent)
-        info_row.pack(fill='x', pady=(0, PAD_ROW))
-
-        self.info_text = tk.StringVar(value="No buffs tracked. Click 'Tracked Buffs...' to add some.")
-        ttk.Label(info_row, textvariable=self.info_text,
-                  foreground=THEME_COLORS['muted'], font=FONT_SMALL).pack(side='left', padx=(0, PAD_LF))
-        self.whitelist_preview_var = tk.StringVar(value="")
-        self.whitelist_preview_label = ttk.Label(
-            parent, textvariable=self.whitelist_preview_var,
-            foreground=THEME_COLORS['muted'], font=FONT_SMALL)
-
+    def _build_dynamic_row(self, parent):
+        """Pack the Fill/Sort/Order dynamic options."""
         self.dynamic_frame = ttk.Frame(parent)
         dyn_row = ttk.Frame(self.dynamic_frame)
         dyn_row.pack(fill='x', pady=(0, PAD_ROW))
@@ -405,7 +467,7 @@ class GridEditorPanel(ttk.Frame):
         self.fill_var = tk.StringVar()
         self.fill_combo = labeled_combobox(dyn_row, "Fill:", self.fill_var, [], width=22,
             tooltip=lambda: _FILL_DESCRIPTIONS.get(self.fill_var.get(), "Direction buffs fill into the grid"),
-            on_change=self._notify_edit,
+            on_change=self._on_look_edit,
             padx=(PAD_BUTTON_GAP, PAD_TAB))
 
         self.sort_var = tk.StringVar()
@@ -469,19 +531,36 @@ class GridEditorPanel(ttk.Frame):
         else:
             self.dynamic_frame.pack(fill='x')
 
-        self.update_labels()
-        self._update_preview()
+        self._refresh_view()
 
-    def _update_preview(self):
-        """Redraw the small grid shape preview in the card: a band as it grows
-        over a head (rows from the bottom, each centred), any other grid as its box."""
-        cfg = self.grid_config
-        if self._band:
-            draw_band_cells(self._preview_canvas, cfg.get('rowCap', 5), cfg.get('maxSlots', 10),
-                            self._accent_color, GRID_PREVIEW_PX, GRID_PREVIEW_PX)
-            return
-        draw_grid_cells(self._preview_canvas, cfg.get('rows', 1), cfg.get('cols', 5),
-                        self._accent_color, GRID_PREVIEW_PX, GRID_PREVIEW_PX)
+    def _refresh_view(self):
+        """Redraw the preview, then the lines that read it (the summary says
+        the ratio the preview settled on)."""
+        self._update_preview()
+        self.update_labels()
+
+    def _update_preview(self, scale=None):
+        """Draw the grid to scale: its icons at their baked size (`scale`,
+        mid-drag, ahead of the stored one)."""
+        if scale is None:
+            scale = self.grid_config.get('scale', 100)
+        icon = grid_metrics(self._get_base_size(), scale).icon
+        self.preview.set_config(self.grid_config, icon, bool(self.enabled_var.get()))
+
+    def _on_size_moved(self, scale):
+        """A Size drag step: the preview and its ratio follow at once; the
+        value itself commits on release."""
+        self._update_preview(scale)
+        self._update_summary()
+
+    def _on_look_edit(self):
+        """A field the preview or summary draws from changed (size, gap, fill,
+        Applied by me): commit it, then redraw. The commit flushes every card's
+        widgets into its config (`save_to_config`), so the redraw reads it."""
+        self._notify_edit()
+        if self._on_edit is None:
+            self.save_to_config()
+        self._refresh_view()
 
     def _validate_name(self, interactive=True):
         """Red on empty or duplicate, commit on valid. Never rewrites the field —
@@ -576,63 +655,76 @@ class GridEditorPanel(ttk.Frame):
         self.grid_config['layout'] = _LAYOUT_CODE_BY_LABEL.get(
             self.layout_var.get(), self.grid_config.get('layout', 'buffFirst'))
 
+    def _name_of(self, ref):
+        """A buff ref as its database name, `(missing #id)` when gone."""
+        if isinstance(ref, str):
+            return ref
+        return (self.database.by_id.get(ref) or {}).get('name', f"(missing #{ref})")
+
     def _format_buff_preview(self, ids, max_show=4):
         """Comma-separated preview of buff names for up to *max_show* IDs."""
-        names = [
-            (self.database.by_id.get(bid) or {}).get('name', f"(missing #{bid})")
-            for bid in ids[:max_show]
-        ]
+        names = [self._name_of(bid) for bid in ids[:max_show]]
         extra = f" + {len(ids) - max_show} more" if len(ids) > max_show else ""
         return ", ".join(names) + extra
 
-    def update_labels(self):
-        """Refresh whitelist, slot assignment, and header summary labels."""
+    def _update_summary(self):
         cfg = self.grid_config
-        wl = cfg.get('whitelist', [])
-        rows = cfg.get('rows', 1)
-        cols = cfg.get('cols', 5)
+        shown_at = grid_preview.ratio_text(PREVIEW_RATIO[0], self.preview.ratio, PREVIEW_RATIO[1])
+        self.section.set_summary("  " + grid_preview.summary(
+            cfg, applied_by_me=bool(self.self_cast_var.get()), shown_at=shown_at))
 
-        sa = cfg.get('slotAssignments', {})
-        assigned_ids = []
-        for v in sa.values():
-            if isinstance(v, list):
-                assigned_ids.extend(b for b in v if b)
-            elif v:
-                assigned_ids.append(v)
-        configured = sum(1 for v in sa.values() if v)
+    def update_labels(self):
+        """Refresh the title, the summary and the names line."""
+        self.section.set_title(self.grid_config.get('id', 'Grid'))
+        self._update_summary()
+        self._names = [self._name_of(ref) for ref in grid_preview.held_ids(self.grid_config)]
+        self._draw_names()
 
+    def _draw_names(self):
+        """The names line, cut to the card's width: the buffs the grid holds,
+        or what to click while it holds nothing."""
+        nudge = grid_preview.empty_nudge(self.grid_config)
+        if nudge is not None:
+            self.names_var.set(nudge)
+            return
+        width = self.section.body.winfo_width()
+        self._names_w = width
+        self.names_var.set(grid_preview.names_line(
+            self._names, _measure, width if width > 1 else _NAMES_FALLBACK_W))
+
+    def _on_body_resized(self, event):
+        if event.width != self._names_w:
+            self._draw_names()
+
+    def _names_tip(self):
+        if not self._names:
+            return grid_preview.empty_nudge(self.grid_config) or ""
+        n = len(self._names)
+        return f"{n} buff{'s' if n != 1 else ''}: " + ", ".join(self._names)
+
+    def _preview_tip(self, slot):
+        cfg = self.grid_config
         if cfg.get('slotMode') == 'static':
-            self.info_text.set(f"{configured} of {rows * cols} slots assigned")
-        elif self._band and wl:
-            self.info_text.set(f"Tracking {len(wl)} buffs, up to {cfg.get('maxSlots', 10)} shown")
-        else:
-            self.info_text.set(
-                f"Tracking {len(wl)} buffs" if wl
-                else "No buffs tracked. Click 'Tracked Buffs...' to add some."
-            )
-
-        preview_ids = assigned_ids if cfg.get('slotMode') == 'static' else wl
-        if preview_ids:
-            self.whitelist_preview_var.set(self._format_buff_preview(preview_ids))
-            self.whitelist_preview_label.pack(fill='x', pady=(0, PAD_BUTTON_GAP))
-        else:
-            self.whitelist_preview_var.set("")
-            self.whitelist_preview_label.pack_forget()
-
-        self.section.set_title(cfg.get('id', 'Grid'))
+            if slot < 0:
+                return "Click a slot to choose its buffs"
+            return grid_preview.slot_tip(cfg, self._name_of, slot)
         if self._band:
-            self.section.set_summary(f"  up to {cfg.get('maxSlots', 10)} · "
-                                     f"{cfg.get('rowCap', 5)} wide · dynamic")
-        else:
-            self.section.set_summary(f"  {rows}×{cols} · {cfg.get('slotMode', 'dynamic')}")
+            return f"Click to choose the buffs this grid tracks — it shows up to {cfg.get('maxSlots', 10)}"
+        return "Click to choose the buffs this grid tracks"
 
-    def _on_mode_btn_click(self):
-        if self.grid_config.get('slotMode') == 'static':
-            self.edit_slots()
-        else:
+    def _on_pick(self, slot):
+        if slot is None:
             self.edit_whitelist()
+        else:
+            self.edit_slot(slot)
+
+    def _buffs_changed(self):
+        self.update_labels()
+        if self._on_whitelist_changed:
+            self._on_whitelist_changed()
 
     def edit_whitelist(self):
+        """The Tracked Buffs picker on the whitelist (a dynamic grid's preview)."""
         self.save_to_config()
         dialog = BuffSelectorDialog(
             self.winfo_toplevel(), self.database, "Edit Tracked Buffs",
@@ -642,19 +734,59 @@ class GridEditorPanel(ttk.Frame):
         self.wait_window(dialog)
         if dialog.result is not None:
             self.grid_config['whitelist'] = dialog.result
-            self.update_labels()
-            if self._on_whitelist_changed:
-                self._on_whitelist_changed()
+            self._update_preview()
+            self._buffs_changed()
 
-    def edit_slots(self):
+    def edit_slot(self, slot):
+        """The same picker on one static slot (a click on its cell)."""
         self.save_to_config()
-        dialog = SlotAssignmentDialog(self.winfo_toplevel(), self.database, self.grid_config)
+        dialog = BuffSelectorDialog(
+            self.winfo_toplevel(), self.database, f"Slot {slot} Buffs",
+            initial_ids=grid_preview.slot_ids(self.grid_config, slot),
+            layout=self.grid_config.get('layout', 'mixed'),
+        )
         self.wait_window(dialog)
         if dialog.result is not None:
-            self.grid_config['slotAssignments'] = dialog.result
-            self.update_labels()
-            if self._on_whitelist_changed:
-                self._on_whitelist_changed()
+            self._write_slot(slot, dialog.result)
+            self._buffs_changed()
+
+    def _write_slot(self, slot, refs):
+        """Set (or, with no refs, drop) static slot `slot` and repaint its cell."""
+        sa = self.grid_config.setdefault('slotAssignments', {})
+        sa.pop(slot, None)
+        if refs:
+            sa[str(slot)] = list(refs)
+        else:
+            sa.pop(str(slot), None)
+        self.preview.repaint_slot(slot)
+
+    def clear_slot(self, slot):
+        """Empty a static slot at once (right-click or Delete on its cell); the
+        toast's click puts back every slot cleared while it showed."""
+        refs = grid_preview.slot_ids(self.grid_config, slot)
+        if not refs:
+            return
+        now = time.monotonic()
+        self._cleared = {s: v for s, v in self._cleared.items() if now - v[1] < _CLEAR_UNDO_S}
+        self._cleared[slot] = (refs, now)
+        self._write_slot(slot, [])
+        self._buffs_changed()
+        app_toast(self, f"Cleared slot {slot} — click to undo", 'info', _CLEAR_UNDO_S,
+                  key=f'grid-slot-clear-{id(self)}', on_click=self._undo_clear)
+
+    def _undo_clear(self):
+        """Refill the slots still empty since their clear; a slot filled again
+        meanwhile keeps what it holds now."""
+        cleared, self._cleared = self._cleared, {}
+        if not self.winfo_exists():
+            return
+        restored = False
+        for slot, (refs, _when) in cleared.items():
+            if not grid_preview.slot_ids(self.grid_config, slot):
+                self._write_slot(slot, refs)
+                restored = True
+        if restored:
+            self._buffs_changed()
 
     def delete_grid(self):
         # No confirm — grids_panel shows an undo toast instead.
@@ -682,6 +814,7 @@ class GridEditorPanel(ttk.Frame):
         self._stripe.configure(
             bg=self._accent_color if enabled else TK_COLORS['border'])
         self.section.set_dimmed(not enabled)
+        self._update_preview()
 
     def _on_timers_clicked(self):
         """Timers dropdown handler — load_from_config calls _on_timers_toggled
@@ -719,8 +852,7 @@ class GridEditorPanel(ttk.Frame):
 
     def _on_band_changed(self):
         self._store_band_shape()
-        self.update_labels()
-        self._update_preview()
+        self._refresh_view()
         if self._on_resize:
             self._on_resize()
 
@@ -762,8 +894,7 @@ class GridEditorPanel(ttk.Frame):
             app_toast(self, "Dynamic grids need at least 2 slots, switched to 1×2", 'info',
                       key='grid_resize')
         self._update_fill_options(new_rows, new_cols)
-        self.update_labels()
-        self._update_preview()
+        self._refresh_view()
         if self._on_resize:
             self._on_resize()
 

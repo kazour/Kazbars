@@ -8,7 +8,7 @@ hygiene (which must ride this module's Tk instance — see the section note at
 the bottom). Event flow, visual correctness, and drag/animation behavior stay
 manual QA. Deferred to v2 (need a
 data context or block on wait_window): BuffSelectorDialog,
-SlotAssignmentDialog, BuffEditDialog, the first-launch dialog,
+BuffEditDialog, the first-launch dialog,
 show_close_game_required_dialog, BuildLoadingScreen, the settings_backup
 dialog, show_welcome_popup.
 

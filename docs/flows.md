@@ -98,18 +98,18 @@ End state: new grid config appended to `self.grids`; new `GridEditorPanel` card 
 
 ## 5. select tracked buffs for a dynamic grid
 
-Trigger: User clicks "Tracked Buffs..." on a dynamic-mode `GridEditorPanel` (the same button shows "Slot Assignments" in static mode and routes to a different dialog)
+Trigger: User clicks the to-scale preview on a dynamic-mode `GridEditorPanel` (or Tabs to it and presses Enter/space); on a static grid the click lands on one cell and opens the same picker on that slot instead
 
 Steps:
-1. `_on_mode_btn_click()` — src/kazbars/grid_editor_panel.py — dispatches to `edit_whitelist()` when grid is in dynamic mode (or `edit_slots()` for static)
+1. `GridPreview._activate()` — src/kazbars/grid_preview_canvas.py — a dynamic grid's preview calls the card's `on_pick(None)`; `GridEditorPanel._on_pick()` — src/kazbars/grid_editor_panel.py — routes `None` to `edit_whitelist()` (a slot index to `edit_slot()`)
 2. `edit_whitelist()` — src/kazbars/grid_editor_panel.py — flushes current widget state via `save_to_config()`; opens `BuffSelectorDialog`
 3. `BuffSelectorDialog.__init__()` — src/kazbars/grid_dialogs.py — resolves initial `whitelist` refs to entry names (`database.by_id` for ids, by name for preserved legacy strings); refs that don't resolve go to `unknown_refs` — inert, never silently dropped; restores last-used category/type filter from settings; calls `refresh_lists()`
 4. `BuffDatabase.search()` — src/kazbars/buff_database.py — filters `grouped_buffs` by query/category/type; sorts by type then name
 5. `BuffSelectorDialog.refresh_lists()` — src/kazbars/grid_dialogs.py — repopulates Available and Selected listboxes; per-row foreground tinted by buff type (`THEME_COLORS['type_debuff']`/`type_misc`) to mirror the Database editor; selected entries sort by type when the grid `layout` is `buffFirst` or `debuffFirst`, alphabetically when `mixed`. Unresolved refs cluster at the bottom of Selected as greyed (`dim_text`) "unknown buff (#id)" rows — removable like any row via `remove_selected()` (the one place a stored ref may be dropped, as an explicit act; "Clear" drops them too), and the status line appends "+ N unresolved"
 6. `BuffSelectorDialog.on_ok()` — src/kazbars/grid_dialogs.py — saves filter state; maps each selected name back to `entry['ids'][0]` via `database.get_entry_by_name()`; appends the surviving `unknown_refs` untouched; sets `self.result`
-7. `update_labels()` — src/kazbars/grid_editor_panel.py — refreshes whitelist count and buff-name preview text in card header (`_format_buff_preview` shows an unresolved ref as "(missing #id)")
+7. `_update_preview()` then `update_labels()` — src/kazbars/grid_editor_panel.py — the preview fills its cells in the type accent, the summary counts the buffs and the names line under the preview lists them (`grid_preview.names_line`; an unresolved ref reads "(missing #id)")
 
-End state: `grid_config['whitelist']` updated with new primary spell ID list plus any inert refs the user chose to keep; panel header shows new buff count and preview names. Inert refs are skipped at build (with a summary count — Flow 1, step 19) and revive in place once a database update or import supplies the buff
+End state: `grid_config['whitelist']` updated with new primary spell ID list plus any inert refs the user chose to keep; the card's summary and names line show the new buffs. Inert refs are skipped at build (with a summary count — Flow 1, step 19) and revive in place once a database update or import supplies the buff
 
 ---
 
