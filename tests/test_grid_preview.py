@@ -33,7 +33,6 @@ def test_slots_sit_where_the_runtime_places_them(key):
     for r, line in enumerate(_DRAWN[key]):
         for c, slot in enumerate(line):
             assert gp.slot_pos(rows, cols, fill, slot) == (r, c)
-            assert gp.pos_to_slot(rows, cols, fill, r, c) == slot
 
 
 def test_a_band_grows_from_the_bottom_each_row_centred():
@@ -115,6 +114,7 @@ def test_a_slot_tip_names_its_buffs_and_counts_repeats():
 def test_the_names_line_fits_what_it_can_then_counts_the_rest():
     names = ['Lash', 'Bloodlust', 'Fury']
     assert gp.names_line(names, len, 100) == 'Lash, Bloodlust, Fury'
+    assert gp.names_line(['Lash', 'Bloodlust', 'Fury of the Ages'], len, 24) == 'Lash, Bloodlust + 1 more'
     assert gp.names_line(names, len, 20) == 'Lash + 2 more'
     assert gp.names_line(names, len, 10) == '… + 2 more'
     assert gp.names_line(['Bloodlust'], len, 5) == 'Bloo…'
@@ -145,9 +145,9 @@ def test_the_nudges_say_what_to_click():
 
 def test_the_summary_reads_shape_mode_and_holdings():
     static = {'slotMode': 'static', 'rows': 3, 'cols': 3, 'slotAssignments': {'0': [1], '4': [2]}}
-    assert gp.summary(static, applied_by_me=False, shown_at='') == '3×3 · static · 2 of 9 assigned'
-    dyn = {'slotMode': 'dynamic', 'rows': 3, 'cols': 4, 'whitelist': [1, 2]}
-    assert gp.summary(dyn, applied_by_me=True, shown_at=' · shown at 1:2') == (
-        '3×4 · dynamic · tracking 2 buffs · shown at 1:2 · applied by me')
+    assert gp.summary(static, shown_at='') == '3×3 · static · 2 of 9 assigned'
+    dyn = {'slotMode': 'dynamic', 'rows': 3, 'cols': 4, 'whitelist': [1, 2], 'selfCastOnly': True}
+    assert gp.summary(dyn, shown_at=' · shown at 1:2', icon=56) == (
+        '3×4 · dynamic · tracking 2 buffs · 56 px icons · shown at 1:2 · applied by me')
     band = {'type': 'hostile', 'slotMode': 'dynamic', 'rowCap': 5, 'maxSlots': 15, 'whitelist': []}
-    assert gp.summary(band, applied_by_me=False, shown_at='') == 'up to 15 · 5 wide · dynamic'
+    assert gp.summary(band, shown_at='') == 'up to 15 · 5 wide · dynamic'

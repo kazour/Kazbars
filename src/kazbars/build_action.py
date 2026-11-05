@@ -147,7 +147,7 @@ def build(app):
         # Rebuild the cards from the mutated dicts BEFORE pushing to the store:
         # _on_grids_edited flushes widget values over the dicts, so pushing
         # first would let the stale enabled-toggles clobber the disable.
-        app.grids_panel.refresh_panels(expand_index=-1)
+        app.grids_panel.refresh_panels()
         app._on_grids_edited()
 
     if not _declarations_gate(app):

@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from math import gcd
 from typing import Any
 
-from .grid_model import is_band
+from .grid_model import is_band, ref_list
 from .grids_generator import grid_ships
 
 Rect = tuple[int, int, int, int]
@@ -43,19 +43,6 @@ def slot_pos(rows: int, cols: int, fill: str, idx: int) -> tuple[int, int]:
     if fill in ('BL-TR', 'BR-TL'):
         r = rows - 1 - r
     return r, c
-
-
-def pos_to_slot(rows: int, cols: int, fill: str, r: int, c: int) -> int:
-    """The slot drawn at (row, col): the exact inverse of `slot_pos`."""
-    if rows == 1:
-        return (cols - 1 - c) if fill == 'RL' else c
-    if cols == 1:
-        return (rows - 1 - r) if fill == 'BT' else r
-    if fill in ('TR-BL', 'BR-TL'):
-        c = cols - 1 - c
-    if fill in ('BL-TR', 'BR-TL'):
-        r = rows - 1 - r
-    return r * cols + c
 
 
 def band_positions(row_cap: int, max_slots: int) -> list[tuple[int, int]]:
@@ -171,16 +158,10 @@ def step(lay: Layout, idx: int, dx: int, dy: int) -> int:
 # ============================================================================
 # CONTENT
 # ============================================================================
-def _as_list(value: Any) -> list:
-    if isinstance(value, list):
-        return [v for v in value if v]
-    return [value] if value else []
-
-
 def slot_ids(cfg: dict, idx: int) -> list:
     """The buff refs static slot `idx` holds (a bare scalar reads as one)."""
     sa = cfg.get('slotAssignments') or {}
-    return _as_list(sa.get(str(idx), sa.get(idx)))
+    return ref_list(sa.get(str(idx), sa.get(idx)))
 
 
 def slot_total(cfg: dict) -> int:
@@ -200,7 +181,7 @@ def held_ids(cfg: dict) -> list:
         for i in range(slot_total(cfg)):
             out.extend(slot_ids(cfg, i))
         return list(dict.fromkeys(out))
-    return _as_list(cfg.get('whitelist'))
+    return ref_list(cfg.get('whitelist'))
 
 
 def _named(refs: Sequence, name_of: Callable[[Any], str]) -> str:
@@ -231,27 +212,30 @@ def empty_nudge(cfg: dict) -> str | None:
     return "No buffs tracked yet, so it is not built. Click the preview to choose them."
 
 
+def join_names(names: Sequence[str], k: int) -> str:
+    """The first `k` names, comma-joined, then ` + N more` for the rest."""
+    more = f" + {len(names) - k} more" if k < len(names) else ''
+    return ', '.join(names[:k]) + more
+
+
 def names_line(names: Sequence[str], measure: Callable[[str], int], width: int) -> str:
     """As many names as fit `width` (per `measure`), then ` + N more`. The
     first name alone is cut with an ellipsis when even it is too wide."""
     if not names:
         return ''
-
-    def text(k: int) -> str:
-        more = f" + {len(names) - k} more" if k < len(names) else ''
-        return ', '.join(names[:k]) + more
-
-    if measure(text(len(names))) <= width:
-        return text(len(names))
+    if measure(join_names(names, len(names))) <= width:
+        return join_names(names, len(names))
     # Short of the whole list every text carries its ` + N more`, so the
-    # widths grow with k: stop at the first that overflows.
-    fit = 0
-    for k in range(1, len(names)):
-        if measure(text(k)) > width:
-            break
-        fit = k
-    if fit:
-        return text(fit)
+    # widths grow with k: bisect for the most that fit.
+    lo, hi = 0, len(names) - 1
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if measure(join_names(names, mid)) <= width:
+            lo = mid
+        else:
+            hi = mid - 1
+    if lo:
+        return join_names(names, lo)
     more = f" + {len(names) - 1} more" if len(names) > 1 else ''
     head = names[0]
     while head and measure(head + '…' + more) > width:
@@ -259,11 +243,12 @@ def names_line(names: Sequence[str], measure: Callable[[str], int], width: int) 
     return head + '…' + more
 
 
-def summary(cfg: dict, *, applied_by_me: bool, shown_at: str) -> str:
+def summary(cfg: dict, *, shown_at: str, icon: int | None = None) -> str:
     """The title line's muted summary: shape, mode, what it holds, then the
-    preview ratio and Applied by me when they apply."""
+    icon size (`icon`, given when off the default), the preview ratio and
+    Applied by me when they apply."""
     mode = cfg.get('slotMode', 'dynamic')
-    tracked = len(_as_list(cfg.get('whitelist')))
+    tracked = len(ref_list(cfg.get('whitelist')))
     if mode == 'static':
         parts = [f"{cfg.get('rows', 1)}×{cfg.get('cols', 1)}", 'static',
                  f"{assigned_slots(cfg)} of {slot_total(cfg)} assigned"]
@@ -274,4 +259,7 @@ def summary(cfg: dict, *, applied_by_me: bool, shown_at: str) -> str:
             parts = [f"{cfg.get('rows', 1)}×{cfg.get('cols', 1)}", 'dynamic']
         if tracked:
             parts.append(f"tracking {tracked} buff{'s' if tracked != 1 else ''}")
-    return ' · '.join(parts) + shown_at + (' · applied by me' if applied_by_me else '')
+    if icon is not None:
+        parts.append(f"{icon} px icons")
+    applied = ' · applied by me' if cfg.get('selfCastOnly') is True else ''
+    return ' · '.join(parts) + shown_at + applied

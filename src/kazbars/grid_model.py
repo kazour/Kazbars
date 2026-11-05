@@ -108,6 +108,26 @@ def slot_count(grid):
     return grid['maxSlots'] if is_band(grid) else grid['rows'] * grid['cols']
 
 
+def valid_fills(rows, cols):
+    """The fill directions a box of this shape offers, and the one it falls
+    back to when its own stops fitting: a row fills sideways, a column up or
+    down, anything else from a corner."""
+    if rows == 1:
+        return ('LR', 'RL'), 'LR'
+    if cols == 1:
+        return ('TB', 'BT'), 'BT'
+    return ('TL-BR', 'TR-BL', 'BL-TR', 'BR-TL'), 'BL-TR'
+
+
+def ref_list(value):
+    """A whitelist or slot-assignment value as a list of buff refs: a bare
+    scalar (an imported or hand-edited profile can carry one known id instead
+    of a list) reads as one, nothing as none."""
+    if isinstance(value, list):
+        return value
+    return [value] if value else []
+
+
 def band_shape(row_cap, slots):
     """A band's derived (rows, cols): `rowCap` to a row, rows as needed."""
     return math.ceil(slots / row_cap), row_cap

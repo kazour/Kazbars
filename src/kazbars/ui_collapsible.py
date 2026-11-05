@@ -45,15 +45,10 @@ class CollapsibleSection(ttk.Frame):
         initially_open=False,
         badge_text=None,
         badge_color=None,
-        keep_summary=False,
     ):
-        """Initialize a collapsible section with a clickable header and togglable content area.
-
-        `keep_summary` keeps the header's summary on show while open (by
-        default it hides, the open content saying it instead)."""
+        """Initialize a collapsible section with a clickable header and togglable content area."""
         super().__init__(parent)
         self._is_open = initially_open
-        self._keep_summary = keep_summary
         self._dimmed = False
         self._accent_color = accent_color
         self._badge_color = badge_color
@@ -152,10 +147,6 @@ class CollapsibleSection(ttk.Frame):
         _left.bind("<Enter>", _on_header_enter)
         _left.bind("<Leave>", _on_header_leave)
 
-        # --- Body (always visible, between the header and the toggled content) ---
-        self.body = ttk.Frame(self)
-        self.body.pack(fill="x", padx=(PAD_COLLAPSE_INDENT, 0))
-
         # --- Content area (toggled) ---
         self._content_wrapper = ttk.Frame(self)
         if badge_color:
@@ -180,16 +171,14 @@ class CollapsibleSection(ttk.Frame):
             self._is_open = True
             self._arrow_label.config(text="▼")
             self._content_wrapper.pack(fill="x", padx=(PAD_COLLAPSE_INDENT, 0), pady=(PAD_XS, 0))
-            if not self._keep_summary:
-                self._summary_frame.pack_forget()
+            self._summary_frame.pack_forget()
 
     def collapse(self):
         if self._is_open:
             self._is_open = False
             self._arrow_label.config(text="▶")
             self._content_wrapper.pack_forget()
-            if not self._keep_summary:
-                self._summary_frame.pack(side="left", padx=(PAD_TAB, 0), in_=self._title_label.master)
+            self._summary_frame.pack(side="left", padx=(PAD_TAB, 0), in_=self._title_label.master)
 
     def set_title(self, text):
         self._title_label.config(text=text)

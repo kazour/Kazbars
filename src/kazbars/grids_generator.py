@@ -15,7 +15,7 @@ from .cast_timer import is_enabled as cast_is_enabled
 from .cast_timer import validate_config as validate_cast_config
 from .console import ships as console_ships
 from .console import validate_config as validate_console_config
-from .grid_model import DEFAULT_GAME_RESOLUTION, is_band, is_plate, project_px
+from .grid_model import DEFAULT_GAME_RESOLUTION, is_band, is_plate, project_px, ref_list
 from .inspect import validate_config as validate_inspect_config
 from .overlay import VERDANA, as2_face, font_slug
 from .overlay import validate_config as validate_overlay
@@ -157,14 +157,6 @@ def grid_ships(grid):
         if inside and value:
             return True
     return False
-
-
-def _as_list(value):
-    """Normalize a whitelist/slot-assignment value that may be a bare scalar
-    (an imported or hand-edited profile can carry one known id instead of a
-    list) into a list — the shape `_expand_primary_ids` and the unresolved-ref
-    scan both need."""
-    return value if isinstance(value, list) else [value]
 
 
 def _pack_units(units, budget):
@@ -493,7 +485,7 @@ class CodeGenerator:
             labels: dict = {}
             whitelist = self._expand_primary_ids(grid.get("whitelist", []), labels)
             slots = {
-                k: self._expand_primary_ids(_as_list(v), labels) if v else []
+                k: self._expand_primary_ids(ref_list(v), labels) if v else []
                 for k, v in grid.get("slotAssignments", {}).items()
             }
             if grid["slotMode"] == "static":
@@ -656,7 +648,7 @@ def unresolved_refs(grids, database) -> list:
         refs = list(g.get('whitelist') or [])
         for val in (g.get('slotAssignments') or {}).values():
             if val:
-                refs.extend(_as_list(val))
+                refs.extend(ref_list(val))
         for ref in refs:
             if isinstance(ref, bool) or ref in seen:
                 continue

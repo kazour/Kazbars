@@ -284,14 +284,36 @@ def _stored_grid(app, index):
     return app.profile_store.get_section('grids')['grids'][index]
 
 
-def test_spinbox_commit_reaches_profile_store(app):
-    from tkinter import ttk
+def _settings(card):
+    """Open the card's Grid Settings (the cog)."""
+    from kazbars.grid_settings_dialog import open_grid_settings
+    return open_grid_settings(card)
+
+
+def test_grid_settings_apply_reaches_profile_store(app):
     card, idx = _add_seam_grid(app, 'SeamSpin')
-    card.gap_var.set(7)
-    spin = _find_widget(card, ttk.Spinbox, card.gap_var)
-    assert spin is not None
-    spin.event_generate('<FocusOut>')  # the clamp + on_change commit path
-    assert _stored_grid(app, idx)['gap'] == 7
+    dlg = _settings(card)
+    dlg.gap_var.set('7')
+    rl_label = dlg.fill_combo['values'][1]  # 1×5 grid → (Left → Right, Right → Left)
+    dlg.fill_var.set(rl_label)
+    dlg.apply()
+    assert not dlg.winfo_exists()
+    stored = _stored_grid(app, idx)
+    assert (stored['gap'], stored['fillDirection']) == (7, 'RL')
+
+
+def test_grid_settings_cancel_leaves_the_config_and_redraws_the_card(app):
+    import copy
+    card, idx = _add_seam_grid(app, 'SeamCancel')
+    before = copy.deepcopy(card.grid_config)
+    width = card.preview.layout.width
+    dlg = _settings(card)
+    dlg.cols_var.set('8')
+    dlg._on_shape('cols')
+    assert card.preview.layout.width > width, "the card previews the draft"
+    dlg.cancel()
+    assert card.grid_config == before
+    assert card.preview.layout.width == width
 
 
 def _find_scale(root):
@@ -305,21 +327,25 @@ def _find_scale(root):
     return None
 
 
-def test_size_slider_commits_on_release_only(app):
+def test_size_slider_previews_live_and_lands_on_apply(app):
     card, idx = _add_seam_grid(app, 'SeamSize')
-    scale = _find_scale(card)
+    cell = card.preview.layout.cell
+    dlg = _settings(card)
+    scale = _find_scale(dlg)
     assert scale is not None
-    scale.set(152.6)  # a drag: snapped to 155, nothing written yet
+    scale.set(152.6)  # a drag: snapped to 155, the card's preview follows
     app.update()
-    assert card.scale_var.get() == 155
+    assert dlg.scale_var.get() == 155
+    assert card.preview.layout.cell > cell
     assert card.grid_config['scale'] == 100
-    scale.event_generate('<ButtonRelease-1>')
+    dlg.apply()
     assert _stored_grid(app, idx)['scale'] == 155
 
 
 def test_size_slider_keys_step_a_notch(app):
-    card, idx = _add_seam_grid(app, 'SeamKeys')
-    scale = _find_scale(card)
+    card, _ = _add_seam_grid(app, 'SeamKeys')
+    dlg = _settings(card)
+    scale = _find_scale(dlg)
     assert scale is not None
     def fire(seq):
         # The test app never holds keyboard focus, so a generated key event
@@ -327,11 +353,13 @@ def test_size_slider_keys_step_a_notch(app):
         name = scale.bind(seq).split('[', 1)[1].split()[0]
         return scale.tk.call(name, *(['0'] * 14 + [str(scale)] + ['0'] * 4))
 
-    for key, want in (('Right', 105), ('Right', 110), ('Left', 105), ('End', 200), ('Home', 50)):
-        assert fire(f'<{key}>') == 'break', key
-        fire('<KeyRelease>')
-        assert (card.scale_var.get(), round(float(scale.get()))) == (want, want), key
-        assert _stored_grid(app, idx)['scale'] == want, key
+    try:
+        for key, want in (('Right', 105), ('Right', 110), ('Left', 105), ('End', 200), ('Home', 50)):
+            assert fire(f'<{key}>') == 'break', key
+            fire('<KeyRelease>')
+            assert (dlg.scale_var.get(), round(float(scale.get()))) == (want, want), key
+    finally:
+        dlg.cancel()
 
 
 def test_an_overlay_size_change_unticks_the_build_step(app):
@@ -357,24 +385,6 @@ def test_extras_switch_on_with_nothing_to_build_stays_off(app):
     app.grids_panel.extras_row._on_toggle('console')
     assert store.get_section('console')['enabled'] is False
     assert tile['var'].get() is False
-
-
-def test_combobox_selection_reaches_profile_store(app):
-    card, idx = _add_seam_grid(app, 'SeamCombo')
-    rl_label = card.fill_combo['values'][1]  # 1×5 grid → (Left → Right, Right → Left)
-    card.fill_var.set(rl_label)
-    card.fill_combo.event_generate('<<ComboboxSelected>>')
-    assert _stored_grid(app, idx)['fillDirection'] == 'RL'
-
-
-def test_save_now_captures_mid_typing_edit(app):
-    """Ctrl+S (and close/build) gather the panel before flushing: a value
-    typed into a field with no focus-out has fired no on_change yet, and
-    flush() alone would persist the stale store."""
-    card, idx = _add_seam_grid(app, 'SeamType')
-    card.gap_var.set(7)  # typed value, no commit event fired
-    app._save_now()
-    assert _stored_grid(app, idx)['gap'] == 7
 
 
 # ============================================================================
@@ -995,7 +1005,7 @@ def test_a_static_cell_opens_the_picker_on_its_slot_and_repaints_that_cell(app, 
     assert _FakePicker.opened == [('Slot 4 Buffs', [11])]
     assert card.grid_config['slotAssignments'] == {'4': [21, 22]}
     assert painted == [4], "only that cell repaints"
-    assert '1 of 9 assigned' in card.section._summary_frame.winfo_children()[0].cget('text')
+    assert '1 of 9 assigned' in card.summary_label.cget('text')
     stored = app.profile_store.get_section('grids')['grids'][-1]
     assert stored['slotAssignments'] == {'4': [21, 22]}
 
@@ -1022,10 +1032,42 @@ def test_a_right_click_clears_a_slot_and_the_toast_puts_it_back(app, monkeypatch
 
     # A slot the grid shrank past stays cleared on undo.
     card.preview._clear(3)
-    card._rows_var.set('1')
-    card._on_dimension_changed('rows')
+    card.apply_settings(dict(card.grid_config, rows=1))
     toasts[-1][1]()
     assert '3' not in card.grid_config['slotAssignments']
+
+
+def test_an_undo_lands_on_the_card_a_rebuild_put_in_its_place(app, monkeypatch):
+    from kazbars import grid_editor_panel
+    from kazbars.grid_model import create_default_grid
+    card = _card_for(app, dict(create_default_grid('player', 1, 3, 'static', 'SeamRebuilt'),
+                               slotAssignments={'1': [9]}))
+    toasts = []
+    monkeypatch.setattr(grid_editor_panel, 'app_toast',
+                        lambda w, msg, *a, **k: toasts.append(k.get('on_click')))
+    card.preview._clear(1)
+    app.grids_panel.refresh_panels()  # an add, delete or move within the toast's life
+    toasts[-1]()
+    fresh = app.grids_panel.grid_panels[-1]
+    assert fresh is not card and fresh.grid_config['slotAssignments'] == {'1': [9]}
+    assert app.profile_store.get_section('grids')['grids'][-1]['slotAssignments'] == {'1': [9]}
+
+
+def test_applying_a_smaller_shape_trims_slots_with_the_warning(app, monkeypatch):
+    from kazbars import grid_editor_panel
+    from kazbars.grid_model import create_default_grid
+    card = _card_for(app, dict(create_default_grid('player', 3, 3, 'static', 'SeamTrim'),
+                               slotAssignments={'0': [1], '8': [2]}))
+    toasts = []
+    monkeypatch.setattr(grid_editor_panel, 'app_toast', lambda w, msg, *a, **k: toasts.append(msg))
+    dlg = _settings(card)
+    dlg.rows_var.set('2')
+    dlg.cols_var.set('2')
+    dlg._on_shape('cols')
+    dlg.apply()
+    cfg = card.grid_config
+    assert (cfg['rows'], cfg['cols'], cfg['slotAssignments']) == (2, 2, {'0': [1]})
+    assert toasts and toasts[-1].startswith('Unassigned 1 buff')
 
 
 def test_the_keyboard_slot_survives_the_picker_and_the_pointer_leaving(app):
@@ -1033,7 +1075,6 @@ def test_the_keyboard_slot_survives_the_picker_and_the_pointer_leaving(app):
     card = _card_for(app, create_default_grid('player', 2, 3, 'static', 'SeamKeep'))
     preview = card.preview
     preview._set_hot(4)
-    preview.event_generate('<FocusOut>')
     preview._set_hot(-1)  # what FocusOut does while the picker holds focus
     preview._set_hot(preview._kept)  # what FocusIn does on its return
     assert preview._hot == 4
@@ -1042,7 +1083,7 @@ def test_the_keyboard_slot_survives_the_picker_and_the_pointer_leaving(app):
 def test_a_tall_grid_says_its_preview_stepped_down(app):
     from kazbars.grid_model import create_default_grid
     card = _card_for(app, create_default_grid('player', 6, 6, 'static', 'SeamTall'))
-    summary = card.section._summary_frame.winfo_children()[0].cget('text')
+    summary = card.summary_label.cget('text')
     assert summary.endswith('· shown at 2:5')
     assert card.preview.layout.height <= 128
 
@@ -1065,9 +1106,12 @@ def test_a_band_card_redraws_when_its_row_cap_changes(app):
     card = _card_for(app, create_default_grid('friendly', 2, 5, 'dynamic', 'SeamBandDraw'))
     lay = card.preview.layout
     assert len(lay.rects) == 10 and lay.rects[0][1] > lay.rects[9][1]  # rows from the bottom
-    card._row_cap_var.set(3)
-    card._on_band_changed()
+    dlg = _settings(card)
+    dlg.row_cap_var.set(3)
+    dlg._changed()
     assert card.preview.layout.width < lay.width and len(card.preview.layout.rects) == 10
+    dlg.apply()
+    assert card.grid_config['rowCap'] == 3
 
 
 def test_step_arrows_move_a_card_and_grey_at_the_ends(app):
@@ -1091,15 +1135,45 @@ def test_a_band_card_writes_its_cap_slots_and_overhead_keys(app):
     gp.refresh_panels()
     app.update()
     card = gp.grid_panels[-1]
-    card._row_cap_var.set(7)
-    card._max_slots_var.set('9')
-    card._max_distance_var.set(60)
-    card._show_self_var.set(False)
-    card.save_to_config()
+    dlg = _settings(card)
+    assert not hasattr(dlg, 'x_var'), "a band has no screen position"
+    assert dlg.fill_var.get() == 'Centred'
+    dlg.row_cap_var.set(7)
+    dlg.max_slots_var.set('9')
+    dlg.max_distance_var.set('60')
+    dlg.show_self_var.set(False)
+    dlg.apply()
     cfg = card.grid_config
     assert (cfg['rowCap'], cfg['maxSlots'], cfg['rows'], cfg['cols']) == (7, 9, 2, 7)
     assert (cfg['maxDistance'], cfg['showSelf'], cfg['fillDirection']) == (60, False, 'C')
-    assert card.fill_var.get() == 'Centred'
+
+
+def test_a_hostile_box_has_overhead_settings_and_no_sorting(app):
+    from kazbars.grid_model import create_default_grid
+    card = _card_for(app, create_default_grid('hostile', 2, 3, 'static', 'SeamHostileBox'))
+    dlg = _settings(card)
+    try:
+        from tkinter import ttk
+        titles = {str(w.cget('text')) for w in _widgets(dlg, ttk.LabelFrame)}
+        assert titles == {'Grid', 'Icons', 'Overhead'}
+        assert hasattr(dlg, 'rows_var') and not hasattr(dlg, 'fill_var')
+    finally:
+        dlg.cancel()
+
+
+def test_the_cog_opens_settings_and_a_taken_name_blocks_apply(app):
+    card, _ = _add_seam_grid(app, 'SeamCog')
+    _add_seam_grid(app, 'SeamTaken')
+    card = app.grids_panel.grid_panels[-2]
+    assert card.cog_label.bind('<Return>') and card.cog_label.cget('takefocus')
+    card.open_settings()
+    dlg = card.settings_dialog
+    assert dlg is not None and dlg.winfo_exists()
+    dlg.id_var.set('SeamTaken')
+    dlg.apply()
+    assert dlg.winfo_exists() and 'already' in dlg._name_hint.cget('text')
+    assert card.grid_config['id'] == 'SeamCog'
+    dlg.cancel()
 
 
 def _wizard_grid(app, gtype, setup):

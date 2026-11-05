@@ -648,7 +648,7 @@ class GridsPanel(ttk.Frame):
         )
         self.grids.append(self._join_current_tab(grid_config))
         self._mark_modified()
-        self.refresh_panels(expand_index=len(self.grids) - 1)
+        self.refresh_panels()
 
     def get_profile_data(self):
         """Return current grid configurations (save all panel values first)."""
@@ -748,7 +748,7 @@ class GridsPanel(ttk.Frame):
             self.save_settings()
             self.grids.append(self._join_current_tab(wizard.result))
             self._mark_modified()
-            self.refresh_panels(expand_index=len(self.grids) - 1)
+            self.refresh_panels()
 
     def delete_grid(self, panel):
         """Delete a single grid — undoable via toast instead of a confirm."""
@@ -757,7 +757,7 @@ class GridsPanel(ttk.Frame):
                 self.save_settings()  # flush sibling cards before refresh_panels rebuilds them
                 removed = self.grids.pop(i)
                 self._mark_modified()
-                self.refresh_panels(expand_index=-1)
+                self.refresh_panels()
                 gen = self._profile_generation
                 app_toast(self, f"Deleted grid '{removed['id']}' — click to undo",
                           'info', 8, key='grid-delete-undo',
@@ -782,19 +782,14 @@ class GridsPanel(ttk.Frame):
         self.save_settings()  # flush live cards before the rebuild
         self.grids.insert(index, grid)
         self._mark_modified()
-        self.refresh_panels(expand_index=index)
+        self.refresh_panels()
 
-    def refresh_panels(self, expand_index=-1):
+    def refresh_panels(self):
         """Rebuild GridEditorPanel widgets or show empty state.
 
-        Destroys and recreates every card from self.grids, so the live widget
-        state of existing cards is discarded. Callers that mutate self.grids
-        while cards are open must save_settings() first or in-progress edits
-        revert to the last save (load/clear deliberately skip the flush).
-
-        Cards collapse by default; only an explicit expand_index (a just-created
-        or restored grid) opens one. Startup and profile loads pass no index, so
-        every card starts collapsed."""
+        Destroys and recreates every card from self.grids. A card's only live
+        control is Enabled (Grid Settings writes the config on Apply), so
+        callers that mutate self.grids flush with save_settings() first."""
         self._drag_manager.clear()
 
         self._update_tab_counts()
@@ -812,10 +807,10 @@ class GridsPanel(ttk.Frame):
                 widget.destroy()
         self.grid_panels.clear()
 
-        for i, grid_config in enumerate(self.grids):
+        for grid_config in self.grids:
             panel = GridEditorPanel(
                 self.grids_frame, self.database, grid_config,
-                on_delete=self.delete_grid, initially_open=(i == expand_index),
+                on_delete=self.delete_grid,
                 get_base_size=self.base_size,
                 on_resize=self._on_grid_resized,
                 on_whitelist_changed=self._on_card_buffs_changed,
@@ -823,6 +818,7 @@ class GridsPanel(ttk.Frame):
                 on_edit=self._mark_modified,
                 on_move=self.move_or_copy,
                 on_step=self._step_card,
+                find_card=self._card_for,
             )
             self.grid_panels.append(panel)
         self._repack_panels()
@@ -840,11 +836,21 @@ class GridsPanel(ttk.Frame):
         panel.drag_handle.bind('<Alt-Up>', lambda e, i=index: self._move_grid(i, -1))
         panel.drag_handle.bind('<Alt-Down>', lambda e, i=index: self._move_grid(i, 1))
 
+    def _card_for(self, config):
+        """The card showing `config` now, or None once that grid left the list
+        (deleted, or another profile loaded)."""
+        for grid, panel in zip(self.grids, self.grid_panels):
+            if grid is config:
+                return panel
+        return None
+
     def _step_card(self, panel, delta):
-        """A card's ▲ / ▼: the same move as Alt+↑/↓ on its handle."""
+        """A card's ▲ / ▼: the same move as Alt+↑/↓ on its handle. Focus stays
+        on the pressed glyph, so Enter repeats the move."""
         visible = self._visible()
         n = visible.index(self.grid_panels.index(panel))
         self._move_grid(n, delta)
+        panel.focus_step(delta)
 
     def _move_grid(self, index, delta):
         """Keyboard equivalent of dragging the ☰ handle. Clamps at both ends

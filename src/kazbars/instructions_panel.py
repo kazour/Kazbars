@@ -273,18 +273,18 @@ SECTIONS: list[_Section] = [
         'id': 'grid-card',
         'title': 'The Grid Card',
         'body': [
-            'Each grid is a card in the Grids tab. Open or closed, it shows '
-            'the grid drawn to scale and a line naming the buffs it holds. '
-            'The chevron opens its settings.',
+            'Each grid is a card in the Grids tab: the grid drawn to scale '
+            "and a line naming the buffs it holds. Its ⚙ cog opens the grid's "
+            'settings.',
             _sub('The preview', [
                 'Icons are drawn at two-thirds of their in-game size. A grid '
                 'too big for the card steps down to a smaller scale, and the '
                 'title line says so: "shown at 1:2", for example.',
-                'Shape, Size, Gap and Fill redraw it as you change them. A '
-                'disabled grid draws grey. The preset cards on an empty '
+                'A disabled grid draws grey. The preset cards on an empty '
                 'Grids tab are drawn the same way.',
-                "It is also where you choose the grid's buffs: click the "
-                'preview, or a slot on a static grid.',
+                "It is also where you choose the grid's buffs. On a dynamic "
+                'grid the whole preview lights as you hover, and one click '
+                'picks for all of it; on a static grid, click a slot.',
                 _link('Tracked Buffs', 'tracked-buffs'),
             ]),
             _sub('The buffs line', [
@@ -293,14 +293,27 @@ SECTIONS: list[_Section] = [
                 'list.',
             ]),
             _sub('The title line', [
-                'Move…, Enabled, ▲ ▼ and × sit at the right. ▲ ▼ move the '
-                'card one place up or down the list, greyed at the ends. '
-                'Dragging the ☰ handle does the same, and so does Alt+↑ / '
-                'Alt+↓ once you Tab to it.',
+                'After the name and type, a muted summary: shape, mode and '
+                'what the grid holds — plus the icon size, as "56 px '
+                'icons", when it is not the default.',
+                'The ⚙ cog, Move…, Enabled, ▲ ▼ and × sit at the right. '
+                '▲ ▼ move the card one place up or down the list, greyed at '
+                'the ends. Dragging the ☰ handle does the same, and so does '
+                'Alt+↑ / Alt+↓ once you Tab to it.',
             ]),
-            _sub('Settings', [
-                'Position (X and Y, floating grids only), the shape, Size, '
-                'Gap, Timers, Fill and the rest.',
+            _sub('Grid Settings', [
+                'The cog opens a window just under the card, or above it '
+                'when there is no room, so the preview stays in view. '
+                'Its sections: Grid, Icons and — where they apply — '
+                'Overhead and Sorting.',
+                'Every change shows on the preview at once — Size too, '
+                'while you drag. Apply (or Enter) saves; Cancel (or Esc) '
+                'puts it back.',
+                "A name that is empty or another grid's blocks Apply, with "
+                'a hint under the Name field.',
+                'Shrink a static grid and the slots past the new size are '
+                'unassigned, with a warning toast. Grow it back and they '
+                'return.',
                 _link('Grid Display Options', 'display-options'),
             ]),
         ],
@@ -372,7 +385,8 @@ SECTIONS: list[_Section] = [
         'id': 'display-options',
         'title': 'Grid Display Options',
         'body': [
-            'These settings are per-grid.',
+            'These settings are per-grid, in Grid Settings — the ⚙ cog on '
+            'its card.',
             'Rows and Cols — the shape. A grid holds up to 64 slots on its '
             'own, an overhead grid 16; there is no total across grids.',
             'Size — a slider, 50–200 %, of the Overlay size. It sets icon, '
@@ -381,8 +395,10 @@ SECTIONS: list[_Section] = [
             'Gap — the space between icons. Negative overlaps them.',
             'Timers — Digits shows the seconds left under each icon, Bar '
             "draws a line inside the icon's bottom edge that shrinks as "
-            'time runs out, Off shows none. Y Offset nudges digits only.',
-            'Flash — icons pulse near expiry. Set the threshold in seconds.',
+            'time runs out, Off shows none. Y offset nudges digits only, so '
+            'it greys out for Bar and Off.',
+            'Flash — icons pulse near expiry. Under sets the threshold in '
+            'seconds; it greys out while Flash is off.',
             'Applied by me — show an effect only while you are the one who '
             'applied it.',
             'Where a floating grid sits on screen is decided in-game, not '
@@ -581,8 +597,8 @@ SECTIONS: list[_Section] = [
                 'size. With many grids it shrinks itself to stay on screen.',
             ]),
             _sub('X/Y in the app', [
-                "The X/Y under Position in a floating grid's settings only "
-                'seed a first-ever session. Once you drag in-game, the '
+                "The X/Y under Position in a floating grid's Grid Settings "
+                'only seed a first-ever session. Once you drag in-game, the '
                 'dragged spot wins.',
             ]),
         ],
