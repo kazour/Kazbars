@@ -48,11 +48,11 @@
 | `src/kazbars/game_folder.py` | 430 |
 | `src/kazbars/game_persistence.py` | 608 |
 | `src/kazbars/game_resolution.py` | 150 |
-| `src/kazbars/grid_dialogs.py` | 905 |
-| `src/kazbars/grid_editor_panel.py` | 733 |
-| `src/kazbars/grid_model.py` | 269 |
-| `src/kazbars/grids_generator.py` | 661 |
-| `src/kazbars/grids_panel.py` | 751 |
+| `src/kazbars/grid_dialogs.py` | 940 |
+| `src/kazbars/grid_editor_panel.py` | 858 |
+| `src/kazbars/grid_model.py` | 388 |
+| `src/kazbars/grids_generator.py` | 673 |
+| `src/kazbars/grids_panel.py` | 794 |
 | `src/kazbars/inspect.py` | 58 |
 | `src/kazbars/inspect_panel.py` | 212 |
 | `src/kazbars/instructions_panel.py` | 1143 |
@@ -78,9 +78,9 @@
 | `src/kazbars/timer_overlay.py` | 372 |
 | `src/kazbars/ui_collapsible.py` | 232 |
 | `src/kazbars/ui_components.py` | 677 |
-| `src/kazbars/ui_forms.py` | 523 |
+| `src/kazbars/ui_forms.py` | 549 |
 | `src/kazbars/ui_headers.py` | 197 |
-| `src/kazbars/ui_helpers.py` | 191 |
+| `src/kazbars/ui_helpers.py` | 197 |
 | `src/kazbars/ui_tk_style.py` | 67 |
 | `src/kazbars/ui_widgets.py` | 320 |
 | `src/kazbars/update_check.py` | 64 |
@@ -94,7 +94,7 @@
 | `tests/test_boss_timer.py` | 151 |
 | `tests/test_buff_db_layers.py` | 266 |
 | `tests/test_buff_xml.py` | 324 |
-| `tests/test_build_compile.py` | 175 |
+| `tests/test_build_compile.py` | 178 |
 | `tests/test_build_executor.py` | 660 |
 | `tests/test_cast_timer.py` | 122 |
 | `tests/test_cluster_isolation.py` | 188 |
@@ -117,8 +117,8 @@
 | `tests/test_foreground.py` | 95 |
 | `tests/test_game_folder.py` | 132 |
 | `tests/test_game_persistence.py` | 748 |
-| `tests/test_grid_model.py` | 175 |
-| `tests/test_grids_generator.py` | 559 |
+| `tests/test_grid_model.py` | 281 |
+| `tests/test_grids_generator.py` | 603 |
 | `tests/test_hud_overlay.py` | 141 |
 | `tests/test_imports.py` | 33 |
 | `tests/test_inspect.py` | 103 |
@@ -129,7 +129,7 @@
 | `tests/test_overlay_rung.py` | 138 |
 | `tests/test_overlay_size.py` | 226 |
 | `tests/test_panel_ratios.py` | 162 |
-| `tests/test_panels_construct.py` | 871 |
+| `tests/test_panels_construct.py` | 908 |
 | `tests/test_prefs.py` | 58 |
 | `tests/test_prefs_migration.py` | 68 |
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |

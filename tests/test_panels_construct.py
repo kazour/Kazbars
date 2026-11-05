@@ -7,7 +7,7 @@ Scope: construction + the panel's own close path, plus ui_widgets binding
 hygiene (which must ride this module's Tk instance — see the section note at
 the bottom). Event flow, visual correctness, and drag/animation behavior stay
 manual QA. Deferred to v2 (need a
-data context or block on wait_window): AddGridWizard, BuffSelectorDialog,
+data context or block on wait_window): BuffSelectorDialog,
 SlotAssignmentDialog, BuffEditDialog, the first-launch dialog,
 show_close_game_required_dialog, BuildLoadingScreen, the settings_backup
 dialog, show_welcome_popup.
@@ -869,3 +869,40 @@ def test_dialogs_confirm_and_focus(app, monkeypatch, method, getter):
 
     _close_via_protocol(panel)
     app.update()
+
+
+def test_a_band_card_writes_its_cap_slots_and_overhead_keys(app):
+    from kazbars.grid_model import create_default_grid
+    gp = app.grids_panel
+    gp.grids.append(create_default_grid('friendly', 2, 5, 'dynamic', 'SeamBand'))
+    gp.refresh_panels()
+    app.update()
+    card = gp.grid_panels[-1]
+    card._row_cap_var.set(7)
+    card._max_slots_var.set('9')
+    card._max_distance_var.set(60)
+    card._show_self_var.set(False)
+    card.save_to_config()
+    cfg = card.grid_config
+    assert (cfg['rowCap'], cfg['maxSlots'], cfg['rows'], cfg['cols']) == (7, 9, 2, 7)
+    assert (cfg['maxDistance'], cfg['showSelf'], cfg['fillDirection']) == (60, False, 'C')
+    assert card.fill_var.get() == 'Centred'
+
+
+def test_the_add_grid_wizard_makes_a_band_with_a_snapped_row_cap(app):
+    from kazbars.grid_dialogs import AddGridWizard
+    wiz = AddGridWizard(app, set(), name_in_use=lambda name, cfg: False)
+    try:
+        wiz.type_var.set('hostile')
+        wiz._on_type_changed()
+        wiz.mode_var.set('dynamic')
+        wiz.cols_var.set('4')
+        wiz.rows_var.set('9')
+        wiz.on_cols_changed()
+        assert (wiz.rows_var.get(), wiz.cols_var.get()) == ('3', '5')
+        wiz.on_create()
+        grid = wiz.result
+    finally:
+        if wiz.winfo_exists():
+            wiz.destroy()
+    assert grid['type'] == 'hostile' and grid['rowCap'] == 5 and grid['maxSlots'] == 15

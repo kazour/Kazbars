@@ -12,7 +12,7 @@ from pathlib import Path
 from .build_utils import compile_as2, resolve_assets_path
 from .cast_timer import is_enabled as cast_is_enabled
 from .cast_timer import validate_config as validate_cast_config
-from .grid_model import DEFAULT_GAME_RESOLUTION, project_px
+from .grid_model import DEFAULT_GAME_RESOLUTION, is_band, is_plate, project_px
 from .inspect import validate_config as validate_inspect_config
 from .overlay import VERDANA, as2_face, font_slug
 from .overlay import validate_config as validate_overlay
@@ -202,7 +202,11 @@ class CodeGenerator:
         game_resolution=None,
     ):
         """Initialize the code generator with grid configs and the buff database."""
-        self.grids = [g for g in grids if grid_ships(g)]
+        # Bands last, stable: KazBarsOverhead stacks a character's views in bake
+        # order, so its static grids sit at the bottom against the nameplate
+        # and the bands above them. Screen grids keep their order.
+        self.grids = sorted((g for g in grids if grid_ships(g)), key=is_band)
+        self.include_overhead = any(is_plate(g["type"]) for g in self.grids)
         self.database = database
         self.app_version = app_version
         self._assets_path = assets_path
@@ -477,7 +481,15 @@ class CodeGenerator:
             timerYOffset: {grid["timerYOffset"]},
             stackFont: {m.stack},
             enableFlashing: {_bool(grid["enableFlashing"])}'''
-        # Only where it applies, so a grid without it bakes as before.
+        # Only where they apply, so a screen grid without selfCastOnly bakes as before.
+        if is_plate(grid["type"]):
+            unit += (f",\n            plateOffset: {grid['plateOffset']},"
+                     f"\n            maxDistance: {grid['maxDistance']}")
+            # A band: rows x cols are its derived shape (cols the row cap), fillDir "C".
+            if is_band(grid):
+                unit += f",\n            maxSlots: {grid['maxSlots']}"
+        if grid["type"] == "friendly":
+            unit += f",\n            showSelf: {_bool(grid['showSelf'])}"
         if grid.get("selfCastOnly") is True:
             unit += ",\n            selfCastOnly: true"
 
@@ -512,7 +524,7 @@ class CodeGenerator:
             "CAST": self.include_cast_timer,
             "INS": self.include_inspect,
             "ONS": False,
-            "PLATE": False,
+            "PLATE": self.include_overhead,
             "SW": self.include_stopwatch,
         })
 

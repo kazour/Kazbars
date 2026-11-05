@@ -133,6 +133,10 @@ _RETRO_COLORS = {
 GRID_TYPE_COLORS = {
     'player': '#3498db',   # Blue
     'target': '#e67e22',   # Orange
+    # Overhead grids: green over friendly characters, red over hostile ones
+    # (the readable danger red: the badge carries it as text).
+    'friendly': '#00bc8c',
+    'hostile': '#f06a5d',
 }
 
 
@@ -180,7 +184,9 @@ def style_treeview_heading():
     # Type-tinted Radiobutton labels (Add Grid wizard). Bold so the colored
     # label reads as semantic identity, not as just "decorated text".
     for name, color in (('Player', GRID_TYPE_COLORS['player']),
-                        ('Target', GRID_TYPE_COLORS['target'])):
+                        ('Target', GRID_TYPE_COLORS['target']),
+                        ('Friendly', GRID_TYPE_COLORS['friendly']),
+                        ('Hostile', GRID_TYPE_COLORS['hostile'])):
         style_name = f'{name}.TRadiobutton'
         style.configure(style_name, foreground=color, font=FONT_SECTION)
         style.map(style_name,

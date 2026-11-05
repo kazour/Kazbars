@@ -12,11 +12,15 @@ from tkinter import ttk
 
 from .grid_dialogs import BuffSelectorDialog, SlotAssignmentDialog
 from .grid_model import (
+    BAND_ROW_CAPS,
     CLAMP_SPECS,
-    MAX_COLS,
-    MAX_GRID_SLOTS,
-    MAX_ROWS,
+    PLATE_MAX_SLOTS,
+    band_shape,
     get_game_resolution_or_default,
+    is_band,
+    is_plate,
+    max_shape,
+    max_slots,
     project_px,
     unproject_px,
 )
@@ -24,6 +28,7 @@ from .overlay import DEFAULT_SIZE
 from .overlay_size import grid_metrics
 from .ui_collapsible import CollapsibleSection
 from .ui_forms import (
+    draw_band_cells,
     draw_grid_cells,
     labeled_combobox,
     labeled_spinbox,
@@ -33,6 +38,7 @@ from .ui_forms import (
 from .ui_helpers import (
     CARD_STRIPE_PX,
     FONT_BODY_LG,
+    FONT_FORM_LABEL,
     FONT_SMALL,
     FONT_SMALL_BOLD,
     FONT_SYMBOL,
@@ -77,6 +83,9 @@ class GridEditorPanel(ttk.Frame):
 
         grid_type = grid_config.get('type', 'player')
         self._accent_color = GRID_TYPE_COLORS.get(grid_type, GRID_TYPE_COLORS['player'])
+        # The type and slot mode are fixed at creation, so the card is built for them.
+        self._plate = is_plate(grid_type)
+        self._band = is_band(grid_config)
 
         self._resting_border_color = TK_COLORS['border']
         self._card = tk.Frame(self,
@@ -130,6 +139,8 @@ class GridEditorPanel(ttk.Frame):
 
         self._build_top_row(settings_col)
         self._build_icon_row(settings_col)
+        if self._plate:
+            self._build_overhead_row(settings_col)
         self._build_timer_row(settings_col)
         self._build_info_and_dynamic(settings_col)
 
@@ -172,25 +183,28 @@ class GridEditorPanel(ttk.Frame):
                         command=self._on_enabled_toggled,
                         bootstyle="success-round-toggle").pack(side='right', padx=(0, PAD_XS))  # type: ignore[call-arg]
 
-        pos_frame = ttk.Frame(header)
-        pos_frame.pack(side='right', padx=(0, PAD_LF))
+        # An overhead grid floats over each character it shows on: no screen position.
         self.x_var = tk.StringVar(value=str(cfg.get('x', 0)))
-        position_entry(pos_frame, "X:", self.x_var, lo=0, hi=max_x,
-                       tooltip="Horizontal position on screen (pixels from left edge)",
-                       on_change=self._notify_edit,
-                       label_color=THEME_COLORS['muted'], padx=(PAD_MICRO, PAD_MID))
         self.y_var = tk.StringVar(value=str(cfg.get('y', 0)))
-        position_entry(pos_frame, "Y:", self.y_var, lo=0, hi=max_y,
-                       tooltip="Vertical position on screen (pixels from top edge)",
-                       on_change=self._notify_edit,
-                       label_color=THEME_COLORS['muted'], padx=(PAD_MICRO, 0))
+        if not self._plate:
+            pos_frame = ttk.Frame(header)
+            pos_frame.pack(side='right', padx=(0, PAD_LF))
+            position_entry(pos_frame, "X:", self.x_var, lo=0, hi=max_x,
+                           tooltip="Horizontal position on screen (pixels from left edge)",
+                           on_change=self._notify_edit,
+                           label_color=THEME_COLORS['muted'], padx=(PAD_MICRO, PAD_MID))
+            position_entry(pos_frame, "Y:", self.y_var, lo=0, hi=max_y,
+                           tooltip="Vertical position on screen (pixels from top edge)",
+                           on_change=self._notify_edit,
+                           label_color=THEME_COLORS['muted'], padx=(PAD_MICRO, 0))
 
         ttk.Button(header, text="Tracked Buffs...",
                    command=self._on_mode_btn_click,
                    bootstyle='info-outline').pack(side='right', padx=(0, PAD_LF))  # type: ignore[call-arg]
 
     def _build_top_row(self, parent):
-        """Pack the Name + Rows + Cols controls."""
+        """Pack the Name + shape controls: Rows + Cols, or a band's Row cap +
+        Max slots."""
         cfg = self.grid_config
         top_row = ttk.Frame(parent)
         top_row.pack(fill='x', pady=(0, PAD_ROW))
@@ -207,19 +221,65 @@ class GridEditorPanel(ttk.Frame):
         add_tooltip(self._name_entry, "Display name for this grid (shown in preview mode)")
 
         self._rows_var = tk.StringVar(value=str(cfg.get('rows', 1)))
+        self._cols_var = tk.StringVar(value=str(cfg.get('cols', 5)))
+        self._row_cap_var = tk.IntVar(value=cfg.get('rowCap', 5))
+        self._max_slots_var = tk.StringVar(value=str(cfg.get('maxSlots', 10)))
+        if self._band:
+            ttk.Label(top_row, text="Row cap:", font=FONT_FORM_LABEL,
+                      foreground=THEME_COLORS['muted']).pack(side='left')
+            for cap in BAND_ROW_CAPS:
+                rb = ttk.Radiobutton(top_row, text=str(cap), value=cap, variable=self._row_cap_var,
+                                     command=self._on_band_changed, bootstyle='toolbutton')  # type: ignore[call-arg]
+                rb.pack(side='left', padx=(PAD_MICRO, 0))
+                add_tooltip(rb, "Icons to a row, centred over the head, before the next row starts above")
+            labeled_spinbox(
+                top_row, "Max slots:", self._max_slots_var, from_=1, to=PLATE_MAX_SLOTS, width=4,
+                tooltip=f"The most icons the band shows (1-{PLATE_MAX_SLOTS})",
+                on_change=self._on_band_changed,
+                label_color=THEME_COLORS['muted'], padx=(PAD_MICRO, 0),
+            )
+            return
+        max_rows, max_cols = max_shape(cfg.get('type', 'player'))
+        limit = max_slots(cfg.get('type', 'player'))
         labeled_spinbox(
-            top_row, "Rows:", self._rows_var, from_=1, to=MAX_ROWS, width=4,
-            tooltip=f"Grid rows (height). A grid holds up to {MAX_GRID_SLOTS} slots.",
+            top_row, "Rows:", self._rows_var, from_=1, to=max_rows, width=4,
+            tooltip=f"Grid rows (height). A grid holds up to {limit} slots.",
             on_change=lambda: self._on_dimension_changed('rows'),
             label_color=THEME_COLORS['muted'], padx=(PAD_MICRO, PAD_MID),
         )
-        self._cols_var = tk.StringVar(value=str(cfg.get('cols', 5)))
         labeled_spinbox(
-            top_row, "Cols:", self._cols_var, from_=1, to=MAX_COLS, width=4,
-            tooltip=f"Grid columns (width). A grid holds up to {MAX_GRID_SLOTS} slots.",
+            top_row, "Cols:", self._cols_var, from_=1, to=max_cols, width=4,
+            tooltip=f"Grid columns (width). A grid holds up to {limit} slots.",
             on_change=lambda: self._on_dimension_changed('cols'),
             label_color=THEME_COLORS['muted'], padx=(PAD_MICRO, 0),
         )
+
+    def _build_overhead_row(self, parent):
+        """An overhead grid's Height (room for the nameplate) and Range, and a
+        friendly grid's Over me."""
+        cfg = self.grid_config
+        row = ttk.Frame(parent)
+        row.pack(fill='x', pady=(0, PAD_ROW))
+        self._plate_offset_var = tk.IntVar(value=cfg.get('plateOffset', 75))
+        labeled_spinbox(row, "Height:", self._plate_offset_var, from_=0, to=400, width=4,
+            tooltip="Room left for the game's nameplate between the head and the grid, in px",
+            on_change=self._notify_edit, padx=(PAD_BUTTON_GAP, PAD_XS))
+        ttk.Label(row, text="px", foreground=THEME_COLORS['muted'],
+                  font=FONT_SMALL).pack(side='left', padx=(0, PAD_TAB))
+        self._max_distance_var = tk.IntVar(value=cfg.get('maxDistance', 40))
+        who = ("you (Over me), your group and friendly players" if cfg.get('type') == 'friendly'
+               else "your target and anyone fighting you or your group")
+        labeled_spinbox(row, "Range:", self._max_distance_var, from_=5, to=100, width=4,
+            tooltip=f"Hidden past this distance. It shows over {who}.",
+            on_change=self._notify_edit, padx=(PAD_BUTTON_GAP, PAD_XS))
+        ttk.Label(row, text="m", foreground=THEME_COLORS['muted'],
+                  font=FONT_SMALL).pack(side='left', padx=(0, PAD_TAB))
+        self._show_self_var = tk.BooleanVar(value=cfg.get('showSelf', True))
+        if cfg.get('type') == 'friendly':
+            cb = ttk.Checkbutton(row, text="Over me", variable=self._show_self_var,
+                                 command=self._notify_edit)
+            cb.pack(side='left')
+            add_tooltip(cb, "Also float this grid over your own character")
 
     def _build_icon_row(self, parent):
         """Pack the Size slider (with its icon-size hint) and the gap."""
@@ -345,6 +405,13 @@ class GridEditorPanel(ttk.Frame):
         game_w, game_h = get_game_resolution_or_default()
         self.x_var.set(str(project_px(cfg.get('fx', 100 / 1920), game_w)))
         self.y_var.set(str(project_px(cfg.get('fy', 400 / 1080), game_h)))
+        if self._band:
+            self._row_cap_var.set(cfg.get('rowCap', 5))
+            self._max_slots_var.set(str(cfg.get('maxSlots', 10)))
+        if self._plate:
+            self._plate_offset_var.set(cfg.get('plateOffset', 75))
+            self._max_distance_var.set(cfg.get('maxDistance', 40))
+            self._show_self_var.set(cfg.get('showSelf', True))
         self.scale_var.set(cfg.get('scale', 100))
         self._refresh_size()
         self.gap_var.set(max(-5, min(cfg.get('gap', -1), 10)))
@@ -374,10 +441,14 @@ class GridEditorPanel(ttk.Frame):
         self._update_preview()
 
     def _update_preview(self):
-        """Redraw the small grid shape preview in the card."""
-        rows = self.grid_config.get('rows', 1)
-        cols = self.grid_config.get('cols', 5)
-        draw_grid_cells(self._preview_canvas, rows, cols,
+        """Redraw the small grid shape preview in the card: a band as it grows
+        over a head (rows from the bottom, each centred), any other grid as its box."""
+        cfg = self.grid_config
+        if self._band:
+            draw_band_cells(self._preview_canvas, cfg.get('rowCap', 5), cfg.get('maxSlots', 10),
+                            self._accent_color, GRID_PREVIEW_PX, GRID_PREVIEW_PX)
+            return
+        draw_grid_cells(self._preview_canvas, cfg.get('rows', 1), cfg.get('cols', 5),
                         self._accent_color, GRID_PREVIEW_PX, GRID_PREVIEW_PX)
 
     def _validate_name(self, interactive=True):
@@ -416,7 +487,6 @@ class GridEditorPanel(ttk.Frame):
         self._validate_name(interactive=False)
         self.grid_config['enabled'] = self.enabled_var.get()
         var_map = {
-            'rows': self._rows_var, 'cols': self._cols_var,
             'scale': self.scale_var, 'gap': self.gap_var,
             'timerFlashThreshold': self.flash_threshold_var,
             'timerYOffset': self.timer_y_offset_var,
@@ -429,15 +499,36 @@ class GridEditorPanel(ttk.Frame):
                 # Validator allows transient '' / '-' mid-edit; fall back to current value.
                 v = self.grid_config.get(key, lo)
             self.grid_config[key] = max(lo, min(v, hi))
-        # Position fields carry projected px; unproject back to fractions at
-        # the current game resolution (typed overshoot clamps to the screen).
-        game_w, game_h = get_game_resolution_or_default()
-        for key, var, extent in (('fx', self.x_var, game_w), ('fy', self.y_var, game_h)):
-            try:
-                px = max(0, min(int(var.get()), extent))
-            except (ValueError, tk.TclError):
-                px = project_px(self.grid_config.get(key, 0.0), extent)
-            self.grid_config[key] = unproject_px(px, extent)
+        if self._band:
+            self._store_band_shape()
+        else:
+            max_rows, max_cols = max_shape(self.grid_config.get('type', 'player'))
+            for key, var, hi in (('rows', self._rows_var, max_rows), ('cols', self._cols_var, max_cols)):
+                try:
+                    v = int(var.get())
+                except (ValueError, tk.TclError):
+                    v = self.grid_config.get(key, 1)
+                self.grid_config[key] = max(1, min(v, hi))
+        if self._plate:
+            for key, var, lo, hi in (('plateOffset', self._plate_offset_var, 0, 400),
+                                     ('maxDistance', self._max_distance_var, 5, 100)):
+                try:
+                    v = int(var.get())
+                except (ValueError, tk.TclError):
+                    v = self.grid_config.get(key, lo)
+                self.grid_config[key] = max(lo, min(v, hi))
+            if self.grid_config.get('type') == 'friendly':
+                self.grid_config['showSelf'] = bool(self._show_self_var.get())
+        else:
+            # Position fields carry projected px; unproject back to fractions at
+            # the current game resolution (typed overshoot clamps to the screen).
+            game_w, game_h = get_game_resolution_or_default()
+            for key, var, extent in (('fx', self.x_var, game_w), ('fy', self.y_var, game_h)):
+                try:
+                    px = max(0, min(int(var.get()), extent))
+                except (ValueError, tk.TclError):
+                    px = project_px(self.grid_config.get(key, 0.0), extent)
+                self.grid_config[key] = unproject_px(px, extent)
         self.grid_config['timerStyle'] = _TIMER_CODE_BY_LABEL.get(
             self.timer_style_var.get(), self.grid_config.get('timerStyle', 'digits'))
         self.grid_config['enableFlashing'] = self.flashing_var.get()
@@ -480,6 +571,8 @@ class GridEditorPanel(ttk.Frame):
 
         if cfg.get('slotMode') == 'static':
             self.info_text.set(f"{configured} of {rows * cols} slots assigned")
+        elif self._band and wl:
+            self.info_text.set(f"Tracking {len(wl)} buffs, up to {cfg.get('maxSlots', 10)} shown")
         else:
             self.info_text.set(
                 f"Tracking {len(wl)} buffs" if wl
@@ -495,7 +588,11 @@ class GridEditorPanel(ttk.Frame):
             self.whitelist_preview_label.pack_forget()
 
         self.section.set_title(cfg.get('id', 'Grid'))
-        self.section.set_summary(f"  {rows}×{cols} · {cfg.get('slotMode', 'dynamic')}")
+        if self._band:
+            self.section.set_summary(f"  up to {cfg.get('maxSlots', 10)} · "
+                                     f"{cfg.get('rowCap', 5)} wide · dynamic")
+        else:
+            self.section.set_summary(f"  {rows}×{cols} · {cfg.get('slotMode', 'dynamic')}")
 
     def _on_mode_btn_click(self):
         if self.grid_config.get('slotMode') == 'static':
@@ -578,9 +675,29 @@ class GridEditorPanel(ttk.Frame):
         else:
             self._flash_threshold_frame.pack_forget()
 
+    def _store_band_shape(self):
+        """A band's row cap and max slots, and the shape derived from them."""
+        cap = self._row_cap_var.get()
+        try:
+            slots = max(1, min(int(self._max_slots_var.get()), PLATE_MAX_SLOTS))
+        except (ValueError, tk.TclError):
+            slots = self.grid_config.get('maxSlots', 10)
+        rows, cols = band_shape(cap, slots)
+        self.grid_config.update(rowCap=cap, maxSlots=slots, rows=rows, cols=cols, fillDirection='C')
+
+    def _on_band_changed(self):
+        self._store_band_shape()
+        self.update_labels()
+        self._update_preview()
+        if self._on_resize:
+            self._on_resize()
+
     def _on_dimension_changed(self, dim):
+        gtype = self.grid_config.get('type', 'player')
         var = self._rows_var if dim == 'rows' else self._cols_var
-        limit = MAX_ROWS if dim == 'rows' else MAX_COLS
+        max_rows, max_cols = max_shape(gtype)
+        limit = max_rows if dim == 'rows' else max_cols
+        slots = max_slots(gtype)
         try:
             new_val = max(1, min(int(var.get()), limit))
         except (ValueError, tk.TclError):
@@ -588,10 +705,10 @@ class GridEditorPanel(ttk.Frame):
             return
         old_val = self.grid_config.get(dim, 1)
         other_dim = self.grid_config.get('cols' if dim == 'rows' else 'rows', 1)
-        if new_val * other_dim > MAX_GRID_SLOTS:
-            new_val = max(1, MAX_GRID_SLOTS // other_dim)
+        if new_val * other_dim > slots:
+            new_val = max(1, slots // other_dim)
             var.set(str(new_val))
-            app_toast(self, f"A grid holds at most {MAX_GRID_SLOTS} slots", 'info',
+            app_toast(self, f"A grid holds at most {slots} slots", 'info',
                       key='grid_resize')
         new_rows = new_val if dim == 'rows' else other_dim
         new_cols = other_dim if dim == 'rows' else new_val
@@ -674,6 +791,12 @@ class GridEditorPanel(ttk.Frame):
         )
 
     def _update_fill_options(self, rows, cols):
+        if self._band:
+            # A band has no fill to choose: its rows centre over the head.
+            self.fill_combo['values'] = [_BAND_FILL_LABEL]
+            self.fill_var.set(_BAND_FILL_LABEL)
+            self.fill_combo.configure(state='disabled')
+            return
         if rows == 1:
             valid_codes = ['LR', 'RL']
             default = 'LR'
@@ -702,6 +825,8 @@ _FILL_OPTIONS = [
     ('BR-TL', 'Bottom-right → Top-left', 'Fills from the bottom-right corner'),
 ]
 _FILL_LABEL_BY_CODE = {code: label for code, label, _ in _FILL_OPTIONS}
+_BAND_FILL_LABEL = 'Centred'
+
 _FILL_CODE_BY_LABEL = {label: code for code, label, _ in _FILL_OPTIONS}
 _FILL_DESCRIPTIONS = {label: desc for _, label, desc in _FILL_OPTIONS}
 

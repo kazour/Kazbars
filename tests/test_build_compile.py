@@ -66,7 +66,7 @@ def _worst_case():
     """The most the generator can be handed: eight dynamic grids each
     whitelisting the whole catalog (the per-grid slot cap bounds slots, not the
     ids a grid references), a static grid, ids that need escaping or collide
-    once sanitized, and every module on."""
+    once sanitized, a friendly band and a full hostile box, and every module on."""
     every_primary = [b["ids"][0] for b in _db().buffs]
     grids = [_grid(f"All {k}", cols=8, whitelist=every_primary) for k in range(8)]
     grids += [
@@ -75,6 +75,9 @@ def _worst_case():
         _grid("Grid ünïcodé 日本", whitelist=[222609]),
         _grid("a-b", whitelist=[222609], timerStyle="bar"),
         _grid("a b", whitelist=[222609], selfCastOnly=True),
+        _grid("Band", type="friendly", rows=2, cols=5, whitelist=every_primary[:200]),
+        _grid("Plates", type="hostile", slotMode="static", rows=2, cols=8,
+              slotAssignments={str(i): [222609] for i in range(16)}),
     ]
     extras = dict(
         cast_config={"enabled": True, "enableP": True, "enableT": True, "scale": 200},
@@ -125,9 +128,9 @@ def test_every_module_class_is_in_the_full_build(builds):
     sizes = _class_sizes(builds["full"][2])
     for cls in ("KazBars", "KazBarsData", "KazBarsData1", "KazBarsGrids", "KazBarsGridView",
                 "KazBarsWorld", "KazBarsClock", "KazBarsCastTimer", "KazBarsStopwatch",
-                "KazBarsInspect", "KazBarsPreviewPanel"):
+                "KazBarsInspect", "KazBarsPreviewPanel", "KazBarsOverhead", "KazBarsRelations"):
         assert cls in sizes, cls
-    for cls in ("KazBarsConsole", "KazBarsOnslaught", "KazBarsOverhead"):
+    for cls in ("KazBarsConsole", "KazBarsOnslaught"):
         assert cls not in sizes, f"{cls} is gated off"
 
 

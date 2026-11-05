@@ -197,6 +197,32 @@ def draw_grid_cells(canvas, rows, cols, type_color, area_w, area_h, tag="cells")
             )
 
 
+def draw_band_cells(canvas, row_cap, slots, type_color, area_w, area_h, tag="cells"):
+    """Draw a band (an overhead dynamic grid) at its fullest: `row_cap` icons to
+    a row, rows stacked up from the bottom, each row centred — the way it grows
+    over a head in game."""
+    canvas.delete(tag)
+    cell_border = TK_COLORS["separator"]
+    rows = -(-slots // row_cap)
+    widest = min(row_cap, slots)
+    cell, gap = CELL_PX, CELL_GAP
+    while (rows * cell + (rows - 1) * gap > area_h - 8
+           or widest * cell + (widest - 1) * gap > area_w - 16) and cell > 3:
+        cell -= 1
+    total_h = rows * cell + (rows - 1) * gap
+    bottom = (area_h + total_h) // 2
+    for r in range(rows):
+        n = min(row_cap, slots - r * row_cap)
+        row_w = n * cell + (n - 1) * gap
+        sx = (area_w - row_w) // 2
+        y = bottom - (r + 1) * cell - r * gap
+        for c in range(n):
+            x = sx + c * (cell + gap)
+            canvas.create_rectangle(
+                x, y, x + cell, y + cell, fill=type_color, outline=cell_border, tags=tag
+            )
+
+
 def create_rounded_rect(canvas, x1, y1, x2, y2, radius, **kwargs):
     """Draw a rounded rectangle on a tkinter Canvas (smoothed polygon)."""
     if radius <= 0:

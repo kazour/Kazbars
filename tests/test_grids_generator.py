@@ -557,3 +557,47 @@ def test_generate_files_is_three_files_for_a_small_profile_and_two_for_none():
     assert [name for name, _ in empty] == ["KazBars.as", "KazBarsData.as"]
     assert ".fill(" not in empty[1][1]
     assert "return d;" in empty[1][1]
+
+
+# --------------------------------------------------------------------------
+# Overhead grids and bands
+# --------------------------------------------------------------------------
+
+
+def test_a_band_bakes_its_derived_shape_centred_fill_and_slots_last():
+    grids = [
+        _grid(id="Band", type="hostile", rowCap=3, maxSlots=7),
+        dict(_grid(id="Box", type="hostile", rows=1, cols=2, slotMode="static", whitelist=[]),
+             slotAssignments={"0": BUFF}),
+        _grid(id="Screen"),
+    ]
+    main, data = _gen(grids).generate()
+    assert ('            id: "Band",\n            key: "Band",\n            type: "hostile",\n'
+            '            rows: 3,\n            cols: 3,') in data
+    assert '            fillDir: "C",' in data
+    assert "            maxDistance: 40,\n            maxSlots: 7\n        };" in data
+    assert data.index("// Box\n") < data.index("// Screen\n") < data.index("// Band\n")
+    assert "maxSlots: 2" not in data, "a box bakes no maxSlots"
+
+
+def test_an_overhead_grid_turns_the_gate_on_and_bakes_its_keys():
+    plate = _grid(id="P", type="hostile", rows=1, cols=4, plateOffset=90, maxDistance=30)
+    main, data = _gen([_grid(), plate]).generate()
+    assert "overhead = new KazBarsOverhead(rootClip);" in main
+    assert "overhead.configure(d, world, clock);" in main
+    assert "modules.push(overhead);" in main
+    assert ("            enableFlashing: true,\n            plateOffset: 90,\n"
+            "            maxDistance: 30,\n            maxSlots: 4\n        };") in data
+    assert "showSelf" not in data
+
+
+def test_a_friendly_grid_bakes_over_me():
+    plate = _grid(id="F", type="friendly", rows=1, cols=4, maxDistance=30, showSelf=False)
+    _, data = _gen([plate]).generate()
+    assert "            maxDistance: 30,\n            maxSlots: 4,\n            showSelf: false\n        };" in data
+
+
+def test_a_build_without_overhead_grids_never_names_the_classes():
+    main, data = _gen().generate()
+    assert "KazBarsOverhead" not in main
+    assert "plateOffset" not in data

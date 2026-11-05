@@ -21,7 +21,7 @@ from .app_popups import show_close_game_required_dialog
 from .build_loading import BuildLoadingScreen
 from .cast_timer import is_enabled as cast_is_enabled
 from .cast_timer import validate_config as validate_cast_config
-from .grid_model import MAX_GRID_SLOTS, get_game_resolution_or_default
+from .grid_model import get_game_resolution_or_default, max_slots, slot_count
 from .grids_generator import unresolved_refs
 from .profile_document import build_signature
 from .ui_helpers import THEME_COLORS
@@ -67,10 +67,10 @@ def build(app):
     )
 
     grids = app.grids_panel.get_profile_data()
-    oversized = next((g for g in grids if g['rows'] * g['cols'] > MAX_GRID_SLOTS), None)
+    oversized = next((g for g in grids if slot_count(g) > max_slots(g['type'])), None)
     oversized_msg = '' if oversized is None else (
-        f"Grid '{oversized['id']}' has {oversized['rows'] * oversized['cols']} slots; "
-        f"a grid holds at most {MAX_GRID_SLOTS}.\n\nReduce its rows or columns.")
+        f"Grid '{oversized['id']}' has {slot_count(oversized)} slots; "
+        f"a grid holds at most {max_slots(oversized['type'])}.\n\nReduce its rows or columns.")
 
     di_settings = dict(app.profile_store.get_section('damage_numbers'))
     di_enabled = bool(di_settings.get('enabled'))

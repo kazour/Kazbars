@@ -4,8 +4,9 @@ Constants, validation specs, and default grid configuration.
 """
 
 import copy
+import math
 
-from .overlay_size import SCALE_DEFAULT, SCALE_MAX, SCALE_MIN
+from .overlay_size import SCALE_DEFAULT, SCALE_MAX, SCALE_MIN, grid_metrics
 from .profile_document import LANE_BUILD
 from .profile_document import SectionSpec as ProfileSectionSpec
 from .settings_core import Field, Schema
@@ -19,6 +20,19 @@ from .settings_core import Field, Schema
 MAX_GRID_SLOTS = 64
 MAX_ROWS = 64
 MAX_COLS = 64
+# An overhead grid is drawn once per character it floats over, so its own
+# shape is capped well below a screen grid's: 16 slots, at most 4 rows of 8.
+PLATE_MAX_ROWS = 4
+PLATE_MAX_COLS = 8
+PLATE_MAX_SLOTS = 16
+PLATE_OFFSET_DEFAULT = 75
+PLATE_DISTANCE_DEFAULT = 40
+# A band (an overhead dynamic grid) has no shape of its own: it grows sideways
+# from the head's centre, `rowCap` icons to a row (odd, so one icon and a full
+# row both centre) before the next row starts above, up to `maxSlots`.
+BAND_ROW_CAPS = (3, 5, 7)
+BAND_ROW_CAP_DEFAULT = 5
+BAND_SLOTS_DEFAULT = 10
 
 DEFAULT_GAME_RESOLUTION = (1920, 1080)
 
@@ -50,7 +64,7 @@ TIMER_STYLES = ('bar', 'digits', 'off')
 
 # key → (default, valid_values)
 ENUM_SPECS = {
-    'type': ('player', ('player', 'target')),
+    'type': ('player', ('player', 'target', 'friendly', 'hostile')),
     'slotMode': ('dynamic', ('dynamic', 'static')),
     'fillDirection': ('LR', ('LR', 'RL', 'TB', 'BT', 'BL-TR', 'BR-TL', 'TL-BR', 'TR-BL')),
     'sortOrder': ('longest', ('longest', 'shortest', 'application')),
@@ -60,11 +74,64 @@ ENUM_SPECS = {
 
 
 # ============================================================================
+# OVERHEAD GRIDS AND BANDS
+# ============================================================================
+def is_plate(grid_type):
+    """`friendly` / `hostile`: an overhead grid, drawn over each known character
+    of that relation instead of at a screen position."""
+    return grid_type in ('friendly', 'hostile')
+
+
+def is_band(grid):
+    """An overhead dynamic grid: a band, centred over the head."""
+    return is_plate(grid.get('type')) and grid.get('slotMode') == 'dynamic'
+
+
+def snap_row_cap(v):
+    """The nearest of BAND_ROW_CAPS, a tie going up (4 reads 5, 6 reads 7)."""
+    return 3 if v <= 3 else 5 if v <= 5 else 7
+
+
+def max_shape(grid_type):
+    """The largest (rows, cols) a grid of `grid_type` may have."""
+    return (PLATE_MAX_ROWS, PLATE_MAX_COLS) if is_plate(grid_type) else (MAX_ROWS, MAX_COLS)
+
+
+def max_slots(grid_type):
+    """The most slots a grid of `grid_type` may have: 64 on screen, 16 overhead."""
+    return PLATE_MAX_SLOTS if is_plate(grid_type) else MAX_GRID_SLOTS
+
+
+def slot_count(grid):
+    """The slots a grid can show: a band's `maxSlots`, else rows x cols."""
+    return grid['maxSlots'] if is_band(grid) else grid['rows'] * grid['cols']
+
+
+def screen_extent(grid, base):
+    """The grid's size on screen in game px, (width, height): `KazBarsGridView`'s
+    own W and H, `n x (icon + gap) - gap` along each axis, the icon at `base`
+    (the profile's overlay size) and the grid's scale. A band's is its fullest:
+    its widest row by its rows."""
+    icon = grid_metrics(base, grid['scale']).icon
+    gap = grid['gap']
+    cols = min(grid['cols'], grid['maxSlots']) if is_band(grid) else grid['cols']
+    return cols * (icon + gap) - gap, grid['rows'] * (icon + gap) - gap
+
+
+def band_shape(row_cap, slots):
+    """A band's derived (rows, cols): `rowCap` to a row, rows as needed."""
+    return math.ceil(slots / row_cap), row_cap
+
+
+# ============================================================================
 # DEFAULT GRID CONFIGURATION
 # ============================================================================
 def create_default_grid(grid_type="player", rows=1, cols=10, mode="dynamic", grid_id=None):
-    """Return a grid configuration dictionary with sensible defaults."""
-    if rows == 1 and cols == 1:
+    """Return a grid configuration dictionary with sensible defaults. An
+    overhead dynamic grid is a band: its row cap from `cols` (snapped to 3, 5
+    or 7), its max slots `rows x cols`; a screen grid's 1x1 is static."""
+    plate = is_plate(grid_type)
+    if rows == 1 and cols == 1 and not plate:
         mode = "static"
 
     if rows == 1:
@@ -74,7 +141,7 @@ def create_default_grid(grid_type="player", rows=1, cols=10, mode="dynamic", gri
     else:
         fill_dir = "BL-TR"
 
-    return {
+    grid = {
         'id': grid_id or f"{grid_type.title()}Grid 1",
         'enabled': True,
         'type': grid_type,
@@ -85,16 +152,27 @@ def create_default_grid(grid_type="player", rows=1, cols=10, mode="dynamic", gri
         'fx': (100 if grid_type == "player" else 300) / 1920,
         'fy': 400 / 1080,
         'slotMode': mode,
-        'timerStyle': 'digits',
+        'timerStyle': 'bar' if plate else 'digits',
         'timerFlashThreshold': 6,
         'timerYOffset': -3,
         'enableFlashing': True,
         'fillDirection': fill_dir,
         'sortOrder': 'longest',
-        'layout': 'buffFirst' if grid_type == "player" else 'debuffFirst',
+        'layout': 'debuffFirst' if grid_type in ('target', 'hostile') else 'buffFirst',
         'whitelist': [],
         'slotAssignments': {}
     }
+    if plate:
+        grid['plateOffset'] = PLATE_OFFSET_DEFAULT
+        grid['maxDistance'] = PLATE_DISTANCE_DEFAULT
+        if mode == 'dynamic':
+            cap = snap_row_cap(cols)
+            slots = max(1, min(rows * cols, PLATE_MAX_SLOTS))
+            grid['rows'], grid['cols'] = band_shape(cap, slots)
+            grid.update(rowCap=cap, maxSlots=slots, fillDirection='C')
+    if grid_type == 'friendly':
+        grid['showSelf'] = True
+    return grid
 
 
 def default_grid_name(grid_type, existing_ids):
@@ -148,6 +226,8 @@ def validate_grid(grid):
         if grid.get(key) not in valid:
             grid[key] = enum_default
 
+    _validate_overhead(grid)
+
     # Validate booleans
     for bool_key in ('enabled', 'enableFlashing'):
         if not isinstance(grid.get(bool_key), bool):
@@ -169,6 +249,45 @@ def validate_grid(grid):
         grid['slotAssignments'] = {}
 
     return grid
+
+
+def _clamp_int(grid, key, default, lo, hi):
+    try:
+        value = int(grid.get(key, default))
+    except (TypeError, ValueError, OverflowError):
+        value = default
+    return max(lo, min(value, hi))
+
+
+def _validate_overhead(grid):
+    """The overhead keys, where they apply and nowhere else: an overhead grid's
+    shape inside 4 x 8 with its columns giving way to its 16 slots, its height
+    (`plateOffset`, px of room for the nameplate) and range (`maxDistance`, m);
+    a band's `rowCap` and `maxSlots` and the shape and centred fill derived from
+    them; a friendly grid's `showSelf`."""
+    gtype = grid['type']
+    if is_plate(gtype):
+        grid['rows'] = min(grid['rows'], PLATE_MAX_ROWS)
+        grid['cols'] = min(grid['cols'], PLATE_MAX_COLS)
+        grid['plateOffset'] = _clamp_int(grid, 'plateOffset', PLATE_OFFSET_DEFAULT, 0, 400)
+        grid['maxDistance'] = _clamp_int(grid, 'maxDistance', PLATE_DISTANCE_DEFAULT, 5, 100)
+        if is_band(grid):
+            cap = snap_row_cap(_clamp_int(grid, 'rowCap', grid['cols'], 1, 7))
+            slots = _clamp_int(grid, 'maxSlots', grid['rows'] * grid['cols'], 1, PLATE_MAX_SLOTS)
+            grid['rows'], grid['cols'] = band_shape(cap, slots)
+            grid.update(rowCap=cap, maxSlots=slots, fillDirection='C')
+        else:
+            grid['cols'] = min(grid['cols'], PLATE_MAX_SLOTS // grid['rows'])
+            grid.pop('rowCap', None)
+            grid.pop('maxSlots', None)
+    else:
+        for key in ('plateOffset', 'maxDistance', 'rowCap', 'maxSlots'):
+            grid.pop(key, None)
+    if gtype == 'friendly':
+        if not isinstance(grid.get('showSelf'), bool):
+            grid['showSelf'] = True
+    else:
+        grid.pop('showSelf', None)
 
 
 def dedupe_grid_ids(grids):

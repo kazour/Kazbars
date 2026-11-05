@@ -4,7 +4,6 @@ AddGridWizard, BuffSelectorDialog, SlotAssignmentDialog.
 """
 
 import logging
-import math
 import tkinter as tk
 from collections import Counter
 from tkinter import ttk
@@ -13,7 +12,16 @@ logger = logging.getLogger(__name__)
 
 from ttkbootstrap.dialogs import Messagebox
 
-from .grid_model import MAX_GRID_SLOTS, create_default_grid, default_grid_name
+from .grid_model import (
+    BAND_ROW_CAPS,
+    MAX_GRID_SLOTS,
+    create_default_grid,
+    default_grid_name,
+    is_plate,
+    max_shape,
+    max_slots,
+    snap_row_cap,
+)
 from .settings_manager import get_setting, set_setting
 from .ui_headers import create_dialog_header
 from .ui_helpers import (
@@ -32,7 +40,6 @@ from .ui_helpers import (
     MODULE_COLORS,
     PAD_BUTTON_GAP,
     PAD_INNER,
-    PAD_LF,
     PAD_LIST_ITEM,
     PAD_MICRO,
     PAD_RADIO_INDENT,
@@ -52,9 +59,10 @@ from .window_position import (
     restore_window_position,
 )
 
-ADD_GRID_WIZARD_SIZE = (460, 549)   # measured content height at the stock font; the
+ADD_GRID_WIZARD_SIZE = (460, 600)   # measured content height at the stock font; the
                                     # dialog is fixed-size, so `fit_window_height` re-fits
                                     # it rather than clip the button row at larger text
+WIZARD_TYPE_DESC_WRAP = 180  # px, the type descriptions under the two kind columns
 BUFF_SELECTOR_SIZE = (800, 600)
 BUFF_SELECTOR_MIN = (640, 400)
 SLOT_ASSIGNMENT_SIZE = (620, 520)
@@ -81,7 +89,21 @@ def _section(parent, text):
 # ADD GRID WIZARD
 # ============================================================================
 class AddGridWizard(tk.Toplevel):
-    """Dialog wizard for creating a new grid with type, size, and mode options."""
+    """Dialog wizard for creating a new grid: where it sits (a floating grid on
+    the player or the target, or an overhead grid over friendly or hostile
+    characters), its mode and its shape. An overhead dynamic grid is a band:
+    its columns are the row cap (3, 5 or 7) and the rows give way to its 16
+    slots; every other shape stays inside its grid's own limit, the columns
+    giving way."""
+
+    # (label, rows, cols) per kind of grid: floating (False) or overhead (True).
+    _PRESETS = {
+        False: (("H-bar 1x10", 1, 10), ("V-bar 10x1", 10, 1), ("Grid 3x3", 3, 3), ("Single 1x1", 1, 1)),
+        True: (("Row 1x3", 1, 3), ("Band 2x5", 2, 5), ("Grid 3x3", 3, 3), ("Single 1x1", 1, 1)),
+    }
+    _TYPE_STYLES = {'player': 'Player', 'target': 'Target', 'friendly': 'Friendly', 'hostile': 'Hostile'}
+    _PRESET_STYLES = {'player': 'info-outline', 'target': 'warning-outline',
+                      'friendly': 'success-outline', 'hostile': 'danger-outline'}
 
     def __init__(self, parent, existing_ids, name_in_use):
         super().__init__(parent)
@@ -95,7 +117,6 @@ class AddGridWizard(tk.Toplevel):
         # One owner for the uniqueness rule (grids_panel._grid_name_in_use);
         # existing_ids stays for the default-name suggestion only.
         self.name_in_use = name_in_use
-        self.available_slots = MAX_GRID_SLOTS
         self.result = None
         self.parent = parent
 
@@ -118,88 +139,91 @@ class AddGridWizard(tk.Toplevel):
         """User typed in the name field — stop auto-filling it from the type."""
         self._name_is_auto = False
 
+    def _band(self):
+        return is_plate(self.type_var.get()) and self.mode_var.get() == 'dynamic'
+
     def create_widgets(self):
         create_dialog_header(self, "CREATE NEW GRID", MODULE_COLORS['grids'])
 
         frame = ttk.Frame(self, padding=PAD_INNER)
         frame.pack(fill='both', expand=True)
 
-        self.avail_label = ttk.Label(frame, text=f"A grid holds up to {MAX_GRID_SLOTS} slots",
-                                     font=FONT_SMALL, foreground=THEME_COLORS['info_value'])
-        self.avail_label.pack(pady=(0, PAD_LF))
-
         name_frame = ttk.Frame(frame)
         name_frame.pack(fill='x', pady=PAD_TINY)
         ttk.Label(name_frame, text="Grid Name:", font=FONT_FORM_LABEL,
-                 foreground=THEME_COLORS['muted']).pack(side='left')
+                  foreground=THEME_COLORS['muted']).pack(side='left')
         self.id_var = tk.StringVar(value=default_grid_name('player', self.existing_ids))
         self.name_entry = ttk.Entry(name_frame, textvariable=self.id_var, width=20)
         self.name_entry.pack(side='left', padx=PAD_SMALL)
         self.name_entry.bind('<KeyRelease>', self._on_name_edited)
 
-        source_frame = _section(frame, "Source")
-
         self.type_var = tk.StringVar(value="player")
-        self.type_var.trace_add('write', lambda *a: self._on_type_changed())
-        # ttkbootstrap strips custom style= at construction; apply via configure() after.
-        rb_player = ttk.Radiobutton(source_frame, text="Player", variable=self.type_var, value="player")
-        rb_player.configure(style='Player.TRadiobutton')
-        rb_player.pack(anchor='w')
-        ttk.Label(source_frame, text="Track buffs/debuffs on yourself",
-                 foreground=THEME_COLORS['muted'], font=FONT_SMALL).pack(anchor='w', padx=PAD_RADIO_INDENT)
-        rb_target = ttk.Radiobutton(source_frame, text="Target", variable=self.type_var, value="target")
-        rb_target.configure(style='Target.TRadiobutton')
-        rb_target.pack(anchor='w', pady=(PAD_TINY, 0))
-        ttk.Label(source_frame, text="Track buffs/debuffs on your current target",
-                 foreground=THEME_COLORS['muted'], font=FONT_SMALL).pack(anchor='w', padx=PAD_RADIO_INDENT)
+        kinds = ttk.Frame(frame)
+        kinds.pack(fill='x')
+        for col, (title, options) in enumerate((
+            ("Floating", (("Player", "player", "On yourself, at a spot on screen"),
+                          ("Target", "target", "On your current target, at a spot on screen"))),
+            ("Overhead", (("Friendly", "friendly", "Over you, your group and friendly players"),
+                          ("Hostile", "hostile", "Over your target and anyone fighting you"))),
+        )):
+            lf = ttk.LabelFrame(kinds, text=title, padding=PAD_SMALL)
+            lf.grid(row=0, column=col, sticky='nsew', padx=(0, PAD_SMALL) if col == 0 else 0,
+                    pady=PAD_SMALL)
+            kinds.columnconfigure(col, weight=1)
+            for k, (text, value, desc) in enumerate(options):
+                rb = ttk.Radiobutton(lf, text=text, variable=self.type_var, value=value,
+                                     command=self._on_type_changed)
+                # ttkbootstrap strips custom style= at construction; apply via configure() after.
+                rb.configure(style=f'{self._TYPE_STYLES[value]}.TRadiobutton')
+                rb.pack(anchor='w', pady=(PAD_TINY if k else 0, 0))
+                ttk.Label(lf, text=desc, foreground=THEME_COLORS['muted'], font=FONT_SMALL,
+                          wraplength=WIZARD_TYPE_DESC_WRAP, justify='left'
+                          ).pack(anchor='w', padx=PAD_RADIO_INDENT)
 
         mode_lf = _section(frame, "Mode")
-
         self.mode_var = tk.StringVar(value="dynamic")
-        self.mode_dynamic = ttk.Radiobutton(mode_lf, text="Dynamic", variable=self.mode_var, value="dynamic")
+        self.mode_dynamic = ttk.Radiobutton(mode_lf, text="Dynamic", variable=self.mode_var,
+                                            value="dynamic", command=self._on_mode_changed)
         self.mode_dynamic.pack(anchor='w')
-        ttk.Label(mode_lf, text="Shows all tracked buffs, auto-sorted",
-                 foreground=THEME_COLORS['muted'], font=FONT_SMALL).pack(anchor='w', padx=PAD_RADIO_INDENT)
-
-        self.mode_static = ttk.Radiobutton(mode_lf, text="Static", variable=self.mode_var, value="static")
+        self._dynamic_desc = ttk.Label(mode_lf, foreground=THEME_COLORS['muted'], font=FONT_SMALL)
+        self._dynamic_desc.pack(anchor='w', padx=PAD_RADIO_INDENT)
+        self.mode_static = ttk.Radiobutton(mode_lf, text="Static", variable=self.mode_var,
+                                           value="static", command=self._on_mode_changed)
         self.mode_static.pack(anchor='w', pady=(PAD_TINY, 0))
         ttk.Label(mode_lf, text="Fixed slots for specific buffs. Empty when buff not active",
-                 foreground=THEME_COLORS['muted'], font=FONT_SMALL).pack(anchor='w', padx=PAD_RADIO_INDENT)
+                  foreground=THEME_COLORS['muted'], font=FONT_SMALL).pack(anchor='w', padx=PAD_RADIO_INDENT)
 
         dim_frame = _section(frame, "Dimensions")
-
         dim_row = ttk.Frame(dim_frame)
         dim_row.pack(fill='x')
-
         ttk.Label(dim_row, text="Rows:", font=FONT_FORM_LABEL,
-                 foreground=THEME_COLORS['muted']).pack(side='left')
+                  foreground=THEME_COLORS['muted']).pack(side='left')
         self.rows_var = tk.StringVar(value="1")
-        self.rows_spin = ttk.Spinbox(dim_row, from_=1, to=self.available_slots,
-                                      textvariable=self.rows_var, width=INPUT_WIDTH_NUM,
-                                      command=self.on_rows_changed)
+        self.rows_spin = ttk.Spinbox(dim_row, from_=1, to=MAX_GRID_SLOTS,
+                                     textvariable=self.rows_var, width=INPUT_WIDTH_NUM,
+                                     command=self.on_rows_changed)
         self.rows_spin.pack(side='left', padx=(PAD_BUTTON_GAP, PAD_LIST_ITEM))
         self.rows_spin.bind('<KeyRelease>', lambda e: self.on_rows_changed())
-
         ttk.Label(dim_row, text="Columns:", font=FONT_FORM_LABEL,
-                 foreground=THEME_COLORS['muted']).pack(side='left')
+                  foreground=THEME_COLORS['muted']).pack(side='left')
         self.cols_var = tk.StringVar(value="10")
-        self.cols_spin = ttk.Spinbox(dim_row, from_=1, to=self.available_slots,
-                                      textvariable=self.cols_var, width=INPUT_WIDTH_NUM,
-                                      command=self.on_cols_changed)
+        self.cols_spin = ttk.Spinbox(dim_row, from_=1, to=MAX_GRID_SLOTS,
+                                     textvariable=self.cols_var, width=INPUT_WIDTH_NUM,
+                                     command=self.on_cols_changed)
         self.cols_spin.pack(side='left', padx=(PAD_BUTTON_GAP, 0))
         self.cols_spin.bind('<KeyRelease>', lambda e: self.on_cols_changed())
 
         self.shape_var = tk.StringVar(value="")
         ttk.Label(dim_frame, textvariable=self.shape_var, font=FONT_SECTION).pack(pady=(PAD_SMALL, PAD_BUTTON_GAP))
+        self.limit_var = tk.StringVar(value="")
+        ttk.Label(dim_frame, textvariable=self.limit_var, font=FONT_SMALL,
+                  foreground=THEME_COLORS['info_value']).pack()
 
         preset_frame = ttk.Frame(dim_frame)
         preset_frame.pack(pady=(PAD_XS, 0))
-
         self._preset_buttons = []
-        for label, r, c in [("H-bar 1x10", 1, 10), ("V-bar 10x1", 10, 1),
-                             ("Grid 3x3", 3, 3), ("Single 1x1", 1, 1)]:
-            btn = ttk.Button(preset_frame, text=label, width=BTN_MEDIUM, bootstyle='info-outline',
-                             command=lambda r=r, c=c: self.apply_preset(r, c))
+        for _ in range(4):
+            btn = ttk.Button(preset_frame, width=BTN_MEDIUM, bootstyle='info-outline')
             btn.pack(side='left', padx=PAD_MICRO)
             self._preset_buttons.append(btn)
 
@@ -214,34 +238,30 @@ class AddGridWizard(tk.Toplevel):
 
         self.bind('<Escape>', lambda e: self.on_cancel())
         self.bind('<Return>', lambda e: self.on_create())
-        self.update_display()
+        self._on_type_changed()
 
     def _on_type_changed(self):
-        bs = 'info-outline' if self.type_var.get() == 'player' else 'warning-outline'
-        for btn in self._preset_buttons:
-            btn.configure(bootstyle=bs)
+        gtype = self.type_var.get()
+        overhead = is_plate(gtype)
+        for btn, (label, r, c) in zip(self._preset_buttons, self._PRESETS[overhead]):
+            btn.configure(text=label, bootstyle=self._PRESET_STYLES[gtype],
+                          command=lambda r=r, c=c: self.apply_preset(r, c))
+        self._dynamic_desc.configure(
+            text="A band centred over the head: rows of up to 7 icons, growing up"
+            if overhead else "Shows all tracked buffs, auto-sorted")
         if self._name_is_auto:
-            self.id_var.set(default_grid_name(self.type_var.get(), self.existing_ids))
+            self.id_var.set(default_grid_name(gtype, self.existing_ids))
+        self._clamp_shape()
+        self.update_display()
+
+    def _on_mode_changed(self):
+        self._clamp_shape()
+        self.update_display()
 
     def apply_preset(self, rows, cols):
-        total = rows * cols
-        if total > self.available_slots:
-            if rows == 1:
-                cols = self.available_slots
-            elif cols == 1:
-                rows = self.available_slots
-            elif rows == cols:
-                rows = cols = max(1, int(math.sqrt(self.available_slots)))
-            else:
-                scale = math.sqrt(self.available_slots / total)
-                rows = max(1, int(rows * scale))
-                cols = max(1, int(cols * scale))
-                while (rows + 1) * cols <= self.available_slots:
-                    rows += 1
-                while rows * (cols + 1) <= self.available_slots:
-                    cols += 1
         self.rows_var.set(str(rows))
         self.cols_var.set(str(cols))
+        self._clamp_shape()
         self.update_display()
 
     def safe_get_int(self, var, default=1):
@@ -253,35 +273,50 @@ class AddGridWizard(tk.Toplevel):
         except (ValueError, tk.TclError):
             return default
 
-    def _on_dimension_changed(self, changed='rows'):
+    def _clamp_shape(self, changed='rows'):
+        """Keep the shape inside the grid's limit. A band snaps its columns to
+        3, 5 or 7 and its rows give way to the 16 slots; any other grid keeps
+        its rows and columns inside its max shape, the other one giving way to
+        its slot limit."""
+        gtype = self.type_var.get()
         rows = self.safe_get_int(self.rows_var, 1)
         cols = self.safe_get_int(self.cols_var, 1)
-        if changed == 'rows':
-            rows = min(rows, self.available_slots)
-            max_other = self.available_slots if rows == 1 else self.available_slots // rows
-            if cols > max_other:
-                self.cols_var.set(str(max_other))
-            self.cols_spin.config(to=max_other)
+        limit = max_slots(gtype)
+        max_rows, max_cols = max_shape(gtype)
+        if self._band():
+            cols = snap_row_cap(cols)
+            rows = min(rows, max(1, limit // cols))
+            self.cols_spin.config(values=BAND_ROW_CAPS)
+            self.rows_spin.config(from_=1, to=max(1, limit // cols))
         else:
-            cols = min(cols, self.available_slots)
-            max_other = self.available_slots if cols == 1 else self.available_slots // cols
-            if rows > max_other:
-                self.rows_var.set(str(max_other))
-            self.rows_spin.config(to=max_other)
-        self.update_display()
+            self.cols_spin.config(values=())
+            rows, cols = min(rows, max_rows), min(cols, max_cols)
+            if changed == 'rows':
+                cols = min(cols, max(1, limit // rows))
+            else:
+                rows = min(rows, max(1, limit // cols))
+            self.rows_spin.config(from_=1, to=min(max_rows, max(1, limit // cols)))
+            self.cols_spin.config(from_=1, to=min(max_cols, max(1, limit // rows)))
+        self.rows_var.set(str(rows))
+        self.cols_var.set(str(cols))
 
     def on_rows_changed(self):
-        self._on_dimension_changed('rows')
+        self._clamp_shape('rows')
+        self.update_display()
 
     def on_cols_changed(self):
-        self._on_dimension_changed('cols')
+        self._clamp_shape('cols')
+        self.update_display()
 
     def update_display(self):
         rows = self.safe_get_int(self.rows_var, 1)
         cols = self.safe_get_int(self.cols_var, 1)
         total = rows * cols
+        gtype = self.type_var.get()
+        limit = max_slots(gtype)
 
-        if rows == 1 and cols == 1:
+        # A floating 1x1 is a single static slot; an overhead 1x1 may be a band of one.
+        if rows == 1 and cols == 1 and not is_plate(gtype):
             shape = "Single Slot"
             if not self._mode_forced_static:
                 self._mode_before_force = self.mode_var.get()
@@ -290,21 +325,21 @@ class AddGridWizard(tk.Toplevel):
             self.mode_dynamic.config(state='disabled')
         else:
             if self._mode_forced_static:
-                self.mode_var.set(self._mode_before_force)
                 self._mode_forced_static = False
+                self.mode_var.set(self._mode_before_force)
             self.mode_dynamic.config(state='normal')
-            if rows == 1:
+            if self._band():
+                shape = f"Band: up to {min(total, limit)} icons, {cols} to a row"
+            elif rows == 1:
                 shape = f"Horizontal Bar ({cols} slots)"
             elif cols == 1:
                 shape = f"Vertical Bar ({rows} slots)"
             else:
                 shape = f"Grid ({rows}x{cols} = {total} slots)"
-
         self.shape_var.set(shape)
-        if total <= self.available_slots:
-            self.warning_var.set("")
-        else:
-            self.warning_var.set(f"A grid holds at most {self.available_slots} slots")
+        self.limit_var.set(f"An overhead grid holds up to {limit} slots, at most 4 rows or 8 columns"
+                           if is_plate(gtype) else f"A grid holds up to {limit} slots")
+        self.warning_var.set("" if total <= limit else f"A grid holds at most {limit} slots")
 
     def on_create(self):
         grid_id = self.id_var.get().strip()
@@ -316,12 +351,12 @@ class AddGridWizard(tk.Toplevel):
             Messagebox.show_error(f"Grid name '{grid_id}' already exists.", title="Name Taken")
             return
 
+        self._clamp_shape()
         rows = self.safe_get_int(self.rows_var, 1)
         cols = self.safe_get_int(self.cols_var, 1)
-        total = rows * cols
-
-        if total > self.available_slots:
-            app_toast(self.parent, f"A grid holds at most {self.available_slots} slots. Reduce rows or columns.", 'warning')
+        limit = max_slots(self.type_var.get())
+        if rows * cols > limit:
+            app_toast(self.parent, f"A grid holds at most {limit} slots. Reduce rows or columns.", 'warning')
             return
 
         self.result = create_default_grid(

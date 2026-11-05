@@ -20,6 +20,8 @@ from .grid_model import (
     dedupe_grid_ids,
     default_grid_name,
     get_game_resolution_or_default,
+    is_plate,
+    snap_row_cap,
     validate_grid,
 )
 from .overlay import DEFAULT_SIZE, FONT_CHOICES, SIZE_CHOICES, font_label
@@ -30,7 +32,7 @@ from .ui_components import (
     create_scrollable_frame,
     scroll_widget_into_view,
 )
-from .ui_forms import draw_grid_cells
+from .ui_forms import draw_band_cells, draw_grid_cells
 from .ui_helpers import (
     BTN_MEDIUM,
     FONT_BODY,
@@ -93,7 +95,9 @@ class GridsPanel(ttk.Frame):
         """Build normal view (toolbar + scroll) and empty state frame."""
         self._normal_view = ttk.Frame(self)
 
-        toolbar = ttk.Frame(self._normal_view)
+        # A child of self, packed first: the Overlay row sizes the extras too,
+        # so it stays on screen in the zero-grids empty state.
+        toolbar = ttk.Frame(self)
         toolbar.pack(fill='x', padx=PAD_TAB, pady=PAD_SMALL)
         ttk.Button(toolbar, text="+ Add Grid", command=self.add_grid,
                    width=BTN_MEDIUM).pack(side='left', padx=PAD_BUTTON_GAP)
@@ -259,46 +263,34 @@ class GridsPanel(ttk.Frame):
                       pady=(0, PAD_SECTION_GAP))
 
         self._empty_type_var = tk.StringVar(value="player")
-        self._radio_player, self._radio_target = self._build_radio_row(
+        radios = self._build_radio_row(
             center, "Source:", self._empty_type_var,
-            [("Player", "player"), ("Target", "target")],
-            command=self._redraw_empty_cards, pady=(0, PAD_LF))
+            [("Player", "player"), ("Target", "target"),
+             ("Friendly", "friendly"), ("Hostile", "hostile")],
+            command=self._on_empty_type_changed, pady=(0, PAD_LF))
         # ttkbootstrap strips custom style= at construction; apply via configure() after.
-        self._radio_player.configure(style='Player.TRadiobutton')
-        self._radio_target.configure(style='Target.TRadiobutton')
+        for rb, (style, tip) in zip(radios, (
+            ('Player', "Track buffs/debuffs on yourself"),
+            ('Target', "Track buffs/debuffs on your current target"),
+            ('Friendly', "Overhead: over you, your group and friendly players"),
+            ('Hostile', "Overhead: over your target and anyone fighting you"),
+        )):
+            rb.configure(style=f'{style}.TRadiobutton')
+            add_tooltip(rb, tip)
 
         self._empty_mode_var = tk.StringVar(value="dynamic")
         self._radio_dynamic, self._radio_static = self._build_radio_row(
             center, "Mode:", self._empty_mode_var,
             [("Dynamic", "dynamic"), ("Static", "static")],
-            command=None, pady=(0, PAD_TAB))
+            command=self._redraw_empty_cards, pady=(0, PAD_TAB))
 
-        cards_frame = ttk.Frame(center)
-        cards_frame.pack(pady=(0, PAD_SECTION_GAP), fill='x')
-
-        presets = [
-            ("1\u00d710 Bar", 1, 10, "dynamic", PRESET_CARD_BAR_LONG, PRESET_CARD_BAR_SHORT,
-             "Horizontal bar, great for tracking player buffs across the top"),
-            ("10\u00d71 Bar", 10, 1, "dynamic", PRESET_CARD_BAR_SHORT, PRESET_CARD_SQUARE,
-             "Vertical bar, stack buffs along the side of your screen"),
-            ("3\u00d73 Grid", 3, 3, "dynamic", PRESET_CARD_SQUARE, PRESET_CARD_SQUARE,
-             "Compact grid, fits many buffs in a small area"),
-            ("1\u00d71 Slot \u00b7 static", 1, 1, "static", PRESET_CARD_SQUARE, PRESET_CARD_SQUARE,
-             "Single slot. Pin one specific buff. Mode is locked to Static."),
-            ("Custom", None, None, None, PRESET_CARD_SQUARE, PRESET_CARD_SQUARE,
-             "Open the Add Grid wizard to set custom rows, columns, and options"),
-        ]
+        self._cards_frame = ttk.Frame(center)
+        self._cards_frame.pack(pady=(0, PAD_SECTION_GAP), fill='x')
+        self._cards_frame.bind('<Configure>', self._reflow_preset_cards)
         self._empty_cards = []
-        for i, (label, rows, cols, mode, w, h, desc) in enumerate(presets):
-            card = self._build_preset_card(cards_frame, label, rows, cols, mode, w, h, desc)
-            card.grid(row=0, column=i, padx=PAD_LF, sticky='s')
+        self._cards_overhead = None
+        self._on_empty_type_changed()
 
-        cards_frame.bind('<Configure>', self._reflow_preset_cards)
-
-        self._redraw_empty_cards()
-
-        add_tooltip(self._radio_player, "Track buffs/debuffs on yourself")
-        add_tooltip(self._radio_target, "Track buffs/debuffs on your current target")
         add_tooltip(self._radio_dynamic,
                     "Slots fill automatically as buffs activate. "
                     "You control fill direction, sort order, and grouping.")
@@ -307,6 +299,49 @@ class GridsPanel(ttk.Frame):
                     "Shows the buff when active, stays empty when it's not.")
 
         return frame
+
+    # (label, rows, cols, card w, card h, description) per kind: floating, overhead.
+    _PRESETS = {
+        False: (
+            ("1\u00d710 Bar", 1, 10, PRESET_CARD_BAR_LONG, PRESET_CARD_BAR_SHORT,
+             "Horizontal bar, great for tracking player buffs across the top"),
+            ("10\u00d71 Bar", 10, 1, PRESET_CARD_BAR_SHORT, PRESET_CARD_SQUARE,
+             "Vertical bar, stack buffs along the side of your screen"),
+            ("3\u00d73 Grid", 3, 3, PRESET_CARD_SQUARE, PRESET_CARD_SQUARE,
+             "Compact grid, fits many buffs in a small area"),
+            ("1\u00d71 Slot \u00b7 static", 1, 1, PRESET_CARD_SQUARE, PRESET_CARD_SQUARE,
+             "Single slot. Pin one specific buff. Mode is locked to Static."),
+        ),
+        True: (
+            ("1\u00d73 Row", 1, 3, PRESET_CARD_SQUARE, PRESET_CARD_SQUARE,
+             "Three icons over each head"),
+            ("2\u00d75 Band", 2, 5, PRESET_CARD_SQUARE, PRESET_CARD_SQUARE,
+             "Up to ten icons, five to a row"),
+            ("3\u00d73 Grid", 3, 3, PRESET_CARD_SQUARE, PRESET_CARD_SQUARE,
+             "Up to nine icons, three to a row"),
+            ("1\u00d71 Single", 1, 1, PRESET_CARD_SQUARE, PRESET_CARD_SQUARE,
+             "One icon over each head"),
+        ),
+    }
+
+    def _on_empty_type_changed(self):
+        """Floating and overhead grids have their own presets: rebuild the cards
+        when the source moves between the two kinds, else just recolour them."""
+        overhead = is_plate(self._empty_type_var.get())
+        if overhead != self._cards_overhead:
+            self._cards_overhead = overhead
+            for card, *_ in self._empty_cards:
+                card.destroy()
+            self._empty_cards = []
+            presets = (*self._PRESETS[overhead],
+                       ("Custom", None, None, PRESET_CARD_SQUARE, PRESET_CARD_SQUARE,
+                        "Open the Add Grid wizard to set custom rows, columns, and options"))
+            for i, (label, rows, cols, w, h, desc) in enumerate(presets):
+                card = self._build_preset_card(self._cards_frame, label, rows, cols, w, h, desc)
+                card.grid(row=0, column=i, padx=PAD_LF, sticky='s')
+            self._last_cards_width = None
+            self._reflow_preset_cards()
+        self._redraw_empty_cards()
 
     def _build_radio_row(self, parent, label_text, var, options, command, pady):
         """Pack a label + horizontal Radiobutton group; return the Radiobutton widgets."""
@@ -322,7 +357,7 @@ class GridsPanel(ttk.Frame):
             radios.append(rb)
         return radios
 
-    def _build_preset_card(self, parent, label, rows, cols, mode, card_w, card_h, description):
+    def _build_preset_card(self, parent, label, rows, cols, card_w, card_h, description):
         """Create a preset shape card. Caller grid()s it so _reflow_preset_cards can re-row on resize."""
         border = TK_COLORS['border']
         accent = THEME_COLORS['accent']
@@ -337,12 +372,13 @@ class GridsPanel(ttk.Frame):
 
         self._empty_cards.append((card, rows, cols, card_w, card_h))
 
-        def _on_click(e, r=rows, c=cols, m=mode):
+        def _on_click(e, r=rows, c=cols):
             if r is None:
-                self._create_from_empty_state(r, c, m)
+                self._create_from_empty_state(r, c, None)
                 return
-            effective_mode = 'static' if (r == 1 and c == 1) else self._empty_mode_var.get()
-            self._create_from_empty_state(r, c, effective_mode)
+            # A floating 1x1 is a static slot; an overhead one may be a band of one.
+            single = r == 1 and c == 1 and not is_plate(self._empty_type_var.get())
+            self._create_from_empty_state(r, c, 'static' if single else self._empty_mode_var.get())
 
         def _highlight(e, color, c=card):
             c.configure(highlightbackground=color)
@@ -356,9 +392,10 @@ class GridsPanel(ttk.Frame):
         card.bind('<FocusOut>', lambda e: _highlight(e, border))
         return card
 
-    def _reflow_preset_cards(self, event):
-        """Wrap preset cards into multiple grid rows when the wrapper is too narrow."""
-        avail = event.width
+    def _reflow_preset_cards(self, event=None):
+        """Wrap preset cards into multiple grid rows when the wrapper is too narrow
+        (on resize, and when the cards are rebuilt for another kind of grid)."""
+        avail = event.width if event is not None else self._cards_frame.winfo_width()
         if avail < 100 or not getattr(self, '_empty_cards', None):
             return
         if getattr(self, '_last_cards_width', None) == avail:
@@ -378,8 +415,11 @@ class GridsPanel(ttk.Frame):
             col += 1
 
     def _redraw_empty_cards(self):
-        """Redraw grid shape previews on empty state cards using current type color."""
-        type_color = GRID_TYPE_COLORS[self._empty_type_var.get()]
+        """Redraw grid shape previews on empty state cards using current type
+        color; an overhead dynamic preset draws as the band it makes."""
+        gtype = self._empty_type_var.get()
+        type_color = GRID_TYPE_COLORS[gtype]
+        band = is_plate(gtype) and self._empty_mode_var.get() == 'dynamic'
         for card, rows, cols, card_w, card_h in self._empty_cards:
             card.delete('cells')
             preview_h = card_h - PRESET_LABEL_AREA
@@ -388,7 +428,10 @@ class GridsPanel(ttk.Frame):
                                  anchor='center', fill=type_color,
                                  font=FONT_HEADING, tags='cells')
                 continue
-            draw_grid_cells(card, rows, cols, type_color, card_w, preview_h)
+            if band:
+                draw_band_cells(card, snap_row_cap(cols), rows * cols, type_color, card_w, preview_h)
+            else:
+                draw_grid_cells(card, rows, cols, type_color, card_w, preview_h)
 
     def _dismiss_tip(self):
         """Dismiss the tip bar permanently for this session."""
