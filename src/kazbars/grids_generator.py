@@ -9,6 +9,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
+from . import inspect_catalog
 from .build_utils import compile_as2, resolve_assets_path
 from .cast_timer import is_enabled as cast_is_enabled
 from .cast_timer import validate_config as validate_cast_config
@@ -389,6 +390,44 @@ class CodeGenerator:
             f"collapsed: {_bool(c['startCollapsed'])}}};"
         )
 
+    def _inspect_rows_block(self):
+        """`d.INS.groups` / `.rows` / `.watch`: the groups that own a shown row
+        (`{n, p}`, p the PvP player gate), the rows in the panel's order (`g`
+        indexing those groups, `l` the label, then the row's own AS2 fields),
+        and every id they read plus the always-polled ones."""
+        selected = inspect_catalog.shown(self.inspect_config["rows"])
+        groups: list = []
+        for r in selected:
+            if r.group not in groups:
+                groups.append(r.group)
+        groups_line = "        d.INS.groups = [{}];".format(", ".join(
+            f'{{n: "{g.label}", p: {_bool(g.player_gated)}}}' for g in groups))
+        if selected:
+            entries = ",\n".join(
+                f'            {{g: {groups.index(r.group)}, l: "{escape_as2_string(r.label)}", '
+                f'{r.as2_fields()}}}' for r in selected)
+            rows_lines = f"        d.INS.rows = [\n{entries}\n        ];"
+        else:
+            rows_lines = "        d.INS.rows = [];"
+        watch = ", ".join(str(i) for i in inspect_catalog.watch_ids(selected))
+        return f"\n{groups_line}\n{rows_lines}\n        d.INS.watch = [{watch}];"
+
+    def _pvp_view_block(self):
+        """`d.INS.pvp`, the PvP tab's fixed view: `groups` (`{n: title, c:
+        [column titles]}`), `rows` (as `d.INS.rows`, `l` the view's own label)
+        and `ids` (what the view reads plus the always-polled ids; not
+        `watch`, a method every AS2 object has)."""
+        groups = ", ".join(
+            "{{n: \"{}\", c: [{}]}}".format(title, ", ".join(f'"{c}"' for c in cols))
+            for title, cols, _ in inspect_catalog.PVP_VIEW)
+        labels = [(g, label) for g, (_, _, lines) in enumerate(inspect_catalog.PVP_VIEW)
+                  for label, _ in lines]
+        rows = ", ".join(
+            f'{{g: {g}, l: "{escape_as2_string(label)}", {row.as2_fields()}}}'
+            for (g, label), row in zip(labels, inspect_catalog.pvp_rows()))
+        ids = ", ".join(str(i) for i in inspect_catalog.watch_ids(inspect_catalog.pvp_rows()))
+        return f"\n        d.INS.pvp = {{groups: [{groups}], rows: [{rows}], ids: [{ids}]}};"
+
     def _data_units(self):
         """The data-class body as self-contained source units, in emit order:
         one per grid (its config and its id set with each id's facts), then one
@@ -446,6 +485,8 @@ class CodeGenerator:
             lines.append(self._stopwatch_data_block())
         if self.include_inspect:
             lines.append(self._inspect_data_block())
+            lines.append(self._inspect_rows_block())
+            lines.append(self._pvp_view_block())
 
         if chunk_count:
             lines.append("")

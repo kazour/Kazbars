@@ -17,10 +17,19 @@ the game resolution (pixels exist only at dialog display and AS2 emit via
 first-session seed; from then on the game persists drag position, collapsed
 state and the PvP tab in the module config archive, for every user
 (`game_persistence`).
+
+`rows` is the user's row list (catalog keys, `inspect_catalog`), or None for
+the Default sheet (the Summary group). A list keeps the catalog's known string
+keys in stored order — a key retired with successors becomes them — with
+duplicates collapsed; an empty list is legal (a title-only panel), but a list
+that named keys and kept none reads as None, not as an emptied panel its
+author never asked for.
 """
 
 import logging
+from typing import Any
 
+from .inspect_catalog import resolve
 from .overlay_size import SCALE_DEFAULT, scale_from
 from .profile_document import LANE_BUILD
 from .profile_document import SectionSpec as ProfileSectionSpec
@@ -30,12 +39,24 @@ logger = logging.getLogger(__name__)
 
 # Master on/off. Off by default — nothing compiles until the user turns it on,
 # so the SWF carries no inspect-panel code when unused.
+def _validate_rows(value: Any) -> list[str] | None:
+    if not isinstance(value, list):
+        return None
+    named = [k for k in value if isinstance(k, str)]
+    out: list[str] = []
+    for key in (live for k in named for live in resolve(k)):
+        if key not in out:
+            out.append(key)
+    return out if out or not named else None
+
+
 _SCHEMA = Schema('', 1, {
     "enabled": Field(False, kind='bool'),
     "fx": Field(40 / 1920, kind='float', min=0.0, max=1.0),
     "fy": Field(240 / 1080, kind='float', min=0.0, max=1.0),
     "scale": Field(SCALE_DEFAULT, validate=scale_from),
     "startCollapsed": Field(False, kind='bool'),
+    "rows": Field(None, validate=_validate_rows),
 })
 
 INSPECT_DEFAULTS = get_defaults(_SCHEMA)

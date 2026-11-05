@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 
 from as2c.swf import TAG_DO_INIT_ACTION, Movie
-from kazbars import damageinfo_settings, grids_generator
+from kazbars import damageinfo_settings, grids_generator, inspect_catalog
 from kazbars.buff_database import BuffDatabase
 from kazbars.damageinfo_generator import build_damageinfo
 from kazbars.grid_model import create_default_grid, validate_grid
@@ -66,7 +66,8 @@ def _worst_case():
     """The most the generator can be handed: eight dynamic grids each
     whitelisting the whole catalog (the per-grid slot cap bounds slots, not the
     ids a grid references), a static grid, ids that need escaping or collide
-    once sanitized, a friendly band and a full hostile box, and every module on."""
+    once sanitized, a friendly band and a full hostile box, and every module on at its
+    largest (the inspect panel with every catalog row)."""
     every_primary = [b["ids"][0] for b in _db().buffs]
     grids = [_grid(f"All {k}", cols=8, whitelist=every_primary) for k in range(8)]
     grids += [
@@ -82,7 +83,7 @@ def _worst_case():
     extras = dict(
         cast_config={"enabled": True, "enableP": True, "enableT": True, "scale": 200},
         stopwatch_config={"enabled": True, "scale": 200},
-        inspect_config={"enabled": True, "scale": 200},
+        inspect_config={"enabled": True, "scale": 200, "rows": [r.key for r in inspect_catalog.ROWS]},
         overlay={"size": 24, "font": "Arial"},
     )
     return grids, extras
@@ -128,7 +129,8 @@ def test_every_module_class_is_in_the_full_build(builds):
     sizes = _class_sizes(builds["full"][2])
     for cls in ("KazBars", "KazBarsData", "KazBarsData1", "KazBarsGrids", "KazBarsGridView",
                 "KazBarsWorld", "KazBarsClock", "KazBarsCastTimer", "KazBarsStopwatch",
-                "KazBarsInspect", "KazBarsPreviewPanel", "KazBarsOverhead", "KazBarsRelations"):
+                "KazBarsInspect", "KazBarsInspectRows", "KazBarsInspectData", "KazBarsPreviewPanel",
+                "KazBarsOverhead", "KazBarsRelations"):
         assert cls in sizes, cls
     for cls in ("KazBarsConsole", "KazBarsOnslaught"):
         assert cls not in sizes, f"{cls} is gated off"

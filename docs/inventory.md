@@ -52,10 +52,11 @@
 | `src/kazbars/grid_dialogs.py` | 940 |
 | `src/kazbars/grid_editor_panel.py` | 883 |
 | `src/kazbars/grid_model.py` | 396 |
-| `src/kazbars/grids_generator.py` | 687 |
+| `src/kazbars/grids_generator.py` | 728 |
 | `src/kazbars/grids_panel.py` | 894 |
-| `src/kazbars/inspect.py` | 58 |
-| `src/kazbars/inspect_panel.py` | 212 |
+| `src/kazbars/inspect.py` | 79 |
+| `src/kazbars/inspect_catalog.py` | 618 |
+| `src/kazbars/inspect_panel.py` | 393 |
 | `src/kazbars/instructions_panel.py` | 1143 |
 | `src/kazbars/live_tracker_panel.py` | 521 |
 | `src/kazbars/live_tracker_settings.py` | 175 |
@@ -95,7 +96,7 @@
 | `tests/test_boss_timer.py` | 151 |
 | `tests/test_buff_db_layers.py` | 266 |
 | `tests/test_buff_xml.py` | 324 |
-| `tests/test_build_compile.py` | 178 |
+| `tests/test_build_compile.py` | 180 |
 | `tests/test_build_executor.py` | 660 |
 | `tests/test_cast_timer.py` | 122 |
 | `tests/test_classes.py` | 59 |
@@ -124,6 +125,7 @@
 | `tests/test_hud_overlay.py` | 141 |
 | `tests/test_imports.py` | 33 |
 | `tests/test_inspect.py` | 103 |
+| `tests/test_inspect_catalog.py` | 248 |
 | `tests/test_log_name.py` | 22 |
 | `tests/test_manifest.py` | 124 |
 | `tests/test_mypy_gate.py` | 74 |
