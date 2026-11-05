@@ -6,7 +6,10 @@ lives in :mod:`damageinfo_settings`). ``build_damageinfo()`` then copies the pri
 game ``DamageInfo.swf`` and compiles the baked sources into that copy
 (``compile_as2``), replacing the damage-number classes while leaving the SWF's symbols
 and timeline intact. Two entry points are forced so ``FixOnLoad`` (which makes the
-container's ``onLoad`` fire) survives the inject. Pure build logic; no Tk.
+container's ``onLoad`` fire) survives the inject. A ``font`` other than Hyborian draws
+the text larger (``DEFAULT_TEXT_SCALE`` rewritten to ``swf_font.dn_scale``) and, after
+the compile, replaces the SWF's ``_ConanFont`` import with that face's two embedded
+fonts (``swf_font.set_damage_font``). Pure build logic; no Tk.
 """
 
 import logging
@@ -17,6 +20,8 @@ from pathlib import Path
 
 from . import damageinfo_settings as dis
 from .build_utils import compile_as2
+from .overlay import HYBORIAN, font_slug
+from .swf_font import SwfFontError, dn_scale, set_damage_font
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +32,10 @@ ENTRY_POINTS = (
     'MainDamageNumbers.as',
     'com/helperFramework/display/FixOnLoad.as',
 )
+
+# The stock text scale a non-Hyborian face rewrites (Hyborian keeps the file byte for byte).
+_TEXT_SCALE_FILE = 'numbersTypes/DamageTextAbstract.as'
+_TEXT_SCALE_STOCK = 'var DEFAULT_TEXT_SCALE = 1;'
 
 
 class DamageInfoGenerator:
@@ -67,6 +76,10 @@ class DamageInfoGenerator:
             repl = self._replacement(key, meta, self.settings[key])
             if repl is not None:
                 mods.setdefault(meta['file'], []).append(repl)
+        scale = dn_scale(self.settings['font'])
+        if scale != 100:
+            mods.setdefault(_TEXT_SCALE_FILE, []).append(
+                (re.escape(_TEXT_SCALE_STOCK), f'var DEFAULT_TEXT_SCALE = {scale / 100};'))
         return mods
 
     def _replacement(self, key: str, meta: dict, offset) -> tuple[str, str] | None:
@@ -124,6 +137,15 @@ def build_damageinfo(assets_path: str | Path, settings: dict,
         if not ok:
             output_swf.unlink(missing_ok=True)  # don't leave a pristine/partial SWF at the caller's path
             return False, f'Damage Numbers compile failed:\n{err}'
+
+        font = dis.validate_all_settings(settings)['font']
+        if font != HYBORIAN:
+            blob = assets_path / 'kazbars' / 'fonts' / f'{font_slug(font)}.bin'
+            try:
+                output_swf.write_bytes(set_damage_font(output_swf.read_bytes(), font, blob.read_bytes()))
+            except (OSError, SwfFontError) as e:
+                output_swf.unlink(missing_ok=True)
+                return False, f"Couldn't set Damage Numbers in {font}:\n{e}"
 
         size = output_swf.stat().st_size
         return True, f'DamageInfo.swf built ({size:,} bytes)'

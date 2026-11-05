@@ -9,8 +9,10 @@ compiler's 32 KB-per-class bytecode cap (no class may come near it).
 Compiling costs about a second, so every build here is made once per module
 (`builds`) and every test reads one: the worst case (every module on, every
 grid whitelisting the whole catalog, grid ids that need escaping, sanitize the
-same way or are not ASCII) and the empty build (no grid, nothing on). The one
-extra compile is the chunking's negative control.
+same way or are not ASCII), the empty build (no grid, nothing on), the same
+small build in a baked face and in the game's Verdana, and DamageInfo.swf in
+Hyborian and in a baked face. The one extra compile is the chunking's
+negative control.
 
 Run: `pytest tests/test_build_compile.py` (from repo root).
 """
@@ -22,11 +24,13 @@ from pathlib import Path
 import pytest
 
 from as2c.swf import TAG_DO_INIT_ACTION, Movie
-from kazbars import grids_generator
+from kazbars import damageinfo_settings, grids_generator
 from kazbars.buff_database import BuffDatabase
+from kazbars.damageinfo_generator import build_damageinfo
 from kazbars.grid_model import create_default_grid, validate_grid
 from kazbars.grids_generator import build_grids
-from kazbars.paths import KAZBARS_ASSETS
+from kazbars.paths import ASSETS, KAZBARS_ASSETS
+from kazbars.swf_font import font_tags
 
 _BASE_SWF = KAZBARS_ASSETS / "base.swf"
 # The compiler's per-class cap is 32 KB; a class past the warning line is a
@@ -81,12 +85,24 @@ def _worst_case():
     return grids, extras
 
 
+def _compile_damage_info(font):
+    out = Path(tempfile.mkdtemp(prefix="kazbars_test_")) / "DamageInfo.swf"
+    settings = dict(damageinfo_settings.get_default_settings(), enabled=True, font=font)
+    ok, msg = build_damageinfo(ASSETS, settings, out)
+    return ok, msg, out
+
+
 @pytest.fixture(scope="module")
 def builds():
     out = {}
     grids, extras = _worst_case()
     out["full"] = _compile(grids, **extras)
     out["empty"] = _compile([])
+    small = [_grid("G", whitelist=[222609])]
+    out["exo"] = _compile(small, overlay={"size": 12, "font": "Exo 2"})
+    out["verdana"] = _compile(small, overlay={"size": 12, "font": "Verdana"})
+    out["dn-hyborian"] = _compile_damage_info("Hyborian")
+    out["dn-bangers"] = _compile_damage_info("Bangers")
     return out
 
 
@@ -98,7 +114,7 @@ def _class_sizes(swf_path):
             for t in movie.find_tags(TAG_DO_INIT_ACTION)}
 
 
-@pytest.mark.parametrize("name", ["full", "empty"])
+@pytest.mark.parametrize("name", ["full", "empty", "exo", "verdana", "dn-hyborian", "dn-bangers"])
 def test_the_build_compiles(builds, name):
     ok, msg, out = builds[name]
     assert ok, msg
@@ -123,7 +139,23 @@ def test_the_empty_build_carries_no_module_but_the_grids_and_the_panel(builds):
     assert "KazBarsPreviewPanel" in sizes and "KazBarsGrids" in sizes
 
 
-@pytest.mark.parametrize("name", ["full", "empty"])
+def test_a_baked_face_build_carries_the_face_and_a_verdana_build_imports_it(builds):
+    exo = builds["exo"][2].read_bytes()
+    assert font_tags(exo) == (KAZBARS_ASSETS / "fonts" / "exo-2.bin").read_bytes()
+    verdana = builds["verdana"][2].read_bytes()
+    assert font_tags(verdana) == b""
+    assert b"_StandardFont" in Movie.from_bytes(verdana).to_bytes(compressed=False)
+
+
+def test_a_damage_face_build_embeds_it_and_hyborian_keeps_the_import(builds):
+    hyb = Movie.load(builds["dn-hyborian"][2]).to_bytes(compressed=False)
+    assert b"_ConanFont" in hyb and font_tags(builds["dn-hyborian"][2].read_bytes()) == b""
+    bangers = builds["dn-bangers"][2].read_bytes()
+    assert b"_ConanFont" not in Movie.from_bytes(bangers).to_bytes(compressed=False)
+    assert font_tags(bangers) != b""
+
+
+@pytest.mark.parametrize("name", ["full", "empty", "exo", "verdana"])
 def test_every_class_stays_under_the_bytecode_cap(builds, name):
     sizes = _class_sizes(builds[name][2])
     over = {cls: n for cls, n in sizes.items() if n >= CLASS_CAP}

@@ -14,11 +14,12 @@ from .cast_timer import is_enabled as cast_is_enabled
 from .cast_timer import validate_config as validate_cast_config
 from .grid_model import DEFAULT_GAME_RESOLUTION, project_px
 from .inspect import validate_config as validate_inspect_config
-from .overlay import as2_face
+from .overlay import VERDANA, as2_face, font_slug
 from .overlay import validate_config as validate_overlay
 from .overlay_size import cast_fs, grid_metrics, panel_fs
 from .prefs import ANCHOR_SIDE_DEFAULT, ANCHOR_UP_DEFAULT
 from .stopwatch import validate_config as validate_stopwatch_config
+from .swf_font import SwfFontError, import_game_font, splice
 
 logger = logging.getLogger(__name__)
 
@@ -550,6 +551,21 @@ def unresolved_refs(grids, database) -> list:
 # ============================================================================
 # BUILD FUNCTION
 # ============================================================================
+def font_base(base_swf: Path, font: str) -> bytes:
+    """The SWF the compiler injects into for the overlay `font`: `base.swf` as
+    shipped for Arial; for the game's Verdana, `base.swf` importing it in place
+    of its two Arials; for a baked face, `base.swf` with that face's outlines
+    (`fonts/<slug>.bin` beside it) spliced over them. The AS2 is the same for
+    every font — only `d.PF.face` names Verdana's `_StandardFont`."""
+    base = base_swf.read_bytes()
+    if font == VERDANA:
+        return import_game_font(base)
+    slug = font_slug(font)
+    if slug is None:
+        return base
+    return splice(base, (base_swf.parent / "fonts" / f"{slug}.bin").read_bytes())
+
+
 def build_grids(
     grids: list,
     database,
@@ -613,10 +629,14 @@ def build_grids(
                 f.write(src)
             sources.append(path)
 
-        # Step 3: Copy base.swf to temp
+        # Step 3: The base for the overlay font, written to temp
         output_swf.parent.mkdir(parents=True, exist_ok=True)
         temp_swf = Path(temp_dir) / "KazBars.swf"
-        shutil.copy2(base_swf, temp_swf)
+        font = generator.overlay["font"]
+        try:
+            temp_swf.write_bytes(font_base(base_swf, font))
+        except (OSError, SwfFontError) as e:
+            return False, f"Couldn't set the overlay in {font}:\n{e}"
 
         # Step 4: Compile (main class + every data class)
         common_stubs = base_swf.parent.parent / "common_stubs"

@@ -12,7 +12,8 @@ closes the window; Cancel / X / Escape discard them. Single-instance, opened via
 ``open_damage_numbers_panel`` (mirrors ``open_deeps_panel``).
 
 Sliders run in offset space but their readout shows the resulting game value
-(``compute_final_value``), so a 0 offset reads as the stock number, not "0".
+(``compute_final_value``), so a 0 offset reads as the stock number, not "0". The
+Style card's Font picks the damage text's face (``swf_font.DN_FONTS``).
 """
 
 import logging
@@ -20,6 +21,8 @@ import tkinter as tk
 from tkinter import ttk
 
 from . import damageinfo_settings as dis
+from .overlay import font_label
+from .swf_font import DN_FONTS, dn_scale
 from .ui_components import create_scrollable_frame
 from .ui_forms import create_card, create_slider_row
 from .ui_headers import create_dialog_header, create_tip_bar
@@ -27,6 +30,7 @@ from .ui_helpers import (
     BTN_DIALOG,
     BTN_MEDIUM,
     FONT_BODY,
+    FONT_SMALL,
     MODULE_COLORS,
     PAD_ROW,
     PAD_SMALL,
@@ -96,6 +100,9 @@ class DamageNumbersPanel(tk.Toplevel):
         self._shadow_dist_scale: ttk.Scale | None = None
         self._shadow_blur_scale: ttk.Scale | None = None
         self._spread_spacing_var: tk.StringVar | None = None  # the coupled spread/spacing radio
+        self._font_var: tk.StringVar | None = None
+        self._font_combo: ttk.Combobox | None = None  # readonly when live, so not in _all_controls
+        self._font_hint: ttk.Label | None = None
 
         self._enabled_var = tk.BooleanVar(value=bool(self.settings['enabled']))
 
@@ -147,6 +154,7 @@ class DamageNumbersPanel(tk.Toplevel):
         body.pack(fill="both", expand=True)
 
         self._build_presets(body)
+        self._build_style(body)
         for title, keys in _CARDS:
             card = create_card(body, title)
             card.pack(fill="x", pady=(0, PAD_ROW))
@@ -177,6 +185,41 @@ class DamageNumbersPanel(tk.Toplevel):
             )
             btn.pack(side="left", padx=(0, PAD_XS))
             self._all_controls.append(btn)
+
+    def _build_style(self, parent: tk.Misc) -> None:
+        """Font: the damage text's face, with a muted `+N %` when it is drawn
+        larger to read as big as Hyborian."""
+        card = create_card(parent, "Style")
+        card.pack(fill="x", pady=(0, PAD_ROW))
+        row = ttk.Frame(card)
+        row.pack(fill="x", pady=PAD_XS)
+        lbl = ttk.Label(row, text="Font:", font=FONT_BODY,
+                        foreground=THEME_COLORS['body'], width=_LABEL_W, anchor="w")
+        lbl.pack(side="left")
+        self._register_dim(lbl)
+        tip = ("The typeface of the damage numbers. Hyborian is the game's own; the "
+               "others are heavy display fonts that Build & Install embeds in "
+               "DamageInfo.swf, each drawn at Hyborian's size.")
+        add_tooltip(lbl, tip)
+        self._font_by_label = {font_label(f): f for f in DN_FONTS}
+        self._font_var = tk.StringVar(value=font_label(self.settings['font']))
+        combo = ttk.Combobox(row, textvariable=self._font_var, values=list(self._font_by_label),
+                             width=24, state="readonly")
+        combo.pack(side="left", padx=PAD_XS)
+        combo.bind("<<ComboboxSelected>>", lambda _e: self._on_font())
+        add_tooltip(combo, tip)
+        self._font_combo = combo
+        self._font_hint = ttk.Label(row, font=FONT_SMALL, foreground=THEME_COLORS['muted'])
+        self._font_hint.pack(side="left")
+        self._register_dim(self._font_hint)
+        add_tooltip(self._font_hint, lambda: (
+            f"Drawn {dn_scale(self.settings['font']) - 100} % larger to match Hyborian's size."))
+        self._show_font_hint()
+
+    def _show_font_hint(self) -> None:
+        if self._font_hint is not None:
+            k = dn_scale(self.settings['font'])
+            self._font_hint.configure(text=f"+{k - 100} %" if k != 100 else "")
 
     def _build_control(self, card: tk.Misc, key: str) -> None:
         if key == 'spread_spacing':  # composite radio driving two baked offsets
@@ -333,6 +376,11 @@ class DamageNumbersPanel(tk.Toplevel):
                 self.settings.update(values)  # writes both fixed_x_offset + fixed_y_spacing
                 break
 
+    def _on_font(self) -> None:
+        if self._font_var is not None:
+            self.settings['font'] = self._font_by_label.get(self._font_var.get(), DN_FONTS[0])
+            self._show_font_hint()
+
     def _on_enabled(self) -> None:
         self.settings['enabled'] = bool(self._enabled_var.get())
         self._sync_enabled_state()
@@ -376,6 +424,9 @@ class DamageNumbersPanel(tk.Toplevel):
         on = self._enabled_var.get()
         for widget in self._all_controls:
             self._set_state(widget, on)
+        # The combobox's live state is readonly, not normal — normal would make it editable.
+        if self._font_combo is not None:
+            self._font_combo.configure(state="readonly" if on else "disabled")
         # Carry the row descriptors + value readouts with their controls so a disabled
         # panel reads fully-off, not half-on (the readouts especially must not look live).
         for lbl, normal_fg in self._dim_labels:

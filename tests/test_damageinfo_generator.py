@@ -181,3 +181,28 @@ def test_bake_leaves_untouched_constants_alone(tmp_path):
     assert _value(out, 'essential_labels_only') == '1'
     assert _value(out, 'ranged_keep') == '0'                   # default (off), untouched
     assert _value(out, 'other_resource_loss_to_target') == '0'
+
+
+def _text_scale(out):
+    content = (out / "numbersTypes" / "DamageTextAbstract.as").read_text(encoding='utf-8')
+    return re.search(r'var DEFAULT_TEXT_SCALE = ([0-9.]+);', content).group(1)
+
+
+def test_hyborian_keeps_the_stock_text_scale(tmp_path):
+    out = _bake(tmp_path, dis.get_default_settings())
+    assert _text_scale(out) == '1'
+
+
+@pytest.mark.parametrize('font, scale', [
+    ('Bangers', '1.55'), ('Lilita One', '1.25'), ('Changa One', '1.15'), ('Bevan', '1.1'),
+    ('Alfa Slab One', '1.05'), ('GG Comic', '1'), ('Rubik Black', '1')])
+def test_a_face_drawn_larger_rewrites_the_text_scale(tmp_path, font, scale):
+    out = _bake(tmp_path, dict(dis.get_default_settings(), font=font))
+    assert _text_scale(out) == scale
+
+
+def test_the_font_is_one_of_the_list_else_hyborian():
+    assert dis.get_default_settings()['font'] == 'Hyborian'
+    for gone in ('Verdana', 'Arial', 'Roboto', 'GG', 'Ubuntu', None, 7):
+        assert dis.validate_all_settings({'font': gone})['font'] == 'Hyborian', gone
+    assert dis.validate_all_settings({'font': 'Bevan'})['font'] == 'Bevan'

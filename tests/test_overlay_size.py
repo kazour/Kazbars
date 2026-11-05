@@ -25,6 +25,8 @@ from kazbars.overlay_size import (
     snap_scale,
     text_box_h,
 )
+from kazbars.paths import KAZBARS_ASSETS
+from kazbars.swf_font import DN_FONTS
 
 SIZES = [s for s, _ in overlay.SIZE_CHOICES]
 SCALES = range(SCALE_MIN, SCALE_MAX + 1, SCALE_STEP)
@@ -72,6 +74,18 @@ def test_every_baked_face_has_a_slug_and_arial_and_verdana_have_none():
     slugs = [overlay.font_slug(f) for f in overlay.FONT_CHOICES[2:]]
     assert slugs == ["gg", "roboto", "inter", "noto-sans", "source-sans-3", "pt-sans",
                      "fira-sans", "barlow-semi-condensed", "exo-2", "alegreya-sans"]
+
+
+def test_each_slug_ships_its_tags_and_its_licence_and_nothing_else_does():
+    fonts = KAZBARS_ASSETS / "fonts"
+    slugs = sorted({overlay.font_slug(f) for f in (*overlay.FONT_CHOICES, *DN_FONTS)} - {None})
+    assert sorted(p.stem for p in fonts.glob("*.bin")) == slugs
+    assert sorted(p.stem for p in (fonts / "LICENSES").glob("*.txt")) == slugs
+    for slug in slugs:
+        text = (fonts / "LICENSES" / f"{slug}.txt").read_text(encoding="utf-8")
+        whole = "github.com/BooroH/GigaUI-Ultimate" if slug.startswith("gg") \
+            else "SIL OPEN FONT LICENSE Version 1.1"
+        assert whole in text, slug
 
 
 def test_the_section_reads_a_size_that_is_a_choice_and_a_font_on_the_list():

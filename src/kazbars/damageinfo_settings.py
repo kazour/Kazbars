@@ -37,6 +37,7 @@ from . import settings_core
 from .profile_document import LANE_BUILD, LANE_PATCH
 from .profile_document import SectionSpec as ProfileSectionSpec
 from .settings_core import Field, Schema
+from .swf_font import DN_DEFAULT_FONT, DN_FONTS
 
 logger = logging.getLogger(__name__)
 
@@ -452,6 +453,10 @@ def _build_schema_fields() -> dict[str, Field]:
         kind = 'float' if is_float_key(key) else 'int'
         fields[key] = Field(meta['default'], min=meta['min'], max=meta['max'], kind=kind)
     fields['enabled'] = Field(False, kind='bool')
+    # The damage text's face (`swf_font.DN_FONTS`): Hyborian, the game's own,
+    # leaves DamageInfo.swf's font alone; any other is embedded at build time.
+    # A name no longer offered reads as Hyborian.
+    fields['font'] = Field(DN_DEFAULT_FONT, choices=DN_FONTS)
     return fields
 
 

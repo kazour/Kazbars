@@ -30,9 +30,9 @@
 | `src/kazbars/content_update.py` | 415 |
 | `src/kazbars/custom_menu_bar.py` | 446 |
 | `src/kazbars/damageinfo_colors_panel.py` | 566 |
-| `src/kazbars/damageinfo_generator.py` | 131 |
-| `src/kazbars/damageinfo_panel.py` | 436 |
-| `src/kazbars/damageinfo_settings.py` | 533 |
+| `src/kazbars/damageinfo_generator.py` | 153 |
+| `src/kazbars/damageinfo_panel.py` | 487 |
+| `src/kazbars/damageinfo_settings.py` | 538 |
 | `src/kazbars/database_editor.py` | 855 |
 | `src/kazbars/deeps_meter.py` | 485 |
 | `src/kazbars/deeps_overlay.py` | 757 |
@@ -51,7 +51,7 @@
 | `src/kazbars/grid_dialogs.py` | 905 |
 | `src/kazbars/grid_editor_panel.py` | 733 |
 | `src/kazbars/grid_model.py` | 269 |
-| `src/kazbars/grids_generator.py` | 641 |
+| `src/kazbars/grids_generator.py` | 661 |
 | `src/kazbars/grids_panel.py` | 751 |
 | `src/kazbars/inspect.py` | 58 |
 | `src/kazbars/inspect_panel.py` | 212 |
@@ -74,6 +74,7 @@
 | `src/kazbars/settings_manager.py` | 56 |
 | `src/kazbars/stopwatch.py` | 59 |
 | `src/kazbars/stopwatch_panel.py` | 209 |
+| `src/kazbars/swf_font.py` | 302 |
 | `src/kazbars/timer_overlay.py` | 372 |
 | `src/kazbars/ui_collapsible.py` | 232 |
 | `src/kazbars/ui_components.py` | 677 |
@@ -93,7 +94,7 @@
 | `tests/test_boss_timer.py` | 151 |
 | `tests/test_buff_db_layers.py` | 266 |
 | `tests/test_buff_xml.py` | 324 |
-| `tests/test_build_compile.py` | 143 |
+| `tests/test_build_compile.py` | 175 |
 | `tests/test_build_executor.py` | 660 |
 | `tests/test_cast_timer.py` | 122 |
 | `tests/test_cluster_isolation.py` | 188 |
@@ -101,8 +102,8 @@
 | `tests/test_content_update.py` | 391 |
 | `tests/test_cut_release.py` | 177 |
 | `tests/test_damageinfo_colors_panel.py` | 293 |
-| `tests/test_damageinfo_generator.py` | 183 |
-| `tests/test_damageinfo_settings.py` | 336 |
+| `tests/test_damageinfo_generator.py` | 208 |
+| `tests/test_damageinfo_settings.py` | 338 |
 | `tests/test_data_integrity.py` | 121 |
 | `tests/test_deeps_meter.py` | 469 |
 | `tests/test_deeps_overlay.py` | 374 |
@@ -126,7 +127,7 @@
 | `tests/test_mypy_gate.py` | 74 |
 | `tests/test_overlay_config.py` | 102 |
 | `tests/test_overlay_rung.py` | 138 |
-| `tests/test_overlay_size.py` | 212 |
+| `tests/test_overlay_size.py` | 226 |
 | `tests/test_panel_ratios.py` | 162 |
 | `tests/test_panels_construct.py` | 871 |
 | `tests/test_prefs.py` | 58 |
@@ -145,6 +146,7 @@
 | `tests/test_settings_manager.py` | 33 |
 | `tests/test_stopwatch.py` | 100 |
 | `tests/test_subprocess_flags.py` | 88 |
+| `tests/test_swf_font.py` | 320 |
 | `tests/test_timer_sizing.py` | 41 |
 | `tests/test_toast_model.py` | 277 |
 | `tests/test_toggle_button_state.py` | 41 |
