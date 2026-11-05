@@ -906,3 +906,30 @@ def test_the_add_grid_wizard_makes_a_band_with_a_snapped_row_cap(app):
         if wiz.winfo_exists():
             wiz.destroy()
     assert grid['type'] == 'hostile' and grid['rowCap'] == 5 and grid['maxSlots'] == 15
+
+
+def test_class_tabs_list_their_own_grids_and_switching_recreates_no_card(app):
+    from kazbars.grid_model import create_default_grid
+    gp = app.grids_panel
+    gp._tab_var.set(0)
+    gp.grids.append(create_default_grid('player', 1, 5, 'dynamic', 'TabAll'))
+    gp.grids.append(dict(create_default_grid('player', 1, 5, 'dynamic', 'TabDT'), **{'class': 31}))
+    gp.refresh_panels()
+    app.update()
+    cards = list(gp.grid_panels)
+    by_id = {p.grid_config['id']: p for p in cards}
+    assert by_id['TabAll'].winfo_manager() == 'pack'
+    assert by_id['TabDT'].winfo_manager() == ''
+    gp._tab_var.set(31)
+    gp._on_tab_changed()
+    app.update()
+    assert gp.grid_panels == cards, "a tab switch only repacks"
+    assert by_id['TabDT'].winfo_manager() == 'pack' and by_id['TabAll'].winfo_manager() == ''
+    assert gp._tab_buttons[31][0].cget('text') == 'DT 1'
+    gp.move_or_copy(by_id['TabDT'], 0, copy_it=True)
+    copied = gp.grids[-1]
+    assert copied['id'] == 'TabDT All' and 'class' not in copied
+    gp.move_or_copy(gp.grid_panels[gp.grids.index(next(g for g in gp.grids if g['id'] == 'TabDT'))], 22, copy_it=False)
+    assert next(g for g in gp.grids if g['id'] == 'TabDT')['class'] == 22
+    gp._tab_var.set(0)
+    gp._on_tab_changed()

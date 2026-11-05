@@ -19,6 +19,7 @@ import logging
 from typing import Any
 
 from . import CONTENT_BASELINE_VERSION
+from .classes import id_of as class_id_of
 from .settings_core import Field, Migration, Schema, Store
 from .userdata import PREFS_FILENAME
 
@@ -89,6 +90,11 @@ def _validate_last_build(value: Any) -> dict:
     ):
         out["target_resolution"] = res
     return out
+
+
+def _validate_grids_tab(value: Any) -> int:
+    """The Grids tab's class tab: a class id, else 0 (All)."""
+    return class_id_of(value) or 0
 
 
 def _validate_last_patch(value: Any) -> dict:
@@ -180,6 +186,8 @@ PREFS_SCHEMA = Schema(
         # Per-window geometry — ONE structured dict (see _validate_window_positions).
         "window_positions": Field({}, validate=_validate_window_positions),
         # UI state.
+        # The Grids tab's class tab (0: All), so the tab reopens where it was left.
+        "grids_tab": Field(0, validate=_validate_grids_tab),
         "buff_selector_category": Field("All"),
         "buff_selector_type": Field("All"),
         "buff_display_section_open": Field({}, validate=_validate_section_open),

@@ -10,6 +10,7 @@ this module — the container does not read them.
 import tkinter as tk
 from tkinter import ttk
 
+from .classes import CLASSES
 from .grid_dialogs import BuffSelectorDialog, SlotAssignmentDialog
 from .grid_model import (
     BAND_ROW_CAPS,
@@ -68,7 +69,7 @@ class GridEditorPanel(ttk.Frame):
 
     def __init__(self, parent, database, grid_config, on_delete=None, initially_open=False,
                  get_base_size=None, on_resize=None, on_whitelist_changed=None,
-                 name_in_use=None, on_edit=None):
+                 name_in_use=None, on_edit=None, on_move=None):
         super().__init__(parent)
         self.database = database
         self.grid_config = grid_config
@@ -80,6 +81,8 @@ class GridEditorPanel(ttk.Frame):
         self._on_whitelist_changed = on_whitelist_changed
         self._name_in_use = name_in_use
         self._on_edit = on_edit
+        # on_move(card, class_id, copy): Move to… / Copy to… another class tab.
+        self._on_move = on_move
 
         grid_type = grid_config.get('type', 'player')
         self._accent_color = GRID_TYPE_COLORS.get(grid_type, GRID_TYPE_COLORS['player'])
@@ -178,6 +181,15 @@ class GridEditorPanel(ttk.Frame):
         bind_label_hover_colors(delete_label, THEME_COLORS['muted'], THEME_COLORS['danger_text'])
         bind_label_press_effect(delete_label, THEME_COLORS['danger_text'])
         add_tooltip(delete_label, "Delete this grid")
+        if self._on_move is not None:
+            move_label = ttk.Label(header, text="Move…", font=FONT_SMALL,
+                                   foreground=THEME_COLORS['muted'], cursor='hand2',
+                                   takefocus=True, padding=(PAD_XS, PAD_MICRO))
+            move_label.pack(side='right', padx=(PAD_XS, 0))
+            for seq in ('<Button-1>', '<Return>', '<space>'):
+                move_label.bind(seq, lambda e, w=move_label: self._show_move_menu(w))
+            bind_label_hover_colors(move_label, THEME_COLORS['muted'], THEME_COLORS['heading'])
+            add_tooltip(move_label, "Move this grid to another class tab, or copy it there")
         ttk.Checkbutton(header, text="Enabled",
                         variable=self.enabled_var,
                         command=self._on_enabled_toggled,
@@ -201,6 +213,19 @@ class GridEditorPanel(ttk.Frame):
         ttk.Button(header, text="Tracked Buffs...",
                    command=self._on_mode_btn_click,
                    bootstyle='info-outline').pack(side='right', padx=(0, PAD_LF))  # type: ignore[call-arg]
+
+    def _show_move_menu(self, anchor):
+        """Move to / Copy to, each listing All classes and the twelve classes;
+        Move greys the grid's own."""
+        own = self.grid_config.get('class', 0)
+        menu = tk.Menu(self, tearoff=0)
+        for title, copy_it in (("Move to", False), ("Copy to", True)):
+            sub = tk.Menu(menu, tearoff=0)
+            for cid, name in ((0, "All classes"), *((c.id, c.name) for c in CLASSES)):
+                sub.add_command(label=name, state='disabled' if (cid == own and not copy_it) else 'normal',
+                                command=lambda c=cid, cp=copy_it: self._on_move(self, c, cp))
+            menu.add_cascade(label=title, menu=sub)
+        menu.tk_popup(anchor.winfo_rootx(), anchor.winfo_rooty() + anchor.winfo_height())
 
     def _build_top_row(self, parent):
         """Pack the Name + shape controls: Rows + Cols, or a band's Row cap +

@@ -3,6 +3,7 @@ KazBars — Grid Editor Panel
 Grid configuration UI: add/edit/delete grids, whitelist editing, slot assignment.
 """
 
+import copy
 import logging
 import tkinter as tk
 from tkinter import ttk
@@ -10,6 +11,7 @@ from tkinter import ttk
 logger = logging.getLogger(__name__)
 
 
+from .classes import CLASSES, by_id
 from .extras_shortcuts import ExtrasShortcutsRow
 from .grid_dialogs import AddGridWizard
 from .grid_editor_panel import (
@@ -24,9 +26,10 @@ from .grid_model import (
     snap_row_cap,
     validate_grid,
 )
+from .grids_generator import free_id
 from .overlay import DEFAULT_SIZE, FONT_CHOICES, SIZE_CHOICES, font_label
 from .profile_document import build_signature
-from .settings_manager import get_setting
+from .settings_manager import get_setting, set_setting
 from .ui_components import (
     DragReorderManager,
     create_scrollable_frame,
@@ -102,6 +105,7 @@ class GridsPanel(ttk.Frame):
         ttk.Button(toolbar, text="+ Add Grid", command=self.add_grid,
                    width=BTN_MEDIUM).pack(side='left', padx=PAD_BUTTON_GAP)
         self._build_overlay_row(toolbar)
+        self._build_class_tabs()
 
         self._build_tip_bar()
 
@@ -131,6 +135,8 @@ class GridsPanel(ttk.Frame):
         outer, self.grids_frame, self.grids_canvas = create_scrollable_frame(
             grids_container)
         outer.pack(fill='both', expand=True)
+        self._tab_empty_lbl = ttk.Label(self.grids_frame, font=FONT_BODY,
+                                        foreground=THEME_COLORS['muted'])
 
         self._drag_manager = DragReorderManager(
             self.grids_canvas, self.grids_frame, self._reorder_grid)
@@ -162,6 +168,83 @@ class GridsPanel(ttk.Frame):
                     "panel has its own Size, a percent of this.")
         ttk.Label(toolbar, text="Overlay:", font=FONT_BODY,
                   foreground=THEME_COLORS['muted']).pack(side='right', padx=(0, PAD_XS))
+
+    def _build_class_tabs(self):
+        """`All | Guard Conq DT | PoM ToS BS | Barb Sin Ranger | Demo Necro HoX`:
+        one group per archetype, each tab showing a count of its own grids. A tab
+        lists its own grids only — All the All grids, a class tab the grids with
+        its class (in game a class builds both). The tab is the `grids_tab`
+        pref, so the panel reopens where it was left."""
+        row = ttk.Frame(self)
+        row.pack(fill='x', padx=PAD_TAB, pady=(0, PAD_XS))
+        self._tab_var = tk.IntVar(value=get_setting('grids_tab') or 0)
+        self._tab_buttons: dict[int, tuple[ttk.Radiobutton, str]] = {}
+        groups = [[(0, "All", "Grids built for every class. In game each class gets "
+                              "these as well as its own.")]]
+        for archetype in range(4):
+            groups.append([(c.id, c.short, f"{c.name}: its own grids.")
+                           for c in CLASSES if c.archetype == archetype])
+        for gi, group in enumerate(groups):
+            for k, (cid, short, tip) in enumerate(group):
+                rb = ttk.Radiobutton(row, text=short, value=cid, variable=self._tab_var,
+                                     command=self._on_tab_changed,
+                                     bootstyle='toolbutton')  # type: ignore[call-arg]
+                rb.pack(side='left', padx=(PAD_TAB if gi and k == 0 else 0, 0))
+                add_tooltip(rb, tip)
+                self._tab_buttons[cid] = (rb, short)
+
+    def _tab_class(self):
+        """The current tab's class id, or None for All."""
+        return self._tab_var.get() or None
+
+    def _visible(self):
+        """Indexes into `self.grids` of the grids the current tab lists."""
+        cls = self._tab_class()
+        return [i for i, g in enumerate(self.grids) if g.get('class') == cls]
+
+    def _update_tab_counts(self):
+        for cid, (rb, short) in self._tab_buttons.items():
+            n = sum(1 for g in self.grids if g.get('class') == (cid or None))
+            rb.configure(text=f"{short} {n}" if n else short)
+
+    def _on_tab_changed(self):
+        set_setting('grids_tab', self._tab_var.get())
+        self._repack_panels()
+
+    def move_or_copy(self, panel, class_id, copy_it):
+        """Move to… (the grid's `class` set to `class_id`, 0 All) or Copy to… (a
+        duplicate for that class, its id `<id> <short>` kept clear of every
+        other grid's archive key). Says what it did in a toast."""
+        index = self.grid_panels.index(panel)
+        self.save_settings()
+        grid = self.grids[index]
+        short = by_id(class_id).short if class_id else "All"
+        if copy_it:
+            dup = copy.deepcopy(grid)
+            dup['id'] = free_id([g['id'] for g in self.grids], f"{grid['id']} {short}")
+            self._set_class(dup, class_id)
+            self.grids.append(dup)
+            self._mark_modified()
+            self.refresh_panels()
+            app_toast(self, f"Copied '{grid['id']}' to {short} as '{dup['id']}'", 'info',
+                      key='grids_class')
+        else:
+            self._set_class(grid, class_id)
+            self._mark_modified()
+            self._repack_panels()
+            app_toast(self, f"Moved '{grid['id']}' to {short}", 'info', key='grids_class')
+
+    @staticmethod
+    def _set_class(grid, class_id):
+        if class_id:
+            grid['class'] = class_id
+        else:
+            grid.pop('class', None)
+
+    def _join_current_tab(self, grid):
+        """A new grid joins the tab it was made on."""
+        self._set_class(grid, self._tab_var.get())
+        return grid
 
     def _overlay(self):
         store = self.app.profile_store if self.app is not None else None
@@ -544,7 +627,7 @@ class GridsPanel(ttk.Frame):
             grid_type=grid_type, rows=rows, cols=cols, mode=mode,
             grid_id=default_grid_name(grid_type, existing)
         )
-        self.grids.append(grid_config)
+        self.grids.append(self._join_current_tab(grid_config))
         self._mark_modified()
         self.refresh_panels(expand_index=len(self.grids) - 1)
 
@@ -644,7 +727,7 @@ class GridsPanel(ttk.Frame):
             # live widget state of existing cards first — otherwise their unsaved
             # edits (Enabled, icon size, position, …) revert to the last save.
             self.save_settings()
-            self.grids.append(wizard.result)
+            self.grids.append(self._join_current_tab(wizard.result))
             self._mark_modified()
             self.refresh_panels(expand_index=len(self.grids) - 1)
 
@@ -695,6 +778,7 @@ class GridsPanel(ttk.Frame):
         every card starts collapsed."""
         self._drag_manager.clear()
 
+        self._update_tab_counts()
         if not self.grids:
             self._normal_view.pack_forget()
             self._empty_state.pack(fill='both', expand=True)
@@ -705,7 +789,8 @@ class GridsPanel(ttk.Frame):
         self._normal_view.pack(fill='both', expand=True)
 
         for widget in self.grids_frame.winfo_children():
-            widget.destroy()
+            if widget is not self._tab_empty_lbl:
+                widget.destroy()
         self.grid_panels.clear()
 
         for i, grid_config in enumerate(self.grids):
@@ -717,14 +802,16 @@ class GridsPanel(ttk.Frame):
                 on_whitelist_changed=self._on_card_buffs_changed,
                 name_in_use=self._grid_name_in_use,
                 on_edit=self._mark_modified,
+                on_move=self.move_or_copy,
             )
             self.grid_panels.append(panel)
-            self._attach_panel(panel, i)
+        self._repack_panels()
 
         self._update_tip()
 
     def _attach_panel(self, panel, index):
-        """Pack a grid panel at index with separator and drag handle binding."""
+        """Pack a grid panel at its index among the listed cards, with separator
+        and drag handle binding."""
         if index > 0:
             tk.Frame(self.grids_frame, height=1, bg=TK_COLORS['border']).pack(
                 fill='x', padx=PAD_LIST_ITEM, pady=PAD_ROW)
@@ -738,15 +825,19 @@ class GridsPanel(ttk.Frame):
         (no wrap) and moves focus with the grid, so Alt+↓ can be repeated to
         walk a card down the list."""
         new_index = index + delta
-        if 0 <= new_index < len(self.grid_panels):
+        visible = self._visible()
+        if 0 <= new_index < len(visible):
             self._reorder_grid(index, new_index)
-            moved = self.grid_panels[new_index]
+            moved = self.grid_panels[self._visible()[new_index]]
             moved.drag_handle.focus_set()
             scroll_widget_into_view(self.grids_canvas, moved)
         return 'break'
 
     def _reorder_grid(self, old_index, new_index):
-        """Move a grid from old_index to new_index and repack panels."""
+        """Move the listed grid at old_index to new_index (indexes among the
+        current tab's cards) and repack panels."""
+        visible = self._visible()
+        old_index, new_index = visible[old_index], visible[new_index]
         grid = self.grids.pop(old_index)
         self.grids.insert(new_index, grid)
         panel = self.grid_panels.pop(old_index)
@@ -755,15 +846,24 @@ class GridsPanel(ttk.Frame):
         self._repack_panels()
 
     def _repack_panels(self):
-        """Repack existing panels in current order without destroying them."""
+        """Repack the current tab's cards in order without destroying any: a
+        tab switch only changes which cards are packed."""
         self._drag_manager.clear()
         for widget in self.grids_frame.winfo_children():
             if isinstance(widget, tk.Frame) and not isinstance(widget, GridEditorPanel):
                 widget.destroy()
             else:
                 widget.pack_forget()  # type: ignore[attr-defined]
-        for i, panel in enumerate(self.grid_panels):
-            self._attach_panel(panel, i)
+        visible = self._visible()
+        for n, i in enumerate(visible):
+            self._attach_panel(self.grid_panels[i], n)
+        if self.grids and not visible:
+            tab = by_id(self._tab_var.get())
+            self._tab_empty_lbl.configure(
+                text=f"No grids for {tab.name} yet. + Add Grid makes one for this class."
+                if tab else "No grids for every class. + Add Grid makes one.")
+            self._tab_empty_lbl.pack(pady=PAD_SECTION_GAP)
+        self._update_tab_counts()
 
     def _grid_name_in_use(self, name, exclude_config):
         """True if a grid other than `exclude_config` already uses `name`.

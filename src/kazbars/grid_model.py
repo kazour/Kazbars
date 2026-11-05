@@ -6,6 +6,7 @@ Constants, validation specs, and default grid configuration.
 import copy
 import math
 
+from .classes import id_of as class_id_of
 from .overlay_size import SCALE_DEFAULT, SCALE_MAX, SCALE_MIN, grid_metrics
 from .profile_document import LANE_BUILD
 from .profile_document import SectionSpec as ProfileSectionSpec
@@ -236,6 +237,13 @@ def validate_grid(grid):
     # when true, so a grid that never set it reads and saves unchanged.
     if grid.get('selfCastOnly') is not True:
         grid.pop('selfCastOnly', None)
+    # `class`: the class this grid is built for in game (classes.CLASSES);
+    # absent is every class (All). Written only when set.
+    cls = class_id_of(grid.get('class'))
+    if cls is None:
+        grid.pop('class', None)
+    else:
+        grid['class'] = cls
 
     # Validate grid name/id
     grid_id = str(grid.get('id', '')).strip()

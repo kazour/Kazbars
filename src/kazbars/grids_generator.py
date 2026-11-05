@@ -114,6 +114,18 @@ def sanitize_id(grid_id):
     return safe or "Grid"
 
 
+def free_id(taken, base):
+    """`base`, or `base_2`, `base_3`, …: the first whose in-game archive key
+    (`sanitize_id`) no id in `taken` makes (`Buffs DT` and `Buffs_DT` are one
+    key), so a copied grid gets saved positions of its own."""
+    keys = {sanitize_id(t) for t in taken}
+    grid_id, n = base, 2
+    while sanitize_id(grid_id) in keys:
+        grid_id = f"{base}_{n}"
+        n += 1
+    return grid_id
+
+
 def fact_code(btype, stack):
     """An id's facts for one grid, the value of `d.WL[gid][id]`: bits 0-1 its
     type (1 buff, 2 debuff, 3 misc; any other word is a buff), bits 2-11 its
@@ -492,6 +504,8 @@ class CodeGenerator:
             unit += f",\n            showSelf: {_bool(grid['showSelf'])}"
         if grid.get("selfCastOnly") is True:
             unit += ",\n            selfCastOnly: true"
+        if "class" in grid:
+            unit += f",\n            cls: {grid['class']}"
 
         if is_static:
             lines.append(unit + ",\n            slots: {}\n        };")
