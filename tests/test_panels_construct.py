@@ -317,6 +317,48 @@ def test_size_slider_commits_on_release_only(app):
     assert _stored_grid(app, idx)['scale'] == 155
 
 
+def test_size_slider_keys_step_a_notch(app):
+    card, idx = _add_seam_grid(app, 'SeamKeys')
+    scale = _find_scale(card)
+    assert scale is not None
+    def fire(seq):
+        # The test app never holds keyboard focus, so a generated key event
+        # never lands; call the widget's own binding instead.
+        name = scale.bind(seq).split('[', 1)[1].split()[0]
+        return scale.tk.call(name, *(['0'] * 14 + [str(scale)] + ['0'] * 4))
+
+    for key, want in (('Right', 105), ('Right', 110), ('Left', 105), ('End', 200), ('Home', 50)):
+        assert fire(f'<{key}>') == 'break', key
+        fire('<KeyRelease>')
+        assert (card.scale_var.get(), round(float(scale.get()))) == (want, want), key
+        assert _stored_grid(app, idx)['scale'] == want, key
+
+
+def test_an_overlay_size_change_unticks_the_build_step(app):
+    panel = app.grids_panel
+    size_label, other = list(panel._size_by_label)[:2]
+    panel._overlay_size_var.set(size_label)
+    panel._on_overlay_changed()
+    panel._build_done = True
+    panel._on_overlay_changed()  # same size again: nothing moved
+    assert panel._build_done is True
+    panel._overlay_size_var.set(other)
+    panel._on_overlay_changed()
+    assert panel._build_done is False
+    assert app.profile_store.get_section('overlay')['size'] == panel._size_by_label[other]
+
+
+def test_extras_switch_on_with_nothing_to_build_stays_off(app):
+    store = app.profile_store
+    store.update_section('console', {'enabled': False, 'tabs': []})
+    app.grids_panel.refresh_extras_shortcuts()
+    tile = app.grids_panel.extras_row._tiles['console']
+    tile['var'].set(True)
+    app.grids_panel.extras_row._on_toggle('console')
+    assert store.get_section('console')['enabled'] is False
+    assert tile['var'].get() is False
+
+
 def test_combobox_selection_reaches_profile_store(app):
     card, idx = _add_seam_grid(app, 'SeamCombo')
     rl_label = card.fill_combo['values'][1]  # 1×5 grid → (Left → Right, Right → Left)
@@ -907,16 +949,19 @@ def _wizard_grid(app, gtype, setup):
             wiz.destroy()
 
 
-def test_the_add_grid_wizard_makes_bands_whose_rows_give_way_to_sixteen(app):
+def test_the_add_grid_wizard_makes_bands_with_a_snapped_row_cap(app):
     def custom(wiz):
         wiz.mode_var.set('dynamic')
         wiz._on_mode_changed()
         wiz.cols_var.set('4')
         wiz.rows_var.set('9')
         wiz.on_cols_changed()
-        assert (wiz.rows_var.get(), wiz.cols_var.get()) == ('4', '4')
+        assert (wiz.rows_var.get(), wiz.cols_var.get()) == ('3', '5')
+        assert wiz.shape_var.get() == 'Band: up to 15 icons, 5 to a row'
+        assert wiz.limit_var.get() == ('An overhead grid holds up to 16 slots, '
+                                       'at most 4 rows or 8 columns')
     grid = _wizard_grid(app, 'hostile', custom)
-    assert (grid['type'], grid['rowCap'], grid['maxSlots']) == ('hostile', 5, 16)
+    assert (grid['type'], grid['rowCap'], grid['maxSlots']) == ('hostile', 5, 15)
 
     def single(wiz):
         wiz.mode_var.set('dynamic')

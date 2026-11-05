@@ -99,13 +99,15 @@ def change_game_resolution(app):
     btns.pack(fill='x', pady=(PAD_SMALL, 0))
 
     def _apply():
-        _apply_anchor(app, side_var.get(), up_var.get())
         new_res = parse_resolution(res_var.get())
-        if not new_res:
-            dialog.destroy()
+        if not new_res or min(new_res) <= 0:
+            # Nothing is saved — the anchor waits for a resolution that reads.
+            app_toast(app, "Type a resolution as width x height, like 2560x1440", 'warning')
             return
+        anchor_changed = _apply_anchor(app, side_var.get(), up_var.get())
         new_w, new_h = new_res
-        if (new_w, new_h) != (current_w, current_h):
+        res_changed = (new_w, new_h) != (current_w, current_h)
+        if res_changed:
             # Positions are fractions — nothing in the document moves. Flush
             # the widgets at the OLD resolution first (their px unprojects
             # against it), then persist and rebuild so every pixel field
@@ -118,7 +120,13 @@ def change_game_resolution(app):
             # The installed SWF was baked at the old resolution — flip the
             # status row stale without touching the document.
             app.grids_panel.refresh_build_status()
+        if res_changed and anchor_changed:
+            app_toast(app, f"Resolution set to {new_w}×{new_h} and overhead anchor saved — "
+                           "Build & Install to apply", 'info')
+        elif res_changed:
             app_toast(app, f"Resolution set to {new_w}×{new_h}", 'info')
+        elif anchor_changed:
+            app_toast(app, "Overhead anchor saved — Build & Install to apply", 'info')
         dialog.destroy()
 
     ttk.Button(btns, text="Apply", bootstyle="success",
@@ -134,8 +142,8 @@ def change_game_resolution(app):
 
 
 def _apply_anchor(app, side_text, up_text):
-    """Persist the overhead anchor fields (clamped like the pref); a change
-    owes a rebuild, so say so."""
+    """Persist the overhead anchor fields (clamped like the pref). Returns
+    whether either moved — a change owes a rebuild, which `_apply` says."""
     changed = False
     for key, text in (('anchor_side', side_text), ('anchor_up', up_text)):
         try:
@@ -149,4 +157,4 @@ def _apply_anchor(app, side_text, up_text):
         app.settings.save()
         # The installed SWF was baked with the old anchor.
         app.grids_panel.refresh_build_status()
-        app_toast(app, "Overhead anchor saved — Build & Install to apply", 'info')
+    return changed

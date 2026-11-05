@@ -124,7 +124,8 @@ def build_damageinfo(assets_path: str | Path, settings: dict,
     temp_dir = Path(tempfile.mkdtemp(prefix='damageinfo_'))
     try:
         temp_pkg = temp_dir / '__Packages'
-        if not DamageInfoGenerator(source_pkg, settings).generate(temp_pkg):
+        generator = DamageInfoGenerator(source_pkg, settings)
+        if not generator.generate(temp_pkg):
             return False, 'Failed to bake Damage Numbers source (a setting pattern matched nothing — see log).'
 
         entries = [temp_pkg / e for e in ENTRY_POINTS]
@@ -138,7 +139,7 @@ def build_damageinfo(assets_path: str | Path, settings: dict,
             output_swf.unlink(missing_ok=True)  # don't leave a pristine/partial SWF at the caller's path
             return False, f'Damage Numbers compile failed:\n{err}'
 
-        font = dis.validate_all_settings(settings)['font']
+        font = generator.settings['font']
         if font != HYBORIAN:
             blob = assets_path / 'kazbars' / 'fonts' / f'{font_slug(font)}.bin'
             try:

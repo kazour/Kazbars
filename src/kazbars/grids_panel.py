@@ -267,11 +267,15 @@ class GridsPanel(ttk.Frame):
     def _on_overlay_changed(self):
         size = self._size_by_label.get(self._overlay_size_var.get(), DEFAULT_SIZE)
         font = self._font_by_label.get(self._overlay_font_var.get(), 'Arial')
-        if self.app is not None and self.app.profile_store is not None:
-            self.app.profile_store.update_section('overlay', {'size': size, 'font': font})
+        store = self.app.profile_store if self.app is not None else None
+        if store is not None:
+            if store.get_section('overlay') == {'size': size, 'font': font}:
+                return
+            store.update_section('overlay', {'size': size, 'font': font})
         for panel in self.grid_panels:
             panel.refresh_size_hint()
-        self.refresh_build_status()
+        # The deployed SWF was baked at the old size/font: un-tick Build.
+        self._mark_modified()
 
     def _build_tip_bar(self):
         """Build the contextual next-step guide (tip bar) shown above grids/empty state."""

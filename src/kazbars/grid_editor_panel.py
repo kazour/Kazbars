@@ -216,15 +216,22 @@ class GridEditorPanel(ttk.Frame):
 
     def _show_move_menu(self, anchor):
         """Move to / Copy to, each listing All classes and the twelve classes;
-        Move greys the grid's own."""
+        Move greys the grid's own. Built once per card, re-greyed per click."""
+        targets = ((0, "All classes"), *((c.id, c.name) for c in CLASSES))
+        menu = getattr(self, '_move_menu', None)
+        if menu is None:
+            menu = self._move_menu = tk.Menu(self, tearoff=0)
+            for title, copy_it in (("Move to", False), ("Copy to", True)):
+                sub = tk.Menu(menu, tearoff=0)
+                for cid, name in targets:
+                    sub.add_command(label=name,
+                                    command=lambda c=cid, cp=copy_it: self._on_move(self, c, cp))
+                menu.add_cascade(label=title, menu=sub)
+                if not copy_it:
+                    self._move_sub = sub
         own = self.grid_config.get('class', 0)
-        menu = tk.Menu(self, tearoff=0)
-        for title, copy_it in (("Move to", False), ("Copy to", True)):
-            sub = tk.Menu(menu, tearoff=0)
-            for cid, name in ((0, "All classes"), *((c.id, c.name) for c in CLASSES)):
-                sub.add_command(label=name, state='disabled' if (cid == own and not copy_it) else 'normal',
-                                command=lambda c=cid, cp=copy_it: self._on_move(self, c, cp))
-            menu.add_cascade(label=title, menu=sub)
+        for i, (cid, _name) in enumerate(targets):
+            self._move_sub.entryconfigure(i, state='disabled' if cid == own else 'normal')
         menu.tk_popup(anchor.winfo_rootx(), anchor.winfo_rooty() + anchor.winfo_height())
 
     def _build_top_row(self, parent):

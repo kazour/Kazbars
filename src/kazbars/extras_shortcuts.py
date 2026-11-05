@@ -235,12 +235,16 @@ class ExtrasShortcutsRow(ttk.Frame):
         tile = self._tiles[key]
         on = bool(tile['var'].get())
         tile['write'](self.app, on)
+        empty = on and not tile['read'](self.app)
+        if empty:
+            # Switched on with nothing to build (a console with no tab): the
+            # card stays off, so the store does too.
+            tile['write'](self.app, False)
         self.refresh()
         # The row's parent is GridsPanel; a flipped gate changes what the next
         # build bakes, so its status row re-checks.
         self.master.refresh_build_status()
-        if on and not tile['read'](self.app):
-            # Switched on with nothing to build (a console with no tab).
+        if empty:
             app_toast(self, f"{tile['title']} has nothing to build — open its settings",
                       'warning', key=f'extras_{key}')
         elif on:

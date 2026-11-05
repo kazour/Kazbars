@@ -281,17 +281,18 @@ class AddGridWizard(tk.Toplevel):
 
     def _clamp_shape(self, changed='rows'):
         """Keep the shape inside the grid's limit. A band's columns are its row
-        cap (the spinbox steps through 3, 5 and 7; a preset's own columns stand,
-        so a Single 1x1 band is one icon, three to a row) and its rows give way
-        to the 16 slots; any other grid keeps its rows and columns inside its
-        max shape, the other one giving way to its slot limit."""
+        cap, snapped to 3, 5 or 7 (a typed 4 reads 5) — but a Single 1x1 band
+        stays one icon, three to a row — and its rows give way to the 16
+        slots; any other grid keeps its rows and columns inside its max shape,
+        the other one giving way to its slot limit."""
         gtype = self.type_var.get()
         rows = self.safe_get_int(self.rows_var, 1)
         cols = self.safe_get_int(self.cols_var, 1)
         limit = max_slots(gtype)
         max_rows, max_cols = max_shape(gtype)
         if self._band():
-            cols = min(cols, BAND_ROW_CAPS[-1])
+            if (rows, cols) != (1, 1):
+                cols = snap_row_cap(cols)
             rows = min(rows, max(1, limit // cols))
             self.cols_spin.config(values=BAND_ROW_CAPS)
             self.rows_spin.config(from_=1, to=max(1, limit // cols))
@@ -345,8 +346,10 @@ class AddGridWizard(tk.Toplevel):
             else:
                 shape = f"Grid ({rows}x{cols} = {total} slots)"
         self.shape_var.set(shape)
-        self.limit_var.set(f"An overhead grid holds up to {limit} slots, at most 4 rows or 8 columns"
-                           if is_plate(gtype) else f"A grid holds up to {limit} slots")
+        max_rows, max_cols = max_shape(gtype)
+        self.limit_var.set(f"An overhead grid holds up to {limit} slots, at most {max_rows} rows "
+                           f"or {max_cols} columns" if is_plate(gtype)
+                           else f"A grid holds up to {limit} slots")
         self.warning_var.set("" if total <= limit else f"A grid holds at most {limit} slots")
 
     def on_create(self):

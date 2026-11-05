@@ -56,9 +56,9 @@ def format_game_path(path, max_parts=3):
     parts = resolved.parts
     if len(parts) <= max_parts:
         return str(resolved)
-    # parts[0] is the drive root and already ends in a separator ('C:\\'),
-    # so only one more goes before '...' or the display doubles it up.
-    return f"{parts[0]}...\\{parts[-1]}"
+    # A join, not a format: a drive root already ends in a separator ('C:\\'),
+    # a drive-less first part does not.
+    return str(Path(parts[0], '...', parts[-1]))
 
 
 def change_game_folder(app):

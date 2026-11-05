@@ -10,7 +10,7 @@ and Live Tracker config panels.
 import tkinter as tk
 from tkinter import ttk
 
-from .overlay_size import SCALE_MAX, SCALE_MIN, snap_scale
+from .overlay_size import SCALE_MAX, SCALE_MIN, SCALE_STEP, snap_scale
 from .ui_helpers import (
     CELL_GAP,
     CELL_PX,
@@ -509,6 +509,19 @@ def size_slider(parent, initial, hint, on_commit=None, *, label="Size:", length=
             committed[0] = var.get()
             on_commit()
 
+    def _key_to(p):
+        # ttk.Scale's own keys step by 1, which the 5 % snap rounds straight
+        # back; step a whole notch instead (the release commits it).
+        var.set(snap_scale(p))
+        scale.set(var.get())
+        _show()
+        return "break"
+
+    for seq, step in (("<Left>", -SCALE_STEP), ("<Up>", -SCALE_STEP),
+                      ("<Right>", SCALE_STEP), ("<Down>", SCALE_STEP)):
+        scale.bind(seq, lambda _e, d=step: _key_to(var.get() + d))
+    scale.bind("<Home>", lambda _e: _key_to(SCALE_MIN))
+    scale.bind("<End>", lambda _e: _key_to(SCALE_MAX))
     scale.bind("<ButtonRelease-1>", _commit)
     scale.bind("<KeyRelease>", _commit)
     if tooltip:

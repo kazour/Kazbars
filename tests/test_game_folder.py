@@ -130,3 +130,8 @@ class TestFormatGamePath:
         deeper = r"C:\Program Files (x86)\Steam\steamapps\common\Age of Conan - Unchained\bin"
         assert (game_folder.format_game_path(deeper, max_parts=6)
                 == r"C:\...\bin")
+
+    def test_a_drive_less_path_keeps_its_separators(self):
+        assert game_folder.format_game_path(r"Games\Funcom\AoC\Age of Conan") == r"Games\...\Age of Conan"
+        assert (game_folder.format_game_path(r"\\nas\share\Games\Funcom\Age of Conan")
+                == r"\\nas\share\...\Age of Conan")
