@@ -20,6 +20,7 @@ from math import gcd
 from typing import Any
 
 from .grid_model import is_band
+from .grids_generator import grid_ships
 
 Rect = tuple[int, int, int, int]
 
@@ -220,15 +221,13 @@ def slot_tip(cfg: dict, name_of: Callable[[Any], str], idx: int) -> str:
 
 
 def empty_nudge(cfg: dict) -> str | None:
-    """What a grid holding nothing says instead of its names — the build's
-    own rule (`grid_ships`): such a grid is left out."""
+    """What a grid holding nothing says instead of its names. The build's own
+    rule decides (`grid_ships`, enabled or not): such a grid is left out."""
+    if grid_ships(dict(cfg, enabled=True)):
+        return None
     if cfg.get('slotMode') == 'static':
-        if assigned_slots(cfg):
-            return None
         return ("No slots assigned yet, so it is not built. Click a slot to choose "
                 f"its buffs ({slot_total(cfg)} slots).")
-    if _as_list(cfg.get('whitelist')):
-        return None
     return "No buffs tracked yet, so it is not built. Click the preview to choose them."
 
 
@@ -242,8 +241,12 @@ def names_line(names: Sequence[str], measure: Callable[[str], int], width: int) 
         more = f" + {len(names) - k} more" if k < len(names) else ''
         return ', '.join(names[:k]) + more
 
+    if measure(text(len(names))) <= width:
+        return text(len(names))
+    # Short of the whole list every text carries its ` + N more`, so the
+    # widths grow with k: stop at the first that overflows.
     fit = 0
-    for k in range(1, len(names) + 1):
+    for k in range(1, len(names)):
         if measure(text(k)) > width:
             break
         fit = k

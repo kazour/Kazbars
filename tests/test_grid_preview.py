@@ -119,6 +119,9 @@ def test_the_names_line_fits_what_it_can_then_counts_the_rest():
     assert gp.names_line(names, len, 10) == '… + 2 more'
     assert gp.names_line(['Bloodlust'], len, 5) == 'Bloo…'
     assert gp.names_line([], len, 100) == ''
+    # The whole list carries no " + N more", so it can fit where one name plus its tail can't.
+    two = ['Bloodlust of the Ancients', 'Lash']
+    assert gp.names_line(two, len, len('Bloodlust of the Ancients, Lash')) == 'Bloodlust of the Ancients, Lash'
 
 
 @pytest.mark.parametrize('cfg', [

@@ -1020,6 +1020,24 @@ def test_a_right_click_clears_a_slot_and_the_toast_puts_it_back(app, monkeypatch
     card.preview._clear(1)  # an empty slot: nothing to clear
     assert len(toasts) == 2
 
+    # A slot the grid shrank past stays cleared on undo.
+    card.preview._clear(3)
+    card._rows_var.set('1')
+    card._on_dimension_changed('rows')
+    toasts[-1][1]()
+    assert '3' not in card.grid_config['slotAssignments']
+
+
+def test_the_keyboard_slot_survives_the_picker_and_the_pointer_leaving(app):
+    from kazbars.grid_model import create_default_grid
+    card = _card_for(app, create_default_grid('player', 2, 3, 'static', 'SeamKeep'))
+    preview = card.preview
+    preview._set_hot(4)
+    preview.event_generate('<FocusOut>')
+    preview._set_hot(-1)  # what FocusOut does while the picker holds focus
+    preview._set_hot(preview._kept)  # what FocusIn does on its return
+    assert preview._hot == 4
+
 
 def test_a_tall_grid_says_its_preview_stepped_down(app):
     from kazbars.grid_model import create_default_grid

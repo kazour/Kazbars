@@ -211,6 +211,12 @@ class GridEditorPanel(ttk.Frame):
         for glyph, delta, tip in (("▼", 1, "Move this grid down the list"),
                                   ("▲", -1, "Move this grid up the list")):
             self._step_labels[delta] = self._make_step_label(header, glyph, delta, tip)
+        enabled_cb = ttk.Checkbutton(header, text="Enabled",
+                                     variable=self.enabled_var,
+                                     command=self._on_enabled_toggled,
+                                     bootstyle="success-round-toggle")  # type: ignore[call-arg]
+        enabled_cb.pack(side='right', padx=(0, PAD_XS))
+        in_view = [enabled_cb, self._step_labels[-1], self._step_labels[1], delete_label]
         if self._on_move is not None:
             move_label = ttk.Label(header, text="Move…", font=FONT_SMALL,
                                    foreground=THEME_COLORS['muted'], cursor='hand2',
@@ -220,10 +226,10 @@ class GridEditorPanel(ttk.Frame):
                 move_label.bind(seq, lambda e, w=move_label: self._show_move_menu(w))
             bind_label_hover_colors(move_label, THEME_COLORS['muted'], THEME_COLORS['heading'])
             add_tooltip(move_label, "Move this grid to another class tab, or copy it there")
-        ttk.Checkbutton(header, text="Enabled",
-                        variable=self.enabled_var,
-                        command=self._on_enabled_toggled,
-                        bootstyle="success-round-toggle").pack(side='right', padx=(0, PAD_XS))  # type: ignore[call-arg]
+            in_view.insert(0, move_label)
+        # Packed right to left; raise them left to right so Tab walks them as seen.
+        for w in in_view:
+            w.lift()
 
     def _make_step_label(self, header, glyph, delta, tip):
         """▲ or ▼: a glyph label like ×, live unless the card sits at that end
@@ -559,8 +565,7 @@ class GridEditorPanel(ttk.Frame):
         Applied by me): commit it, then redraw. The commit flushes every card's
         widgets into its config (`save_to_config`), so the redraw reads it."""
         self._notify_edit()
-        if self._on_edit is None:
-            self.save_to_config()
+        self.save_to_config()
         self._refresh_view()
 
     def _validate_name(self, interactive=True):
@@ -782,8 +787,10 @@ class GridEditorPanel(ttk.Frame):
         if not self.winfo_exists():
             return
         restored = False
+        total = grid_preview.slot_total(self.grid_config)
         for slot, (refs, _when) in cleared.items():
-            if not grid_preview.slot_ids(self.grid_config, slot):
+            # A slot the grid shrank past since stays cleared.
+            if slot < total and not grid_preview.slot_ids(self.grid_config, slot):
                 self._write_slot(slot, refs)
                 restored = True
         if restored:
@@ -802,6 +809,7 @@ class GridEditorPanel(ttk.Frame):
 
     def _on_enabled_toggled(self):
         self._apply_enabled_styling(self.enabled_var.get())
+        self._update_preview()
         self._notify_edit()
 
     def _apply_enabled_styling(self, enabled):
@@ -815,7 +823,6 @@ class GridEditorPanel(ttk.Frame):
         self._stripe.configure(
             bg=self._accent_color if enabled else TK_COLORS['border'])
         self.section.set_dimmed(not enabled)
-        self._update_preview()
 
     def _on_timers_clicked(self):
         """Timers dropdown handler — load_from_config calls _on_timers_toggled

@@ -34,6 +34,9 @@ from .ui_helpers import (
 from .ui_widgets import add_tooltip, refresh_tooltip
 
 _NUM_INSET = 2
+# The 1 px focus ring is drawn inside the canvas, over its outer pixels:
+# every item sits this far in, and a pointer reads this far back.
+_RING = 1
 
 
 class GridPreview(tk.Canvas):
@@ -42,7 +45,7 @@ class GridPreview(tk.Canvas):
     def __init__(self, parent, *, accent, on_pick, on_clear, tip_for,
                  max_w=PREVIEW_MAX_W, max_h=PREVIEW_MAX_H):
         super().__init__(parent, width=1, height=1, bg=TK_COLORS['bg'], bd=0,
-                         highlightthickness=1, highlightbackground=TK_COLORS['bg'],
+                         highlightthickness=_RING, highlightbackground=TK_COLORS['bg'],
                          highlightcolor=accent, takefocus=True)
         self._accent = accent
         self._on_pick = on_pick
@@ -53,13 +56,16 @@ class GridPreview(tk.Canvas):
         self._enabled = True
         self._layout: grid_preview.Layout | None = None
         self._hot = -1
+        # The slot the keyboard sits on: kept while the picker has focus or
+        # the pointer wanders off, so Tab back lands where it was.
+        self._kept = 0
         self._hand = False
 
         self.bind('<Motion>', self._on_motion)
-        self.bind('<Leave>', lambda e: self._set_hot(-1))
+        self.bind('<Leave>', lambda e: self._set_hot(self._kept if self._focused() else -1))
         self.bind('<Button-1>', self._on_click)
         self.bind('<Button-3>', self._on_right_click)
-        self.bind('<FocusIn>', lambda e: self._set_hot(max(self._hot, 0)))
+        self.bind('<FocusIn>', lambda e: self._set_hot(self._kept))
         self.bind('<FocusOut>', lambda e: self._set_hot(-1))
         for key, dx, dy in (('Left', -1, 0), ('Right', 1, 0), ('Up', 0, -1), ('Down', 0, 1)):
             self.bind(f'<{key}>', lambda e, x=dx, y=dy: self._on_arrow(x, y))
@@ -93,6 +99,7 @@ class GridPreview(tk.Canvas):
         if self._layout is None or lay.rects != self._layout.rects:
             self._layout = lay
             self._hot = min(self._hot, len(lay.rects) - 1)
+            self._kept = min(self._kept, len(lay.rects) - 1)
             self.redraw()
         else:
             self._layout = lay
@@ -105,10 +112,10 @@ class GridPreview(tk.Canvas):
         if lay is None:
             return
         self.delete('all')
-        # The 1 px focus ring sits outside the drawing; +1 keeps the far edge in.
-        self.configure(width=lay.width + 1, height=lay.height + 1)
+        self.configure(width=lay.width, height=lay.height)  # Tk adds the ring around this
         for i, (x0, y0, x1, y1) in enumerate(lay.rects):
             tag = f'slot_{i}'
+            x0, y0, x1, y1 = x0 + _RING, y0 + _RING, x1 + _RING, y1 + _RING
             self.create_rectangle(x0, y0, x1 - 1, y1 - 1, width=1, tags=(tag, 'rect'))
             self.create_text(x0 + _NUM_INSET, y0 + _NUM_INSET - 1, anchor='nw',
                              font=FONT_SMALL, tags=(tag, 'num'))
@@ -148,9 +155,18 @@ class GridPreview(tk.Canvas):
     def _slot_at(self, event):
         if self._layout is None:
             return -1
-        return grid_preview.slot_at(self._layout, int(self.canvasx(event.x)), int(self.canvasy(event.y)))
+        return grid_preview.slot_at(self._layout, int(self.canvasx(event.x)) - _RING,
+                                    int(self.canvasy(event.y)) - _RING)
+
+    def _focused(self):
+        try:
+            return self.focus_get() is self
+        except (KeyError, tk.TclError):  # focus in a window Tk can't name
+            return False
 
     def _set_hot(self, i):
+        if i >= 0:
+            self._kept = i
         if i == self._hot:
             return
         prev, self._hot = self._hot, i

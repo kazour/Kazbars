@@ -81,7 +81,7 @@ PAD_SECTION_GAP = 20      # Visual separation between button groups
 # Canvas-drawn geometry — pixel sizes for canvases (mini-previews, step badges).
 # Distinct from PAD_*: these size canvases, not widget padding.
 CARD_STRIPE_PX = 3             # Grid-card left identity stripe (player/target accent)
-GRID_PREVIEW_PX = 80           # Mini preview canvas inside each editor card
+GRID_PREVIEW_PX = 80           # Cast timer dialog: its text-sample canvas
 STEP_BADGE_PX = 20             # Numbered step badge in the tip bar
 PREVIEW_RATIO = (2, 3)         # A grid card's preview: app px per game px of the baked icon
 PREVIEW_MAX_H = 128            # Tallest a card's preview grows before it steps down a ratio
