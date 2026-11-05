@@ -13,6 +13,8 @@ from . import inspect_catalog
 from .build_utils import compile_as2, resolve_assets_path
 from .cast_timer import is_enabled as cast_is_enabled
 from .cast_timer import validate_config as validate_cast_config
+from .console import ships as console_ships
+from .console import validate_config as validate_console_config
 from .grid_model import DEFAULT_GAME_RESOLUTION, is_band, is_plate, project_px
 from .inspect import validate_config as validate_inspect_config
 from .overlay import VERDANA, as2_face, font_slug
@@ -210,6 +212,7 @@ class CodeGenerator:
         cast_config=None,
         stopwatch_config=None,
         inspect_config=None,
+        console_config=None,
         overlay=None,
         anchor=None,
         game_resolution=None,
@@ -242,6 +245,8 @@ class CodeGenerator:
         self.include_stopwatch = self.stopwatch_config["enabled"]
         self.inspect_config = validate_inspect_config(inspect_config)
         self.include_inspect = self.inspect_config["enabled"]
+        self.console_config = validate_console_config(console_config)
+        self.include_console = console_ships(self.console_config)
 
     def _archive_key(self, grid_id):
         """Stable per-build archive key for a grid's persisted position — a
@@ -428,6 +433,13 @@ class CodeGenerator:
         ids = ", ".join(str(i) for i in inspect_catalog.watch_ids(inspect_catalog.pvp_rows()))
         return f"\n        d.INS.pvp = {{groups: [{groups}], rows: [{rows}], ids: [{ids}]}};"
 
+    def _console_data_block(self):
+        """`d.CON`: the console's text size and its tabs in the strip's order."""
+        c = self.console_config
+        tabs = ", ".join(f'"{t}"' for t in c["tabs"])
+        return (f"\n        d.CON = {{fontSize: {panel_fs(self.base_size, c['scale'])}, "
+                f"tabs: [{tabs}]}};")
+
     def _data_units(self):
         """The data-class body as self-contained source units, in emit order:
         one per grid (its config and its id set with each id's facts), then one
@@ -487,6 +499,8 @@ class CodeGenerator:
             lines.append(self._inspect_data_block())
             lines.append(self._inspect_rows_block())
             lines.append(self._pvp_view_block())
+        if self.include_console:
+            lines.append(self._console_data_block())
 
         if chunk_count:
             lines.append("")
@@ -573,9 +587,9 @@ class CodeGenerator:
     def _main_class(self):
         template = _load_template(self._assets_path)
         return _apply_feature_gates(template, {
-            "CONSOLE": False,
-            "CONBUFFS": False,
-            "CONCASTS": False,
+            "CONSOLE": self.include_console,
+            "CONBUFFS": self.include_console and "buffs" in self.console_config["tabs"],
+            "CONCASTS": self.include_console and "casts" in self.console_config["tabs"],
             "CAST": self.include_cast_timer,
             "INS": self.include_inspect,
             "ONS": False,
@@ -644,6 +658,7 @@ def build_grids(
     cast_config: dict | None = None,
     stopwatch_config: dict | None = None,
     inspect_config: dict | None = None,
+    console_config: dict | None = None,
     overlay: dict | None = None,
     anchor: tuple[int, int] | None = None,
     game_resolution: tuple[int, int] | None = None,
@@ -680,6 +695,7 @@ def build_grids(
             cast_config=cast_config,
             stopwatch_config=stopwatch_config,
             inspect_config=inspect_config,
+            console_config=console_config,
             overlay=overlay,
             anchor=anchor,
             game_resolution=game_resolution,

@@ -84,6 +84,7 @@ def _worst_case():
         cast_config={"enabled": True, "enableP": True, "enableT": True, "scale": 200},
         stopwatch_config={"enabled": True, "scale": 200},
         inspect_config={"enabled": True, "scale": 200, "rows": [r.key for r in inspect_catalog.ROWS]},
+        console_config={"enabled": True, "scale": 200, "tabs": ["casts", "buffs"]},
         overlay={"size": 24, "font": "Arial"},
     )
     return grids, extras
@@ -130,9 +131,10 @@ def test_every_module_class_is_in_the_full_build(builds):
     for cls in ("KazBars", "KazBarsData", "KazBarsData1", "KazBarsGrids", "KazBarsGridView",
                 "KazBarsWorld", "KazBarsClock", "KazBarsCastTimer", "KazBarsStopwatch",
                 "KazBarsInspect", "KazBarsInspectRows", "KazBarsInspectData", "KazBarsPreviewPanel",
-                "KazBarsOverhead", "KazBarsRelations"):
+                "KazBarsOverhead", "KazBarsRelations", "KazBarsConsole", "KazBarsConBuffs",
+                "KazBarsConCasts", "KazBarsConList"):
         assert cls in sizes, cls
-    for cls in ("KazBarsConsole", "KazBarsOnslaught"):
+    for cls in ("KazBarsOnslaught",):
         assert cls not in sizes, f"{cls} is gated off"
 
 

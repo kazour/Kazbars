@@ -21,6 +21,7 @@ from .app_popups import show_close_game_required_dialog
 from .build_loading import BuildLoadingScreen
 from .cast_timer import is_enabled as cast_is_enabled
 from .cast_timer import validate_config as validate_cast_config
+from .console import ships as console_ships
 from .grid_model import get_game_resolution_or_default, max_slots, slot_count
 from .grids_generator import unresolved_refs
 from .profile_document import build_signature
@@ -88,10 +89,12 @@ def build(app):
     cast_config = validate_cast_config(dict(app.profile_store.get_section('cast_timer')))
     stopwatch_config = dict(app.profile_store.get_section('stopwatch'))
     inspect_config = dict(app.profile_store.get_section('inspect'))
+    console_config = dict(app.profile_store.get_section('console'))
     any_extra = (
         cast_is_enabled(cast_config)
         or bool(stopwatch_config.get('enabled'))
         or bool(inspect_config.get('enabled'))
+        or console_ships(console_config)
         or di_enabled
     )
 
@@ -173,6 +176,7 @@ def build(app):
         'cast_config': cast_config,
         'stopwatch_config': stopwatch_config,
         'inspect_config': inspect_config,
+        'console_config': console_config,
         'overlay': dict(app.profile_store.get_section('overlay')),
         'anchor': (app.settings.get('anchor_side'), app.settings.get('anchor_up')),
         'game_resolution': get_game_resolution_or_default(),
@@ -226,6 +230,7 @@ def _build_worker(app, loading, ctx):
             cast_config=ctx['cast_config'],
             stopwatch_config=ctx['stopwatch_config'],
             inspect_config=ctx['inspect_config'],
+            console_config=ctx['console_config'],
             overlay=ctx['overlay'],
             anchor=ctx['anchor'],
             game_resolution=ctx['game_resolution'],

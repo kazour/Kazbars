@@ -19,6 +19,7 @@ from kazbars import (
     buff_xml,
     build_action,
     cast_timer,
+    console,
     content_update,
     damageinfo_settings,
     deeps_settings,
@@ -145,6 +146,7 @@ class KazBarsApp(ttkb.Window):
         self.registry.register(inspect.PROFILE_SECTION)
         self.registry.register(cast_timer.PROFILE_SECTION)
         self.registry.register(damageinfo_settings.PROFILE_SECTION)
+        self.registry.register(console.PROFILE_SECTION)
         # The XML editors' sparse PATCH-lane overrides — never dispatched on
         # profile switch (profile_io.apply_document only touches BUILD/LIVE).
         self.registry.register(damageinfo_settings.DAMAGE_COLORS_SECTION)
@@ -166,6 +168,7 @@ class KazBarsApp(ttkb.Window):
         self.stopwatch_dialog = None
         self.inspect_dialog = None
         self.cast_timer_dialog = None
+        self.console_dialog = None
 
         # One shared focus gate for every overlay: hides them whenever neither
         # KazBars nor AoC owns the foreground window. Overlays register on
@@ -435,6 +438,8 @@ class KazBarsApp(ttkb.Window):
             {'type': 'separator'},
             {'type': 'command', 'label': 'Cast timer…',
              'command': self._open_cast_timer_settings},
+            {'type': 'command', 'label': 'Console…',
+             'command': self._open_console_settings},
             {'type': 'command', 'label': 'Damage number mod…',
              'command': self._open_damage_numbers},
             {'type': 'command', 'label': 'Inspect panel…',
@@ -639,6 +644,11 @@ class KazBarsApp(ttkb.Window):
         """Open the Cast Timer settings dialog (modal)."""
         from .cast_timer_panel import open_cast_timer_dialog
         open_cast_timer_dialog(self)
+
+    def _open_console_settings(self):
+        """Open the in-game Console settings dialog (Extras ▸ Console…)."""
+        from .console_panel import open_console_dialog
+        open_console_dialog(self)
 
     def _open_backup_dialog(self):
         """Open the Backup & Restore settings dialog."""

@@ -1,9 +1,10 @@
 """
 KazBars — Extras shortcuts row.
 
-Four toggle cards along the bottom of the Grids tab, beside Build & Install —
-one per SWF-build extra, in Extras-menu order (Cast timer, Damage numbers,
-Inspect panel, Stopwatch) so the row and the menu read as the same list. Each
+Toggle cards along the bottom of the Grids tab, beside Build & Install —
+one per SWF-build extra, in Extras-menu order (Cast timer, Console, Damage
+numbers, Inspect panel, Stopwatch) so the row and the menu read as the same
+list. Each
 card carries two controls, not one: the **card body** opens that feature's
 Extras dialog (the same opener the menu item calls), and the **round switch**
 flips whether it ships in the next Build & Install, writing the same
@@ -21,6 +22,7 @@ Identity comes from the label — the cards rest neutral when off.
 import tkinter as tk
 from tkinter import ttk
 
+from .console import ships as console_ships
 from .ui_helpers import (
     FONT_SECTION,
     FONT_SMALL,
@@ -43,6 +45,12 @@ def _read_section(app, key):
     return store is not None and bool(store.get_section(key).get('enabled'))
 
 
+def _read_console(app):
+    # The console ships only with a tab, so its card says so too.
+    store = app.profile_store
+    return store is not None and console_ships(store.get_section('console'))
+
+
 def _make_section_setter(key, side_flags=()):
     def _set(app, on):
         patch = {'enabled': on}
@@ -54,7 +62,7 @@ def _make_section_setter(key, side_flags=()):
     return _set
 
 
-# Shared by all four switches — they do the same thing on every card.
+# Shared by every switch — they do the same thing on every card.
 _TOGGLE_TOOLTIP = 'Whether this ships in your next Build & Install'
 
 # The hover cue for whichever zone the pointer is over — same white as the
@@ -79,6 +87,11 @@ _FEATURES = (
      '_open_cast_timer_settings',
      lambda app: _read_section(app, 'cast_timer'),
      _make_section_setter('cast_timer', side_flags=('enableP', 'enableT'))),
+    ('console', 'Console', 'next build removes it',
+     'Buff IDs and casts, logged in game. Click to open Extras ▸ Console…',
+     '_open_console_settings',
+     _read_console,
+     _make_section_setter('console')),
     ('damage_numbers', 'Damage numbers', 'next build restores stock',
      "Re-tunes AoC's floating combat numbers. Click to open Extras ▸ Damage number mod…",
      '_open_damage_numbers',
@@ -101,7 +114,7 @@ _FEATURES = (
 # ROW WIDGET
 # ============================================================================
 class ExtrasShortcutsRow(ttk.Frame):
-    """One row of four equal-width toggle cards for the SWF-build extras."""
+    """One row of equal-width toggle cards for the SWF-build extras."""
 
     def __init__(self, parent, app):
         super().__init__(parent)
@@ -213,7 +226,11 @@ class ExtrasShortcutsRow(ttk.Frame):
         # The row's parent is GridsPanel; a flipped gate changes what the next
         # build bakes, so its status row re-checks.
         self.master.refresh_build_status()
-        if on:
+        if on and not tile['read'](self.app):
+            # Switched on with nothing to build (a console with no tab).
+            app_toast(self, f"{tile['title']} has nothing to build — open its settings",
+                      'warning', key=f'extras_{key}')
+        elif on:
             msg = f"{tile['title']} on — Build & Install to apply"
             app_toast(self, msg, 'success', key=f'extras_{key}')
         else:
