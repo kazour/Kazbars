@@ -116,8 +116,9 @@ SECTIONS: list[_Section] = [
             'KazBars makes two kinds of thing. The difference: whether the '
             'app must stay open.',
             _sub('Built into the game — then close the app', [
-                [('Grids, Damage Numbers, the Stopwatch, the Inspect Panel and '
-                  'the Cast Timer are compiled in by ', None),
+                [('Grids, Damage Numbers, the Stopwatch, the Inspect Panel, '
+                  'the Cast Timer, the Console and the Onslaught Tracker are '
+                  'compiled in by ', None),
                  ('Build & Install', _SUCCESS),
                  ('. They work with the app closed. Open it again only to '
                   'change something.', None)],
@@ -173,15 +174,16 @@ SECTIONS: list[_Section] = [
                 'screen.',
             ]),
             _sub('What travels with a profile', [
-                'Grids, Stopwatch, Inspect panel, Cast timer and Damage '
-                'Numbers all live inside it — and so do Deeps and the '
+                'Grids, the Overlay size and font, Stopwatch, Inspect panel, '
+                'Cast timer, Console, Onslaught tracker and Damage Numbers '
+                'all live inside it — and so do Deeps and the '
                 "Ethram-Fal Live Tracker's live settings. So do any Default "
                 'Buff Bars or Damage Number Colors '
                 "overrides you've set — only the fields you've actually "
                 'changed; everything else still defers to the game, and '
                 "only that editor's own Apply writes it.",
-                'Machine-local instead: the shared panel text size and the '
-                'buff-discovery console toggle.',
+                'Machine-local instead: your game resolution and the '
+                'overhead anchor, both under Game ▸ Game resolution….',
                 _link('Deeps', 'deeps'),
                 _link('Ethram-Fal Live Tracker', 'ethram-fal'),
             ]),
@@ -192,7 +194,8 @@ SECTIONS: list[_Section] = [
         'id': 'player-target',
         'title': 'Player vs Target Grids',
         'body': [
-            'Every grid tracks one source, set when you create it.',
+            'A floating grid sits at a spot on screen and tracks one '
+            'source, set when you create it.',
             _sub('Player grid', [
                 'Tracks buffs and debuffs on your own character.',
             ], GRID_TYPE_COLORS['player']),
@@ -200,6 +203,68 @@ SECTIONS: list[_Section] = [
                 'Tracks buffs and debuffs on your current target (mob, '
                 'friendly, or enemy player).',
             ], GRID_TYPE_COLORS['target']),
+            'Friendly and Hostile grids float over characters instead.',
+            _link('Overhead Grids', 'overhead-grids'),
+        ],
+    },
+    {
+        'cat': 'Grids',
+        'id': 'overhead-grids',
+        'title': 'Overhead Grids',
+        'body': [
+            'An overhead grid has no spot on screen. It floats over the '
+            'head of each character it applies to — one set of icons per '
+            'character.',
+            _sub('Friendly and Hostile', [
+                'Friendly shows over you (tick Over me), your group and '
+                'friendly players. Hostile shows over your target and '
+                'anyone fighting you or your group.',
+                "The game doesn't list who is around you, so a character "
+                'gets its grid once something names it: your group, your '
+                'target, someone you hit or heal, or whoever casts on a '
+                'character already known.',
+            ]),
+            _sub('Box or band', [
+                'Static makes a box — up to 4 rows of 8, 16 slots in all.',
+                'Dynamic makes a band: icons centred over the head, Row cap '
+                '(3, 5 or 7) to a row, growing upward, up to Max slots '
+                '(1–16). Fill reads Centred.',
+            ]),
+            _sub('Height and Range', [
+                "Height — room left for the game's nameplate between the "
+                'head and the grid, in px.',
+                'Range — hidden past this many metres.',
+                'Over me — Friendly only: also float the grid over your own '
+                'character.',
+            ]),
+            'If the icons sit off a head, nudge the overhead anchor and '
+            'rebuild.',
+            _link('Game Resolution', 'resolution'),
+            _link('Applying and Positioning In-Game', 'positioning'),
+        ],
+    },
+    {
+        'cat': 'Grids',
+        'id': 'class-tabs',
+        'title': 'Class Tabs',
+        'body': [
+            'A row of tabs under the Grids toolbar sorts your grids by '
+            'class: All, then the twelve classes in four groups — Guard '
+            'Conq DT, PoM ToS BS, Barb Sin Ranger, Demo Necro HoX. Each tab '
+            'shows how many grids it holds.',
+            _sub('What a tab means', [
+                'A tab lists its own grids only. A new grid joins the tab '
+                'you add it on.',
+                'In game you get the All grids plus the grids of the class '
+                "you're playing. The set follows your character's class.",
+            ]),
+            _sub('Move… and Copy…', [
+                "A grid card's Move… menu has Move to and Copy to, each "
+                'listing All classes and the twelve classes. Copy leaves the '
+                'original and makes a second grid named after it and the '
+                'class.',
+            ]),
+            'KazBars reopens on the tab you left.',
         ],
     },
     {
@@ -248,6 +313,11 @@ SECTIONS: list[_Section] = [
                 'Build & Install counts these in its summary: "N unresolved '
                 'buffs excluded — a database update can bring them back."',
             ]),
+            _sub('A grid with nothing to track', [
+                'A dynamic grid with no Tracked Buffs, or a static grid with '
+                "nothing in its slots, isn't built. It stays in your profile "
+                'and ships once you give it something.',
+            ]),
         ],
     },
     {
@@ -256,12 +326,54 @@ SECTIONS: list[_Section] = [
         'title': 'Grid Display Options',
         'body': [
             'These settings are per-grid.',
-            'Timers — remaining duration below each icon.',
+            'Rows and Cols — the shape. A grid holds up to 64 slots on its '
+            'own, an overhead grid 16; there is no total across grids.',
+            'Size — a slider, 50–200 %, of the Overlay size. It sets icon, '
+            'timer and stack-count size together; the hint beside it shows '
+            'the icon in px.',
+            'Gap — the space between icons. Negative overlaps them.',
+            'Timers — Digits shows the seconds left under each icon, Bar '
+            "draws a line inside the icon's bottom edge that shrinks as "
+            'time runs out, Off shows none. Y Offset nudges digits only.',
             'Flash — icons pulse near expiry. Set the threshold in seconds.',
-            'Icon size and gaps — the size of each icon and the spacing '
-            'between them.',
-            'Where a grid sits on screen is decided in-game, not here.',
+            'Applied by me — show an effect only while you are the one who '
+            'applied it.',
+            'Where a floating grid sits on screen is decided in-game, not '
+            'here.',
+            _link('Overlay Size and Font', 'overlay-size'),
             _link('Applying and Positioning In-Game', 'positioning'),
+        ],
+    },
+    {
+        'cat': 'Grids',
+        'id': 'overlay-size',
+        'title': 'Overlay Size and Font',
+        'body': [
+            'Two dropdowns on the Grids toolbar set the size and the font '
+            'of everything KazBars draws in game. Both are saved in the '
+            'profile; rebuild to apply.',
+            _sub('Overlay', [
+                'The base size, 10 to 24 — 12 suits 1080p, 16 suits 1440p, '
+                '24 suits 4K. First launch picks the one for your '
+                'resolution.',
+                'Change it and every grid and panel resizes together, each '
+                'in proportion.',
+            ]),
+            _sub('Size sliders', [
+                'Each grid, and the Stopwatch, Inspect panel, Cast timer, '
+                'Console and Onslaught tracker, has its own Size: a percent '
+                'of the Overlay size, 50–200 %. The hint beside it says '
+                'what that comes to — icon px for a grid, points of text '
+                'for a panel.',
+            ]),
+            _sub('Font', [
+                "Arial, Verdana (the game's own font), GG, or one of nine "
+                'open fonts: Roboto, Inter, Noto Sans, Source Sans 3, PT '
+                'Sans, Fira Sans, Barlow Semi Condensed, Exo 2, Alegreya '
+                'Sans.',
+                'Damage Numbers has its own Font.',
+            ]),
+            _link('Game Resolution', 'resolution'),
         ],
     },
     {
@@ -314,24 +426,22 @@ SECTIONS: list[_Section] = [
         'id': 'finding-buff-ids',
         'title': 'Finding Buff IDs',
         'body': [
-            'The buff-discovery console logs every in-game effect with its '
-            'name and buff ID, live. It switches on in Extras ▸ Inspect '
-            'panel….',
+            "The Console's Buffs tab logs every in-game effect with its "
+            'name and buff ID, live. It switches on in Extras ▸ Console….',
             _sub('Turn it on', [
                 [('Tick ', None),
-                 ('Include the buff-discovery console in builds', _SUCCESS),
-                 (', then ', None),
+                 ('Include the console in builds', _SUCCESS),
+                 (', keep Buffs ticked, then ', None),
                  ('Build & Install', _SUCCESS),
-                 ('. Preview mode (Shift+Ctrl+Alt) shows the console.', None)],
+                 ('. If the console is not on screen after /reloadui, tick '
+                  'its box in the KazBars Preview panel (Shift+Ctrl+Alt).',
+                  None)],
                 'Everything landing on you or your target is logged. Copy the '
                 'ID into the Database tab.',
             ]),
-            'Drag it by its title bar; − collapses it to a small bar, click '
-            'to reopen. The game remembers spot, fold, and open state.',
-            'Its text uses the size all four in-game panels share, set in '
-            'the same dialog.',
             "Off by default, so finished builds don't carry it. Turn it off "
             'and rebuild to remove it.',
+            _link('Console', 'console'),
         ],
     },
     {
@@ -407,23 +517,25 @@ SECTIONS: list[_Section] = [
             'in-game, in preview mode.',
             _sub('Preview mode', [
                 'Press Shift+Ctrl+Alt in-game to toggle. Each grid shows as a '
-                'colored rectangle with live X/Y. Drag things where you want '
+                'colored rectangle with its name. Drag things where you want '
                 '— the game remembers, across relogs and restarts.',
+                'Overhead grids follow their characters, so there is nothing '
+                'to drag: preview shows an empty sample of each over your '
+                'target.',
             ]),
             _sub('The KazBars Preview panel', [
                 'Preview mode also shows a KazBars Preview panel: one '
-                'checkbox per grid and extra, grouped under Player Grids, '
-                'Target Grids and Tools. Click a header to toggle its whole '
-                'group. Each box is a persistent master switch — unchecked '
-                'stays off until you re-check it.',
+                'checkbox per floating grid and extra, grouped under Player '
+                'Grids, Target Grids and Tools. Click a header to toggle its '
+                'whole group. Each box is a persistent master switch — '
+                'unchecked stays off until you re-check it.',
                 'Its footer repeats the exit keybind, the /reloadui '
-                'reminder and the app version. Its text uses the size all '
-                'four in-game panels share (Extras ▸ Inspect panel…). With '
-                'many grids it shrinks itself to stay on screen.',
+                'reminder and the app version. Its text follows the Overlay '
+                'size. With many grids it shrinks itself to stay on screen.',
             ]),
             _sub('X/Y in the app', [
-                'The Grids-tab X/Y only seed a first-ever session. Once you '
-                'drag in-game, the dragged spot wins.',
+                'The X/Y on a floating grid only seed a first-ever session. '
+                'Once you drag in-game, the dragged spot wins.',
             ]),
         ],
     },
@@ -434,8 +546,19 @@ SECTIONS: list[_Section] = [
         'body': [
             'Game ▸ Game resolution... sets the screen size builds target. '
             'It must match the resolution you play at.',
-            'Change it and loaded grids re-anchor — 1920×1080 scales to '
-            '2560×1440 by itself. Rebuild to apply.',
+            'Change it and nothing in your profile moves: positions are '
+            'fractions of the screen and sizes a percent of the Overlay '
+            'size. On a bigger screen, pick a bigger Overlay size on the '
+            'Grids tab. Rebuild to apply.',
+            _sub('Overhead anchor', [
+                'The same dialog has Right and Up fields: where overhead '
+                "grids sit against a character's head. Positive moves them "
+                'right and up, negative left and down.',
+                "It depends on your game's field of view, so it is kept on "
+                'this PC, not in the profile. A change needs a rebuild.',
+            ]),
+            _link('Overlay Size and Font', 'overlay-size'),
+            _link('Overhead Grids', 'overhead-grids'),
         ],
     },
     {
@@ -516,31 +639,26 @@ SECTIONS: list[_Section] = [
                 'Nothing to build — /reloadui in-game shows the change.',
             ]),
             _sub('Build & Install to apply', [
-                [('Damage Numbers, Stopwatch, Inspect Panel and Cast Timer '
-                  'are off by default — off means zero code in the build. '
-                  'Tick the box, ', None),
+                [('Cast Timer, Console, Damage Numbers, Inspect Panel, '
+                  'Onslaught Tracker and Stopwatch are off by default — off '
+                  'means zero code in the build. Tick the box, ', None),
                  ('Apply', _SUCCESS),
                  (', then ', None),
                  ('Build & Install', _SUCCESS),
                  ('. Cancel, Escape or the X discard.', None)],
-                [('The four cards at the bottom of the Grids tab, just '
+                [('The six cards at the bottom of the Grids tab, just '
                   'above ', None),
                  ('Build & Install', _SUCCESS),
                  (', are two controls: the switch flips whether the '
                   'feature ships, and clicking anywhere else on the card '
                   'opens its dialog.', None)],
             ]),
-            _sub('One text size, four panels', [
-                'Stopwatch, inspect panel, buff console and control panel '
-                'share one text size (8–48), baked at build time. Each '
-                'panel scales as one piece, collapsed bars included.',
-                'Set it in Extras ▸ Inspect panel…, under Text size. It '
-                'lives there because the console and control panel have no '
-                'dialog of their own.',
-                [('To size the stopwatch or inspect panel differently, '
-                  'untick ', None),
-                 ('Use the shared size for this panel', _SUCCESS),
-                 (' in its own dialog.', None)],
+            _sub('One size, set once', [
+                'The Overlay size on the Grids tab is the base for every '
+                'panel. Each dialog has a Size slider — a percent of it, '
+                '50–200 % — and the panel scales as one piece, collapsed '
+                'bars included.',
+                _link('Overlay Size and Font', 'overlay-size'),
             ]),
         ],
     },
@@ -609,6 +727,11 @@ SECTIONS: list[_Section] = [
                 _link('How Extras Ship', 'extras-shipping'),
             ]),
             _sub('What you can tune', [
+                "Font — Hyborian, the game's own, is the default and leaves "
+                'the stock file as it is. Nine heavy display faces are built '
+                'into the mod on your next Build & Install. A face that runs '
+                'small is drawn larger to read as big as Hyborian; the '
+                'dialog shows by how much.',
                 'Keep ranged numbers big — holds ranged hit size past ~15 '
                 'metres. Melee is never touched.',
                 'Shadow, pop-in, and fade speed — with Default and Performance '
@@ -633,11 +756,11 @@ SECTIONS: list[_Section] = [
             _sub('Using it in-game', [
                 'A draggable panel shows h:mm:ss. − collapses it to the title '
                 'bar, which keeps showing the time; click to reopen.',
-                'Drag the title bar; live coordinates show. The game '
-                "remembers position and fold — the dialog's X/Y only seed "
-                'the first session.',
-                'Text size is the one all four in-game panels share — the '
-                'dialog can override it for the stopwatch alone.',
+                'Drag the title bar. The game remembers position and fold — '
+                "the dialog's X/Y only seed the first session — and keeps "
+                'the spot when the screen resizes.',
+                'Size is a slider in the dialog: a percent of the Overlay '
+                'size.',
             ]),
             [('Tick ', None),
              ('Include the stopwatch in builds', _SUCCESS),
@@ -656,37 +779,48 @@ SECTIONS: list[_Section] = [
             _sub('What it shows', [
                 'The name strip reads Name Class (Level/PvP level). A mob '
                 'just reads Name (83).',
-                'Health, armor, protections, crit and critigation, heal '
-                'rating, spell damage, combat and weapon damage, tenacity, '
-                "ferocity — in the game sheet's own Rating (Effect%) "
-                'language, at any target level. A dash: the target lacks it.',
-                [('Player targets add a PvP block. Untick ', None),
-                 ('Show the PvP section', _SUCCESS),
-                 (' to drop it from the build.', None)],
+                "The rows are yours to pick (below), in the game sheet's "
+                'own Rating (Effect%) language, at any target level. A dash: '
+                'the target lacks it.',
+                'Player targets also get a PvP tab, from a button in the '
+                'name strip: PvP combat stats, protections, bonus spell '
+                'damage and their K/D record.',
+            ]),
+            _sub('Stat rows', [
+                '112 rows in seven groups: Summary, Vitals, Attributes, '
+                'Offensive, Defensive, PvP Stats and PvP Combat.',
+                'Default shows the twelve Summary rows — health, armor, '
+                'protection, crit, critigation, hate, tenacity, penetration, '
+                'heal rating, combat rating, bonus spell damage, ferocity. '
+                'Custom list shows the rows you pick.',
+                'Add and Remove move rows between Available and Active; '
+                'Move up and Move down order them within their section. '
+                'Any change pins the list as a Custom list.',
+                'Search matches a name, a group or a stat ID; Group filters '
+                'Available. Pick one row and the line under the lists says '
+                'what it reads. It also warns when your rows would run '
+                'taller than the game screen at this size.',
             ]),
             _sub('The Perks row', [
                 "Six boxes mirror the game's perk bar — blue General, red "
                 'Archetype, dark Class. Double-slot Class perks paint two '
                 'identical icons.',
-                [('The row reads perk buffs: active perks show only while '
-                  "running; a groupmate's perk can appear too. Untick ", None),
-                 ('Track slotted perks', _SUCCESS),
-                 (' to drop the row.', None)],
+                'The row reads perk buffs on player targets: active perks '
+                "show only while running; a groupmate's perk can appear "
+                'too. Hover one to see its name.',
             ]),
-            _sub('Positioning and text size', [
+            _sub('Positioning and size', [
                 'Drag by the name strip; − collapses to just the strip. The '
                 'game remembers position and fold.',
                 'No target? Preview mode (Shift+Ctrl+Alt) shows a '
                 'placeholder.',
-                'This dialog sets the text size all four in-game panels '
-                'share — or the inspect panel alone.',
+                'Size is a slider in this dialog: a percent of the Overlay '
+                'size. The whole panel scales with it.',
             ]),
             [('Tick ', None),
              ('Include the inspect panel in builds', _SUCCESS),
-             (' to ship it. The same dialog holds the buff-discovery console.',
-              None)],
+             (' to ship it.', None)],
             _link('How Extras Ship', 'extras-shipping'),
-            _link('Finding Buff IDs', 'finding-buff-ids'),
         ],
     },
     {
@@ -699,8 +833,9 @@ SECTIONS: list[_Section] = [
             _sub('What you can set', [
                 'Player position and Target position — where each timer sits '
                 'on screen.',
-                'Text — Bold, Font size (8–48), Color; shared by both timers. '
-                'The sample shows the result.',
+                'Text — Bold, Size, Color; shared by both timers. Size is a '
+                'percent of the Overlay size, and the face is the Overlay '
+                'font. The sample shows the result.',
                 'Show — Elapsed counts up, Total is the estimated cast '
                 'length, Both shows 1.2 / 2.5.',
             ]),
@@ -717,6 +852,80 @@ SECTIONS: list[_Section] = [
              ('Include the cast timer in builds', _SUCCESS),
              (' to ship it. One toggle runs both the Player and Target sides.',
               None)],
+            _link('How Extras Ship', 'extras-shipping'),
+        ],
+    },
+    {
+        'cat': 'Extras',
+        'id': 'console',
+        'title': 'Console',
+        'body': [
+            'Extras ▸ Console… adds an in-game panel of tabs that logs what '
+            "the game doesn't show you.",
+            _sub('Tabs', [
+                'Buffs — every buff and debuff on you and your target, with '
+                'its buff ID. This is how you find IDs for the Database tab.',
+                "Casts — your and your target's casts as they end: "
+                'finished, interrupted or lost, and how long they took.',
+                'Tick the tabs you want and use ▲ ▼ to order the strip. A '
+                "tab you leave out isn't built; with none ticked, neither is "
+                'the console.',
+            ]),
+            _sub('Using it in-game', [
+                'Drag it by its title bar; − collapses it to a small bar, '
+                'click to reopen. The game remembers spot, fold, open state '
+                'and the tab you were on.',
+                'Its box in the KazBars Preview panel (Shift+Ctrl+Alt) '
+                'switches it off and on.',
+                'Size is a slider in the dialog: a percent of the Overlay '
+                'size.',
+            ]),
+            [('Tick ', None),
+             ('Include the console in builds', _SUCCESS),
+             (' to ship it.', None)],
+            _link('How Extras Ship', 'extras-shipping'),
+            _link('Finding Buff IDs', 'finding-buff-ids'),
+        ],
+    },
+    {
+        'cat': 'Extras',
+        'id': 'onslaught',
+        'title': 'Onslaught Tracker',
+        'body': [
+            'Extras ▸ Onslaught tracker… adds an in-game board for the '
+            'Onslaught instances, Skull Gate and Kuthchemes. It does '
+            'nothing anywhere else.',
+            _sub('Five displays', [
+                'Board — Mob list: the bosses, skulls and minis in view, '
+                'with their health. Wave timer: the wave and the time to the '
+                'next spawn. Hylda HP: Valkyrie Hylda, the ally you defend '
+                'in Skull Gate, with alerts at 50 % and 25 %.',
+                'Alerts — Spawn alerts: a banner when a watched boss, skull '
+                "or mini spawns. AoE warnings: a banner when Thugra Khotan's "
+                'AoE helpers spawn in Kuthchemes.',
+                'Tick the ones you want. Alert time (3–15 s) is how long a '
+                'banner stays.',
+            ]),
+            _sub('Watched mobs', [
+                'It always watches 27 mobs from its catalog. Include '
+                'Kuthchemes camps adds the camp beasts to the board — '
+                'listed, never alerted.',
+                'Your own names — up to 20, watched as minis. A name has to '
+                "match the game's exactly, capitals included; the dialog "
+                'says why it refuses one as you type. × deletes a name, and '
+                'the toast offers an undo.',
+                'These matter when Mob list or Spawn alerts is on.',
+            ]),
+            _sub('Using it in-game', [
+                'Place the board and the alerts in preview mode '
+                '(Shift+Ctrl+Alt): drag each where you want it, the game '
+                'remembers.',
+                'Size is a slider in the dialog: a percent of the Overlay '
+                'size. The alerts draw larger than the board.',
+            ]),
+            [('Tick ', None),
+             ('Include the onslaught tracker in builds', _SUCCESS),
+             (' to ship it.', None)],
             _link('How Extras Ship', 'extras-shipping'),
         ],
     },

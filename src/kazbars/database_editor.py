@@ -250,10 +250,10 @@ class BuffEditDialog(tk.Toplevel):
         if not ids:
             Messagebox.show_error(
                 "Enter at least one buff ID.\n\n"
-                "IDs aren't published anywhere — find them in-game: tick "
-                "Include the buff-discovery console in builds under "
-                "Extras ▸ Inspect panel…, then Build & Install. In preview mode "
-                "(Shift+Ctrl+Alt) the console logs every effect's name and ID.",
+                "IDs aren't published anywhere — find them in-game: turn on "
+                "Extras ▸ Console… with its Buffs tab, then Build & Install. In "
+                "preview mode (Shift+Ctrl+Alt) the console's Buffs tab logs every "
+                "effect's name and ID.",
                 title="Missing Buff ID")
             return None
 

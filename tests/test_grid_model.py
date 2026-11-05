@@ -31,7 +31,6 @@ from kazbars.grid_model import (
     max_shape,
     max_slots,
     project_px,
-    screen_extent,
     slot_count,
     snap_row_cap,
     unproject_px,
@@ -162,16 +161,14 @@ def test_scale_clamps_and_the_retired_pixel_sizes_never_zombie():
         assert key not in grid, key
 
 
-def test_timer_style_reads_and_the_retired_key_decides_when_absent():
+def test_timer_style_reads_bar_digits_or_off():
+    # The retired `showTimers` is the schema 2 -> 3 rung's to convert (test_overlay_rung).
     def style(raw):
         return validate_grid(raw)["timerStyle"]
     assert style({"timerStyle": "bar"}) == "bar"
     assert style({"timerStyle": "off"}) == "off"
     assert style({}) == "digits"
-    assert style({"showTimers": False}) == "off"
-    assert style({"showTimers": True}) == "digits"
-    assert style({"showTimers": 1}) == "digits"
-    assert style({"timerStyle": "BAR", "showTimers": False}) == "off"
+    assert style({"timerStyle": "BAR"}) == "digits"
     assert TIMER_STYLES == ("bar", "digits", "off")
 
 
@@ -202,7 +199,6 @@ def test_a_band_reads_its_cap_and_slots_and_derives_its_shape():
     assert validate_grid({"type": "friendly", "rowCap": 70})["rowCap"] == 7
     g = validate_grid({"type": "friendly", "rowCap": 7, "maxSlots": 3})
     assert (g["rows"], g["cols"]) == (1, 7)
-    assert screen_extent(g, 12) == (3 * 47 + 1, 48), "the widest row, 3 icons"
 
 
 def test_a_band_saved_as_a_box_reads_its_cap_off_its_columns_and_its_slots_off_its_shape():
@@ -267,15 +263,3 @@ def test_a_new_overhead_grid_is_a_band_or_a_box_with_bar_timers():
     assert create_default_grid("player", 1, 1)["slotMode"] == "static"
     assert snap_row_cap(4) == 5 and snap_row_cap(2) == 3 and snap_row_cap(6) == 7
     assert (BAND_ROW_CAPS, BAND_ROW_CAP_DEFAULT, BAND_SLOTS_DEFAULT) == ((3, 5, 7), 5, 10)
-
-
-def test_screen_extent_is_the_views_own_width_and_height():
-    def ext(base=12, **kw):
-        return screen_extent(validate_grid(kw), base)
-    assert ext(rows=1, cols=10) == (471, 48)
-    assert ext(rows=8, cols=8) == (377, 377)
-    assert ext(rows=1, cols=10, gap=-5) == (435, 48)
-    assert ext(rows=1, cols=10, gap=10) == (570, 48)
-    assert ext(rows=1, cols=1, gap=10) == (48, 48)
-    assert ext(24, rows=1, cols=10, scale=200) == (1911, 192)
-    assert ext(10, rows=2, cols=3, scale=50, gap=0) == (60, 40)

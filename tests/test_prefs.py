@@ -56,3 +56,21 @@ def test_record_last_patch_merges_per_game_and_saves(tmp_path):
                    "buff_bars": {"Player": {"icon_size": 40}}},
         "D:/AoC": {"damage_colors": {"colors": {"self_healed": "00FF00"}}},
     }
+
+
+def test_last_build_keeps_the_overhead_anchor_it_baked():
+    rec = {"profile_id": "a3f81c2e", "hash": "ab" * 32, "anchor": [389, -13]}
+    assert _coerce("last_build", rec)["anchor"] == [389, -13]
+    for junk in ([389], ["389", -13], [True, 0], "389,-13"):
+        assert "anchor" not in _coerce("last_build", dict(rec, anchor=junk)), junk
+
+
+def test_the_overhead_anchor_prefs_clamp_and_default():
+    assert (_coerce("anchor_side", None), _coerce("anchor_up", "x")) == (389, -13)
+    assert (_coerce("anchor_side", 9999), _coerce("anchor_up", -9999)) == (2000, -2000)
+    assert _coerce("anchor_side", "120") == 120
+
+
+def test_the_retired_panel_prefs_are_gone():
+    for key in ("panel_font_size", "build_console"):
+        assert key not in PREFS_SCHEMA.fields

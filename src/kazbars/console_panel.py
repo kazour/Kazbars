@@ -88,8 +88,8 @@ def open_console_dialog(app):
                                 variable=enabled_var)
     enable_cb.pack(side='left')
     add_tooltip(enable_cb,
-                "Adds an in-game console of tabs to the overlay. It opens in preview "
-                "mode (Shift+Ctrl+Alt).")
+                "Adds an in-game console of tabs to the overlay. Show or hide it from "
+                "the preview panel (Shift+Ctrl+Alt).")
 
     footer = ttk.Frame(dialog, padding=(PAD_TAB, PAD_XS))
     footer.pack(fill='x', side='bottom')

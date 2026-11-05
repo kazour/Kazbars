@@ -23,7 +23,7 @@ from .cast_timer import is_enabled as cast_is_enabled
 from .cast_timer import validate_config as validate_cast_config
 from .console import ships as console_ships
 from .grid_model import get_game_resolution_or_default, max_slots, slot_count
-from .grids_generator import unresolved_refs
+from .grids_generator import grid_ships, unresolved_refs
 from .profile_document import build_signature
 from .ui_helpers import THEME_COLORS
 from .ui_widgets import app_toast, confirm, flash_status_bar
@@ -68,7 +68,9 @@ def build(app):
     )
 
     grids = app.grids_panel.get_profile_data()
-    oversized = next((g for g in grids if slot_count(g) > max_slots(g['type'])), None)
+    # A hand-edited grid past its limit blocks the build only if it would be baked.
+    oversized = next((g for g in grids
+                      if grid_ships(g) and slot_count(g) > max_slots(g['type'])), None)
     oversized_msg = '' if oversized is None else (
         f"Grid '{oversized['id']}' has {slot_count(oversized)} slots; "
         f"a grid holds at most {max_slots(oversized['type'])}.\n\nReduce its rows or columns.")
@@ -301,6 +303,7 @@ def _finish_success(app, loading, staging_dir, ctx, compile_result, ok, err,
                 'profile_name': ctx['build_profile_name'],
                 'hash': ctx['build_signature'],
                 'target_resolution': list(ctx['game_resolution']),
+                'anchor': list(ctx['anchor']),
             })
             if not app.settings.get('has_built_before'):
                 app.settings.set('has_built_before', True)

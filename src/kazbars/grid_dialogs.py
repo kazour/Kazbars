@@ -251,10 +251,16 @@ class AddGridWizard(tk.Toplevel):
             if overhead else "Shows all tracked buffs, auto-sorted")
         if self._name_is_auto:
             self.id_var.set(default_grid_name(gtype, self.existing_ids))
-        self._clamp_shape()
-        self.update_display()
+        self._reshape()
 
     def _on_mode_changed(self):
+        self._reshape()
+
+    def _reshape(self):
+        """Clamp the shape for the kind and mode now in force. update_display
+        settles the mode first (a floating 1x1 forces Static, which an
+        overhead grid lifts), so it runs on both sides of the clamp."""
+        self.update_display()
         self._clamp_shape()
         self.update_display()
 
@@ -274,17 +280,18 @@ class AddGridWizard(tk.Toplevel):
             return default
 
     def _clamp_shape(self, changed='rows'):
-        """Keep the shape inside the grid's limit. A band snaps its columns to
-        3, 5 or 7 and its rows give way to the 16 slots; any other grid keeps
-        its rows and columns inside its max shape, the other one giving way to
-        its slot limit."""
+        """Keep the shape inside the grid's limit. A band's columns are its row
+        cap (the spinbox steps through 3, 5 and 7; a preset's own columns stand,
+        so a Single 1x1 band is one icon, three to a row) and its rows give way
+        to the 16 slots; any other grid keeps its rows and columns inside its
+        max shape, the other one giving way to its slot limit."""
         gtype = self.type_var.get()
         rows = self.safe_get_int(self.rows_var, 1)
         cols = self.safe_get_int(self.cols_var, 1)
         limit = max_slots(gtype)
         max_rows, max_cols = max_shape(gtype)
         if self._band():
-            cols = snap_row_cap(cols)
+            cols = min(cols, BAND_ROW_CAPS[-1])
             rows = min(rows, max(1, limit // cols))
             self.cols_spin.config(values=BAND_ROW_CAPS)
             self.rows_spin.config(from_=1, to=max(1, limit // cols))
@@ -329,7 +336,8 @@ class AddGridWizard(tk.Toplevel):
                 self.mode_var.set(self._mode_before_force)
             self.mode_dynamic.config(state='normal')
             if self._band():
-                shape = f"Band: up to {min(total, limit)} icons, {cols} to a row"
+                n = min(total, limit)
+                shape = f"Band: up to {n} icon{'s' if n != 1 else ''}, {snap_row_cap(cols)} to a row"
             elif rows == 1:
                 shape = f"Horizontal Bar ({cols} slots)"
             elif cols == 1:

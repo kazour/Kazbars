@@ -136,3 +136,10 @@ def test_a_schema_1_document_climbs_both_rungs():
     grid = out["grids"]["grids"][0]
     assert (grid["fx"], grid["fy"], grid["scale"]) == (0.5, 0.5, 90)
     assert out["overlay"]["size"] == 16
+
+
+def test_an_overlay_section_with_a_size_off_the_list_takes_the_one_its_scales_use():
+    raw = _schema2_doc(1440, overlay={"size": 15, "font": "Inter"})
+    out = _migrated(raw)
+    assert out["overlay"] == {"size": 16, "font": "Inter"}
+    assert grid_metrics(16, out["grids"]["grids"][0]["scale"]).icon == 48

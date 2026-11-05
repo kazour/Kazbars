@@ -893,23 +893,38 @@ def test_a_band_card_writes_its_cap_slots_and_overhead_keys(app):
     assert card.fill_var.get() == 'Centred'
 
 
-def test_the_add_grid_wizard_makes_a_band_with_a_snapped_row_cap(app):
+def _wizard_grid(app, gtype, setup):
     from kazbars.grid_dialogs import AddGridWizard
     wiz = AddGridWizard(app, set(), name_in_use=lambda name, cfg: False)
     try:
-        wiz.type_var.set('hostile')
+        wiz.type_var.set(gtype)
         wiz._on_type_changed()
-        wiz.mode_var.set('dynamic')
-        wiz.cols_var.set('4')
-        wiz.rows_var.set('9')
-        wiz.on_cols_changed()
-        assert (wiz.rows_var.get(), wiz.cols_var.get()) == ('3', '5')
+        setup(wiz)
         wiz.on_create()
-        grid = wiz.result
+        return wiz.result
     finally:
         if wiz.winfo_exists():
             wiz.destroy()
-    assert grid['type'] == 'hostile' and grid['rowCap'] == 5 and grid['maxSlots'] == 15
+
+
+def test_the_add_grid_wizard_makes_bands_whose_rows_give_way_to_sixteen(app):
+    def custom(wiz):
+        wiz.mode_var.set('dynamic')
+        wiz._on_mode_changed()
+        wiz.cols_var.set('4')
+        wiz.rows_var.set('9')
+        wiz.on_cols_changed()
+        assert (wiz.rows_var.get(), wiz.cols_var.get()) == ('4', '4')
+    grid = _wizard_grid(app, 'hostile', custom)
+    assert (grid['type'], grid['rowCap'], grid['maxSlots']) == ('hostile', 5, 16)
+
+    def single(wiz):
+        wiz.mode_var.set('dynamic')
+        wiz._on_mode_changed()
+        wiz.apply_preset(1, 1)
+        assert wiz.shape_var.get() == 'Band: up to 1 icon, 3 to a row'
+    grid = _wizard_grid(app, 'friendly', single)
+    assert (grid['slotMode'], grid['rowCap'], grid['maxSlots']) == ('dynamic', 3, 1)
 
 
 def test_class_tabs_list_their_own_grids_and_switching_recreates_no_card(app):

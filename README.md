@@ -4,7 +4,7 @@
 [![Latest release](https://img.shields.io/github/v/release/kazour/Kazbars?label=release)](https://github.com/kazour/Kazbars/releases/latest)
 [![License: GPL-2.0-or-later](https://img.shields.io/badge/license-GPL--2.0--or--later-blue.svg)](LICENSE)
 
-Buff/debuff overlay editor for **Age of Conan** — design icon grids and bars that show your active effects on top of the game, then compile and install them in one click. It also ships live combat HUDs and a handful of in-game extras: a cast timer, a stopwatch, a target inspect panel, leaner damage numbers, a real-time deeps meter, and the Ethram-Fal seed timer.
+Buff/debuff overlay editor for **Age of Conan** — design icon grids and bars that show your active effects on top of the game, then compile and install them in one click. It also ships live combat HUDs and a handful of in-game extras: a cast timer, a stopwatch, a target inspect panel, a buff-ID and cast console, an Onslaught tracker, leaner damage numbers, a real-time deeps meter, and the Ethram-Fal seed timer.
 
 Most of what KazBars builds is set up once and runs on its own after you close the app. Only the two live combat overlays — the deeps meter and the Ethram-Fal seed timer — keep working while KazBars is open.
 
@@ -14,17 +14,25 @@ Most of what KazBars builds is set up once and runs on its own after you close t
 
 **KazBars** — custom icon overlays arranged in bars or grids that show only the buffs and debuffs you choose to track.
 
-- **Player and Target grids** — track effects on you and your current target
+- **Player and Target grids** — track effects on you and your current target, at a spot on screen
+- **Overhead grids** — Friendly and Hostile: icons float over characters' heads, as a fixed box or a band centred over the head
 - **Dynamic or Static slots** — auto-fill as buffs activate, or pin specific buffs to specific slots
+- **Per-class grids** — class tabs give each of the twelve classes its own grids, on top of the ones every class gets
+- **Timers** — digits or a shrinking bar on each icon; Applied by me shows only effects you cast yourself
+- **One size, one font** — pick an Overlay size and font for everything KazBars draws in game; each grid and panel scales as a percent of it
 - **Buff database** — map numeric buff IDs to readable names and classify them as Buff, Debuff, or Misc
 
 **Cast Timer** — an on-screen readout of your and your target's current cast time, ready to sit over the game's cast bars. Off by default
 
 **Stopwatch** — a draggable Start / Pause / Reset count-up timer that works in fullscreen and never steals focus from the game. Off by default
 
-**Target Inspect Panel** — an in-game combat sheet for whatever you have targeted: armor and protections with their mitigation percentages, crit, critigation, heal rating, bonus spell damage, and combat damage increase. Player targets add a PvP section; clear your target and the panel hides. Off by default
+**Target Inspect Panel** — an in-game combat sheet for whatever you have targeted. Pick its rows from 112 stats in seven groups (armor, protections, crit, critigation, heal rating, bonus spell damage and more), or keep the default twelve. Player targets add a PvP tab; clear your target and the panel hides. Off by default
 
-**Damage Numbers** — a leaner, faster rewrite of the game's floating combat numbers, with new layout and behavior settings. It replaces one stock game file; if the game ever patches, rebuild once to put it back. Off by default
+**Console** — an in-game log of every buff and debuff on you and your target with its buff ID, plus a Casts tab for how casts ended: finished, interrupted or lost. Off by default
+
+**Onslaught Tracker** — for Skull Gate and Kuthchemes: a board of bosses, skulls and minis with their health, the wave timer, Hylda's health, spawn alerts and AoE warnings. Watches the mobs it knows, plus names you add. Off by default
+
+**Damage Numbers** — a leaner, faster rewrite of the game's floating combat numbers, with new layout and behavior settings and a choice of typeface. It replaces one stock game file; if the game ever patches, rebuild once to put it back. Off by default
 
 **Deeps by Veni** — a real-time meter that reads your combat log for DPS out, DPS in, HPS out, HPS in, and ΔHP in.
 
@@ -52,11 +60,11 @@ Most of what KazBars builds is set up once and runs on its own after you close t
 
 6. Launch the game from its own executable — KazBars offers to create a desktop shortcut (DX10 or DX9) after the first build. Launching this way skips the patcher, which is what keeps your setup registered.
 
-Positioning happens in-game: press Ctrl+Shift+Alt for preview mode and drag grids and panels where you want them. The game remembers positions, collapse states, and the control panel's switches across relogs and full restarts — like any other game window.
+Positioning happens in-game: press Ctrl+Shift+Alt for preview mode and drag grids and panels where you want them. The game remembers positions, collapse states, and the control panel's switches across relogs and full restarts — like any other game window. Overhead grids follow their characters instead; preview shows a sample over your target.
 
 If the game ever patches (it hasn't in years), run the official patcher once, then **Game ▸ Repair game install** — KazBars re-registers itself and restores your saved positions.
 
-Once you know the flow, make it yours: `+ Add Grid` for your own layouts, then `Tracked Buffs...` to pick what each one watches. Up to **64 slots total** across all your grids.
+Once you know the flow, make it yours: `+ Add Grid` for your own layouts, then `Tracked Buffs...` to pick what each one watches. A grid holds up to **64 slots** (16 for an overhead grid), with no cap across grids. Overhead grids sit against each head by an anchor that depends on your game's field of view — if they look off, nudge Right and Up in **Game ▸ Game resolution…** and rebuild.
 
 Sharing a layout: File ▸ Export profile… writes one `.kazbars.json` file, with any custom buffs it references baked in — the recipient doesn't need those buffs in their own database first. File ▸ Import profile… reads one back.
 

@@ -28,6 +28,7 @@ from .grid_model import (
 )
 from .grids_generator import free_id
 from .overlay import DEFAULT_SIZE, FONT_CHOICES, SIZE_CHOICES, font_label
+from .prefs import ANCHOR_SIDE_DEFAULT, ANCHOR_UP_DEFAULT
 from .profile_document import build_signature
 from .settings_manager import get_setting, set_setting
 from .ui_components import (
@@ -562,6 +563,8 @@ class GridsPanel(ttk.Frame):
         elif (
             build_signature(self.app.registry, store.document) != last.get('hash')
             or list(get_game_resolution_or_default()) != last.get('target_resolution')
+            or [self.app.settings.get('anchor_side'), self.app.settings.get('anchor_up')]
+            != last.get('anchor', [ANCHOR_SIDE_DEFAULT, ANCHOR_UP_DEFAULT])
         ):
             text = f"In game: {name} — differs from the current setup"
             fg = THEME_COLORS['warning']

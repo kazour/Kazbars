@@ -147,4 +147,6 @@ def _apply_anchor(app, side_text, up_text):
             changed = True
     if changed:
         app.settings.save()
+        # The installed SWF was baked with the old anchor.
+        app.grids_panel.refresh_build_status()
         app_toast(app, "Overhead anchor saved — Build & Install to apply", 'info')

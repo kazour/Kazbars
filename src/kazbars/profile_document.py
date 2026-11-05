@@ -222,7 +222,10 @@ def _overlay_scale(data: dict) -> dict:
         else:
             height = _DEFAULT_AUTHORED_AT[1]
         size = 12 if height <= 1080 else 16 if height <= 1440 else 24
-    if not isinstance(overlay, dict):
+    # Every scale below is relative to `size`, so the section must carry it.
+    if isinstance(overlay, dict):
+        overlay['size'] = size
+    else:
         modules['overlay'] = {'size': size, 'font': 'Arial'}
 
     def scale(value: Any, num: int, den: int) -> int:

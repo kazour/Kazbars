@@ -7,7 +7,7 @@ import copy
 import math
 
 from .classes import id_of as class_id_of
-from .overlay_size import SCALE_DEFAULT, SCALE_MAX, SCALE_MIN, grid_metrics
+from .overlay_size import SCALE_DEFAULT, SCALE_MAX, SCALE_MIN
 from .profile_document import LANE_BUILD
 from .profile_document import SectionSpec as ProfileSectionSpec
 from .settings_core import Field, Schema
@@ -108,17 +108,6 @@ def slot_count(grid):
     return grid['maxSlots'] if is_band(grid) else grid['rows'] * grid['cols']
 
 
-def screen_extent(grid, base):
-    """The grid's size on screen in game px, (width, height): `KazBarsGridView`'s
-    own W and H, `n x (icon + gap) - gap` along each axis, the icon at `base`
-    (the profile's overlay size) and the grid's scale. A band's is its fullest:
-    its widest row by its rows."""
-    icon = grid_metrics(base, grid['scale']).icon
-    gap = grid['gap']
-    cols = min(grid['cols'], grid['maxSlots']) if is_band(grid) else grid['cols']
-    return cols * (icon + gap) - gap, grid['rows'] * (icon + gap) - gap
-
-
 def band_shape(row_cap, slots):
     """A band's derived (rows, cols): `rowCap` to a row, rows as needed."""
     return math.ceil(slots / row_cap), row_cap
@@ -188,11 +177,6 @@ def default_grid_name(grid_type, existing_ids):
 def validate_grid(grid):
     """Validate and clamp a grid config on load. Returns sanitized grid."""
     defaults = create_default_grid()
-
-    # `timerStyle`, else the retired `showTimers`: a false reads `off`,
-    # anything else `digits`.
-    if grid.get('timerStyle') not in TIMER_STYLES:
-        grid['timerStyle'] = 'off' if grid.get('showTimers') is False else 'digits'
 
     # Ensure required keys exist
     for key, val in defaults.items():

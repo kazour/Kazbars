@@ -254,7 +254,9 @@ class ExtrasShortcutsRow(ttk.Frame):
         """Resync every card from its store; no-ops for unchanged tiles."""
         for tile in self._tiles.values():
             on = tile['read'](self.app)
-            if on == tile['on']:
+            # The switch can be ahead of the state: switched on with nothing
+            # to build (a console with no tab), it falls back to off.
+            if on == tile['on'] and tile['var'].get() == on:
                 continue
             tile['on'] = on
             tile['var'].set(on)

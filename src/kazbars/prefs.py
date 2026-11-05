@@ -69,10 +69,11 @@ def _validate_section_open(value: Any) -> dict:
 
 
 def _validate_last_build(value: Any) -> dict:
-    """Keep ``{profile_id, hash, target_resolution[, profile_name]}`` — what the
-    last successful Build & Install baked. `{}` (never built through this pref)
-    hides the status row. `profile_name` is display-only (the built profile may
-    have been renamed or deleted since); identity is the id + hash."""
+    """Keep ``{profile_id, hash, target_resolution[, profile_name, anchor]}`` —
+    what the last successful Build & Install baked (`anchor` the overhead
+    anchor, this PC's and so in no profile hash). `{}` (never built through
+    this pref) hides the status row. `profile_name` is display-only (the built
+    profile may have been renamed or deleted since); identity is the id + hash."""
     if not isinstance(value, dict):
         return {}
     pid = value.get("profile_id")
@@ -89,6 +90,12 @@ def _validate_last_build(value: Any) -> dict:
         and all(isinstance(v, int) and not isinstance(v, bool) and v > 0 for v in res)
     ):
         out["target_resolution"] = res
+    anchor = value.get("anchor")
+    if (
+        isinstance(anchor, list) and len(anchor) == 2
+        and all(isinstance(v, int) and not isinstance(v, bool) for v in anchor)
+    ):
+        out["anchor"] = anchor
     return out
 
 
