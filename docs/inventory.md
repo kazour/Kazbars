@@ -54,6 +54,7 @@
 | `src/kazbars/grid_dialogs.py` | 951 |
 | `src/kazbars/grid_editor_panel.py` | 890 |
 | `src/kazbars/grid_model.py` | 380 |
+| `src/kazbars/grid_preview.py` | 274 |
 | `src/kazbars/grids_generator.py` | 790 |
 | `src/kazbars/grids_panel.py` | 901 |
 | `src/kazbars/inspect.py` | 79 |
@@ -126,6 +127,7 @@
 | `tests/test_game_folder.py` | 137 |
 | `tests/test_game_persistence.py` | 748 |
 | `tests/test_grid_model.py` | 265 |
+| `tests/test_grid_preview.py` | 150 |
 | `tests/test_grids_generator.py` | 603 |
 | `tests/test_hud_overlay.py` | 141 |
 | `tests/test_imports.py` | 33 |
