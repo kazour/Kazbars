@@ -32,8 +32,8 @@ from .settings_core import Field, Schema, get_defaults, validate_all
 # skull mini (s), mini (m), or camp beast (c: listed, but it never alerts).
 BOSS, SKULL, MINI, CAMP = 'b', 's', 'm', 'c'
 
-# Where a row comes from, in catalog order (the dialog's tooltip lists the
-# always-watched mobs by group).
+# Where a row comes from, in catalog order (the dialog names the watched mobs
+# one line per group, in this order).
 GROUPS = ('Skull Gate boss', 'Skull Gate skull', 'Skull Gate mini', 'Kuthchemes boss',
           'Kuthchemes skull', 'Kuthchemes mini', 'Kuthchemes camp')
 

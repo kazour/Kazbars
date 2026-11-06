@@ -31,6 +31,7 @@ from .ui_helpers import (
     FONT_BODY,
     FONT_SMALL,
     MODULE_COLORS,
+    PAD_INNER,
     PAD_MICRO,
     PAD_ROW,
     PAD_SMALL,
@@ -41,14 +42,10 @@ from .ui_helpers import (
 )
 from .ui_tk_style import apply_dark_titlebar
 from .ui_widgets import add_tooltip, app_toast, debounced_callback
-from .window_position import center_on_parent, fit_window_height
+from .window_position import center_on_parent, clamp_to_screen
 
 _WIDTH = 720
 _HEIGHT = 500
-# The roster's first wrap, before the card has a width to read: about the
-# Watched mobs card's inner width at the stock font (the roster's <Configure>
-# then sets the real one).
-_ROSTER_WRAP = 360
 
 # (section key, label, what it draws) per display, by the anchor it appears on.
 _BOARD = (
@@ -112,7 +109,9 @@ def open_onslaught_dialog(app):
     labels: list = []
 
     display = create_card(content, "Display")
-    display.pack(side='left', fill='both', expand=True, padx=(0, PAD_SMALL), pady=(0, PAD_ROW))
+    # Display takes its own width, Watched mobs the rest: the roster's wrap
+    # (read off its width) never feeds back into the split.
+    display.pack(side='left', fill='y', padx=(0, PAD_SMALL), pady=(0, PAD_ROW))
     watched = create_card(content, "Watched mobs")
     watched.pack(side='left', fill='both', expand=True, pady=(0, PAD_ROW))
 
@@ -176,8 +175,7 @@ def open_onslaught_dialog(app):
     for group in onslaught.GROUPS:
         rows = [r for r in onslaught.ROWS if r.group == group]
         line = ttk.Label(roster, text=f"{group}: {', '.join(r.name for r in rows)}",
-                         font=FONT_SMALL, foreground=THEME_COLORS['muted'],
-                         wraplength=_ROSTER_WRAP, justify='left')
+                         font=FONT_SMALL, foreground=THEME_COLORS['muted'], justify='left')
         roster_lines.append(line)
         if rows[0].kind == onslaught.CAMP:
             camp_line = line
@@ -187,18 +185,28 @@ def open_onslaught_dialog(app):
             labels.append((line, _list_or_alerts))
 
     def _refit():
-        # The card grows with its lines (and the user's names); _HEIGHT stays
-        # the floor so a short list keeps its room.
-        if dialog.winfo_ismapped():
-            fit_window_height(dialog, _WIDTH, _HEIGHT)
+        # The dialog follows its content (the roster's lines, the user's
+        # names) about its own centre; _HEIGHT stays the floor so a short
+        # list keeps its room.
+        if not dialog.winfo_ismapped():
+            return
+        dialog.update_idletasks()
+        needed = max(_HEIGHT, dialog.winfo_reqheight())
+        grow = needed - dialog.winfo_height()
+        if grow:
+            x, y = clamp_to_screen(dialog.winfo_x(), dialog.winfo_y() - grow // 2, _WIDTH, needed)
+            dialog.geometry(f'{_WIDTH}x{needed}+{x}+{y}')
+
+    def _wrap_to(width):
+        for line in roster_lines:
+            line.configure(wraplength=width)
 
     def _wrap():
         if not roster.winfo_exists():  # closed while the debounce waited
             return
         width = roster.winfo_width()
         if width > 1 and width != int(roster_lines[0].cget('wraplength')):
-            for line in roster_lines:
-                line.configure(wraplength=width)
+            _wrap_to(width)
             _refit()
 
     roster.bind('<Configure>', debounced_callback(dialog, 30, lambda *_: _wrap()))
@@ -207,7 +215,9 @@ def open_onslaught_dialog(app):
 
     def _show_camps():
         if camps_var.get():
-            camp_line.pack(anchor='w')
+            # In its catalog place, whatever follows it in GROUPS.
+            at = roster_lines.index(camp_line)
+            camp_line.pack(anchor='w', **({'after': roster_lines[at - 1]} if at else {}))
         else:
             camp_line.pack_forget()
         _refit()
@@ -334,6 +344,10 @@ def open_onslaught_dialog(app):
                command=dialog.destroy, width=BTN_DIALOG
                ).pack(side='right', padx=(0, PAD_SMALL))
 
+    # The roster's first wrap, before the card has a width to read: what
+    # Display leaves, less the card's padding (its <Configure> then confirms).
+    dialog.update_idletasks()
+    _wrap_to(_WIDTH - 2 * PAD_TAB - PAD_SMALL - display.winfo_reqwidth() - 2 * PAD_INNER)
     dialog.update_idletasks()
     center_on_parent(dialog, app, _WIDTH, max(_HEIGHT, dialog.winfo_reqheight()))
     dialog.deiconify()

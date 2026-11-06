@@ -43,7 +43,7 @@ def clamp_to_screen(x, y, width, height):
         return x, y
 
 
-def fit_window_height(window, width, min_height=0):
+def fit_window_height(window, width):
     """Re-fit a fixed-width window to the height its content needs right now.
 
     A panel that locks its geometry once at construction clips its last row the
@@ -51,11 +51,10 @@ def fit_window_height(window, width, min_height=0):
     log filename — because the window never follows the content. Call this
     wherever that text is written, not just at build time. Cheap: it reconfigures
     only when the needed height actually moved, and re-clamps so growing can't
-    push the window off the bottom of the screen. `min_height` keeps a floor
-    under it, for a window whose content leaves room it should keep.
+    push the window off the bottom of the screen.
     """
     window.update_idletasks()
-    needed = max(min_height, window.winfo_reqheight())
+    needed = window.winfo_reqheight()
     if needed == window.winfo_height():
         return
     x, y = clamp_to_screen(window.winfo_x(), window.winfo_y(), width, needed)

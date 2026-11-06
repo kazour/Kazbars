@@ -215,7 +215,6 @@ class GridEditorPanel(ttk.Frame):
                                              variable=self.self_cast_var,
                                              command=self._on_self_cast_toggled,
                                              bootstyle="success-round-toggle")  # type: ignore[call-arg]
-        self._self_cast_cb.pack(side='left', padx=(PAD_LF, 0))
         add_tooltip(self._self_cast_cb, "Show only effects you cast, with your own timer, even when "
                                         "other players cast the same effect on the same character.")
 
@@ -245,6 +244,9 @@ class GridEditorPanel(ttk.Frame):
         self.cog_label = self._glyph_label(header, "⚙", FONT_BODY_LG, "This grid's settings",
                                            self.open_settings, THEME_COLORS['heading'])
         in_view.insert(0, self.cog_label)
+        # Packed after the right cluster, so a narrow header squeezes the
+        # toggle before the cog or ×; side='left' still lands it after the mode.
+        self._self_cast_cb.pack(side='left', padx=(PAD_LF, 0))
         # The right cluster is packed right to left; raise everything left to
         # right so Tab walks it as seen.
         for w in [self._self_cast_cb, *in_view]:

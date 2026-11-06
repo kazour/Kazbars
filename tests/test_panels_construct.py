@@ -1434,9 +1434,12 @@ def test_the_preview_keeps_a_margin_so_no_outline_is_cut(app):
 
 def test_applied_by_me_sits_after_the_mode(app):
     card, _ = _add_seam_grid(app, 'SeamSelfCastPlace')
-    order = card.summary_label.master.pack_slaves()
-    assert card._self_cast_cb.pack_info()['side'] == 'left'
-    assert order.index(card._self_cast_cb) == order.index(card.summary_label) + 1
+    # Left-packed slaves line up in pack order; the right cluster packs first
+    # so it keeps its room on a narrow header.
+    slaves = card.summary_label.master.pack_slaves()
+    left = [w for w in slaves if w.pack_info()['side'] == 'left']
+    assert left[-2:] == [card.summary_label, card._self_cast_cb]
+    assert slaves.index(card.cog_label) < slaves.index(card._self_cast_cb)
 
 
 def test_rows_typed_last_give_way_to_the_slot_limit(app):
