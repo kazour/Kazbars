@@ -609,7 +609,7 @@ def test_grid_preview_draws_once_and_repaints_in_place(app):
         x0, y0, *_ = preview.layout.rects[9]
         # The fixture's app is withdrawn, so a generated pointer event never
         # lands; the handlers take the event as Tk hands it over.
-        at = SimpleNamespace(x=x0 + 2, y=y0 + 2)
+        at = SimpleNamespace(x=x0 + 4, y=y0 + 4)  # inside the margin and the ring
         preview._on_motion(at)
         assert sorted(painted) == [-1, 9]  # nothing was hot: one real repaint
         rect = preview.find_withtag('slot_9&&rect')
@@ -1330,3 +1330,151 @@ def test_class_tabs_list_their_own_grids_and_switching_recreates_no_card(app):
     assert next(g for g in gp.grids if g['id'] == 'TabDT')['class'] == 22
     gp._tab_var.set(0)
     gp._on_tab_changed()
+
+
+# ============================================================================
+# STEP 9: CENTRED DIALOGS, THE ONSLAUGHT ROSTER, THE PREVIEW'S MARGIN
+# ============================================================================
+def _toplevel_titled(app, title):
+    return next((w for w in app.winfo_children()
+                 if isinstance(w, tk.Toplevel) and w.winfo_exists() and w.title() == title), None)
+
+
+# (how to open it, how to find it): every dialog the app opens over itself.
+CENTRED = {
+    'cast_timer': (lambda a: a._open_cast_timer_settings(), lambda a: a.cast_timer_dialog),
+    'console': (lambda a: a._open_console_settings(), lambda a: a.console_dialog),
+    'damage_numbers': (lambda a: a._open_damage_numbers(), lambda a: a.damage_numbers_panel),
+    'damage_colors': (lambda a: a._open_damage_number_colors(), _find_damage_number_colors_panel),
+    'inspect': (lambda a: a._open_inspect_settings(), lambda a: a.inspect_dialog),
+    'stopwatch': (lambda a: a._open_stopwatch_settings(), lambda a: a.stopwatch_dialog),
+    'onslaught': (lambda a: a._open_onslaught_settings(), lambda a: a.onslaught_dialog),
+    'game_resolution': (lambda a: a._change_game_resolution(),
+                        lambda a: _toplevel_titled(a, "Game Resolution")),
+    'buff_bars': (lambda a: a._open_buff_display_editor(), _find_buff_display_dialog),
+    'backup': (lambda a: a._open_backup_dialog(),
+               lambda a: _toplevel_titled(a, "Backup & Restore Settings")),
+    'grid_settings': (lambda a: _settings(_add_seam_grid(a, 'SeamCentred')[0]),
+                      lambda a: a.grids_panel.grid_panels[-1].settings_dialog),
+}
+
+
+@pytest.mark.parametrize('name', list(CENTRED))
+def test_every_dialog_opens_centred_on_the_app(app, monkeypatch, name):
+    from kazbars import window_position
+    from kazbars.settings_manager import get_setting, set_setting
+    # A remembered spot far off the centre for every dialog that kept one:
+    # a dialog still restoring it would land there.
+    old = get_setting('window_positions')
+    set_setting('window_positions', {k: {'x': 5, 'y': 5} for k in (
+        'cast_timer_settings', 'console_settings', 'damage_numbers', 'damage_number_colors',
+        'inspect_settings', 'stopwatch_settings', 'onslaught_settings', 'game_resolution',
+        'buff_display_editor', 'settings_backup')})
+    # The placement math, not the screen the runner happens to have. The app
+    # is withdrawn, so its dialogs never map: the box handed to the clamp is
+    # where the window goes.
+    placed = []
+    monkeypatch.setattr(window_position, 'clamp_to_screen',
+                        lambda x, y, w, h: (placed.append((x, y, w, h)), (x, y))[1])
+    app.geometry('950x660+150+100')
+    app.update()
+    opener, find = CENTRED[name]
+    dlg = None
+    try:
+        opener(app)
+        app.update_idletasks()
+        dlg = find(app)
+        assert dlg is not None and dlg.winfo_exists() and placed
+        x, y, w, h = placed[-1]
+        assert dlg.wm_geometry().endswith(f'+{x}+{y}')
+        assert abs(x + w / 2 - (app.winfo_rootx() + app.winfo_width() / 2)) <= 2
+        assert abs(y + h / 2 - (app.winfo_rooty() + app.winfo_height() / 2)) <= 2
+    finally:
+        set_setting('window_positions', old)
+        if dlg is not None and dlg.winfo_exists():
+            _close_via_protocol(dlg)
+        app.update()
+
+
+def test_the_onslaught_dialog_names_the_mobs_it_always_watches(app):
+    from tkinter import ttk
+
+    from kazbars import onslaught
+    app._open_onslaught_settings()
+    dlg = app.onslaught_dialog
+    try:
+        labels = {str(w.cget('text')).split(':')[0]: w for w in _widgets(dlg, ttk.Label)}
+        for group in onslaught.GROUPS:
+            assert group in labels, f"{group} has its line"
+        boss = str(labels['Skull Gate boss'].cget('text'))
+        assert boss == 'Skull Gate boss: Taskmaster Mijoral, Thror Ironhand, Vammatar the Cruel, Louhi'
+        always = next(w for w in _widgets(dlg, ttk.Label) if str(w.cget('text')).endswith(' always'))
+        assert getattr(always, '_kz_tooltip', None) is None, "the list says it"
+        camp = labels['Kuthchemes camp']
+        camps_cb = next(w for w in _widgets(dlg, ttk.Checkbutton)
+                        if str(w.cget('text')) == 'Include Kuthchemes camps')
+        shown = camp.winfo_manager() == 'pack'
+        camps_cb.configure(state='normal')
+        camps_cb.invoke()
+        assert (camp.winfo_manager() == 'pack') is not shown, "the line follows the tick"
+    finally:
+        _close_via_protocol(dlg)
+        app.update()
+
+
+def test_the_preview_keeps_a_margin_so_no_outline_is_cut(app):
+    from kazbars.grid_model import create_default_grid
+    card = _card_for(app, create_default_grid('target', 3, 3, 'static', 'SeamMargin'))
+    preview = card.preview
+    right = max(preview.bbox(r)[2] for r in preview.find_withtag('rect'))
+    bottom = max(preview.bbox(r)[3] for r in preview.find_withtag('rect'))
+    assert right + 1 < preview.winfo_reqwidth()
+    assert bottom + 1 < preview.winfo_reqheight()
+
+
+def test_applied_by_me_sits_after_the_mode(app):
+    card, _ = _add_seam_grid(app, 'SeamSelfCastPlace')
+    order = card.summary_label.master.pack_slaves()
+    assert card._self_cast_cb.pack_info()['side'] == 'left'
+    assert order.index(card._self_cast_cb) == order.index(card.summary_label) + 1
+
+
+def test_rows_typed_last_give_way_to_the_slot_limit(app):
+    from kazbars.grid_model import create_default_grid
+    card = _card_for(app, create_default_grid('player', 1, 5, 'static', 'SeamGiveRows'))
+    dlg = _settings(card)
+    try:
+        dlg.cols_var.set('8')
+        dlg.rows_var.set('10')  # typed, then Enter: no arrow, no focus-out
+        assert (dlg.draft()['rows'], dlg.draft()['cols']) == (8, 8)
+    finally:
+        dlg.cancel()
+
+
+def test_enter_on_a_greyed_end_arrow_means_done(app, monkeypatch):
+    from kazbars.grid_dialogs import BuffSelectorDialog
+    from kazbars.grid_editor_panel import _SlotWalker
+    from kazbars.grid_model import create_default_grid
+    card = _card_for(app, create_default_grid('player', 1, 3, 'static', 'SeamEndArrow'))
+    dlg = BuffSelectorDialog(app, app.database, "Slot 2 Buffs", walker=_SlotWalker(card, 2))
+    try:
+        assert dlg._chip_tip() is None, "between chips: no tip at all"
+        end = dlg._step_buttons[1]
+        assert end.instate(['disabled'])
+        monkeypatch.setattr(dlg, 'focus_get', lambda: end)
+        dlg._on_return(None)
+        assert not dlg.winfo_exists()
+    finally:
+        if dlg.winfo_exists():
+            dlg.destroy()
+
+
+def test_a_tooltip_with_nothing_to_say_shows_nothing(app):
+    from kazbars.ui_widgets import _InAppToolTip
+    label = tk.Label(app, text='x')
+    try:
+        tip = _InAppToolTip(label, lambda: None)
+        tip._show()
+        assert tip._tip_frame is None
+    finally:
+        label.destroy()

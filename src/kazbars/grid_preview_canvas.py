@@ -34,9 +34,12 @@ from .ui_helpers import (
 from .ui_widgets import add_tooltip, refresh_tooltip
 
 _NUM_INSET = 2
-# The 1 px focus ring is drawn inside the canvas, over its outer pixels:
-# every item sits this far in, and a pointer reads this far back.
+# The 1 px focus ring is drawn inside the canvas, over its outer pixels, and
+# a margin keeps the cells off it so an outline is never cut at an edge:
+# every item sits _INSET in, and a pointer reads that far back.
 _RING = 1
+_MARGIN = 2
+_INSET = _RING + _MARGIN
 
 
 class GridPreview(tk.Canvas):
@@ -44,9 +47,11 @@ class GridPreview(tk.Canvas):
 
     def __init__(self, parent, *, accent, on_pick, on_clear, tip_for,
                  max_w=PREVIEW_MAX_W, max_h=PREVIEW_MAX_H):
-        super().__init__(parent, width=1, height=1, bg=TK_COLORS['bg'], bd=0,
-                         highlightthickness=_RING, highlightbackground=TK_COLORS['bg'],
-                         highlightcolor=accent, takefocus=True)
+        super().__init__(parent, width=1, height=1, bd=0, takefocus=True)
+        # After the constructor: ttkbootstrap restyles every tk.Canvas as it
+        # is built, the ring's thickness to 0 among it.
+        self.configure(bg=TK_COLORS['bg'], highlightthickness=_RING,
+                       highlightbackground=TK_COLORS['bg'], highlightcolor=accent)
         self._accent = accent
         self._on_pick = on_pick
         self._on_clear = on_clear
@@ -112,10 +117,11 @@ class GridPreview(tk.Canvas):
         if lay is None:
             return
         self.delete('all')
-        self.configure(width=lay.width, height=lay.height)  # Tk adds the ring around this
+        # Tk adds the ring around this.
+        self.configure(width=lay.width + 2 * _MARGIN, height=lay.height + 2 * _MARGIN)
         for i, (x0, y0, x1, y1) in enumerate(lay.rects):
             tag = f'slot_{i}'
-            x0, y0, x1, y1 = x0 + _RING, y0 + _RING, x1 + _RING, y1 + _RING
+            x0, y0, x1, y1 = x0 + _INSET, y0 + _INSET, x1 + _INSET, y1 + _INSET
             self.create_rectangle(x0, y0, x1 - 1, y1 - 1, width=1, tags=(tag, 'rect'))
             self.create_text(x0 + _NUM_INSET, y0 + _NUM_INSET - 1, anchor='nw',
                              font=FONT_SMALL, tags=(tag, 'num'))
@@ -157,8 +163,8 @@ class GridPreview(tk.Canvas):
     def _slot_at(self, event):
         if self._layout is None:
             return -1
-        return grid_preview.slot_at(self._layout, int(self.canvasx(event.x)) - _RING,
-                                    int(self.canvasy(event.y)) - _RING)
+        return grid_preview.slot_at(self._layout, int(self.canvasx(event.x)) - _INSET,
+                                    int(self.canvasy(event.y)) - _INSET)
 
     def _focused(self):
         try:

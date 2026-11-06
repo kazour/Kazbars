@@ -7,8 +7,9 @@ the alerts draw 1.6 times as large), the five displays by the anchor they
 appear on — Board (Mob list, Wave timer, Hylda HP) and Alerts (Spawn alerts,
 AoE warnings) — and Alert time (how long a banner stays; greyed unless Spawn
 alerts or Hylda HP is on). **Watched mobs** (greyed unless Mob list or Spawn
-alerts is on): the 27 catalog mobs watched in every run, Include Kuthchemes
-camps (greyed unless Mob list is on), and the user's own names — Add (or
+alerts is on): the 27 catalog mobs watched in every run, named by group
+under their count, Include Kuthchemes camps (greyed unless Mob list is on;
+the camps' own line shows while it is ticked), and the user's own names — Add (or
 Enter) only when `onslaught.custom_refusal` accepts the trimmed text, whose
 reason shows as a hint while typing; each name has a delete with an Undo
 toast. Reads/writes the profile document's `onslaught` section (data layer:
@@ -39,11 +40,15 @@ from .ui_helpers import (
     TK_COLORS,
 )
 from .ui_tk_style import apply_dark_titlebar
-from .ui_widgets import add_tooltip, app_toast
-from .window_position import bind_window_position_save, restore_window_position
+from .ui_widgets import add_tooltip, app_toast, debounced_callback
+from .window_position import center_on_parent, fit_window_height
 
 _WIDTH = 720
 _HEIGHT = 500
+# The roster's first wrap, before the card has a width to read: about the
+# Watched mobs card's inner width at the stock font (the roster's <Configure>
+# then sets the real one).
+_ROSTER_WRAP = 360
 
 # (section key, label, what it draws) per display, by the anchor it appears on.
 _BOARD = (
@@ -56,16 +61,6 @@ _ALERTS = (
     ('showAlerts', "Spawn alerts", "A banner when a watched boss, skull or mini spawns"),
     ('showAoe', "AoE warnings", "A banner when Thugra Khotan's AoE helpers spawn in Kuthchemes"),
 )
-
-
-def _always_tip():
-    """The catalog mobs watched in every run, by group."""
-    lines = []
-    for group in onslaught.GROUPS:
-        names = [r.name for r in onslaught.ROWS if r.group == group and r.kind != onslaught.CAMP]
-        if names:
-            lines.append(f"{group}: {', '.join(names)}")
-    return "\n".join(lines)
 
 
 def open_onslaught_dialog(app):
@@ -169,13 +164,58 @@ def open_onslaught_dialog(app):
     always = ttk.Label(watched, text=f"{always_n} always", font=FONT_SMALL,
                        foreground=THEME_COLORS['muted'])
     always.pack(anchor='w')
-    add_tooltip(always, "Watched in every run:\n" + _always_tip())
     labels.append((always, _list_or_alerts))
     hint = ttk.Label(watched, text="Mob list or Spawn alerts reads these.", font=FONT_SMALL,
                      foreground=THEME_COLORS['muted'])
+    # The names themselves, one wrapped line per group in catalog order; the
+    # camps' line only while they are included.
+    roster = ttk.Frame(watched)
+    roster.pack(fill='x')
+    roster_lines = []
+    camp_line = None
+    for group in onslaught.GROUPS:
+        rows = [r for r in onslaught.ROWS if r.group == group]
+        line = ttk.Label(roster, text=f"{group}: {', '.join(r.name for r in rows)}",
+                         font=FONT_SMALL, foreground=THEME_COLORS['muted'],
+                         wraplength=_ROSTER_WRAP, justify='left')
+        roster_lines.append(line)
+        if rows[0].kind == onslaught.CAMP:
+            camp_line = line
+            labels.append((line, lambda: show_vars['showList'].get()))
+        else:
+            line.pack(anchor='w')
+            labels.append((line, _list_or_alerts))
+
+    def _refit():
+        # The card grows with its lines (and the user's names); _HEIGHT stays
+        # the floor so a short list keeps its room.
+        if dialog.winfo_ismapped():
+            fit_window_height(dialog, _WIDTH, _HEIGHT)
+
+    def _wrap():
+        if not roster.winfo_exists():  # closed while the debounce waited
+            return
+        width = roster.winfo_width()
+        if width > 1 and width != int(roster_lines[0].cget('wraplength')):
+            for line in roster_lines:
+                line.configure(wraplength=width)
+            _refit()
+
+    roster.bind('<Configure>', debounced_callback(dialog, 30, lambda *_: _wrap()))
+
     camps_var = tk.BooleanVar(value=cfg['camps'])
-    camps_cb = ttk.Checkbutton(watched, text="Include Kuthchemes camps", variable=camps_var)
+
+    def _show_camps():
+        if camps_var.get():
+            camp_line.pack(anchor='w')
+        else:
+            camp_line.pack_forget()
+        _refit()
+
+    camps_cb = ttk.Checkbutton(watched, text="Include Kuthchemes camps", variable=camps_var,
+                               command=_show_camps)
     camps_cb.pack(anchor='w', pady=(PAD_XS, PAD_XS))
+    _show_camps()
     add_tooltip(camps_cb, "Listed on the board, never alerted: " + ", ".join(
         r.name for r in onslaught.ROWS if r.kind == onslaught.CAMP))
     controls.append((camps_cb, lambda: show_vars['showList'].get()))
@@ -218,6 +258,7 @@ def open_onslaught_dialog(app):
                              command=lambda n=name: _delete(n), state='normal' if live else 'disabled')
             btn.pack(side='right')
             add_tooltip(btn, f"Stop watching {name}")
+        _refit()
 
     def _add(_e=None):
         if _refusal() is None:
@@ -293,9 +334,8 @@ def open_onslaught_dialog(app):
                command=dialog.destroy, width=BTN_DIALOG
                ).pack(side='right', padx=(0, PAD_SMALL))
 
-    restore_window_position(dialog, 'onslaught_settings', _WIDTH, _HEIGHT, app,
-                            resizable=False, offset=(90, 90))
-    bind_window_position_save(dialog, 'onslaught_settings', save_size=False)
+    dialog.update_idletasks()
+    center_on_parent(dialog, app, _WIDTH, max(_HEIGHT, dialog.winfo_reqheight()))
     dialog.deiconify()
 
     dialog.bind("<Return>", lambda e: _apply() if e.widget is not name_entry else None)

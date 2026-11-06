@@ -289,8 +289,8 @@ def _clamp_int(grid, key, default, lo, hi):
 
 def _validate_overhead(grid):
     """The overhead keys, where they apply and nowhere else: an overhead box's
-    shape and fill through `settle_box` (inside 4 x 8, its columns giving way
-    to its 16 slots), an overhead grid's height
+    shape through `settle_box` (inside 4 x 8, its columns giving way to its 16
+    slots; its fill only validated, as a screen grid's), an overhead grid's height
     (`plateOffset`, px of room for the nameplate) and range (`maxDistance`, m);
     a band's `rowCap` and `maxSlots` and the shape and centred fill derived from
     them; a friendly grid's `showSelf`."""
@@ -307,8 +307,7 @@ def _validate_overhead(grid):
             grid['rows'], grid['cols'] = band_shape(cap, slots)
             grid.update(rowCap=cap, maxSlots=slots, fillDirection='C')
         else:
-            grid['rows'], grid['cols'], grid['fillDirection'] = settle_box(
-                grid['rows'], grid['cols'], grid.get('fillDirection'), gtype, False)
+            grid['rows'], grid['cols'], _ = settle_box(grid['rows'], grid['cols'], '', gtype, False)
             grid.pop('rowCap', None)
             grid.pop('maxSlots', None)
     else:

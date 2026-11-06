@@ -3,8 +3,8 @@
 `GridEditorPanel` is one card in the grids list. The container `GridsPanel`
 (in `grids_panel.py`) creates/destroys these as the grid list changes.
 
-A card is a row, never expanded: the title line (name, type, mode; the
-settings cog, Move…, Applied by me, Enabled, ▲ ▼, ×), the grid drawn to scale
+A card is a row, never expanded: the title line (name, type, mode, Applied
+by me; the settings cog, Move…, Enabled, ▲ ▼, ×), the grid drawn to scale
 (`GridPreview`) and the names line under it. The preview is where buffs are
 chosen: a dynamic grid's opens the Tracked Buffs picker, a static grid's cell
 opens it on that slot (walking the grid's slots from there), and a
@@ -199,8 +199,8 @@ class GridEditorPanel(ttk.Frame):
     # Title line
     # ------------------------------------------------------------------
     def _build_title_line(self):
-        """Name, type badge and mode on the left; on the right, left to
-        right: the settings cog, Move…, Applied by me, Enabled, ▲ ▼ and ×."""
+        """Name, type badge, mode and Applied by me on the left; on the right,
+        left to right: the settings cog, Move…, Enabled, ▲ ▼ and ×."""
         header = ttk.Frame(self._row)
         header.pack(fill='x')
         self._title_label = ttk.Label(header, font=FONT_SECTION, foreground=THEME_COLORS['heading'])
@@ -210,6 +210,14 @@ class GridEditorPanel(ttk.Frame):
         self._badge_label.pack(side='left', padx=(PAD_LF, 0))
         self.summary_label = ttk.Label(header, font=FONT_SMALL, foreground=THEME_COLORS['muted'])
         self.summary_label.pack(side='left', padx=(PAD_TAB, 0))
+        self.self_cast_var = tk.BooleanVar(value=self.grid_config.get('selfCastOnly') is True)
+        self._self_cast_cb = ttk.Checkbutton(header, text="Applied by me",
+                                             variable=self.self_cast_var,
+                                             command=self._on_self_cast_toggled,
+                                             bootstyle="success-round-toggle")  # type: ignore[call-arg]
+        self._self_cast_cb.pack(side='left', padx=(PAD_LF, 0))
+        add_tooltip(self._self_cast_cb, "Show only effects you cast, with your own timer, even when "
+                                        "other players cast the same effect on the same character.")
 
         self.enabled_var = tk.BooleanVar(value=True)
         delete_label = self._glyph_label(header, "×", FONT_SYMBOL, "Delete this grid",
@@ -225,16 +233,7 @@ class GridEditorPanel(ttk.Frame):
                                      command=self._on_enabled_toggled,
                                      bootstyle="success-round-toggle")  # type: ignore[call-arg]
         enabled_cb.pack(side='right', padx=(0, PAD_XS))
-        self.self_cast_var = tk.BooleanVar(value=self.grid_config.get('selfCastOnly') is True)
-        self._self_cast_cb = ttk.Checkbutton(header, text="Applied by me",
-                                             variable=self.self_cast_var,
-                                             command=self._on_self_cast_toggled,
-                                             bootstyle="success-round-toggle")  # type: ignore[call-arg]
-        self._self_cast_cb.pack(side='right', padx=(0, PAD_LF))
-        add_tooltip(self._self_cast_cb, "Show only effects you cast, with your own timer, even when "
-                                        "other players cast the same effect on the same character.")
-        in_view = [self._self_cast_cb, enabled_cb, self._step_labels[-1], self._step_labels[1],
-                   delete_label]
+        in_view = [enabled_cb, self._step_labels[-1], self._step_labels[1], delete_label]
         if self._on_move is not None:
             move_label = self._glyph_label(header, "Move…", FONT_SMALL,
                                            "Move this grid to another class tab, or copy it there",
@@ -246,8 +245,9 @@ class GridEditorPanel(ttk.Frame):
         self.cog_label = self._glyph_label(header, "⚙", FONT_BODY_LG, "This grid's settings",
                                            self.open_settings, THEME_COLORS['heading'])
         in_view.insert(0, self.cog_label)
-        # Packed right to left; raise them left to right so Tab walks them as seen.
-        for w in in_view:
+        # The right cluster is packed right to left; raise everything left to
+        # right so Tab walks it as seen.
+        for w in [self._self_cast_cb, *in_view]:
             w.lift()
 
     def _glyph_label(self, header, text, font, tip, command, hover_color, padding=(PAD_XS, PAD_MICRO)):

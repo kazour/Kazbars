@@ -47,7 +47,7 @@ from .ui_helpers import (
 )
 from .ui_tk_style import apply_dark_titlebar, style_tk_listbox
 from .ui_widgets import add_tooltip, app_toast
-from .window_position import bind_window_position_save, restore_window_position
+from .window_position import center_on_parent
 
 _WIDTH = 820
 _HEIGHT = 700
@@ -372,13 +372,7 @@ def open_inspect_dialog(app):
                command=dialog.destroy, width=BTN_DIALOG
                ).pack(side='right', padx=(0, PAD_SMALL))
 
-    # withdraw → build → restore → deiconify, then keep the drag: the dialog
-    # reopens where the user left it (clamped to a live monitor), like the
-    # panels it configures. Staggered off the stopwatch dialog's first-launch
-    # centre so opening both doesn't stack them exactly.
-    restore_window_position(dialog, 'inspect_settings', _WIDTH, _HEIGHT, app,
-                            resizable=False, offset=(30, 30))
-    bind_window_position_save(dialog, 'inspect_settings', save_size=False)
+    center_on_parent(dialog, app, _WIDTH, _HEIGHT)
     dialog.deiconify()
 
     dialog.bind("<Return>", lambda e: _apply() if e.widget is not search_entry else None)

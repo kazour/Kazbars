@@ -217,6 +217,9 @@ class _InAppToolTip:
         self._hide()
         if not self.widget.winfo_exists():
             return
+        text = self.text() if callable(self.text) else self.text
+        if not text:  # a callable with nothing to say here (between a canvas's items)
+            return
         root = self.widget.winfo_toplevel()
         tip = tk.Frame(
             root,
@@ -226,7 +229,7 @@ class _InAppToolTip:
         )
         lbl = tk.Label(
             tip,
-            text=self.text() if callable(self.text) else self.text,
+            text=text,
             bg=TK_COLORS["input_bg"],
             fg=THEME_COLORS["body"],
             font=FONT_SMALL,

@@ -30,7 +30,7 @@ from .ui_helpers import (
     THEME_COLORS,
 )
 from .ui_widgets import app_toast
-from .window_position import restore_window_position
+from .window_position import center_on_parent
 
 COMMON_RESOLUTIONS = ["1920x1080", "2560x1440", "3840x2160"]
 
@@ -55,7 +55,7 @@ def change_game_resolution(app):
     dialog.transient(app)
     dialog.grab_set()
 
-    restore_window_position(dialog, 'game_resolution', 380, 330, app, resizable=False)
+    center_on_parent(dialog, app, 380, 330)
 
     create_dialog_header(dialog, "Game Resolution",
                          MODULE_COLORS['grids'], width=380)

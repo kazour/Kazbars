@@ -56,7 +56,7 @@ from .ui_helpers import (
 )
 from .ui_tk_style import apply_dark_titlebar
 from .ui_widgets import add_tooltip, app_toast
-from .window_position import bind_window_position_save, restore_window_position
+from .window_position import center_on_parent
 
 logger = logging.getLogger(__name__)
 
@@ -240,8 +240,7 @@ class DamageNumberColorsPanel(tk.Toplevel):
         self._refresh_macros()
         self._refresh_apply_state()
 
-        restore_window_position(self, "damage_number_colors", _W, _H, parent, resizable=False)
-        bind_window_position_save(self, "damage_number_colors", save_size=False)
+        center_on_parent(self, parent, _W, _H)
         self.deiconify()
 
         self.bind("<Escape>", lambda e: self.destroy())

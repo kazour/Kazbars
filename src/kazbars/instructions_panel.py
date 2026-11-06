@@ -295,9 +295,10 @@ SECTIONS: list[_Section] = [
             _sub('The title line', [
                 'After the name and type, a muted note gives the mode — '
                 'dynamic or static — and, once the preview is drawn '
-                'smaller, its scale: "shown at 1:2".',
-                'The ⚙ cog, Move…, Applied by me, Enabled, ▲ ▼ and × sit at '
-                'the right. ▲ ▼ move the card one place up or down the '
+                'smaller, its scale: "shown at 1:2". The Applied by me '
+                'toggle comes right after it.',
+                'The ⚙ cog, Move…, Enabled, ▲ ▼ and × sit at the right. '
+                '▲ ▼ move the card one place up or down the '
                 'list, greyed at the ends. Dragging the ☰ handle does the '
                 'same, and so does Alt+↑ / Alt+↓ once you Tab to it.',
                 'Applied by me — the grid shows only effects you cast, with '
@@ -984,9 +985,10 @@ SECTIONS: list[_Section] = [
                 'banner stays.',
             ]),
             _sub('Watched mobs', [
-                'It always watches 27 mobs from its catalog. Include '
+                'It always watches 27 mobs from its catalog, and the dialog '
+                'lists them by name, one line per group. Include '
                 'Kuthchemes camps adds the camp beasts to the board — '
-                'listed, never alerted.',
+                'listed, never alerted — and a line for them in that list.',
                 'Your own names — up to 20, watched as minis. A name has to '
                 "match the game's exactly, capitals included; the dialog "
                 'says why it refuses one as you type. × deletes a name, and '

@@ -54,7 +54,7 @@ from .userdata import (
     prefs_path,
     userdata_root,
 )
-from .window_position import restore_window_position
+from .window_position import center_on_parent
 
 logger = logging.getLogger(__name__)
 
@@ -257,7 +257,7 @@ def open_backup_dialog(app):
     dialog.grab_set()
 
     width = 480
-    restore_window_position(dialog, "settings_backup", width, 400, app, resizable=False)
+    center_on_parent(dialog, app, width, 400)
     create_dialog_header(dialog, "Backup & Restore", MODULE_COLORS["grids"], width=width)
 
     content = ttk.Frame(dialog)

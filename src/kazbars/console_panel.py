@@ -39,7 +39,7 @@ from .ui_helpers import (
 )
 from .ui_tk_style import apply_dark_titlebar
 from .ui_widgets import add_tooltip, app_toast
-from .window_position import bind_window_position_save, restore_window_position
+from .window_position import center_on_parent
 
 _WIDTH = 470
 _HEIGHT = 380
@@ -193,9 +193,7 @@ def open_console_dialog(app):
                command=dialog.destroy, width=BTN_DIALOG
                ).pack(side='right', padx=(0, PAD_SMALL))
 
-    restore_window_position(dialog, 'console_settings', _WIDTH, _HEIGHT, app,
-                            resizable=False, offset=(60, 60))
-    bind_window_position_save(dialog, 'console_settings', save_size=False)
+    center_on_parent(dialog, app, _WIDTH, _HEIGHT)
     dialog.deiconify()
 
     dialog.bind("<Return>", lambda e: _apply())

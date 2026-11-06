@@ -65,7 +65,7 @@ from .ui_helpers import (
 )
 from .ui_tk_style import apply_dark_titlebar
 from .ui_widgets import add_tooltip, app_toast
-from .window_position import clamp_to_screen
+from .window_position import center_on_parent
 
 _WIDTH = 720
 
@@ -109,11 +109,6 @@ _SORT_LABEL_BY_CODE = {code: label for code, label, _ in _SORT_OPTIONS}
 _SORT_CODE_BY_LABEL = {label: code for code, label, _ in _SORT_OPTIONS}
 _SORT_DESCRIPTIONS = {label: desc for _, label, desc in _SORT_OPTIONS}
 
-# Every label a card can show: the label column fits the widest.
-_LABELS = ("Name:", "Rows × Cols:", "Row cap:", "Max slots:", "Position:", "Size:", "Gap:",
-           "Timers:", "Y offset:", "Flash:", "Height:", "Range:", "Over me:", "Fill:",
-           "Sort:", "Order:")
-
 
 def open_grid_settings(card):
     """Open (or raise) the card's Grid Settings window."""
@@ -156,8 +151,10 @@ class GridSettingsDialog(tk.Toplevel):
         self.resizable(False, False)
         self.transient(top)
         self.grab_set()
-        font = tkfont.Font(root=self, font=FONT_FORM_LABEL)
-        self._label_w = max(font.measure(t) for t in _LABELS) + PAD_XS
+        self._label_font = tkfont.Font(root=self, font=FONT_FORM_LABEL)
+        self._label_w = 0  # the widest label `_field` has made
+        # The side Rows / Cols gives way on: the one typed into last.
+        self._give = 'cols'
 
         create_dialog_header(self, f"GRID SETTINGS — {cfg.get('id', 'Grid')}",
                              MODULE_COLORS['grids'], width=_WIDTH)
@@ -174,6 +171,8 @@ class GridSettingsDialog(tk.Toplevel):
                    padx=(0, PAD_SMALL) if i % 2 == 0 else 0, pady=(0, PAD_SMALL))
         body.columnconfigure(0, weight=1, uniform='card')
         body.columnconfigure(1, weight=1, uniform='card')
+        for c in cards:
+            c.columnconfigure(0, minsize=self._label_w + PAD_XS)
 
         footer = ttk.Frame(self, padding=(PAD_TAB, PAD_XS, PAD_TAB, PAD_TAB))
         footer.pack(fill='x', side='bottom')
@@ -186,7 +185,7 @@ class GridSettingsDialog(tk.Toplevel):
         self._sync_timer_fields()
         self._sync_flash_fields()
 
-        self._centre_on(top)
+        center_on_parent(self, top)
         self.deiconify()
         self.bind('<Return>', self._on_return)
         self.bind('<Escape>', lambda e: self.cancel())
@@ -194,37 +193,25 @@ class GridSettingsDialog(tk.Toplevel):
         self.bind('<Map>', lambda e: apply_dark_titlebar(self) if e.widget is self else None, add='+')
         self.after(0, self._name_entry.focus_set)
 
-    def _centre_on(self, top):
-        """Centred on the app window, inside the screen. Only the position is
-        set: the window sizes to its content."""
-        self.update_idletasks()
-        # The frame's title bar sits above the client area winfo_reqheight
-        # measures; the app window wears the same one.
-        bar = max(0, top.winfo_rooty() - top.winfo_y())
-        w, h = self.winfo_reqwidth(), self.winfo_reqheight() + bar
-        x = top.winfo_rootx() + (top.winfo_width() - w) // 2
-        y = top.winfo_rooty() + (top.winfo_height() - h) // 2
-        x, y = clamp_to_screen(x, y, w, h)
-        self.geometry(f"+{x}+{y}")
-
     # ------------------------------------------------------------------
     # Cards: one label / field grid each
     # ------------------------------------------------------------------
-    def _card(self, parent, title):
+    @staticmethod
+    def _card(parent, title):
         card = create_card(parent, title)
-        card.columnconfigure(0, minsize=self._label_w)
         card.next_row = 0  # type: ignore[attr-defined]
         return card
 
-    @staticmethod
-    def _field(card, label=None):
+    def _field(self, card, label=None):
         """The next row of `card`: its label right-aligned in the label column
         (none for a hint row), and the frame its field widgets pack into.
-        Returns (cell, label widget or None)."""
+        Returns (cell, label widget or None). Every label is measured, so
+        the column the cards share fits the widest once they are built."""
         r = card.next_row
         card.next_row += 1
         lbl = None
         if label is not None:
+            self._label_w = max(self._label_w, self._label_font.measure(label))
             lbl = ttk.Label(card, text=label, font=FONT_FORM_LABEL)
             lbl.grid(row=r, column=0, sticky='e', padx=(0, PAD_XS), pady=(0, PAD_ROW))
         cell = ttk.Frame(card)
@@ -269,6 +256,10 @@ class GridSettingsDialog(tk.Toplevel):
             limit = max_slots(self._type)
             self.rows_var = tk.StringVar(value=str(cfg.get('rows', 1)))
             self.cols_var = tk.StringVar(value=str(cfg.get('cols', 1)))
+            # A value typed and applied with Enter never reaches `_on_shape`:
+            # the draft still lets the side typed into give way.
+            self.rows_var.trace_add('write', lambda *_: setattr(self, '_give', 'rows'))
+            self.cols_var.trace_add('write', lambda *_: setattr(self, '_give', 'cols'))
             cell, _ = self._field(card, "Rows × Cols:")
             labeled_spinbox(cell, None, self.rows_var, from_=1, to=max_rows, width=4,
                             tooltip=f"Grid rows (height). A grid holds up to {limit} slots.",
@@ -417,6 +408,7 @@ class GridSettingsDialog(tk.Toplevel):
         if (new_rows, new_cols) != (rows, cols):
             self.rows_var.set(str(new_rows))
             self.cols_var.set(str(new_cols))
+            self._give = dim
             msg = (f"A grid holds at most {max_slots(self._type)} slots" if rows * cols > 1
                    else "Dynamic grids need at least 2 slots, switched to 1×2")
             app_toast(self.card, msg, 'info', key='grid_resize')
@@ -468,7 +460,7 @@ class GridSettingsDialog(tk.Toplevel):
             fill = (_FILL_CODE_BY_LABEL.get(self.fill_var.get(), cfg.get('fillDirection'))
                     if not self._static else cfg.get('fillDirection'))
             out['rows'], out['cols'], out['fillDirection'] = settle_box(
-                *self._shape(), fill, self._type, not self._static)
+                *self._shape(), fill, self._type, not self._static, give=self._give)
         if not self._plate:
             x = _int(self.x_var, self._px0[0], 0, self._res[0])
             y = _int(self.y_var, self._px0[1], 0, self._res[1])
@@ -525,9 +517,8 @@ class GridSettingsDialog(tk.Toplevel):
 
     def _close(self):
         """Close first, then touch the card: a dialog that fails before it
-        closes keeps its grab. Returns the card that shows this grid now — the
-        one it opened from, or the one a rebuild put in its place (`find_card`);
-        None once the grid left the list."""
+        closes keeps its grab. Returns the card, None if it is gone (nothing
+        rebuilds the list under the dialog's grab: the app's shortcuts wait)."""
         card = self.card
         self.destroy()
         try:
@@ -536,5 +527,4 @@ class GridSettingsDialog(tk.Toplevel):
                 return card
         except tk.TclError:
             pass
-        find = getattr(card, '_find_card', None)
-        return find(self._cfg) if find is not None else None
+        return None

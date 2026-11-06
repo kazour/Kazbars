@@ -223,6 +223,15 @@ def test_a_box_has_no_cap_and_keeps_its_shape():
     assert "rowCap" not in g and g["fillDirection"] == "LR"
 
 
+def test_a_box_fill_is_validated_on_load_never_settled():
+    """The fill a shape offers is the settings dialog's to settle, for an
+    overhead box as for a screen one."""
+    assert validate_grid({"type": "hostile", "slotMode": "static", "rows": 2, "cols": 3,
+                          "fillDirection": "LR"})["fillDirection"] == "LR"
+    assert validate_grid({"type": "player", "rows": 2, "cols": 3,
+                          "fillDirection": "LR"})["fillDirection"] == "LR"
+
+
 def test_an_overhead_box_is_capped_at_sixteen_slots():
     assert (lambda g: (g["rows"], g["cols"]))(validate_grid(
         {"type": "friendly", "slotMode": "static", "rows": 10, "cols": 10})) == (4, 4)

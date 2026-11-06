@@ -43,7 +43,7 @@ def clamp_to_screen(x, y, width, height):
         return x, y
 
 
-def fit_window_height(window, width):
+def fit_window_height(window, width, min_height=0):
     """Re-fit a fixed-width window to the height its content needs right now.
 
     A panel that locks its geometry once at construction clips its last row the
@@ -51,14 +51,36 @@ def fit_window_height(window, width):
     log filename — because the window never follows the content. Call this
     wherever that text is written, not just at build time. Cheap: it reconfigures
     only when the needed height actually moved, and re-clamps so growing can't
-    push the window off the bottom of the screen.
+    push the window off the bottom of the screen. `min_height` keeps a floor
+    under it, for a window whose content leaves room it should keep.
     """
     window.update_idletasks()
-    needed = window.winfo_reqheight()
+    needed = max(min_height, window.winfo_reqheight())
     if needed == window.winfo_height():
         return
     x, y = clamp_to_screen(window.winfo_x(), window.winfo_y(), width, needed)
     window.geometry(f'{width}x{needed}+{x}+{y}')
+
+
+def center_on_parent(window, parent, width=None, height=None):
+    """Centre `window` on `parent`'s current geometry, inside the screen.
+
+    The dialogs the app opens over itself come up here every time, never at a
+    remembered spot. A given width / height is set; a missing one is the
+    window's requested size, and with neither only the position is set, so
+    the window keeps sizing to its content. The frame's title bar (the client
+    area winfo_reqheight leaves out) is counted, the parent wearing the same.
+    """
+    if width is None or height is None:
+        window.update_idletasks()
+    w = window.winfo_reqwidth() if width is None else width
+    h = window.winfo_reqheight() if height is None else height
+    bar = max(0, parent.winfo_rooty() - parent.winfo_y())
+    x = parent.winfo_rootx() + (parent.winfo_width() - w) // 2
+    y = parent.winfo_rooty() + (parent.winfo_height() - h - bar) // 2
+    x, y = clamp_to_screen(x, y, w, h + bar)
+    size = '' if width is None and height is None else f'{w}x{h}'
+    window.geometry(f'{size}+{x}+{y}')
 
 
 def save_window_position(window_name, x, y, width=None, height=None):

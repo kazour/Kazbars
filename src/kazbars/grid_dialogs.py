@@ -549,10 +549,10 @@ class BuffSelectorDialog(tk.Toplevel):
         self.bind('<Return>', self._on_return)
 
     def _on_return(self, _event):
-        # Enter on a focused button presses it (◀ ▶ step, Cancel cancels);
-        # anywhere else it means Done.
+        # Enter on a focused, live button presses it (◀ ▶ step, Cancel
+        # cancels); anywhere else (a greyed end arrow too) it means Done.
         focus = self.focus_get()
-        if isinstance(focus, ttk.Button):
+        if isinstance(focus, ttk.Button) and not focus.instate(['disabled']):
             focus.invoke()
         else:
             self.on_ok()
@@ -589,7 +589,7 @@ class BuffSelectorDialog(tk.Toplevel):
         # The current slot's chip names the selection being edited.
         i = self._chip_hot
         if i < 0:
-            return ""
+            return None  # between chips: no tip
         return self.walker.tip(i, self._selected_ids() if i == self.slot else None)
 
     def _chip_at(self, event):

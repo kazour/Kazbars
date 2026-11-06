@@ -61,7 +61,7 @@ from .ui_helpers import (
 )
 from .ui_tk_style import apply_dark_titlebar
 from .ui_widgets import app_toast
-from .window_position import bind_window_position_save, restore_window_position
+from .window_position import center_on_parent
 
 logger = logging.getLogger(__name__)
 
@@ -497,8 +497,7 @@ class BuffDisplayDialog(tk.Toplevel):
         self._create_widgets()
         self._refresh_apply_state()
 
-        restore_window_position(self, 'buff_display_editor', *DIALOG_SIZE, app)
-        bind_window_position_save(self, 'buff_display_editor')
+        center_on_parent(self, app, *DIALOG_SIZE)
         self.minsize(*DIALOG_MIN)
         self.deiconify()
 

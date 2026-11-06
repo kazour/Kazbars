@@ -41,7 +41,7 @@ from .ui_helpers import (
 )
 from .ui_tk_style import apply_dark_titlebar
 from .ui_widgets import add_tooltip, app_toast
-from .window_position import bind_window_position_save, restore_window_position
+from .window_position import center_on_parent
 
 logger = logging.getLogger(__name__)
 
@@ -109,10 +109,7 @@ class DamageNumbersPanel(tk.Toplevel):
         self._build_ui()
         self._sync_enabled_state()
 
-        # restore sets both size and position (resizable=False pins it to _W×_H), so no
-        # separate geometry() call is needed afterwards.
-        restore_window_position(self, "damage_numbers", _W, _H, parent, resizable=False)
-        bind_window_position_save(self, "damage_numbers", save_size=False)
+        center_on_parent(self, parent, _W, _H)
         self.deiconify()
         self.bind("<Return>", lambda e: self._on_apply())
         self.bind("<Escape>", lambda e: self.destroy())
