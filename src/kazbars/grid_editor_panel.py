@@ -86,14 +86,15 @@ class _SlotWalker:
     def assigned(self, slot):
         return bool(self.ids(slot))
 
-    def tip(self, slot):
-        return grid_preview.slot_tip(self.card.grid_config, self.card._name_of, slot, actions=False)
+    def tip(self, slot, refs=None):
+        """What `slot` holds: as stored, or `refs` (the picker's live selection)."""
+        cfg = self.card.grid_config if refs is None else {'slotAssignments': {str(slot): refs}}
+        return grid_preview.slot_tip(cfg, self.card._name_of, slot, actions=False)
 
     def commit(self, slot, refs):
-        """Write `slot` back as the picker leaves it (only when it changed)."""
-        if list(refs) != self.ids(slot):
-            self.card._write_slot(slot, refs)
-            self.committed = True
+        """Write `slot` back: the picker calls this only for a slot it edited."""
+        self.card._write_slot(slot, refs)
+        self.committed = True
 
 
 def _names_measure(widget):

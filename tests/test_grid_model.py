@@ -270,6 +270,7 @@ def test_a_new_overhead_grid_is_a_band_or_a_box_with_bar_timers():
 
 def test_a_box_settles_inside_its_limits_with_a_fill_that_fits():
     assert settle_box(10, 8, 'LR', 'player', False) == (10, 6, 'BL-TR')  # 64 slots
+    assert settle_box(9, 8, 'LR', 'player', False, give='rows') == (8, 8, 'BL-TR')  # rows were edited
     assert settle_box(1, 1, 'LR', 'player', True) == (1, 2, 'LR')  # never a dynamic 1x1
     assert settle_box(1, 1, 'LR', 'player', False) == (1, 1, 'LR')
     assert settle_box(5, 9, 'TB', 'hostile', False) == (4, 4, 'BL-TR')

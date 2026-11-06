@@ -119,9 +119,10 @@ def valid_fills(rows, cols):
     return ('TL-BR', 'TR-BL', 'BL-TR', 'BR-TL'), 'BL-TR'
 
 
-def settle_box(rows, cols, fill, grid_type, dynamic):
+def settle_box(rows, cols, fill, grid_type, dynamic, give='cols'):
     """A box grid's (rows, cols, fill) after its shape rules: each side inside
-    its max, the columns giving way to the slot limit, a dynamic grid never
+    its max, the `give` side ('rows' or 'cols', the one just edited) giving
+    way to the slot limit, a dynamic grid never
     1x1 (it becomes 1x2), and a fill that no longer fits the shape falls back
     to the shape's default. The settings dialog's draft and its Apply both
     run it, so the preview shows what Apply stores."""
@@ -129,7 +130,10 @@ def settle_box(rows, cols, fill, grid_type, dynamic):
     rows, cols = max(1, min(rows, max_rows)), max(1, min(cols, max_cols))
     limit = max_slots(grid_type)
     if rows * cols > limit:
-        cols = max(1, limit // rows)
+        if give == 'rows':
+            rows = max(1, limit // cols)
+        else:
+            cols = max(1, limit // rows)
     if dynamic and rows == 1 and cols == 1:
         cols = 2
     codes, default = valid_fills(rows, cols)

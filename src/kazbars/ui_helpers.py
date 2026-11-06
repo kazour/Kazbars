@@ -100,6 +100,7 @@ BTN_SMALL = 7             # Add, Edit, Delete, Clear, Copy
 BTN_DIALOG = 10           # Cancel + verb pair in dialog footers
 BTN_MEDIUM = 12           # Export, Import, Reset, Browse
 BTN_LARGE = 20            # Build & Install, Generate & Install
+BTN_GLYPH = 3             # A one-glyph button (◀ ▶)
 
 # Form input widths (input text in chars). Reserved for inputs reused 2+ places.
 # One-off widths (a name field, a stack spinbox) stay as literal numbers.
@@ -107,6 +108,7 @@ INPUT_WIDTH_NUM    = 5    # Numeric spinboxes
 INPUT_WIDTH_TYPE   = 10   # Compact type/state dropdowns
 INPUT_WIDTH_FILTER = 18   # Filter category combobox
 INPUT_WIDTH_SEARCH = 20   # Search entries
+INPUT_WIDTH_SORTING = 24  # Grid Settings' Fill / Sort / Order (the longest fill label)
 LABEL_WIDTH_FORM   = 14   # Left-column form labels (fits "Icon spacing:" + 1ch)
 
 # Scanline overlay alpha (0-255). Used for CRT decorative scanline overlays.

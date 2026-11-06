@@ -52,6 +52,7 @@ from .ui_helpers import (
     BTN_DIALOG,
     FONT_FORM_LABEL,
     FONT_SMALL,
+    INPUT_WIDTH_SORTING,
     MODULE_COLORS,
     PAD_MICRO,
     PAD_MID,
@@ -67,8 +68,6 @@ from .ui_widgets import add_tooltip, app_toast
 from .window_position import clamp_to_screen
 
 _WIDTH = 720
-# Fill, Sort and Order share one width: the longest fill label's.
-_COMBO_W = 24
 
 _FILL_OPTIONS = [
     # (persisted code, user-facing label, tooltip description)
@@ -273,11 +272,11 @@ class GridSettingsDialog(tk.Toplevel):
             cell, _ = self._field(card, "Rows × Cols:")
             labeled_spinbox(cell, None, self.rows_var, from_=1, to=max_rows, width=4,
                             tooltip=f"Grid rows (height). A grid holds up to {limit} slots.",
-                            on_change=self._on_shape)
+                            on_change=lambda: self._on_shape('rows'))
             self._unit(cell, "×", padx=PAD_XS)
             labeled_spinbox(cell, None, self.cols_var, from_=1, to=max_cols, width=4,
                             tooltip=f"Grid columns (width). A grid holds up to {limit} slots.",
-                            on_change=self._on_shape)
+                            on_change=lambda: self._on_shape('cols'))
 
         if not self._plate:
             # Positions are fractions; the fields show px at the game resolution.
@@ -374,7 +373,7 @@ class GridSettingsDialog(tk.Toplevel):
         self.fill_var = tk.StringVar()
         cell, _ = self._field(card, "Fill:")
         self.fill_combo = labeled_combobox(
-            cell, None, self.fill_var, [], width=_COMBO_W,
+            cell, None, self.fill_var, [], width=INPUT_WIDTH_SORTING,
             tooltip=lambda: _FILL_DESCRIPTIONS.get(self.fill_var.get(), "Direction buffs fill into the grid"),
             on_change=self._changed)
         if self._band:
@@ -389,13 +388,13 @@ class GridSettingsDialog(tk.Toplevel):
                                                                    _SORT_LABEL_BY_CODE['longest']))
         cell, _ = self._field(card, "Sort:")
         labeled_combobox(cell, None, self.sort_var, [label for _, label, _ in _SORT_OPTIONS],
-                         width=_COMBO_W,
+                         width=INPUT_WIDTH_SORTING,
                          tooltip=lambda: _SORT_DESCRIPTIONS.get(self.sort_var.get(), "How buffs are ordered"))
         self.layout_var = tk.StringVar(value=_LAYOUT_LABEL_BY_CODE.get(cfg.get('layout', 'buffFirst'),
                                                                        _LAYOUT_LABEL_BY_CODE['buffFirst']))
         cell, _ = self._field(card, "Order:")
         labeled_combobox(cell, None, self.layout_var, [label for _, label in _LAYOUT_OPTIONS],
-                         width=_COMBO_W,
+                         width=INPUT_WIDTH_SORTING,
                          tooltip="In Buffs First and Debuffs First, misc effects always lead. "
                                  "In Mixed, all buffs sort together by time.")
         return card
@@ -409,11 +408,12 @@ class GridSettingsDialog(tk.Toplevel):
         return (_int(self.rows_var, self._cfg.get('rows', 1), 1, max_rows),
                 _int(self.cols_var, self._cfg.get('cols', 1), 1, max_cols))
 
-    def _on_shape(self):
-        """Rows or Cols moved: the shape rules (`settle_box`) run at once and
-        the fields show their result, with a toast when one gave way."""
+    def _on_shape(self, dim):
+        """Rows or Cols (`dim`) moved: the shape rules (`settle_box`, the
+        edited side giving way to the slot limit) run at once and the fields
+        show their result, with a toast when one gave way."""
         rows, cols = self._shape()
-        new_rows, new_cols, _ = settle_box(rows, cols, '', self._type, not self._static)
+        new_rows, new_cols, _ = settle_box(rows, cols, '', self._type, not self._static, give=dim)
         if (new_rows, new_cols) != (rows, cols):
             self.rows_var.set(str(new_rows))
             self.cols_var.set(str(new_cols))
@@ -524,9 +524,10 @@ class GridSettingsDialog(tk.Toplevel):
             card.cancel_draft()
 
     def _close(self):
-        """Close first, then touch the card: the card may be gone by now (a
-        rebuild), and a dialog that fails before it closes keeps its grab.
-        Returns the card while it still exists."""
+        """Close first, then touch the card: a dialog that fails before it
+        closes keeps its grab. Returns the card that shows this grid now — the
+        one it opened from, or the one a rebuild put in its place (`find_card`);
+        None once the grid left the list."""
         card = self.card
         self.destroy()
         try:
@@ -535,4 +536,5 @@ class GridSettingsDialog(tk.Toplevel):
                 return card
         except tk.TclError:
             pass
-        return None
+        find = getattr(card, '_find_card', None)
+        return find(self._cfg) if find is not None else None

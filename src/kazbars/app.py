@@ -513,7 +513,9 @@ class KazBarsApp(ttkb.Window):
         runs or any dialog holds the grab — Ctrl+N under Grid Settings would
         rebuild the card the dialog is editing."""
         def handler(_event):
-            if not self._building and self.grab_current() is None:
+            # The grab as Tcl names it: grab_current() can't name a combobox
+            # popdown's grab (KeyError) — any holder at all is enough here.
+            if not self._building and not self.tk.call('grab', 'current'):
                 fn()
         return handler
 

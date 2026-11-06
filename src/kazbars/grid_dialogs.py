@@ -26,6 +26,7 @@ from .settings_manager import get_setting, set_setting
 from .ui_headers import create_dialog_header
 from .ui_helpers import (
     BTN_DIALOG,
+    BTN_GLYPH,
     BTN_MEDIUM,
     FONT_FORM_LABEL,
     FONT_SECTION,
@@ -448,6 +449,17 @@ class BuffSelectorDialog(tk.Toplevel):
                 self.selected_names.add(entry['name'])
             else:
                 self.unknown_refs.append(bid)
+        # What the slot held as loaded: a walk past an untouched slot writes nothing.
+        self._loaded = self._selection_key()
+        self._chips_key = None
+
+    def _selection_key(self):
+        return frozenset(self.selected_names), tuple(map(str, self.unknown_refs))
+
+    def _commit_slot(self):
+        """Hand the current slot to the walker, only when it was edited."""
+        if self._selection_key() != self._loaded:
+            self.walker.commit(self.slot, self._selected_ids())
 
     def save_filter_state(self):
         set_setting('buff_selector_category', self.category_var.get())
@@ -524,7 +536,7 @@ class BuffSelectorDialog(tk.Toplevel):
             self._step_buttons = {}
             for glyph, delta, tip in (("▶", 1, "Next slot (Ctrl+PageDown)"),
                                       ("◀", -1, "Previous slot (Ctrl+PageUp)")):
-                btn = ttk.Button(bottom_frame, text=glyph, width=3, bootstyle='secondary',
+                btn = ttk.Button(bottom_frame, text=glyph, width=BTN_GLYPH, bootstyle='secondary',
                                  command=lambda d=delta: self.go_to(self.slot + d))
                 btn.pack(side='right', padx=(PAD_MICRO, 0))
                 add_tooltip(btn, tip)
@@ -534,7 +546,17 @@ class BuffSelectorDialog(tk.Toplevel):
             self.bind('<Control-Next>', lambda e: self._step_key(1))
 
         self.bind('<Escape>', lambda e: self.on_cancel())
-        self.bind('<Return>', lambda e: self.on_ok())
+        self.bind('<Return>', self._on_return)
+
+    def _on_return(self, _event):
+        # Enter on a focused button presses it (◀ ▶ step, Cancel cancels);
+        # anywhere else it means Done.
+        focus = self.focus_get()
+        if isinstance(focus, ttk.Button):
+            focus.invoke()
+        else:
+            self.on_ok()
+        return 'break'
 
     # ------------------------------------------------------------------
     # Slot walker (a static grid's cell opened the picker)
@@ -561,8 +583,14 @@ class BuffSelectorDialog(tk.Toplevel):
         self._chips.bind('<Button-1>', self._on_chip_click)
         self._chips.bind('<Motion>', self._on_chip_motion)
         self._chips.bind('<Configure>', lambda e: self._fit_chip_bar())
-        add_tooltip(self._chips, lambda: self.walker.tip(self._chip_hot) if self._chip_hot >= 0 else "")
-        self._paint_chips()
+        add_tooltip(self._chips, self._chip_tip)  # painted by refresh_lists
+
+    def _chip_tip(self):
+        # The current slot's chip names the selection being edited.
+        i = self._chip_hot
+        if i < 0:
+            return ""
+        return self.walker.tip(i, self._selected_ids() if i == self.slot else None)
 
     def _chip_at(self, event):
         x = int(self._chips.canvasx(event.x))
@@ -588,14 +616,14 @@ class BuffSelectorDialog(tk.Toplevel):
         elif not overflow and self._chips_bar.winfo_ismapped():
             self._chips_bar.pack_forget()
 
-    def _paint_chips(self):
+    def _paint_chips(self, current_held):
         """The current chip filled with the type accent, an assigned one
         outlined in it, an empty one in the input border; the current one
         scrolled into view."""
         accent = self.walker.accent
         for i in range(self.walker.count):
             current = i == self.slot
-            held = bool(self._selected_ids()) if current else self.walker.assigned(i)
+            held = current_held if current else self.walker.assigned(i)
             fill = accent if current else TK_COLORS['input_bg']
             outline = accent if (current or held) else TK_COLORS['border']
             self._chips.itemconfigure(f'chip_{i}&&rect', fill=fill, outline=outline)
@@ -615,17 +643,29 @@ class BuffSelectorDialog(tk.Toplevel):
         """Commit the slot being edited, then load `slot` in the same window."""
         if not 0 <= slot < self.walker.count or slot == self.slot:
             return
-        self.walker.commit(self.slot, self._selected_ids())
+        self._commit_slot()
         self.slot = slot
         self._load(self.walker.ids(slot))
         self.title(f"Slot {slot} Buffs")
         self.refresh_lists()
 
-    def _sync_walker(self):
+    def _walker_status(self):
+        """Arrows and chips for the slot and selection as they are now, and
+        the status line's tail. Skipped while neither moved (a search
+        keystroke refreshes the lists, not the slots)."""
+        key = (self.slot, self._selection_key())
+        if key == self._chips_key:
+            return self._walker_tail
+        self._chips_key = key
         for delta, btn in self._step_buttons.items():
             live = 0 <= self.slot + delta < self.walker.count
             btn.configure(state='normal' if live else 'disabled')
-        self._paint_chips()
+        held = bool(self.selected_names or self.unknown_refs)
+        self._paint_chips(held)
+        n = self.walker.count
+        everywhere = held and all(self.walker.assigned(i) for i in range(n) if i != self.slot)
+        self._walker_tail = f" · All {n} slots are assigned." if everywhere else ""
+        return self._walker_tail
 
     def refresh_lists(self):
         query = self.search_var.get()
@@ -705,10 +745,7 @@ class BuffSelectorDialog(tk.Toplevel):
         else:
             status = f"{count} buffs selected{unresolved}"
         if self.walker is not None:
-            n = self.walker.count
-            if all(self.walker.assigned(i) for i in range(n) if i != self.slot) and self._selected_ids():
-                status += f" · All {n} slots are assigned."
-            self._sync_walker()
+            status += self._walker_status()
         self.status_var.set(status)
 
     def add_selected(self):
@@ -749,7 +786,7 @@ class BuffSelectorDialog(tk.Toplevel):
         self.save_filter_state()
         self.result = self._selected_ids()
         if self.walker is not None:
-            self.walker.commit(self.slot, self.result)
+            self._commit_slot()
         self.destroy()
 
     def on_cancel(self):

@@ -309,7 +309,7 @@ def test_grid_settings_cancel_leaves_the_config_and_redraws_the_card(app):
     width = card.preview.layout.width
     dlg = _settings(card)
     dlg.cols_var.set('8')
-    dlg._on_shape()
+    dlg._on_shape('cols')
     assert card.preview.layout.width > width, "the card previews the draft"
     dlg.cancel()
     assert card.grid_config == before
@@ -1023,6 +1023,9 @@ def test_the_slot_picker_walks_the_grid_committing_each_slot_it_leaves(app):
     walker = _SlotWalker(card, 0)
     dlg = BuffSelectorDialog(app, app.database, "Slot 0 Buffs", walker=walker)
     try:
+        dlg.go_to(1)
+        dlg.go_to(0)
+        assert not walker.committed, "walking past an untouched slot writes nothing"
         assert len(dlg._chips.find_withtag('rect')) == 3
         assert str(dlg._step_buttons[-1].cget('state')) == 'disabled'
         dlg.selected_names.add(app.database.by_id[b]['name'])
@@ -1105,9 +1108,12 @@ def test_applying_a_smaller_shape_trims_slots_with_the_warning(app, monkeypatch)
     toasts = []
     monkeypatch.setattr(grid_editor_panel, 'app_toast', lambda w, msg, *a, **k: toasts.append(msg))
     dlg = _settings(card)
+    dlg.rows_var.set('4')
+    dlg._on_shape('rows')
+    assert (dlg.rows_var.get(), dlg.cols_var.get()) == ('4', '3'), "under the limit: as typed"
     dlg.rows_var.set('2')
     dlg.cols_var.set('2')
-    dlg._on_shape()
+    dlg._on_shape('cols')
     dlg.apply()
     cfg = card.grid_config
     assert (cfg['rows'], cfg['cols'], cfg['slotAssignments']) == (2, 2, {'0': [1]})
