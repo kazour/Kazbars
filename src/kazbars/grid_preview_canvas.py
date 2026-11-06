@@ -172,9 +172,11 @@ class GridPreview(tk.Canvas):
         if i == self._hot:
             return
         if not self._static():
+            # Every cell of a dynamic grid looks alike: one outline for all.
             self._hot = i
-            for k in range(len(self._layout.rects) if self._layout else 0):
-                self.repaint_slot(k)
+            full = bool(grid_preview.held_ids(self._cfg))
+            rest = (self._accent if self._enabled else TK_COLORS['border']) if full else TK_COLORS['border']
+            self.itemconfigure('rect', outline=THEME_COLORS['heading'] if i >= 0 else rest)
             return
         prev, self._hot = self._hot, i
         self.repaint_slot(prev)

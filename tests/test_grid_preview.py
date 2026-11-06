@@ -141,13 +141,3 @@ def test_the_nudges_say_what_to_click():
         'No buffs tracked yet, so it is not built. Click the preview to choose them.')
     assert gp.empty_nudge({'slotMode': 'static', 'rows': 3, 'cols': 3}) == (
         'No slots assigned yet, so it is not built. Click a slot to choose its buffs (9 slots).')
-
-
-def test_the_summary_reads_shape_mode_and_holdings():
-    static = {'slotMode': 'static', 'rows': 3, 'cols': 3, 'slotAssignments': {'0': [1], '4': [2]}}
-    assert gp.summary(static, shown_at='') == '3×3 · static · 2 of 9 assigned'
-    dyn = {'slotMode': 'dynamic', 'rows': 3, 'cols': 4, 'whitelist': [1, 2], 'selfCastOnly': True}
-    assert gp.summary(dyn, shown_at=' · shown at 1:2', icon=56) == (
-        '3×4 · dynamic · tracking 2 buffs · 56 px icons · shown at 1:2 · applied by me')
-    band = {'type': 'hostile', 'slotMode': 'dynamic', 'rowCap': 5, 'maxSlots': 15, 'whitelist': []}
-    assert gp.summary(band, shown_at='') == 'up to 15 · 5 wide · dynamic'

@@ -279,7 +279,7 @@ SECTIONS: list[_Section] = [
             _sub('The preview', [
                 'Icons are drawn at two-thirds of their in-game size. A grid '
                 'too big for the card steps down to a smaller scale, and the '
-                'title line says so: "shown at 1:2", for example.',
+                'title line says so.',
                 'A disabled grid draws grey. The preset cards on an empty '
                 'Grids tab are drawn the same way.',
                 "It is also where you choose the grid's buffs. On a dynamic "
@@ -293,22 +293,25 @@ SECTIONS: list[_Section] = [
                 'list.',
             ]),
             _sub('The title line', [
-                'After the name and type, a muted summary: shape, mode and '
-                'what the grid holds — plus the icon size, as "56 px '
-                'icons", when it is not the default.',
-                'The ⚙ cog, Move…, Enabled, ▲ ▼ and × sit at the right. '
-                '▲ ▼ move the card one place up or down the list, greyed at '
-                'the ends. Dragging the ☰ handle does the same, and so does '
-                'Alt+↑ / Alt+↓ once you Tab to it.',
+                'After the name and type, a muted note gives the mode — '
+                'dynamic or static — and, once the preview is drawn '
+                'smaller, its scale: "shown at 1:2".',
+                'The ⚙ cog, Move…, Applied by me, Enabled, ▲ ▼ and × sit at '
+                'the right. ▲ ▼ move the card one place up or down the '
+                'list, greyed at the ends. Dragging the ☰ handle does the '
+                'same, and so does Alt+↑ / Alt+↓ once you Tab to it.',
+                'Applied by me — the grid shows only effects you cast, with '
+                'your own timer, even when other players cast the same '
+                'effect on the same character. It greys with the card when '
+                'the grid is disabled, and still works.',
             ]),
             _sub('Grid Settings', [
-                'The cog opens a window just under the card, or above it '
-                'when there is no room, so the preview stays in view. '
-                'Its sections: Grid, Icons and — where they apply — '
-                'Overhead and Sorting.',
+                'The cog opens a window centred on KazBars. Its sections: '
+                'Grid and Icons, then Overhead on an overhead grid and '
+                'Sorting on a dynamic one.',
                 'Every change shows on the preview at once — Size too, '
                 'while you drag. Apply (or Enter) saves; Cancel (or Esc) '
-                'puts it back.',
+                'puts it back. Enter on the Cancel button cancels.',
                 "A name that is empty or another grid's blocks Apply, with "
                 'a hint under the Name field.',
                 'Shrink a static grid and the slots past the new size are '
@@ -358,6 +361,16 @@ SECTIONS: list[_Section] = [
                 'buffs. The picker is titled with the slot, like "Slot 3 '
                 'Buffs". Empty slots stay empty; if several buffs share a '
                 'slot, the most recent wins.',
+                "The picker walks the grid's slots, so you can fill a grid "
+                'without closing it. Numbered chips under the header show '
+                "where you are: the current slot filled in the grid's "
+                'colour, assigned slots outlined. Hover one to see what it '
+                'holds. Click a chip, press ◀ ▶ beside Cancel, or use '
+                'Ctrl+PageUp / Ctrl+PageDown anywhere in the window to move.',
+                'Moving saves the slot you leave. Done saves the current '
+                "one. Cancel drops only the current slot's unsaved change — "
+                'slots you moved past stay saved. Once every slot holds a '
+                'buff, the status line adds "All N slots are assigned."',
                 'Right-click a slot to clear it. A toast says "click to '
                 'undo" for 8 seconds.',
                 'From the keyboard: Tab to the preview, arrows move between '
@@ -399,8 +412,8 @@ SECTIONS: list[_Section] = [
             'it greys out for Bar and Off.',
             'Flash — icons pulse near expiry. Under sets the threshold in '
             'seconds; it greys out while Flash is off.',
-            'Applied by me — show an effect only while you are the one who '
-            'applied it.',
+            "Applied by me is not here — it is the toggle on the card's "
+            'title line.',
             'Where a floating grid sits on screen is decided in-game, not '
             'here.',
             _link('Overlay Size and Font', 'overlay-size'),

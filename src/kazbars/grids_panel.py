@@ -812,7 +812,6 @@ class GridsPanel(ttk.Frame):
                 self.grids_frame, self.database, grid_config,
                 on_delete=self.delete_grid,
                 get_base_size=self.base_size,
-                on_resize=self._on_grid_resized,
                 on_whitelist_changed=self._on_card_buffs_changed,
                 name_in_use=self._grid_name_in_use,
                 on_edit=self._mark_modified,
@@ -901,12 +900,9 @@ class GridsPanel(ttk.Frame):
     def _grid_name_in_use(self, name, exclude_config):
         """True if a grid other than `exclude_config` already uses `name`.
         Names key the generated AS2 whitelist tables, so they must stay unique
-        — the card's rename validator calls this to block duplicates (the Add
-        Grid wizard has its own check)."""
+        — Grid Settings asks it (through the card's `name_problem`) to block
+        duplicates (the Add Grid wizard has its own check)."""
         return any(g is not exclude_config and g.get('id') == name for g in self.grids)
-
-    def _on_grid_resized(self):
-        self._mark_modified()
 
     def _on_card_buffs_changed(self):
         """A card's whitelist / slot-assignment dialog committed — refresh the

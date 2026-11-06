@@ -30,6 +30,7 @@ from .ui_helpers import (
     FONT_FORM_LABEL,
     FONT_SECTION,
     FONT_SMALL,
+    FONT_TINY,
     INPUT_WIDTH_FILTER,
     INPUT_WIDTH_NUM,
     INPUT_WIDTH_SEARCH,
@@ -45,11 +46,13 @@ from .ui_helpers import (
     PAD_TAB,
     PAD_TINY,
     PAD_XS,
+    SLOT_CHIP_GAP,
+    SLOT_CHIP_PX,
     THEME_COLORS,
     TK_COLORS,
 )
 from .ui_tk_style import style_tk_listbox
-from .ui_widgets import app_toast, debounced_callback
+from .ui_widgets import add_tooltip, app_toast, debounced_callback, refresh_tooltip
 from .window_position import (
     bind_window_position_save,
     fit_window_height,
@@ -385,29 +388,31 @@ class BuffSelectorDialog(tk.Toplevel):
     untouched, and can be removed like any other row — the one place a stored
     ref may be dropped is this explicit act. They revive on their own once a
     database update or import supplies the buff again.
+
+    With a `walker` (a static grid's cell opened it) the picker walks the
+    grid's slots itself: a strip of numbered chips under the header, ◀ ▶
+    beside Cancel and Ctrl+PageUp / Ctrl+PageDown anywhere in the window. A
+    move commits the slot it leaves (`walker.commit`) and loads the next; the
+    window, the search and the focus stay. Done commits the current slot;
+    Cancel drops only the current slot's unsaved edit. A walker answers
+    `count`, `start`, `accent`, `ids(i)`, `assigned(i)`, `commit(i, ids)` and
+    `tip(i)`.
     """
 
-    def __init__(self, parent, database, title="Select Buffs", initial_ids=None, layout='mixed'):
+    def __init__(self, parent, database, title="Select Buffs", initial_ids=None, layout='mixed',
+                 walker=None):
         super().__init__(parent)
         self.withdraw()
+        self.walker = walker
+        self.slot = walker.start if walker is not None else None
         self.title(title)
-        self._header_text = title.upper()
+        self._header_text = "SLOT BUFFS" if walker is not None else title.upper()
         self.transient(parent)
         self.grab_set()
 
         self.database = database
         self.layout = layout
-        self.selected_names = set()
-        self.unknown_refs = []  # unresolvable refs (int id / legacy name), kept inert
-        for bid in (initial_ids or []):
-            if isinstance(bid, str):
-                entry = database.get_entry_by_name(bid)
-            else:
-                entry = database.by_id.get(bid)
-            if entry:
-                self.selected_names.add(entry['name'])
-            else:
-                self.unknown_refs.append(bid)
+        self._load(walker.ids(self.slot) if walker is not None else initial_ids)
         self.result = None
         self._search_cache_key = None
         self._search_cache_value = None
@@ -430,12 +435,28 @@ class BuffSelectorDialog(tk.Toplevel):
         self.deiconify()
         self.search_entry.focus_set()
 
+    def _load(self, ids):
+        """Select `ids`: database refs by name, the rest kept as inert refs."""
+        self.selected_names = set()
+        self.unknown_refs = []  # unresolvable refs (int id / legacy name), kept inert
+        for bid in (ids or []):
+            if isinstance(bid, str):
+                entry = self.database.get_entry_by_name(bid)
+            else:
+                entry = self.database.by_id.get(bid)
+            if entry:
+                self.selected_names.add(entry['name'])
+            else:
+                self.unknown_refs.append(bid)
+
     def save_filter_state(self):
         set_setting('buff_selector_category', self.category_var.get())
         set_setting('buff_selector_type', self.type_var.get())
 
     def create_widgets(self):
         create_dialog_header(self, self._header_text, MODULE_COLORS['grids'])
+        if self.walker is not None:
+            self._build_slot_strip()
 
         search_frame = ttk.Frame(self, padding=PAD_SMALL)
         search_frame.pack(fill='x')
@@ -499,9 +520,112 @@ class BuffSelectorDialog(tk.Toplevel):
         ttk.Label(bottom_frame, textvariable=self.status_var).pack(side='left')
         ttk.Button(bottom_frame, text="Done", command=self.on_ok, width=BTN_DIALOG, bootstyle='success').pack(side='right', padx=PAD_SMALL)
         ttk.Button(bottom_frame, text="Cancel", command=self.on_cancel, width=BTN_DIALOG, bootstyle='secondary').pack(side='right', padx=PAD_SMALL)
+        if self.walker is not None:
+            self._step_buttons = {}
+            for glyph, delta, tip in (("▶", 1, "Next slot (Ctrl+PageDown)"),
+                                      ("◀", -1, "Previous slot (Ctrl+PageUp)")):
+                btn = ttk.Button(bottom_frame, text=glyph, width=3, bootstyle='secondary',
+                                 command=lambda d=delta: self.go_to(self.slot + d))
+                btn.pack(side='right', padx=(PAD_MICRO, 0))
+                add_tooltip(btn, tip)
+                self._step_buttons[delta] = btn
+            # On the window, so they work wherever focus is (the search box too).
+            self.bind('<Control-Prior>', lambda e: self._step_key(-1))
+            self.bind('<Control-Next>', lambda e: self._step_key(1))
 
         self.bind('<Escape>', lambda e: self.on_cancel())
         self.bind('<Return>', lambda e: self.on_ok())
+
+    # ------------------------------------------------------------------
+    # Slot walker (a static grid's cell opened the picker)
+    # ------------------------------------------------------------------
+    def _build_slot_strip(self):
+        """One row of numbered chips, one per slot in slot order; scrolls
+        sideways when they don't fit."""
+        frame = ttk.Frame(self, padding=(PAD_SMALL, PAD_XS, PAD_SMALL, 0))
+        frame.pack(fill='x')
+        stride = SLOT_CHIP_PX + SLOT_CHIP_GAP
+        self._chips = tk.Canvas(frame, height=SLOT_CHIP_PX + 2, bg=TK_COLORS['bg'],
+                                highlightthickness=0, bd=0)
+        self._chips.pack(fill='x')
+        self._chips_bar = ttk.Scrollbar(frame, orient='horizontal', command=self._chips.xview)
+        self._chips.configure(xscrollcommand=self._chips_bar.set,
+                              scrollregion=(0, 0, self.walker.count * stride, SLOT_CHIP_PX + 2))
+        for i in range(self.walker.count):
+            x = i * stride
+            self._chips.create_rectangle(x + 1, 1, x + SLOT_CHIP_PX, SLOT_CHIP_PX,
+                                         tags=(f'chip_{i}', 'rect'))
+            self._chips.create_text(x + 1 + SLOT_CHIP_PX // 2, 1 + SLOT_CHIP_PX // 2, text=str(i),
+                                    font=FONT_TINY, tags=(f'chip_{i}', 'num'))
+        self._chip_hot = -1
+        self._chips.bind('<Button-1>', self._on_chip_click)
+        self._chips.bind('<Motion>', self._on_chip_motion)
+        self._chips.bind('<Configure>', lambda e: self._fit_chip_bar())
+        add_tooltip(self._chips, lambda: self.walker.tip(self._chip_hot) if self._chip_hot >= 0 else "")
+        self._paint_chips()
+
+    def _chip_at(self, event):
+        x = int(self._chips.canvasx(event.x))
+        i, off = divmod(x, SLOT_CHIP_PX + SLOT_CHIP_GAP)
+        return i if off <= SLOT_CHIP_PX and 0 <= i < self.walker.count else -1
+
+    def _on_chip_click(self, event):
+        i = self._chip_at(event)
+        if i >= 0:
+            self.go_to(i)
+
+    def _on_chip_motion(self, event):
+        i = self._chip_at(event)
+        if i != self._chip_hot:
+            self._chip_hot = i
+            refresh_tooltip(self._chips)
+
+    def _fit_chip_bar(self):
+        """The scrollbar shows only while the chips overflow the strip."""
+        overflow = self.walker.count * (SLOT_CHIP_PX + SLOT_CHIP_GAP) > self._chips.winfo_width()
+        if overflow and not self._chips_bar.winfo_ismapped():
+            self._chips_bar.pack(fill='x')
+        elif not overflow and self._chips_bar.winfo_ismapped():
+            self._chips_bar.pack_forget()
+
+    def _paint_chips(self):
+        """The current chip filled with the type accent, an assigned one
+        outlined in it, an empty one in the input border; the current one
+        scrolled into view."""
+        accent = self.walker.accent
+        for i in range(self.walker.count):
+            current = i == self.slot
+            held = bool(self._selected_ids()) if current else self.walker.assigned(i)
+            fill = accent if current else TK_COLORS['input_bg']
+            outline = accent if (current or held) else TK_COLORS['border']
+            self._chips.itemconfigure(f'chip_{i}&&rect', fill=fill, outline=outline)
+            self._chips.itemconfigure(f'chip_{i}&&num',
+                                      fill=TK_COLORS['bg'] if current else THEME_COLORS['body'])
+        total = self.walker.count * (SLOT_CHIP_PX + SLOT_CHIP_GAP)
+        left, right = self._chips.xview()
+        pos = self.slot * (SLOT_CHIP_PX + SLOT_CHIP_GAP) / total
+        if not left <= pos < right - SLOT_CHIP_PX / total:
+            self._chips.xview_moveto(max(0.0, pos - (right - left) / 2))
+
+    def _step_key(self, delta):
+        self.go_to(self.slot + delta)
+        return 'break'
+
+    def go_to(self, slot):
+        """Commit the slot being edited, then load `slot` in the same window."""
+        if not 0 <= slot < self.walker.count or slot == self.slot:
+            return
+        self.walker.commit(self.slot, self._selected_ids())
+        self.slot = slot
+        self._load(self.walker.ids(slot))
+        self.title(f"Slot {slot} Buffs")
+        self.refresh_lists()
+
+    def _sync_walker(self):
+        for delta, btn in self._step_buttons.items():
+            live = 0 <= self.slot + delta < self.walker.count
+            btn.configure(state='normal' if live else 'disabled')
+        self._paint_chips()
 
     def refresh_lists(self):
         query = self.search_var.get()
@@ -575,11 +699,17 @@ class BuffSelectorDialog(tk.Toplevel):
         unresolved = f" + {len(self.unknown_refs)} unresolved" if self.unknown_refs else ""
         if count == 0 and not self.unknown_refs:
             if self.avail_data:
-                self.status_var.set("0 buffs selected. Add from the left list.")
+                status = "0 buffs selected. Add from the left list."
             else:
-                self.status_var.set("0 buffs selected. No buffs match the current filters.")
+                status = "0 buffs selected. No buffs match the current filters."
         else:
-            self.status_var.set(f"{count} buffs selected{unresolved}")
+            status = f"{count} buffs selected{unresolved}"
+        if self.walker is not None:
+            n = self.walker.count
+            if all(self.walker.assigned(i) for i in range(n) if i != self.slot) and self._selected_ids():
+                status += f" · All {n} slots are assigned."
+            self._sync_walker()
+        self.status_var.set(status)
 
     def add_selected(self):
         for i in self.avail_list.curselection():
@@ -605,15 +735,21 @@ class BuffSelectorDialog(tk.Toplevel):
         self.unknown_refs.clear()
         self.refresh_lists()
 
-    def on_ok(self):
-        self.save_filter_state()
-        self.result = []
+    def _selected_ids(self):
+        """The selection as refs: each selected entry's primary id, then the
+        inert refs the user didn't explicitly remove, unchanged."""
+        out = []
         for name in self.selected_names:
             entry = self.database.get_entry_by_name(name)
             if entry and entry.get('ids'):
-                self.result.append(entry['ids'][0])
-        # Inert refs the user didn't explicitly remove ride along unchanged.
-        self.result.extend(self.unknown_refs)
+                out.append(entry['ids'][0])
+        return out + list(self.unknown_refs)
+
+    def on_ok(self):
+        self.save_filter_state()
+        self.result = self._selected_ids()
+        if self.walker is not None:
+            self.walker.commit(self.slot, self.result)
         self.destroy()
 
     def on_cancel(self):

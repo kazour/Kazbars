@@ -4,8 +4,8 @@ KazBars — grid preview geometry and text (pure).
 What a grid card draws and says, with no Tk in sight: where each slot sits
 under the grid's fill direction (the AS2 runtime's `place()`, a band's
 `band()`), the to-scale ratio a preview draws at, the hit test behind a click,
-and the card's lines of text (the summary, a slot's tip, the names line, the
-nudge on a grid that holds nothing). The card's canvas (`grid_preview_canvas`)
+and the card's lines of text (a slot's tip, the names line, the nudge on a
+grid that holds nothing). The card's canvas (`grid_preview_canvas`)
 and the empty-state preset cards both draw from `layout()`.
 
 Scale: `num` app px per `den` game px of the baked icon; each gap is the grid's
@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from math import gcd
 from typing import Any
 
-from .grid_model import is_band, ref_list
+from .grid_model import ref_list
 from .grids_generator import grid_ships
 
 Rect = tuple[int, int, int, int]
@@ -168,11 +168,6 @@ def slot_total(cfg: dict) -> int:
     return cfg.get('rows', 1) * cfg.get('cols', 1)
 
 
-def assigned_slots(cfg: dict) -> int:
-    """How many slots inside the shape hold a buff — `grid_ships`'s count."""
-    return sum(1 for i in range(slot_total(cfg)) if slot_ids(cfg, i))
-
-
 def held_ids(cfg: dict) -> list:
     """The refs the grid holds in its order: the whitelist, or the slots in
     slot order (a ref in two slots once)."""
@@ -193,12 +188,14 @@ def _named(refs: Sequence, name_of: Callable[[Any], str]) -> str:
     return ', '.join(f"{n} x{c}" if c > 1 else n for n, c in counts.items())
 
 
-def slot_tip(cfg: dict, name_of: Callable[[Any], str], idx: int) -> str:
-    """A static cell's tooltip: what the slot holds and what a click does."""
+def slot_tip(cfg: dict, name_of: Callable[[Any], str], idx: int, *, actions: bool = True) -> str:
+    """What static slot `idx` holds (`Slot 3: Lash, Bloodlust x2` / `Slot 3:
+    empty`) and, with `actions`, what a click on its cell does."""
     refs = slot_ids(cfg, idx)
-    if not refs:
-        return f"Slot {idx}: empty — click to fill"
-    return f"Slot {idx}: {_named(refs, name_of)} — click to edit, right-click to clear"
+    line = f"Slot {idx}: {_named(refs, name_of)}" if refs else f"Slot {idx}: empty"
+    if not actions:
+        return line
+    return line + (" — click to edit, right-click to clear" if refs else " — click to fill")
 
 
 def empty_nudge(cfg: dict) -> str | None:
@@ -241,25 +238,3 @@ def names_line(names: Sequence[str], measure: Callable[[str], int], width: int) 
     while head and measure(head + '…' + more) > width:
         head = head[:-1]
     return head + '…' + more
-
-
-def summary(cfg: dict, *, shown_at: str, icon: int | None = None) -> str:
-    """The title line's muted summary: shape, mode, what it holds, then the
-    icon size (`icon`, given when off the default), the preview ratio and
-    Applied by me when they apply."""
-    mode = cfg.get('slotMode', 'dynamic')
-    tracked = len(ref_list(cfg.get('whitelist')))
-    if mode == 'static':
-        parts = [f"{cfg.get('rows', 1)}×{cfg.get('cols', 1)}", 'static',
-                 f"{assigned_slots(cfg)} of {slot_total(cfg)} assigned"]
-    else:
-        if is_band(cfg):
-            parts = [f"up to {cfg.get('maxSlots', 10)}", f"{cfg.get('rowCap', 5)} wide", 'dynamic']
-        else:
-            parts = [f"{cfg.get('rows', 1)}×{cfg.get('cols', 1)}", 'dynamic']
-        if tracked:
-            parts.append(f"tracking {tracked} buff{'s' if tracked != 1 else ''}")
-    if icon is not None:
-        parts.append(f"{icon} px icons")
-    applied = ' · applied by me' if cfg.get('selfCastOnly') is True else ''
-    return ' · '.join(parts) + shown_at + applied

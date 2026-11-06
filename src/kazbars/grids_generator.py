@@ -485,7 +485,7 @@ class CodeGenerator:
             labels: dict = {}
             whitelist = self._expand_primary_ids(grid.get("whitelist", []), labels)
             slots = {
-                k: self._expand_primary_ids(ref_list(v), labels) if v else []
+                k: self._expand_primary_ids(ref_list(v), labels)
                 for k, v in grid.get("slotAssignments", {}).items()
             }
             if grid["slotMode"] == "static":
@@ -647,8 +647,7 @@ def unresolved_refs(grids, database) -> list:
             continue
         refs = list(g.get('whitelist') or [])
         for val in (g.get('slotAssignments') or {}).values():
-            if val:
-                refs.extend(ref_list(val))
+            refs.extend(ref_list(val))
         for ref in refs:
             if isinstance(ref, bool) or ref in seen:
                 continue

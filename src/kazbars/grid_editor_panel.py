@@ -3,15 +3,15 @@
 `GridEditorPanel` is one card in the grids list. The container `GridsPanel`
 (in `grids_panel.py`) creates/destroys these as the grid list changes.
 
-A card is a row, never expanded: the title line (name, type, summary; the
-settings cog, Move…, Enabled, ▲ ▼, ×), the grid drawn to scale
+A card is a row, never expanded: the title line (name, type, mode; the
+settings cog, Move…, Applied by me, Enabled, ▲ ▼, ×), the grid drawn to scale
 (`GridPreview`) and the names line under it. The preview is where buffs are
 chosen: a dynamic grid's opens the Tracked Buffs picker, a static grid's cell
-opens it on that slot, and a right-click (or Delete) clears a slot with an
-undo toast. The cog opens Grid Settings (`grid_settings_dialog`), whose draft
-the preview follows live; Apply lands it through `apply_settings`, which runs
-the resize rules (trim / restore slot assignments, a dynamic grid's 1x1, the
-fill reset).
+opens it on that slot (walking the grid's slots from there), and a
+right-click (or Delete) clears a slot with an undo toast. The cog opens Grid
+Settings (`grid_settings_dialog`), whose draft the preview follows live;
+Apply lands it through `apply_settings` (the shape through `settle_box`, a
+static grid's slot assignments trimmed or restored).
 """
 
 import time
@@ -58,6 +58,44 @@ _CLEAR_UNDO_S = 8
 _NAMES_FALLBACK_W = 600
 
 
+# Applied by me's round toggle, and its dimmed twin for a disabled grid (the
+# label greys with the title; the switch keeps working).
+_TOGGLE_STYLE = 'success.Round.Toggle'
+_DIM_TOGGLE_STYLE = 'Dim.' + _TOGGLE_STYLE
+
+
+def _dim_toggle_style():
+    ttk.Style().configure(_DIM_TOGGLE_STYLE, foreground=TK_COLORS['dim_text'])
+    return _DIM_TOGGLE_STYLE
+
+
+class _SlotWalker:
+    """What the slot picker walks: a static grid's slots, read and written
+    through its card (`BuffSelectorDialog`'s `walker`)."""
+
+    def __init__(self, card, start):
+        self.card = card
+        self.start = start
+        self.count = grid_preview.slot_total(card.grid_config)
+        self.accent = card._accent_color
+        self.committed = False
+
+    def ids(self, slot):
+        return grid_preview.slot_ids(self.card.grid_config, slot)
+
+    def assigned(self, slot):
+        return bool(self.ids(slot))
+
+    def tip(self, slot):
+        return grid_preview.slot_tip(self.card.grid_config, self.card._name_of, slot, actions=False)
+
+    def commit(self, slot, refs):
+        """Write `slot` back as the picker leaves it (only when it changed)."""
+        if list(refs) != self.ids(slot):
+            self.card._write_slot(slot, refs)
+            self.committed = True
+
+
 def _names_measure(widget):
     """`measure(text)` in the names line's font: one Font per Tk root, shared
     by every card under it."""
@@ -72,7 +110,7 @@ class GridEditorPanel(ttk.Frame):
     """One grid's row: title line, to-scale preview, names line."""
 
     def __init__(self, parent, database, grid_config, on_delete=None,
-                 get_base_size=None, on_resize=None, on_whitelist_changed=None,
+                 get_base_size=None, on_whitelist_changed=None,
                  name_in_use=None, on_edit=None, on_move=None, on_step=None, find_card=None):
         super().__init__(parent)
         self.database = database
@@ -81,7 +119,6 @@ class GridEditorPanel(ttk.Frame):
         # The profile's overlay size, read live: the preview and the Size hint
         # follow the Grids toolbar's Overlay dropdown.
         self._get_base_size = get_base_size or (lambda: DEFAULT_SIZE)
-        self._on_resize = on_resize
         self._on_whitelist_changed = on_whitelist_changed
         self._name_in_use = name_in_use
         self._on_edit = on_edit
@@ -161,8 +198,8 @@ class GridEditorPanel(ttk.Frame):
     # Title line
     # ------------------------------------------------------------------
     def _build_title_line(self):
-        """Name, type badge and summary on the left; on the right, left to
-        right: the settings cog, Move…, Enabled, ▲ ▼ and × delete."""
+        """Name, type badge and mode on the left; on the right, left to
+        right: the settings cog, Move…, Applied by me, Enabled, ▲ ▼ and ×."""
         header = ttk.Frame(self._row)
         header.pack(fill='x')
         self._title_label = ttk.Label(header, font=FONT_SECTION, foreground=THEME_COLORS['heading'])
@@ -187,7 +224,16 @@ class GridEditorPanel(ttk.Frame):
                                      command=self._on_enabled_toggled,
                                      bootstyle="success-round-toggle")  # type: ignore[call-arg]
         enabled_cb.pack(side='right', padx=(0, PAD_XS))
-        in_view = [enabled_cb, self._step_labels[-1], self._step_labels[1], delete_label]
+        self.self_cast_var = tk.BooleanVar(value=self.grid_config.get('selfCastOnly') is True)
+        self._self_cast_cb = ttk.Checkbutton(header, text="Applied by me",
+                                             variable=self.self_cast_var,
+                                             command=self._on_self_cast_toggled,
+                                             bootstyle="success-round-toggle")  # type: ignore[call-arg]
+        self._self_cast_cb.pack(side='right', padx=(0, PAD_LF))
+        add_tooltip(self._self_cast_cb, "Show only effects you cast, with your own timer, even when "
+                                        "other players cast the same effect on the same character.")
+        in_view = [self._self_cast_cb, enabled_cb, self._step_labels[-1], self._step_labels[1],
+                   delete_label]
         if self._on_move is not None:
             move_label = self._glyph_label(header, "Move…", FONT_SMALL,
                                            "Move this grid to another class tab, or copy it there",
@@ -310,9 +356,9 @@ class GridEditorPanel(ttk.Frame):
         cell, then these)."""
         cfg = self.grid_config if cfg is None else cfg
         self._title_label.configure(text=cfg.get('id', 'Grid'))
+        # The mode only: the preview shows the shape, the names line the buffs.
         shown_at = grid_preview.ratio_text(PREVIEW_RATIO[0], self.preview.ratio, PREVIEW_RATIO[1])
-        icon = self._icon(cfg) if cfg.get('scale', SCALE_DEFAULT) != SCALE_DEFAULT else None
-        self.summary_label.configure(text=grid_preview.summary(cfg, shown_at=shown_at, icon=icon))
+        self.summary_label.configure(text=cfg.get('slotMode', 'dynamic') + shown_at)
         self._names = [self._name_of(ref) for ref in grid_preview.held_ids(cfg)]
         self._draw_names()
 
@@ -391,15 +437,16 @@ class GridEditorPanel(ttk.Frame):
             self._buffs_changed()
 
     def edit_slot(self, slot):
-        """The same picker on one static slot (a click on its cell)."""
+        """The same picker on one static slot (a click on its cell), walking
+        the grid's slots from there: every slot it leaves, and the one Done
+        closes on, is written back as it goes."""
+        walker = _SlotWalker(self, slot)
         dialog = BuffSelectorDialog(
             self.winfo_toplevel(), self.database, f"Slot {slot} Buffs",
-            initial_ids=grid_preview.slot_ids(self.grid_config, slot),
-            layout=self.grid_config.get('layout', 'mixed'),
+            layout=self.grid_config.get('layout', 'mixed'), walker=walker,
         )
         self.wait_window(dialog)
-        if dialog.result is not None:
-            self._write_slot(slot, dialog.result)
+        if walker.committed:
             self._buffs_changed()
 
     def _write_slot(self, slot, refs):
@@ -478,13 +525,8 @@ class GridEditorPanel(ttk.Frame):
         this guards only a caller that skipped it — and a static grid's change
         of slot count trims its assignments (restored on a regrow)."""
         cfg = self.grid_config
-        old_shape = (cfg.get('rows', 1), cfg.get('cols', 1), cfg.get('rowCap'), cfg.get('maxSlots'))
         old_total = grid_preview.slot_total(cfg)
-        cfg.update({k: v for k, v in draft.items() if k != 'selfCastOnly'})
-        if draft.get('selfCastOnly') is True:
-            cfg['selfCastOnly'] = True
-        else:
-            cfg.pop('selfCastOnly', None)
+        cfg.update(draft)
         if not self._band:
             rows, cols, fill = settle_box(cfg['rows'], cfg['cols'], cfg.get('fillDirection'),
                                           cfg.get('type', 'player'), cfg.get('slotMode') == 'dynamic')
@@ -495,19 +537,15 @@ class GridEditorPanel(ttk.Frame):
                 elif rows * cols > old_total:
                     self._restore_orphaned_assignments(rows * cols)
         self._refresh_view()
-        new_shape = (cfg['rows'], cfg['cols'], cfg.get('rowCap'), cfg.get('maxSlots'))
-        if new_shape != old_shape and self._on_resize:
-            self._on_resize()
-        else:
-            self._notify_edit()
+        self._notify_edit()
 
     def _trim_slot_assignments(self, new_total):
         """Drop assignments past new_total; stash dropped IDs on the grid for later restore."""
         sa = self.grid_config.get('slotAssignments') or {}
         dropped_ids = []
         for k, v in sa.items():
-            if int(k) >= new_total and v:
-                dropped_ids.extend(b for b in ref_list(v) if b)
+            if int(k) >= new_total:
+                dropped_ids.extend(ref_list(v))
         self.grid_config['slotAssignments'] = {
             k: v for k, v in sa.items() if int(k) < new_total
         }
@@ -535,7 +573,7 @@ class GridEditorPanel(ttk.Frame):
             if not orphans:
                 break
             slot_key = str(k)
-            if not any(ref_list(sa.get(slot_key))):
+            if not ref_list(sa.get(slot_key)):
                 sa[slot_key] = [orphans.pop(0)]
                 restored.append(sa[slot_key][0])
         if not restored:
@@ -564,10 +602,18 @@ class GridEditorPanel(ttk.Frame):
             self.on_delete(self)
 
     def _notify_edit(self):
-        # Non-structural edit → the container mirrors grids into the profile
-        # store (structural changes notify via _on_resize instead).
+        # Any settled edit → the container mirrors grids into the profile store.
         if self._on_edit:
             self._on_edit()
+
+    def _on_self_cast_toggled(self):
+        """Applied by me: written only when on, so a grid that never set it
+        saves unchanged."""
+        if self.self_cast_var.get():
+            self.grid_config['selfCastOnly'] = True
+        else:
+            self.grid_config.pop('selfCastOnly', None)
+        self._notify_edit()
 
     def _on_enabled_toggled(self):
         self.save_to_config()
@@ -589,3 +635,4 @@ class GridEditorPanel(ttk.Frame):
             foreground=THEME_COLORS['heading'] if enabled else TK_COLORS['dim_text'])
         self._badge_label.configure(
             foreground=self._accent_color if enabled else TK_COLORS['dim_text'])
+        self._self_cast_cb.configure(style=_TOGGLE_STYLE if enabled else _dim_toggle_style())

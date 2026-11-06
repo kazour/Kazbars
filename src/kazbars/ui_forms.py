@@ -49,11 +49,13 @@ def labeled_spinbox(
     `label_sink`, when given a list, receives the descriptor label so a caller
     can grey it in step with the control (as `create_slider_row`).
     """
-    lbl = ttk.Label(parent, text=label, font=label_font)
-    if label_color:
-        lbl.configure(foreground=label_color)
-    lbl.pack(side="left")
-    if label_sink is not None:
+    lbl = None
+    if label is not None:  # None: the caller lays out its own label (a form grid)
+        lbl = ttk.Label(parent, text=label, font=label_font)
+        if label_color:
+            lbl.configure(foreground=label_color)
+        lbl.pack(side="left")
+    if label_sink is not None and lbl is not None:
         label_sink.append(lbl)
 
     def _validate(value):
@@ -102,7 +104,8 @@ def labeled_combobox(
 ):
     """Labeled readonly combobox. `on_change`, if given, fires on user
     selection (never on a programmatic `var.set`). Returns the Combobox widget."""
-    ttk.Label(parent, text=label, font=label_font).pack(side="left")
+    if label is not None:
+        ttk.Label(parent, text=label, font=label_font).pack(side="left")
     combo = ttk.Combobox(parent, textvariable=var, values=values, width=width, state="readonly")
     combo.pack(side="left", padx=padx)
     if on_change is not None:
@@ -133,10 +136,12 @@ def position_entry(
     [lo, hi] on focus-out. `on_change`, if given, fires after the clamp. Returns
     the Entry so callers can grey it when disabled.
     """
-    lbl = ttk.Label(parent, text=label, font=label_font)
-    if label_color:
-        lbl.configure(foreground=label_color)
-    lbl.pack(side="left")
+    lbl = None
+    if label is not None:  # None: the caller lays out its own label (a form grid)
+        lbl = ttk.Label(parent, text=label, font=label_font)
+        if label_color:
+            lbl.configure(foreground=label_color)
+        lbl.pack(side="left")
 
     def _validate(value):
         if value in ("", "-"):
@@ -418,10 +423,12 @@ def size_slider(parent, initial, hint, on_commit=None, *, label="Size:", length=
     `refresh()` to move the thumb and redraw. `label_sink`, when given a list,
     receives the three labels so a caller can grey them with the scale."""
     var = tk.IntVar(value=snap_scale(int(initial)))
-    lbl = ttk.Label(parent, text=label, font=label_font)
-    if label_color:
-        lbl.configure(foreground=label_color)
-    lbl.pack(side="left")
+    lbl = None
+    if label is not None:  # None: the caller lays out its own label (a form grid)
+        lbl = ttk.Label(parent, text=label, font=label_font)
+        if label_color:
+            lbl.configure(foreground=label_color)
+        lbl.pack(side="left")
     value_label = ttk.Label(parent, font=FONT_SMALL, foreground=THEME_COLORS["muted"],
                             width=5, anchor="e")
     hint_label = ttk.Label(parent, font=FONT_SMALL, foreground=THEME_COLORS["muted"])
@@ -478,7 +485,7 @@ def size_slider(parent, initial, hint, on_commit=None, *, label="Size:", length=
     if tooltip:
         add_tooltip(scale, tooltip)
     if label_sink is not None:
-        label_sink.extend((lbl, value_label, hint_label))
+        label_sink.extend(w for w in (lbl, value_label, hint_label) if w is not None)
     _show()
     return scale, var, refresh
 

@@ -508,11 +508,12 @@ class KazBarsApp(ttkb.Window):
         ])
 
     def _hotkey(self, fn):
-        """Wrap a bind_all shortcut handler: shortcuts bypass the build modal's
-        grab (menu items are already blocked by it), so swallow them while a
-        build is running."""
+        """Wrap a bind_all shortcut handler: shortcuts bypass a modal's grab
+        (menu items are already blocked by it), so swallow them while a build
+        runs or any dialog holds the grab — Ctrl+N under Grid Settings would
+        rebuild the card the dialog is editing."""
         def handler(_event):
-            if not self._building:
+            if not self._building and self.grab_current() is None:
                 fn()
         return handler
 

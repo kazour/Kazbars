@@ -309,7 +309,7 @@ def test_grid_settings_cancel_leaves_the_config_and_redraws_the_card(app):
     width = card.preview.layout.width
     dlg = _settings(card)
     dlg.cols_var.set('8')
-    dlg._on_shape('cols')
+    dlg._on_shape()
     assert card.preview.layout.width > width, "the card previews the draft"
     dlg.cancel()
     assert card.grid_config == before
@@ -984,9 +984,12 @@ class _FakePicker:
     opened: list = []
     result = None
 
-    def __init__(self, parent, database, title, initial_ids=None, layout='mixed'):
-        _FakePicker.opened.append((title, list(initial_ids or [])))
+    def __init__(self, parent, database, title, initial_ids=None, layout='mixed', walker=None):
+        start = walker.ids(walker.start) if walker is not None else initial_ids
+        _FakePicker.opened.append((title, list(start or [])))
         self.result = _FakePicker.result
+        if walker is not None and self.result is not None:
+            walker.commit(walker.start, self.result)  # what Done does
 
 
 def test_a_static_cell_opens_the_picker_on_its_slot_and_repaints_that_cell(app, monkeypatch):
@@ -1005,9 +1008,35 @@ def test_a_static_cell_opens_the_picker_on_its_slot_and_repaints_that_cell(app, 
     assert _FakePicker.opened == [('Slot 4 Buffs', [11])]
     assert card.grid_config['slotAssignments'] == {'4': [21, 22]}
     assert painted == [4], "only that cell repaints"
-    assert '1 of 9 assigned' in card.summary_label.cget('text')
+    assert card.summary_label.cget('text') == 'static'
     stored = app.profile_store.get_section('grids')['grids'][-1]
     assert stored['slotAssignments'] == {'4': [21, 22]}
+
+
+def test_the_slot_picker_walks_the_grid_committing_each_slot_it_leaves(app):
+    from kazbars.grid_dialogs import BuffSelectorDialog
+    from kazbars.grid_editor_panel import _SlotWalker
+    from kazbars.grid_model import create_default_grid
+    a, b = (e['ids'][0] for e in app.database.grouped_buffs[:2])
+    card = _card_for(app, dict(create_default_grid('player', 1, 3, 'static', 'SeamWalk'),
+                               slotAssignments={'0': [a]}))
+    walker = _SlotWalker(card, 0)
+    dlg = BuffSelectorDialog(app, app.database, "Slot 0 Buffs", walker=walker)
+    try:
+        assert len(dlg._chips.find_withtag('rect')) == 3
+        assert str(dlg._step_buttons[-1].cget('state')) == 'disabled'
+        dlg.selected_names.add(app.database.by_id[b]['name'])
+        dlg.go_to(1)  # leaving slot 0 commits it
+        assert sorted(card.grid_config['slotAssignments']['0']) == sorted([a, b])
+        assert (dlg.slot, dlg.title(), dlg.selected_names) == (1, 'Slot 1 Buffs', set())
+        assert dlg._step_key(1) == 'break' and dlg.slot == 2
+        assert str(dlg._step_buttons[1].cget('state')) == 'disabled'
+        dlg.selected_names.add(app.database.by_id[a]['name'])
+        dlg.on_cancel()  # drops only the current slot's edit
+        assert '2' not in card.grid_config['slotAssignments'] and walker.committed
+    finally:
+        if dlg.winfo_exists():
+            dlg.destroy()
 
 
 def test_a_right_click_clears_a_slot_and_the_toast_puts_it_back(app, monkeypatch):
@@ -1078,7 +1107,7 @@ def test_applying_a_smaller_shape_trims_slots_with_the_warning(app, monkeypatch)
     dlg = _settings(card)
     dlg.rows_var.set('2')
     dlg.cols_var.set('2')
-    dlg._on_shape('cols')
+    dlg._on_shape()
     dlg.apply()
     cfg = card.grid_config
     assert (cfg['rows'], cfg['cols'], cfg['slotAssignments']) == (2, 2, {'0': [1]})
@@ -1161,6 +1190,48 @@ def test_a_band_card_writes_its_cap_slots_and_overhead_keys(app):
     cfg = card.grid_config
     assert (cfg['rowCap'], cfg['maxSlots'], cfg['rows'], cfg['cols']) == (7, 9, 2, 7)
     assert (cfg['maxDistance'], cfg['showSelf'], cfg['fillDirection']) == (60, False, 'C')
+
+
+def test_applied_by_me_is_a_toggle_on_the_card(app):
+    card, idx = _add_seam_grid(app, 'SeamSelfCast')
+    card.self_cast_var.set(True)
+    card._on_self_cast_toggled()
+    assert _stored_grid(app, idx)['selfCastOnly'] is True
+    card.self_cast_var.set(False)
+    card._on_self_cast_toggled()
+    assert 'selfCastOnly' not in _stored_grid(app, idx)
+    assert card.summary_label.cget('text') == 'dynamic'
+
+
+def test_the_dialog_lines_its_labels_up_in_one_column(app):
+    from tkinter import ttk
+
+    from kazbars.grid_model import create_default_grid
+    card = _card_for(app, create_default_grid('friendly', 2, 5, 'dynamic', 'SeamAlign'))
+    dlg = _settings(card)
+    try:
+        cards = _widgets(dlg, ttk.LabelFrame)
+        assert len(cards) == 4
+        widths = {int(c.columnconfigure(0)['minsize']) for c in cards}
+        assert len(widths) == 1 and widths.pop() > 0
+    finally:
+        dlg.cancel()
+
+
+def test_enter_on_cancel_cancels_and_hotkeys_wait_for_the_dialog(app, monkeypatch):
+    import copy
+    card, _ = _add_seam_grid(app, 'SeamEnter')
+    before = copy.deepcopy(card.grid_config)
+    dlg = _settings(card)
+    fired = []
+    app._hotkey(lambda: fired.append(1))(None)
+    assert fired == [], "a shortcut under the dialog's grab is swallowed"
+    dlg.gap_var.set('9')
+    monkeypatch.setattr(dlg, 'focus_get', lambda: dlg._cancel_btn)
+    dlg._on_return(None)
+    assert not dlg.winfo_exists() and card.grid_config == before
+    app._hotkey(lambda: fired.append(1))(None)
+    assert fired == [1]
 
 
 def test_a_hostile_box_has_overhead_settings_and_no_sorting(app):

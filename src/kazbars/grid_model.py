@@ -161,12 +161,7 @@ def create_default_grid(grid_type="player", rows=1, cols=10, mode="dynamic", gri
     if rows == 1 and cols == 1 and not plate:
         mode = "static"
 
-    if rows == 1:
-        fill_dir = "LR"
-    elif cols == 1:
-        fill_dir = "BT"
-    else:
-        fill_dir = "BL-TR"
+    fill_dir = valid_fills(rows, cols)[1]
 
     grid = {
         'id': grid_id or f"{grid_type.title()}Grid 1",
@@ -289,24 +284,27 @@ def _clamp_int(grid, key, default, lo, hi):
 
 
 def _validate_overhead(grid):
-    """The overhead keys, where they apply and nowhere else: an overhead grid's
-    shape inside 4 x 8 with its columns giving way to its 16 slots, its height
+    """The overhead keys, where they apply and nowhere else: an overhead box's
+    shape and fill through `settle_box` (inside 4 x 8, its columns giving way
+    to its 16 slots), an overhead grid's height
     (`plateOffset`, px of room for the nameplate) and range (`maxDistance`, m);
     a band's `rowCap` and `maxSlots` and the shape and centred fill derived from
     them; a friendly grid's `showSelf`."""
     gtype = grid['type']
     if is_plate(gtype):
-        grid['rows'] = min(grid['rows'], PLATE_MAX_ROWS)
-        grid['cols'] = min(grid['cols'], PLATE_MAX_COLS)
         grid['plateOffset'] = _clamp_int(grid, 'plateOffset', PLATE_OFFSET_DEFAULT, 0, 400)
         grid['maxDistance'] = _clamp_int(grid, 'maxDistance', PLATE_DISTANCE_DEFAULT, 5, 100)
         if is_band(grid):
+            # A band saved without its keys reads them off its shape, clamped first.
+            grid['rows'] = min(grid['rows'], PLATE_MAX_ROWS)
+            grid['cols'] = min(grid['cols'], PLATE_MAX_COLS)
             cap = snap_row_cap(_clamp_int(grid, 'rowCap', grid['cols'], 1, 7))
             slots = _clamp_int(grid, 'maxSlots', grid['rows'] * grid['cols'], 1, PLATE_MAX_SLOTS)
             grid['rows'], grid['cols'] = band_shape(cap, slots)
             grid.update(rowCap=cap, maxSlots=slots, fillDirection='C')
         else:
-            grid['cols'] = min(grid['cols'], PLATE_MAX_SLOTS // grid['rows'])
+            grid['rows'], grid['cols'], grid['fillDirection'] = settle_box(
+                grid['rows'], grid['cols'], grid.get('fillDirection'), gtype, False)
             grid.pop('rowCap', None)
             grid.pop('maxSlots', None)
     else:
