@@ -1,13 +1,14 @@
 // KazBarsOnslaught.as - Onslaught Tracker: an in-game HUD module that runs only
 // inside the two Onslaught instances (Skull Gate, Kuthchemes) and does no
 // per-frame work anywhere else. It finds the watched mobs as they spawn
-// (KazBarsOnsScan), shows where they are and how hurt in four tiers (boss,
-// skull, mini, camps), times each wave from the game's own wave widget (its
-// progress bar is the fatality line), warns about Thugra Khotan's area attacks
-// and keeps the defended ally's HP (Valkyrie Hylda) on screen. Which of the five
-// displays exist, the watch list, the heal buff names and the per-instance facts
-// (playfield ids, start action, spawn window, ally) are all baked into d.ONS;
-// nothing about the game is hardcoded here.
+// (KazBarsOnsScan), shows where they are and how hurt in five tiers (boss,
+// skull, mini, camps, guards: the guards' tier is empty unless the build lists
+// them apart), times each wave from the game's own wave widget (its progress bar
+// is the fatality line), warns about Thugra Khotan's area attacks and keeps the
+// defended ally's HP (Valkyrie Hylda) on screen. Which of the five displays
+// exist, the watch list, the heal and shield buff names and the per-instance
+// facts (playfield ids, start action, spawn window, ally, skull camps) are all
+// baked into d.ONS; nothing about the game is hardcoded here.
 //
 // Two anchors, each placed in preview through the shared overlay in
 // KazBarsPreview and remembered in the module archive (onpx onpy onax onay, and
@@ -20,8 +21,12 @@
 //
 // The board is laid out from a running cursor: the fixed lines (wave, fatality,
 // ally, start hint), then for each tier that has a row a header and its rows in
-// the scan's order. A row is a name, a value, a bar under both and, while a
-// heal buff is on the mob, a green cross after the name. It belongs to its
+// the scan's order. The wave line is the board's title: the wave's label, the
+// elapsed clock, the phase, the remaining clock and "left", one field each on
+// one bottom edge, the clocks at the Alert size. A row is a name, a value (a
+// skull standing on a camp shows the camp's name for its distance), a bar
+// under both (light blue while a shield buff is on the mob) and, while a heal
+// buff is on the mob, a green cross after the name. It belongs to its
 // record (r.row), is made on the record's first paint and is removed when the
 // scan drops the record (a won wave drops all but the camps in view) or when the
 // mob has been out of view for 20 s; the scan goes on holding that record, and
@@ -52,17 +57,21 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
     private var W:Object;         // watched name -> kind
     private var H:Object;         // AoE helper names
     private var HEAL:Object;      // heal buff names -> true
+    private var SHIELD:Object;    // shield buff names -> true
+    private var GUARD:Boolean;    // the guards list apart (their own tier)
+    private var TIERS:String;     // the tiers' kind codes, top to bottom
     private var INST:Object;      // playfield id -> {start, spawnMs, ally, aoe}
     private var PULSE:Array;      // 20 alpha steps, 70 + 30 cos
     private var P:Array;          // anchor x, y pairs: board, alerts
-    private var TS:Object;        // tier style by kind code b s m c: {fs, bold, col, bh, rh, hd}
+    private var TS:Object;        // tier style by kind code b s m c g: {fs, bold, col, bh, rh, hd}
 
     // Geometry beyond the base set, every value Math.round(FS x ratio). Type is
     // the base's roles: boss rows and the wave line Title, camp rows and tier
     // headers Small, alerts Alert, everything else Body (see KazBarsPanel).
     private var NAME_W:Number;    // 16   name column
     private var VAL_W:Number;     // 9    value column
-    private var ABAR_H:Number;    // 0.35 the thin bar under the fatality and ally lines
+    private var ABAR_H:Number;    // 0.45 the thin bar under the fatality and ally lines
+    private var BARW:Number;      // every bar's width: 0.9 x PW, floored
     private var EX:Number;        // what such a bar adds under its line
     private var PW:Number;        // NAME_W + VAL_W
     private var AH:Number;        // an alert line: lh(ALERT_FS)
@@ -145,20 +154,26 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         applyBaseSize(Number(cfg.fontSize));
         NAME_W = rd(16);
         VAL_W = rd(9);
-        ABAR_H = rd(0.35);
+        ABAR_H = rd(0.45);
         EX = ABAR_H + 2;
         PW = NAME_W + VAL_W;
+        BARW = Math.floor(PW * 0.9);
         AH = lh(ALERT_FS);
-        // 37 x FS holds the longest alert there can be (SKULL + the longest
-        // watched name + a three-digit distance) at ALERT_FS, at every FS.
+        // 37 x FS holds the longest alert there can be (SKULL or GUARD + the
+        // longest watched name + a three-digit distance) at ALERT_FS, at every FS.
         AW = rd(37);
-        TS = {b: tier(NAME_FS, true, 0xF7A22B, 0.5, "BOSS"), s: tier(FS, false, 0xE0703C, 0.4, "SKULL"),
-              m: tier(FS, false, 0xC8C0B0, 0.3, "MINI"), c: tier(SMALL_FS, false, 0x9A9284, 0.25, "CAMPS")};
+        GUARD = cfg.watch.g.length > 0;
+        TIERS = "bsmcg";
+        TS = {b: tier(NAME_FS, true, 0xF7A22B, 0.6, "BOSS"), s: tier(FS, false, 0xE0703C, 0.5, "SKULL"),
+              m: tier(FS, false, 0xC8C0B0, 0.4, "MINI"), c: tier(SMALL_FS, false, 0x9A9284, 0.35, "CAMPS"),
+              g: tier(FS, false, 0xE0703C, 0.5, "GUARDS")};
         FX = [0, -Math.round(AW / 2)];
         FW = [PW + PAD * 2, AW];
-        // The board's footprint is its preview sample: wave, fatality and ally lines, four headers, five rows.
-        FH = [PAD * 2 + (WAVE ? NAME_H + LINE + EX : 0) + (ALLY ? LINE + EX : 0)
-              + (LIST ? SMALL_H * 4 + TS.b.rh + TS.s.rh + TS.m.rh * 2 + TS.c.rh : 0), AH * 2];
+        // The board's footprint is its preview sample: wave, fatality and ally lines, four headers,
+        // five rows, and the guards' header and row when they list apart.
+        FH = [PAD * 2 + (WAVE ? AH + LINE + EX : 0) + (ALLY ? LINE + EX : 0)
+              + (LIST ? SMALL_H * 4 + TS.b.rh + TS.s.rh + TS.m.rh * 2 + TS.c.rh
+                 + (GUARD ? SMALL_H + TS.g.rh : 0) : 0), AH * 2];
         var k:String;
         var a:Array;
         var i:Number;
@@ -176,6 +191,10 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         a = cfg.heal;
         i = a.length;
         while (i--) HEAL[a[i]] = true;
+        SHIELD = {};
+        a = cfg.shield;
+        i = a.length;
+        while (i--) SHIELD[a[i]] = true;
         PULSE = [];
         for (i = 0; i < 20; i++) PULSE.push(70 + 30 * Math.cos(i * Math.PI / 10));
     }
@@ -255,7 +274,7 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         var ao:Boolean = AOE && p.aoe;
         if (!previewMode) build(false);
         if (LIST || ALERTS || ao || an != "") {
-            scan = new KazBarsOnsScan(w, W, H, an, ao, HEAL);
+            scan = new KazBarsOnsScan(w, W, H, an, ao, HEAL, SHIELD, p.camps);
             scan.start();
         }
         wReset();
@@ -357,17 +376,19 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         }
         cl[0].createEmptyMovieClip("p", 0);
         if (LIST) {
-            for (i = 0; i < 4; i++) hd[i] = mkHd(TS["bsmc".charAt(i)]);
+            for (i = 0; i < TIERS.length; i++) hd[i] = mkHd(TS[TIERS.charAt(i)]);
         }
         if (cl[1] != null) a0 = mkAl(0);
         if (!prev) return;
 
-        paintP({anchor: 1, ally: {st: 0, pct: 87}, mobs: [
-            {nm: "Louhi", k: "b", st: 0, pct: 100, d: 180, hl: 1},
-            {nm: "Excavator of Souls", k: "s", st: 0, pct: 72, d: 210, hl: 0},
-            {nm: "Gurnakhi Slaver", k: "m", st: 0, pct: 72, d: 240, hl: 0},
-            {nm: "Asshuri Sultan", k: "m", st: 0, pct: 100, d: 95, hl: 0},
-            {nm: "Zug-Touched Monitor", k: "c", st: 0, pct: 100, d: 141, hl: 0}]}, getTimer(), true);
+        var mobs:Array = [
+            {nm: "Louhi", k: "b", st: 0, pct: 100, d: 180, hl: 1, sh: 0, cp: ""},
+            {nm: "Excavator of Souls", k: "s", st: 0, pct: 72, d: 210, hl: 0, sh: 0, cp: "Temple"},
+            {nm: "Gurnakhi Slaver", k: "m", st: 0, pct: 72, d: 240, hl: 0, sh: 0, cp: ""},
+            {nm: "Asshuri Sultan", k: "m", st: 0, pct: 100, d: 95, hl: 0, sh: 0, cp: ""},
+            {nm: "Zug-Touched Monitor", k: "c", st: 0, pct: 100, d: 141, hl: 0, sh: 0, cp: ""}];
+        if (GUARD) mobs.push({nm: "Gurnakhi Juggernaut", k: "g", st: 0, pct: 100, d: 60, hl: 0, sh: 1, cp: ""});
+        paintP({anchor: 1, ally: {st: 0, pct: 87}, mobs: mobs}, getTimer(), true);
         if (cl[1] != null) setAl(a0, "Gurnakhi Slaver - 240 m", 0xF7A22B);
         var lb:Array = ["Onslaught", "Onslaught Alerts"];
         for (i = 0; i < 2; i++) {
@@ -448,8 +469,8 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         var pct:Number;
         var f:Number;             // when the wave bar filled, 0 = not full
         if (WAVE) {
-            title(line(0, y, false), prev ? "Wave 16" : wLab, prev ? "1:08  Spawning 27/36" : waveText(now));
-            y += NAME_H;
+            title(line(0, y, false), prev ? "Wave 16" : wLab, prev ? ["1:08", "Spawning 27/36", "2:12"] : waveParts(now));
+            y += AH;
             // The fatality line's bar is the game meter's: gold while it fills, red once
             // full, pulsing for 3 s from the moment it filled. A sample in preview.
             c = line(1, y, true);
@@ -499,8 +520,8 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
                     rw.splice(j, 1);
                 }
             }
-            for (k = 0; k < 4; k++) {
-                t = "bsmc".charAt(k);
+            for (k = 0; k < TIERS.length; k++) {
+                t = TIERS.charAt(k);
                 s = TS[t];
                 h = hd[k];
                 n = 0;
@@ -541,8 +562,9 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         var k:String;
         for (i = 0; i < f.length; i++) {
             k = f[i].k;
-            if (ALERTS) addAl(((k == "b") ? "BOSS " : ((k == "s") ? "SKULL " : "")) + f[i].nm + ((f[i].d >= 0) ? " - " + f[i].d + " m" : ""),
-                              (k == "b") ? 0xE0503C : ((k == "s") ? 0xE0703C : 0xF7A22B), now);
+            if (ALERTS) addAl(((k == "b") ? "BOSS " : ((k == "s") ? "SKULL " : ((k == "g") ? "GUARD " : ""))) + f[i].nm
+                              + ((f[i].d >= 0) ? " - " + f[i].d + " m" : ""),
+                              (k == "b") ? 0xE0503C : ((k == "s" || k == "g") ? 0xE0703C : 0xF7A22B), now);
         }
         if (hasAlly && r != null && r.st != 2) {
             // Below 50 and below 25 fire once each, and re-arm 5 points above.
@@ -568,32 +590,55 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
 
     // A board line: a pooled clip made on first use, put at the cursor (y written
     // only when it moved). The fatality and ally lines carry the thin bar under
-    // their text. The wave line (0) is the board's title: bold at the title size,
-    // with a second field, w, for the wave's label.
+    // their text. The wave line (0) is the board's title, AH tall: five bold
+    // fields on one bottom edge, the label (w, Title, gold), the elapsed clock
+    // (c1, Alert), the phase (n, Title), the remaining clock (c2, Alert) and l
+    // (Title), the last four bright.
     private function line(i:Number, y:Number, bar:Boolean):MovieClip {
         var c:MovieClip = ln[i];
         if (c == null) {
             if (i == 0) {
-                c = mkRow(cl[0], PW, NAME_FS, true, NAME_H);
-                makeTF(c, "w", PAD, 0, NAME_W, NAME_H, NAME_FS, true, 0xF7A22B, "left");
+                var d:Number = cl[0].getNextHighestDepth();
+                c = cl[0].createEmptyMovieClip("r" + d, d);
+                var ids:Array = ["w", "c1", "n", "c2", "l"];
+                var fs:Number;
+                var j:Number;
+                for (j = 0; j < 5; j++) {
+                    fs = (j == 1 || j == 3) ? ALERT_FS : NAME_FS;
+                    makeTF(c, ids[j], PAD, AH - lh(fs), PW, lh(fs), fs, true, (j == 0) ? 0xF7A22B : 0xE8E2D6, "left");
+                }
             } else c = mkRow(cl[0], PW, FS, false, LINE);
-            if (bar) c.b = mkBar(c, PAD, LINE - 1, PW, ABAR_H);
+            if (bar) c.b = mkBar(c, PAD, LINE - 1, BARW, ABAR_H);
             ln[i] = c;
         }
         if (c._y != y) c._y = y;
         return c;
     }
 
-    // The title's two fields: the label (gold), then the clock and phase (bright)
-    // after it. The second field is moved only when the label changes; with no
-    // label it starts at the left edge.
-    private function title(c:MovieClip, lab:String, rest:String):Void {
-        var w:TextField = c.w;
-        if (w.text != lab) {
-            w.text = lab;
-            c.n._x = PAD + ((lab != "") ? Math.round(w.textWidth + rd(0.4)) : 0);
+    // The title's texts: the label, then p = [elapsed clock, phase, remaining
+    // clock] (see waveParts), "left" only after a remaining clock. When any text
+    // changed the fields are laid out again left to right from PAD, rd(0.4)
+    // apart; an empty field takes no room and adds no gap.
+    private function title(c:MovieClip, lab:String, p:Array):Void {
+        var ids:Array = ["w", "c1", "n", "c2", "l"];
+        var t:Array = [lab, p[0], p[1], p[2], (p[2] != "") ? "left" : ""];
+        var f:TextField;
+        var i:Number;
+        var moved:Boolean = false;
+        for (i = 0; i < 5; i++) {
+            f = c[ids[i]];
+            if (f.text != t[i]) {
+                f.text = t[i];
+                moved = true;
+            }
         }
-        put(c.n, rest, 0xE8E2D6);
+        if (!moved) return;
+        var x:Number = PAD;
+        for (i = 0; i < 5; i++) {
+            f = c[ids[i]];
+            f._x = x;
+            if (f.text != "") x += Math.round(f.textWidth + rd(0.4));
+        }
     }
 
     // A tier's header, hidden until the tier has a row: its name, Small and bold, in the tier's colour.
@@ -616,7 +661,7 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         var c:MovieClip = mkRow(cl[0], NAME_W, s.fs, s.bold, h);
         var a:Number = Math.max(2, Math.round(s.fs * 0.25));   // the cross's arm, its side is three of them
         var z:Number = a * 3;
-        c.b = mkBar(c, PAD, h - 1, PW, s.bh);
+        c.b = mkBar(c, PAD, h - 1, BARW, s.bh);
         put(c.n, r.nm, s.col);
         var x:MovieClip = c.createEmptyMovieClip("x", c.getNextHighestDepth());
         solid(x, 0x1A1612, a - 1, -1, a + 2, z + 2);   // the dark outline: the plus grown by 1 px all round
@@ -709,20 +754,22 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
     }
 
     // A mob's row text: alive in full, out of view dimmed with where it was last,
-    // dead in red; the bar under it takes the HP bands and the cross shows while a
-    // heal buff is on a mob in view.
+    // dead in red; the bar under it takes the HP bands, light blue instead while
+    // a shield buff is on a mob in view, and the cross shows while a heal buff is.
     private function item(c:MovieClip, r:Object, now:Number):Void {
         var s:Number = r.st;
         var v:String = "dead";
         var x:Boolean = (r.hl > 0 && s == 0);
-        if (s == 0) v = r.pct + "%  " + dm(r.d);
-        else if (s == 1) v = "last " + dm(r.d) + " - " + sec(now - r.seen) + " s ago";
+        if (s == 0) v = r.pct + "%  " + where(r);
+        else if (s == 1) v = "last " + where(r) + " - " + sec(now - r.seen) + " s ago";
         row(c, r.nm, (s == 0) ? TS[r.k].col : 0x7F786C, v, (s == 0) ? 0xC8C0B0 : ((s == 1) ? 0x7F786C : 0xE0503C));
-        fill(c.b, r.pct);
+        fill(c.b, r.pct, (s == 0 && r.sh > 0) ? 0x8AC6FF : undefined, false);
         flash(c, s == 0 && now - r.drop < 3000);
         if (c.x._visible != x) c.x._visible = x;
     }
 
+    // Where a mob is: the camp a skull stands on, else its distance.
+    private function where(r:Object):String { return (r.cp != "") ? r.cp : dm(r.d); }
     private function dm(d:Number):String { return (d >= 0) ? d + " m" : ""; }
     private function sec(ms:Number):Number { return Math.floor(ms / 1000); }
     private function short():String { return allyN.substr(allyN.lastIndexOf(" ") + 1); }
@@ -832,17 +879,18 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         else if (!wFull) wFull = now;
     }
 
-    // The title's text is the line without its label (wLab): a stop's text, built
-    // before its own message's text is taken, goes with the label of the wave that ended.
-    private function waveText(now:Number):String {
-        if (wFinal != "") return wFinal;
-        if (wPrev != "1") return "start: " + pf.start;
-        var s:String = wClock ? mmss(now - wStart) + "  " : "";
+    // The title's texts after its label (wLab): [elapsed clock, phase, remaining
+    // clock], "" where there is none. A stop's text, built before its own
+    // message's text is taken, goes with the label of the wave that ended.
+    private function waveParts(now:Number):Array {
+        if (wFinal != "") return ["", wFinal, ""];
+        if (wPrev != "1") return ["", "start: " + pf.start, ""];
+        var s:String = wClock ? mmss(now - wStart) : "";
         if (wPh == "Spawning") {
-            return s + "Spawning " + wCount + "/" + wMax
-                 + (wClock ? " (" + mmss(Math.max(0, pf.spawnMs - (now - wStart))) + " left)" : "");
+            return [s, "Spawning " + wCount + "/" + wMax,
+                    wClock ? mmss(Math.max(0, pf.spawnMs - (now - wStart))) : ""];
         }
-        return s + ((wPh.substr(0, 16) == "EnemiesRemaining") ? "Enemies left " + (wParam ? wParam : 1) : wPh);
+        return [s, (wPh.substr(0, 16) == "EnemiesRemaining") ? "Enemies left " + (wParam ? wParam : 1) : wPh, ""];
     }
 
     private function mmss(ms:Number):String {

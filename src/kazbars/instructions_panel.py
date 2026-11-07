@@ -1007,8 +1007,10 @@ SECTIONS: list[_Section] = [
             _sub('Five displays', [
                 'Board — Mob list: the bosses, skulls and minis in view, '
                 'with their health. Wave timer: the wave and the time to the '
-                'next spawn. Hylda HP: Valkyrie Hylda, the ally you defend '
-                'in Skull Gate, with alerts at 50 % and 25 %.',
+                'next spawn, with the elapsed and remaining clocks drawn '
+                'larger than the wave label. Hylda HP: Valkyrie Hylda, the '
+                'ally you defend in Skull Gate, with alerts at 50 % and '
+                '25 %.',
                 'Alerts — Spawn alerts: a banner when a watched boss, skull '
                 "or mini spawns. AoE warnings: a banner when Thugra Khotan's "
                 'AoE helpers spawn in Kuthchemes.',
@@ -1020,11 +1022,26 @@ SECTIONS: list[_Section] = [
                 'lists them by name, one line per group. Include '
                 'Kuthchemes camps adds the camp beasts to the board — '
                 'listed, never alerted — and a line for them in that list.',
+                'Guards in their own group — ticked by default — lists '
+                'Gurnakhi Juggernaut (Skull Gate) and Ancient Kuthcheman '
+                'Guardian (Kuthchemes) under GUARDS at the very bottom of '
+                'the board, below CAMPS, and tags their spawn alert GUARD '
+                'instead of SKULL. Untick it and they stay skulls. Like '
+                'the camps option, it greys out unless Mob list is on.',
                 'Your own names — up to 20, watched as minis. A name has to '
                 "match the game's exactly, capitals included; the dialog "
                 'says why it refuses one as you type. × deletes a name; '
                 "Cancel drops any change you haven't applied.",
                 'These matter when Mob list or Spawn alerts is on.',
+            ]),
+            _sub('Camp names', [
+                "A skull standing at one of its map's camps shows the "
+                "camp's name where its distance would be: "
+                '"72%  Temple". Out of view it reads "last Temple - 12 s '
+                'ago". Always on, no setting.',
+                'Skull Gate camps: Hub, Cave, WCave, Tower, Bridge, Altar. '
+                'Kuthchemes: Respad, South West, South East, Temple, East, '
+                'South, West, North.',
             ]),
             _sub('Using it in-game', [
                 'Place the board and the alerts in preview mode '

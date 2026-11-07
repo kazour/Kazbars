@@ -18,13 +18,14 @@
 //
 // A name that is watched becomes a held record: a Character whose HP signal
 // and a 1 Hz poll keep pct/distance/state current. A record is the only shape
-// shared with the view: id its id, nm name, k kind (b boss, s skull, m mini, c
-// camp, "" ally), ch the Character, cb its signal closure, st state (0 alive,
-// 1 out of view, 2 dead, 3 dropped), pct HP percent, d metres or -1, seen last
-// time the name read, dead and drop the times of death and of the last HP
-// loss, row the view's own clip, hl the id of the heal buff on it (0 none;
-// buffs are told by name, ids are per session), ca and cr the closures of its
-// buff signals. Every engine call sits in a try.
+// shared with the view: id its id, nm name, k kind (b boss, s skull, g guard,
+// m mini, c camp, "" ally), ch the Character, cb its signal closure, st state
+// (0 alive, 1 out of view, 2 dead, 3 dropped), pct HP percent, d metres or -1,
+// cp the name of the camp a skull last stood on ("" none), seen last time the
+// name read, dead and drop the times of death and of the last HP loss, row the
+// view's own clip, hl and sh the ids of the heal and the shield buff on it (0
+// none; buffs are told by name, ids are per session), ca and cr the closures
+// of its buff signals. Every engine call sits in a try.
 class KazBarsOnsScan {
     public var anchor:Number;     // first id from any source, -1 until then
     public var anchorAt:Number;
@@ -39,6 +40,8 @@ class KazBarsOnsScan {
     private var W:Object;         // watched name -> kind
     private var H:Object;         // AoE helper names
     private var HL:Object;        // heal buff names
+    private var SH:Object;        // shield buff names
+    private var CP:Array;         // this map's skull camps {n, r2, p}, in check order
     private var allyN:String;
     private var wantAoe:Boolean;
     private var CH:Function;      // Character
@@ -61,11 +64,18 @@ class KazBarsOnsScan {
     private var mates:Array;      // the ids of the team members followed
 
     public function KazBarsOnsScan(world:KazBarsWorld, watch:Object, helpers:Object,
-                                   allyName:String, aoe:Boolean, heal:Object) {
+                                   allyName:String, aoe:Boolean, heal:Object, shield:Object,
+                                   camps:Array) {
         w = world;
         W = watch;
         H = helpers;
         HL = heal;
+        SH = shield;
+        CP = [];
+        var i:Number;
+        for (i = 0; i < camps.length; i++) {
+            CP.push({n: camps[i].n, r2: camps[i].r * camps[i].r, p: camps[i].p});
+        }
         allyN = allyName;
         wantAoe = aoe;
         CH = com.GameInterface.Game.Character;
@@ -350,20 +360,22 @@ class KazBarsOnsScan {
     private function hold(n:Number, nm:String, k:String):Object {
         var now:Number = getTimer();
         var r:Object = {id: n, nm: nm, k: k, ch: new CH(new ID(50000, n)), cb: null, st: 0, pct: 100,
-                        d: -1, seen: now, dead: 0, drop: 0, row: null, hl: 0};
+                        d: -1, cp: "", seen: now, dead: 0, drop: 0, row: null, hl: 0, sh: 0};
         r.cb = statSlot(r);
-        r.ca = healSlot(r, true);
-        r.cr = healSlot(r, false);
+        r.ca = buffSlot(r, true);
+        r.cr = buffSlot(r, false);
         try {
             r.ch.SignalStatChanged.Connect(r.cb);
             r.ch.SignalBuffAdded.Connect(r.ca);
             r.ch.SignalBuffRemoved.Connect(r.cr);
             read(r, now, w.ch.GetPosition());
-            // A heal that is up already. The buff list of an NPC is unverified: every level is guarded.
+            // A heal or a shield that is up already. The buff list of an NPC is
+            // unverified: every level is guarded.
             var bl:Object = r.ch.m_BuffList;
             var q:String;
             for (q in bl) {
                 if (HL[bl[q].m_Name]) r.hl = Number(q);
+                if (SH[bl[q].m_Name]) r.sh = Number(q);
             }
         } catch (e) {}
         return r;
@@ -375,19 +387,24 @@ class KazBarsOnsScan {
         return function(stat:Number):Void { if (stat == 27) self.onHp(r); };
     }
 
-    private function healSlot(r:Object, up:Boolean):Function {
+    private function buffSlot(r:Object, up:Boolean):Function {
         var self:KazBarsOnsScan = this;
-        return function(id:Number):Void { self.onHeal(r, id, up); };
+        return function(id:Number):Void { self.onMobBuff(r, id, up); };
     }
 
-    // A heal buff on a held mob, told by its name. Added: look the buff up by its
-    // id. Removed: only the heal's own id clears it, so other buffs coming and
-    // going change nothing.
-    public function onHeal(r:Object, id:Number, up:Boolean):Void {
+    // A heal or a shield buff on a held mob, told by its name. Added: look the
+    // buff up by its id. Removed: only that buff's own id clears it, so other
+    // buffs coming and going change nothing.
+    public function onMobBuff(r:Object, id:Number, up:Boolean):Void {
         if (up) {
             var b:Object = r.ch.m_BuffList[id];
-            if (b != undefined && HL[b.m_Name]) r.hl = id;
-        } else if (id == r.hl) r.hl = 0;
+            if (b == undefined) return;
+            if (HL[b.m_Name]) r.hl = id;
+            if (SH[b.m_Name]) r.sh = id;
+        } else {
+            if (id == r.hl) r.hl = 0;
+            if (id == r.sh) r.sh = 0;
+        }
     }
 
     // The signal reports a death 0.6-0.9 s before the poll would see it. The
@@ -421,7 +438,7 @@ class KazBarsOnsScan {
         r.pct = p;
     }
 
-    // An empty name is out of view, not dead: keep the last pct and distance.
+    // An empty name is out of view, not dead: keep the last pct, distance and camp.
     private function read(r:Object, now:Number, mp:Object):Void {
         var ch:Object = r.ch;
         if (!ch.GetName()) {
@@ -431,8 +448,32 @@ class KazBarsOnsScan {
         setHp(r, now);
         if (r.st == 0) {
             r.seen = now;
-            r.d = dist(mp, ch.GetPosition());
+            var p:Object = ch.GetPosition();
+            r.d = dist(mp, p);
+            if (r.k == "s") r.cp = campAt(p);
         }
+    }
+
+    // The first camp with a point within its reach (3-D, squared), or "".
+    private function campAt(p:Object):String {
+        var i:Number;
+        var j:Number;
+        var c:Object;
+        var a:Array;
+        var x:Number;
+        var y:Number;
+        var z:Number;
+        for (i = 0; i < CP.length; i++) {
+            c = CP[i];
+            a = c.p;
+            for (j = 0; j < a.length; j += 3) {
+                x = p.x - a[j];
+                y = p.y - a[j + 1];
+                z = p.z - a[j + 2];
+                if (x * x + y * y + z * z <= c.r2) return c.n;
+            }
+        }
+        return "";
     }
 
     private function dist(a:Object, b:Object):Number {
@@ -448,6 +489,7 @@ class KazBarsOnsScan {
         r.ch.SignalBuffRemoved.Disconnect(r.cr);
         r.ch = null;
         r.hl = 0;
+        r.sh = 0;
         if (r.st != 2) known[r.id] = 2;
         r.st = 3;
     }

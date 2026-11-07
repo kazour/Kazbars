@@ -9,7 +9,8 @@ AoE warnings) — and Alert time (how long a banner stays; greyed unless Spawn
 alerts or Hylda HP is on). **Watched mobs** (greyed unless Mob list or Spawn
 alerts is on): the 27 catalog mobs watched in every run, named by group
 under their count, Include Kuthchemes camps (greyed unless Mob list is on;
-the camps' own line shows while it is ticked), and the user's own names — Add (or
+the camps' own line shows while it is ticked), Guards in their own group
+(greyed unless Mob list is on), and the user's own names — Add (or
 Enter) only when `onslaught.custom_refusal` accepts the trimmed text, whose
 reason shows as a hint while typing; each name has a delete (Cancel drops
 every unapplied change). Reads/writes the profile document's `onslaught`
@@ -189,6 +190,13 @@ def open_onslaught_dialog(app):
         r.name for r in onslaught.ROWS if r.kind == onslaught.CAMP))
     shell.gate(camps_cb, rule=list_on)
 
+    guards_var = tk.BooleanVar(value=cfg['guards'])
+    guards_cb = ttk.Checkbutton(watched, text="Guards in their own group", variable=guards_var)
+    guards_cb.pack(anchor='w', pady=(0, PAD_XS))
+    add_tooltip(guards_cb, "Listed apart at the bottom of the board: " + ", ".join(
+        r.name for r in onslaught.ROWS if r.kind == onslaught.GUARD))
+    shell.gate(guards_cb, rule=list_on)
+
     own_row = ttk.Frame(watched)
     own_row.pack(fill='x')
     own_lbl = ttk.Label(own_row, text="Your own names:", font=FONT_BODY,
@@ -282,6 +290,7 @@ def open_onslaught_dialog(app):
             **{key: var.get() for key, var in show_vars.items()},
             'alertSeconds': round(alert_scale.get()),
             'camps': camps_var.get(),
+            'guards': guards_var.get(),
             'custom': custom,
         })
         app.profile_store.set_section('onslaught', new_cfg)

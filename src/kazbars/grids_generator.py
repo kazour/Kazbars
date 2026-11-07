@@ -447,10 +447,12 @@ class CodeGenerator:
     def _onslaught_data_block(self):
         """`d.ONS`: the board's and the alerts' first-load spots (fixed
         fractions — both are placed in game), the text size and displays;
-        `d.ONS.watch`, one array per kind (`b`, `s`, `m`, `c`), each the watched
-        names of that kind, a kind no display reads left empty (bosses, skulls
-        and minis feed the list and the alerts, camps only the list); the AoE
-        helpers, the heal buffs and the per-playfield facts."""
+        `d.ONS.watch`, one array per kind (`b`, `s`, `g`, `m`, `c`), each the
+        watched names of that kind, a kind no display reads left empty (bosses,
+        skulls, guards and minis feed the list and the alerts, camps only the
+        list); the AoE helpers, the heal and shield buffs and the per-playfield
+        facts, each playfield's skull camps as `{n, r, p}` (`p` flat x, y, z
+        triples)."""
         c = self.onslaught_config
 
         def names(kind, wanted):
@@ -468,15 +470,25 @@ class CodeGenerator:
             "        d.ONS.watch = {",
             f"            b: [{names(onslaught.BOSS, listed)}],",
             f"            s: [{names(onslaught.SKULL, listed)}],",
+            f"            g: [{names(onslaught.GUARD, listed)}],",
             f"            m: [{names(onslaught.MINI, listed)}],",
             f"            c: [{names(onslaught.CAMP, c['showList'])}]",
             "        };",
             f"        d.ONS.helpers = [{_as2_strs(onslaught.AOE_HELPERS)}];",
             f"        d.ONS.heal = [{_as2_strs(onslaught.HEAL_BUFFS)}];",
+            f"        d.ONS.shield = [{_as2_strs(onslaught.SHIELD_BUFFS)}];",
             "        d.ONS.pf = {};",
         ]
+
+        def camps(playfield):
+            return ", ".join(
+                f'{{n: "{escape_as2_string(camp.name)}", r: {camp.r}, '
+                f'p: [{", ".join(str(v) for point in camp.points for v in point)}]}}'
+                for camp in onslaught.CAMPS.get(playfield, ()))
+
         lines += [f'        d.ONS.pf[{i.playfield}] = {{start: "{escape_as2_string(i.start_hint)}", '
-                  f'spawnMs: {i.spawn_ms}, ally: "{escape_as2_string(i.ally)}", aoe: {_bool(i.aoe)}}};'
+                  f'spawnMs: {i.spawn_ms}, ally: "{escape_as2_string(i.ally)}", aoe: {_bool(i.aoe)}, '
+                  f'camps: [{camps(i.playfield)}]}};'
                   for i in onslaught.INSTANCES]
         return "\n" + "\n".join(lines)
 
