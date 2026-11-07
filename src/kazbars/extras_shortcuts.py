@@ -33,7 +33,7 @@ from .ui_helpers import (
     THEME_COLORS,
     TK_COLORS,
 )
-from .ui_widgets import add_tooltip, app_toast
+from .ui_widgets import add_tooltip, app_toast, is_descendant
 
 
 # ============================================================================
@@ -72,18 +72,9 @@ def _make_section_setter(key, side_flags=()):
 # Shared by every switch — they do the same thing on every card.
 _TOGGLE_TOOLTIP = 'Whether this ships in your next Build & Install'
 
-# The hover cue for whichever zone the pointer is over — same white as the
-# round-1 drag handle's lit state, not a new token.
-_HOVER_BORDER = '#ffffff'
-
-
-def _is_descendant(widget, ancestor):
-    w = widget
-    while w is not None:
-        if w is ancestor:
-            return True
-        w = getattr(w, 'master', None)
-    return False
+# The hover cue for whichever zone the pointer is over — the white the grid
+# preview's hover outline uses.
+_HOVER_BORDER = THEME_COLORS['heading']
 
 
 # (key, title, off-toast tail, tooltip, opener) + read/set — menu order.
@@ -207,7 +198,7 @@ class ExtrasShortcutsRow(ttk.Frame):
             under = card.winfo_containing(event.x_root, event.y_root)
         except (tk.TclError, RuntimeError):
             under = None
-        if under is not None and _is_descendant(under, card):
+        if under is not None and is_descendant(under, card):
             return
         self._set_hover(key, None)
 

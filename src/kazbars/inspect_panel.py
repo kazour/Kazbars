@@ -275,10 +275,13 @@ def open_inspect_dialog(app):
         _refresh_lists(keep_active)
 
     def _on_mode():
+        # Default sets the custom list aside; Custom list brings it back.
         if mode_var.get() == 'default':
+            if state['rows'] is not None:
+                state['custom'] = state['rows']
             state['rows'] = None
         elif state['rows'] is None:
-            state['rows'] = catalog.default_keys()
+            state['rows'] = state.get('custom') or catalog.default_keys()
         _refresh_lists()
 
     def _add(keys):
@@ -306,8 +309,11 @@ def open_inspect_dialog(app):
                          bootstyle=style)  # type: ignore[call-arg]
         btn.pack(pady=pady)
         gated.append(btn)
-    avail_list.bind('<Double-1>', lambda e: _add([shown_avail[i] for i in avail_list.curselection()]))
-    active_list.bind('<Double-1>', lambda e: _remove([shown_active[i] for i in active_list.curselection()]))
+    # A disabled Listbox still fires its bindings: the master switch gates them.
+    avail_list.bind('<Double-1>', lambda e: enabled_var.get() and _add(
+        [shown_avail[i] for i in avail_list.curselection()]))
+    active_list.bind('<Double-1>', lambda e: enabled_var.get() and _remove(
+        [shown_active[i] for i in active_list.curselection()]))
     for lb in (avail_list, active_list):
         lb.bind('<<ListboxSelect>>', _refresh_status)
         gated.append(lb)

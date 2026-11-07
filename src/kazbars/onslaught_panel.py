@@ -277,16 +277,10 @@ def open_onslaught_dialog(app):
         return 'break'
 
     def _delete(name):
-        before = list(custom)
+        # No undo toast: the toasts live in the main window, out of reach of
+        # this modal dialog; Cancel drops every unapplied change.
         custom.remove(name)
         _names_changed()
-
-        def _undo():
-            if dialog.winfo_exists():
-                custom[:] = before
-                _names_changed()
-        app_toast(dialog, f"Removed {name} — click to undo", 'info', 8,
-                  key='onslaught-custom-undo', on_click=_undo)
 
     def _on_name_typed(*_):
         text = name_var.get().strip()

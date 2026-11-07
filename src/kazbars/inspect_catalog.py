@@ -439,30 +439,6 @@ _DECLARED = (
 ROWS: tuple[Row, ...] = tuple(r for g in Group for r in _DECLARED if r.group is g)
 _BY_KEY = {r.key: r for r in ROWS}
 
-# Row keys retired after a release shipped them, with the live keys that
-# replace them: a saved selection naming one gets its successors in place.
-# Append-only — a key stays here for as long as profiles that name it can be
-# opened. A key retired with no successor is deliberately absent: validation
-# drops it.
-ALIASES: dict[str, tuple[str, ...]] = {
-    # The two Kills / Deaths lines (overall, this season) are now the season /
-    # overall pairs of the Kills and Deaths rows.
-    'pvp_kills_deaths': ('pvp_kills', 'pvp_deaths'),
-    'season_kd': ('pvp_kills', 'pvp_deaths'),
-    # Overall-only Tournament / Conquest lines, now season / overall pairs.
-    's1000025': ('pvp_tournament_wins',),
-    's1000026': ('pvp_conquest_wins',),
-    's1000027': ('pvp_conquest_losses',),
-    # The PvP Hit / Immunity ratings, now folded into the two PvP Combat chance
-    # rows that add them to the PvE rating.
-    's311': ('pvp_hit',),
-    's1100': ('pvp_immunity',),
-    # The PvP Bonus Spell Damage line (the highest school), now one line per
-    # school, as the game's PvP Combat tab has them.
-    'pvp_spell_dmg': ('pvp_spell_holy', 'pvp_spell_unholy', 'pvp_spell_cold',
-                      'pvp_spell_elec', 'pvp_spell_fire'),
-}
-
 # Teardown gate + title + player gate, always polled.
 ALWAYS_IDS = (1, 54, 67, 70, 804, 808, 810, 814)
 
@@ -503,14 +479,6 @@ PVP_VIEW: tuple[tuple[str, tuple[str, ...], tuple[tuple[str, str], ...]], ...] =
 
 def find(key: str) -> Row | None:
     return _BY_KEY.get(key)
-
-
-def resolve(key: str) -> tuple[str, ...]:
-    """The live keys a stored row key stands for: itself when the catalog has
-    it, its successors when it was retired with some, nothing otherwise."""
-    if key in _BY_KEY:
-        return (key,)
-    return ALIASES.get(key, ())
 
 
 def select(keys: list[str]) -> list[Row]:

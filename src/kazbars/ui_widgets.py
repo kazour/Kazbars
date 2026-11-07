@@ -120,6 +120,16 @@ def app_toast(widget, message, style="info", duration=None, key=None, on_click=N
         w = getattr(w, "master", None)
 
 
+def is_descendant(widget, ancestor):
+    """True when `widget` is `ancestor` or sits inside it (its .master chain)."""
+    w = widget
+    while w is not None:
+        if w is ancestor:
+            return True
+        w = getattr(w, "master", None)
+    return False
+
+
 def bind_card_events(card_border, color, hover_color=None):
     """Bind hover highlight on a card frame.
 
@@ -132,17 +142,8 @@ def bind_card_events(card_border, color, hover_color=None):
     caller can flip the resting state (e.g. enabled -> disabled) without
     rebinding.
     """
-    _hover = hover_color or "#ffffff"
+    _hover = hover_color or THEME_COLORS["heading"]
     _resting = color if callable(color) else (lambda c=color: c)
-
-    def _is_descendant(widget):
-        """Walk .master chain to check if widget is inside card_border."""
-        w = widget
-        while w is not None:
-            if w is card_border:
-                return True
-            w = getattr(w, "master", None)
-        return False
 
     def on_enter(e):
         card_border.config(highlightbackground=_hover, highlightcolor=_hover)
@@ -150,7 +151,7 @@ def bind_card_events(card_border, color, hover_color=None):
     def on_leave(e):
         try:
             w = card_border.winfo_containing(e.x_root, e.y_root)
-            if w is not None and _is_descendant(w):
+            if w is not None and is_descendant(w, card_border):
                 return
         except (tk.TclError, RuntimeError):
             pass

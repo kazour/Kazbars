@@ -19,17 +19,16 @@ state and the PvP tab in the module config archive, for every user
 (`game_persistence`).
 
 `rows` is the user's row list (catalog keys, `inspect_catalog`), or None for
-the Default sheet (the Summary group). A list keeps the catalog's known string
-keys in stored order — a key retired with successors becomes them — with
-duplicates collapsed; an empty list is legal (a title-only panel), but a list
-that named keys and kept none reads as None, not as an emptied panel its
-author never asked for.
+the Default sheet (the Summary group). A list keeps the catalog's known keys in
+stored order, duplicates collapsed; an empty list is legal (a title-only panel),
+but a list that held entries and kept none reads as None, not as an emptied
+panel its author never asked for.
 """
 
 import logging
 from typing import Any
 
-from .inspect_catalog import resolve
+from .inspect_catalog import find
 from .overlay_size import SCALE_DEFAULT, scale_from
 from .profile_document import LANE_BUILD
 from .profile_document import SectionSpec as ProfileSectionSpec
@@ -42,12 +41,11 @@ logger = logging.getLogger(__name__)
 def _validate_rows(value: Any) -> list[str] | None:
     if not isinstance(value, list):
         return None
-    named = [k for k in value if isinstance(k, str)]
     out: list[str] = []
-    for key in (live for k in named for live in resolve(k)):
-        if key not in out:
+    for key in value:
+        if isinstance(key, str) and find(key) is not None and key not in out:
             out.append(key)
-    return out if out or not named else None
+    return out if out or not value else None
 
 
 _SCHEMA = Schema('', 1, {

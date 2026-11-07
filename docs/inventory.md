@@ -44,7 +44,7 @@
 | `src/kazbars/deeps_rolling_window.py` | 81 |
 | `src/kazbars/deeps_settings.py` | 336 |
 | `src/kazbars/deeps_trackers.py` | 182 |
-| `src/kazbars/extras_shortcuts.py` | 282 |
+| `src/kazbars/extras_shortcuts.py` | 273 |
 | `src/kazbars/first_launch.py` | 402 |
 | `src/kazbars/focus_watcher.py` | 85 |
 | `src/kazbars/foreground.py` | 111 |
@@ -60,14 +60,14 @@
 | `src/kazbars/grid_templates.py` | 83 |
 | `src/kazbars/grids_generator.py` | 791 |
 | `src/kazbars/grids_panel.py` | 972 |
-| `src/kazbars/inspect.py` | 79 |
-| `src/kazbars/inspect_catalog.py` | 618 |
-| `src/kazbars/inspect_panel.py` | 387 |
+| `src/kazbars/inspect.py` | 77 |
+| `src/kazbars/inspect_catalog.py` | 586 |
+| `src/kazbars/inspect_panel.py` | 393 |
 | `src/kazbars/instructions_panel.py` | 1462 |
 | `src/kazbars/live_tracker_panel.py` | 521 |
 | `src/kazbars/live_tracker_settings.py` | 175 |
 | `src/kazbars/onslaught.py` | 204 |
-| `src/kazbars/onslaught_panel.py` | 366 |
+| `src/kazbars/onslaught_panel.py` | 360 |
 | `src/kazbars/overlay.py` | 122 |
 | `src/kazbars/overlay_engine.py` | 800 |
 | `src/kazbars/overlay_size.py` | 126 |
@@ -91,7 +91,7 @@
 | `src/kazbars/ui_headers.py` | 197 |
 | `src/kazbars/ui_helpers.py` | 203 |
 | `src/kazbars/ui_tk_style.py` | 67 |
-| `src/kazbars/ui_widgets.py` | 331 |
+| `src/kazbars/ui_widgets.py` | 332 |
 | `src/kazbars/update_check.py` | 64 |
 | `src/kazbars/update_orchestrator.py` | 148 |
 | `src/kazbars/userdata.py` | 119 |
@@ -137,7 +137,7 @@
 | `tests/test_hud_overlay.py` | 141 |
 | `tests/test_imports.py` | 33 |
 | `tests/test_inspect.py` | 103 |
-| `tests/test_inspect_catalog.py` | 248 |
+| `tests/test_inspect_catalog.py` | 226 |
 | `tests/test_log_name.py` | 22 |
 | `tests/test_manifest.py` | 124 |
 | `tests/test_mypy_gate.py` | 74 |

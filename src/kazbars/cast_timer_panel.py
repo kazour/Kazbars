@@ -191,7 +191,7 @@ def open_cast_timer_dialog(app):
     size_row.pack(anchor='w', pady=(0, PAD_XS))
     size_scale, size_var, _ = size_slider(
         size_row, cfg['scale'], lambda p: f"{cast_fs(base, p)} pt",
-        on_commit=_redraw_preview, length=100,
+        on_commit=_redraw_preview, on_move=lambda _p: _redraw_preview(), length=100,
         tooltip="Timer text size, a percent of the overlay size (Overlay, top "
                 "of the Grids tab).",
         label_sink=sink)

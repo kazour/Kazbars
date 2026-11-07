@@ -71,28 +71,6 @@ def test_the_default_sheet_is_the_summary_group():
         1010, 1403, 1000016, 1000017, 1000018]
 
 
-def test_every_shipped_retired_key_still_migrates_and_targets_are_live():
-    shipped = {
-        "pvp_kills_deaths": ("pvp_kills", "pvp_deaths"),
-        "season_kd": ("pvp_kills", "pvp_deaths"),
-        "s1000025": ("pvp_tournament_wins",),
-        "s1000026": ("pvp_conquest_wins",),
-        "s1000027": ("pvp_conquest_losses",),
-        "s311": ("pvp_hit",),
-        "s1100": ("pvp_immunity",),
-        "pvp_spell_dmg": ("pvp_spell_holy", "pvp_spell_unholy", "pvp_spell_cold",
-                          "pvp_spell_elec", "pvp_spell_fire"),
-    }
-    for old, new in shipped.items():
-        assert cat.ALIASES[old] == new, old
-    for old, new in cat.ALIASES.items():
-        assert cat.find(old) is None, old
-        assert new and all(cat.find(k) for k in new), old
-    assert cat.resolve("armor") == ("armor",)
-    assert cat.resolve("season_kd") == ("pvp_kills", "pvp_deaths")
-    assert cat.resolve("s448") == () and cat.resolve("no_such_key") == ()
-
-
 def test_the_pvp_groups_follow_the_game_tabs():
     assert _keys(r for r in cat.ROWS if r.group is cat.Group.PVP_STATS) == [
         "pvp_kills", "pvp_deaths", "pvp_fatalities", "s1097", "pvp_annih_wins",
@@ -156,9 +134,9 @@ def test_rows_validation():
     assert validate_config({})["rows"] is None
     assert rows("armor") is None, "not a list: the Default sheet"
     assert rows([]) == [], "an empty list is legal: title only"
-    assert rows(["armor", 7, "armor", "season_kd"]) == ["armor", "pvp_kills", "pvp_deaths"]
-    assert rows(["s448", "nope"]) is None, "named keys and kept none: Default, not empty"
-    assert rows([7, None]) == []
+    assert rows(["armor", 7, "armor", "pvp_kills"]) == ["armor", "pvp_kills"]
+    assert rows(["s448", "nope"]) is None, "held entries and kept none: Default, not empty"
+    assert rows([7, None]) is None
     assert list(validate_config({}))[-1] == "rows", "written last"
 
 
