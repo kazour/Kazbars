@@ -197,7 +197,7 @@ def _stub_restore_settings_deps(monkeypatch, tmp_path, order, *, release_store_o
         lambda app: order.append("release_store") or release_store_ok)
     monkeypatch.setattr(
         settings_backup.profile_io, "startup_profile",
-        lambda app: order.append("startup_profile"))
+        lambda app, active_hint=None: order.append(f"startup_profile:{active_hint}"))
     monkeypatch.setattr(settings_backup, "Messagebox", SimpleNamespace(
         show_info=lambda *a, **k: None, show_error=lambda *a, **k: None))
 
@@ -219,7 +219,7 @@ def test_restore_settings_flushes_before_restoring_then_reopens(monkeypatch, tmp
     restore_settings(app, SimpleNamespace(destroy=lambda: None))
 
     assert order == [
-        "release_store", "restore_zip", "settings.reload", "database.reload", "startup_profile"]
+        "release_store", "restore_zip", "settings.reload", "database.reload", "startup_profile:None"]
 
 
 def test_restore_settings_aborts_before_restore_zip_when_release_store_fails(
@@ -261,9 +261,8 @@ def test_a_3_1_backup_restores_its_library_and_the_next_startup_adopts(monkeypat
                         SimpleNamespace(askopenfilename=lambda **k: str(z)))
     monkeypatch.setattr(settings_backup, "userdata_root", userdata.userdata_root)
     monkeypatch.setattr(settings_backup, "restore_zip", restore_zip)
-    restore_settings(_restore_app(order, tmp_path), SimpleNamespace(destroy=lambda: None),
-                     include_prefs=True)
-    assert order[-1] == "startup_profile"
+    restore_settings(_restore_app(order, tmp_path), SimpleNamespace(destroy=lambda: None))
+    assert order[-1] == f"startup_profile:{raid['id']}", "the zip's own pointer, prefs restored or not"
     assert not (root / "profile.yml").exists()
     assert (root / "profiles" / "Raid.json").exists()
 

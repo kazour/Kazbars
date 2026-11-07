@@ -7,7 +7,6 @@ grids…).
 """
 
 import copy
-import json
 import logging
 import tkinter as tk
 from pathlib import Path
@@ -304,9 +303,8 @@ class GridsPanel(ttk.Frame):
         if not path:
             return
         try:
-            text = Path(path).read_text(encoding='utf-8')
-            raw = json.loads(text) if Path(path).suffix.lower() == '.json' else yaml_io.loads(text)
-        except (OSError, ValueError):  # UnicodeDecodeError, JSON and YAML errors are ValueErrors
+            raw = yaml_io.read_file(path)
+        except (OSError, ValueError):
             Messagebox.show_error("That file couldn't be read as a KazBars grids file.",
                                   title="Import Failed")
             return
@@ -319,7 +317,7 @@ class GridsPanel(ttk.Frame):
         # The custom buffs first, so the grids' refs resolve as they land.
         merged = profile_io.merge_embedded_buffs(self.app, buffs) if self.app else (0, 0, False)
         missing: list = []  # unresolved refs stay, greyed, as a load keeps them
-        grids = [self._migrate_grid(g, missing) for g in grids]
+        grids = [self._migrate_grid(validate_grid(g), missing) for g in grids]
         appended, renames = grid_templates.import_into(self.grids, grids, self._tab_class())
         self.grids.extend(appended)
         self._mark_modified()
@@ -886,6 +884,7 @@ class GridsPanel(ttk.Frame):
 
         self._update_tab_counts()
         if not self.grids:
+            self._export_tab_btn.configure(state='disabled')
             self._normal_view.pack_forget()
             self._empty_state.pack(fill='both', expand=True)
             self._update_tip()

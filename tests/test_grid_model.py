@@ -309,3 +309,10 @@ def test_a_box_settles_inside_its_limits_with_a_fill_that_fits():
 def test_a_ref_list_reads_a_scalar_as_one_and_drops_empty_entries():
     assert ref_list(5) == [5] and ref_list(None) == [] and ref_list(0) == []
     assert ref_list([7, None, '', 0, 8]) == [7, 8]
+
+
+def test_a_grid_id_is_always_text():
+    assert validate_grid({"id": 300})["id"] == "300"
+    assert validate_grid({"id": None})["id"] == create_default_grid()["id"]
+    assert validate_grid({"id": "  "})["id"] == create_default_grid()["id"]
+    assert validate_grid({"id": " Keep "})["id"] == " Keep "

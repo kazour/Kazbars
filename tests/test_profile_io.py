@@ -308,3 +308,24 @@ def test_release_store_mirrors_then_flushes_and_reports_a_failure(app):
     assert profile_io.release_store(app) is False
     assert order == ["mirror", "flush"]
     assert app.toasts[0][1] == "danger" and "Profile not saved" in app.toasts[0][0]
+
+
+def test_a_second_damaged_file_never_overwrites_the_first(app, root):
+    (root / "profile.damaged.yml").write_text("first", encoding="utf-8")
+    (root / "profile.yml").write_text("second: [", encoding="utf-8")
+    profile_io.startup_profile(app)
+    assert (root / "profile.damaged.yml").read_text(encoding="utf-8") == "first"
+    assert (root / "profile.damaged-2.yml").read_text(encoding="utf-8") == "second: ["
+
+
+def test_startup_adopts_the_hinted_library_profile(app, root):
+    a, b = _doc(app, "Raid"), _doc(app, "Solo")
+    _library(root, a, b)
+    profile_io.startup_profile(app, active_hint=a["id"])
+    assert app.profile_store.document["id"] == a["id"]
+
+
+def test_a_value_yaml_cannot_hold_is_a_failed_write_not_a_crash(app, root):
+    doc = _doc(app)
+    doc["modules"]["mystery"] = {1: "int key"}
+    assert profile_io.write_profile(app, doc) is None

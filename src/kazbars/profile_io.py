@@ -80,11 +80,9 @@ def read_profile_file(registry, path):
     """A profile file through the gate → ``(doc, embedded_buffs)``. `.json`
     reads as JSON (a 3.1 export or library document), anything else as YAML.
     Raises ``ValueError`` with a user-presentable message."""
-    path = Path(path)
     try:
-        text = path.read_text(encoding='utf-8')
-        raw = json.loads(text) if path.suffix.lower() == '.json' else yaml_io.loads(text)
-    except (OSError, ValueError) as e:  # UnicodeDecodeError, JSON and YAML errors are ValueErrors
+        raw = yaml_io.read_file(path)
+    except (OSError, ValueError) as e:
         raise ValueError(_UNREADABLE) from e
     profile_raw, embedded = profile_share.parse_profile_file(raw)
     return validate_document(registry, profile_raw), embedded
@@ -96,12 +94,13 @@ def _profile_text(app, doc):
 
 def write_profile(app, doc):
     """Validate and write `doc` to `profile.yml`. Returns the path, or None on
-    OSError (the store's writer contract: None is a failed autosave)."""
+    failure (the store's writer contract: None is a failed autosave, retried
+    and surfaced on exit) — a disk error, or a value YAML can't hold."""
     path = profile_path()
     try:
         safe_write_text(path, _profile_text(app, doc))
         return path
-    except OSError as e:
+    except (OSError, TypeError) as e:
         logger.warning('Could not write the profile: %s', e)
         return None
 
@@ -111,7 +110,7 @@ def write_bak(app, doc):
     fallback. Best effort, never raises."""
     try:
         safe_write_text(profile_bak_path(), _profile_text(app, doc))
-    except OSError as e:
+    except (OSError, TypeError) as e:
         logger.debug('Session snapshot skipped: %s', e)
 
 
@@ -145,10 +144,12 @@ def release_store(app) -> bool:
 # ============================================================================
 # STARTUP
 # ============================================================================
-def startup_profile(app):
+def startup_profile(app, active_hint=None):
     """Open the profile: `profile.yml` → its `.bak` (a damaged file) → the
     active profile of a 3.1 library → the template seed (blank if no template
-    reads). Toasts wait for the window."""
+    reads). `active_hint` names the library profile to adopt when prefs.json
+    no longer does (a 3.1 backup restored without its prefs). Toasts wait for
+    the window."""
     doc, toast = None, None
     path = profile_path()
     if path.exists():
@@ -164,7 +165,7 @@ def startup_profile(app):
                 toast = ("Your profile file was damaged and no copy could be read — "
                          "starting from the defaults", 'warning', None)
     else:
-        doc = _adopt_library(app)
+        doc = _adopt_library(app, active_hint)
         if doc is not None:
             write_profile(app, doc)
             toast = (f"Adopted “{doc['name']}” as your profile — your other profiles stay in "
@@ -184,23 +185,28 @@ def startup_profile(app):
 
 def _read_or_set_aside(app, path, keep=False):
     """`path` through the gate, or None — the damaged `profile.yml` moved to
-    `profile.damaged.yml` first (`keep`: leave the file where it is)."""
+    `profile.damaged.yml` first, never over an earlier one (`keep`: leave the
+    file where it is)."""
     try:
         return read_profile_file(app.registry, path)[0]
     except ValueError as e:
         logger.warning('Profile file %s unreadable: %s', path.name, e)
     if not keep:
+        aside, n = profile_damaged_path(), 2
+        while aside.exists():
+            aside = aside.with_name(f'profile.damaged-{n}.yml')
+            n += 1
         try:
-            os.replace(path, profile_damaged_path())
+            os.replace(path, aside)
         except OSError as e:
             logger.warning('Could not set the damaged profile aside: %s', e)
     return None
 
 
-def _adopt_library(app):
+def _adopt_library(app, active_hint=None):
     """The profile a 3.1 library was on: the `active_profile` id its
-    prefs.json still holds, else its newest file. None without one. Reads
-    only; `profiles/` stays as it is."""
+    prefs.json still holds (or `active_hint`), else its newest file. None
+    without one. Reads only; `profiles/` stays as it is."""
     entries = []
     for path in sorted(profiles_dir().glob('*.json')):
         try:
@@ -213,6 +219,7 @@ def _adopt_library(app):
         active = json.loads(prefs_path().read_text(encoding='utf-8')).get('active_profile')
     except (OSError, ValueError, AttributeError):
         active = None
+    active = active or active_hint
     for _path, doc in entries:
         if active and doc['id'] == active:
             return doc

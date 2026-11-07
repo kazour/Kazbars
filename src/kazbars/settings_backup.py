@@ -180,6 +180,17 @@ def _is_library_backup(zip_path):
             and any(n.startswith(f"{KAZBARS_ARC}/profiles/") for n in names))
 
 
+def _zip_active_profile(zip_path):
+    """The `active_profile` a 3.1 backup's own prefs.json names (restored or
+    not), or None."""
+    try:
+        with zipfile.ZipFile(zip_path) as zf:
+            prefs = json.loads(zf.read(f"{KAZBARS_ARC}/{PREFS_FILENAME}").decode("utf-8"))
+        return prefs.get("active_profile") if isinstance(prefs, dict) else None
+    except (OSError, KeyError, zipfile.BadZipFile, ValueError):
+        return None
+
+
 def read_manifest(zip_path):
     """Return the parsed manifest if `zip_path` is a KazBars backup, else None."""
     try:
@@ -466,14 +477,7 @@ def restore_settings(app, dialog, include_prefs=False):
         logger.warning("Pre-restore snapshot failed: %s", e)
         snapshot = None
 
-    # A 3.1 backup holds a profile library, no profile.yml: drop ours so the
-    # startup step below adopts from the restored library.
-    if _is_library_backup(path):
-        try:
-            profile_path().unlink(missing_ok=True)
-        except OSError as e:
-            logger.warning("Could not clear the profile for the library restore: %s", e)
-
+    library = _is_library_backup(path)
     try:
         restored = restore_zip(
             path,
@@ -488,6 +492,14 @@ def restore_settings(app, dialog, include_prefs=False):
         )
         return
 
+    # A 3.1 backup holds a profile library, no profile.yml: once it has landed,
+    # drop ours so the reopen below adopts from the restored library.
+    if library:
+        try:
+            profile_path().unlink(missing_ok=True)
+        except OSError as e:
+            logger.warning("Could not clear the profile for the library restore: %s", e)
+
     # The running app holds prefs in memory and re-saves on exit; resync from
     # disk so a freshly-restored prefs.json (when opted in) isn't clobbered.
     app.settings.reload()
@@ -498,7 +510,7 @@ def restore_settings(app, dialog, include_prefs=False):
     app.database.reload()
     # The in-memory profile store still holds the pre-restore document; reopen
     # the restored profile.yml (or adopt from a restored 3.1 library).
-    profile_io.startup_profile(app)
+    profile_io.startup_profile(app, active_hint=_zip_active_profile(path) if library else None)
     if db_panel is not None:
         db_panel.refresh_from_database()
         db_panel.modified = False   # in-memory now equals the restored disk state

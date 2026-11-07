@@ -1678,9 +1678,11 @@ def test_import_grids_appends_to_the_tab_and_renames_a_taken_id(app, monkeypatch
     gp.grids.append(dict(create_default_grid('player', 1, 5, 'dynamic', 'Shared Raid'), **{'class': 31}))
     gp.refresh_panels()
     src = tmp_path / 'in.kazbars-grids.yml'
-    src.write_text(yaml_io.dumps(grid_templates.build(
-        [create_default_grid('target', 1, 4, 'dynamic', 'Shared_Raid'),
-         create_default_grid('player', 1, 3, 'static', 'Shared Fresh')], {}, {}, {})), encoding='utf-8')
+    value = grid_templates.build([create_default_grid('target', 1, 4, 'dynamic', 'Shared_Raid'),
+                                  create_default_grid('player', 1, 3, 'static', 'Shared Fresh')],
+                                 {}, {}, {})
+    value['grids'][1].update(whitelist=None, slotAssignments=[])  # a hand-edited file
+    src.write_text(yaml_io.dumps(value), encoding='utf-8')
     monkeypatch.setattr(grids_panel.filedialog, 'askopenfilename', lambda **k: str(src))
     toasts = []
     monkeypatch.setattr(grids_panel, 'app_toast', lambda w, msg, *a, **k: toasts.append(msg))

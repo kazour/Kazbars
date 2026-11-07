@@ -6,11 +6,14 @@ indent, keys in the dict's own order, a list of scalars on one line — so a
 file diffs cleanly and reads the same in any YAML tool. Its quoting is
 written for YAML 1.1 readers (PyYAML): every value it writes reads back as
 the same value. `loads` is PyYAML's safe loader (libyaml's when the wheel has
-it); JSON text is valid input. Pure: no Tk, no files.
+it), shaped as JSON would be; JSON text is valid input. `read_file` reads a
+data file by its extension. No Tk.
 """
 
+import json
 import math
 from decimal import Decimal
+from pathlib import Path
 
 import yaml
 
@@ -18,7 +21,7 @@ _PLAIN_FIRST_BANNED = set('-?:,[]{}#&*!|>\'"%@`<=~+.')
 # `?` too: PyYAML's pure-Python reader ends a plain scalar at it in a flow
 # list (libyaml does not), so `[a?b]` would not read back there.
 _FLOW_BANNED = set(',[]{}?')
-_ODD_SPACES = set('\u0085   ﻿')
+_ODD_SPACES = set('\u0085\u00a0\u2028\u2029\ufeff')
 _RESERVED = {'null', 'true', 'false', 'yes', 'no', 'on', 'off', 'y', 'n'}
 _ESCAPES = {'"': '\\"', '\\': '\\\\', '\n': '\\n', '\r': '\\r', '\t': '\\t', '\0': '\\0'}
 
@@ -31,11 +34,44 @@ class YamlError(ValueError):
 # READ
 # ============================================================================
 def loads(text):
-    """The value `text` holds (JSON text reads too). Raises `YamlError`."""
+    """The value `text` holds (JSON text reads too), in JSON's shapes: a
+    mapping key is always text and a value YAML types beyond JSON (a date,
+    a set, binary) reads as text or a list, so whatever loads, `dumps` can
+    write back. Raises `YamlError`."""
     try:
-        return yaml.load(text, Loader=getattr(yaml, 'CSafeLoader', yaml.SafeLoader))
+        return _json_shaped(yaml.load(text, Loader=getattr(yaml, 'CSafeLoader', yaml.SafeLoader)))
     except yaml.YAMLError as e:
         raise YamlError(str(e)) from e
+
+
+def read_file(path):
+    """A data file's value by extension: `.json` as JSON, anything else as
+    YAML. Raises `OSError`, or `ValueError` for text that doesn't read
+    (`UnicodeDecodeError`, a JSON or YAML error)."""
+    path = Path(path)
+    text = path.read_text(encoding='utf-8')
+    return json.loads(text) if path.suffix.lower() == '.json' else loads(text)
+
+
+def _json_shaped(value):
+    if isinstance(value, dict):
+        return {_key_text(k): _json_shaped(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_shaped(v) for v in value]
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, bytes):
+        return value.decode('utf-8', 'replace')
+    return value.isoformat() if hasattr(value, 'isoformat') else str(value)
+
+
+def _key_text(key):
+    """A mapping key as JSON writes one: `1` → "1", `true` → "true"."""
+    if isinstance(key, str):
+        return key
+    if key is None or isinstance(key, bool):
+        return json.dumps(key)
+    return str(_json_shaped(key))
 
 
 # ============================================================================
@@ -117,8 +153,11 @@ def _str(text):
 
 
 def _is_control(ch):
+    """A character a YAML reader refuses raw: C0/C1 controls, lone
+    surrogates and the non-characters U+FFFE / U+FFFF — escaped instead."""
     code = ord(ch)
-    return code < 0x20 or 0x7f <= code <= 0x9f
+    return (code < 0x20 or 0x7f <= code <= 0x9f or 0xd800 <= code <= 0xdfff
+            or code in (0xfffe, 0xffff))
 
 
 def _plain_ok(text):
@@ -143,7 +182,7 @@ def _quoted(text):
     for ch in text:
         if ch in _ESCAPES:
             out.append(_ESCAPES[ch])
-        elif _is_control(ch) or ch in '  ﻿':
+        elif _is_control(ch) or ch in '\u2028\u2029\ufeff':
             out.append(f'\\u{ord(ch):04x}')
         else:
             out.append(ch)

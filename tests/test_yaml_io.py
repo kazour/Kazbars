@@ -15,9 +15,9 @@ TRICKY = ["", " lead", "trail ", "no", "No", "on", "OFF", "yes", "y", "n", "null
           "False", "1.10", "0x1F", "0o7", "12", "-3", "+1", ".5", ".inf", ".nan", "1e5", "a: b",
           "a:", "key #c", "#c", "- x", "-", "?", "[x]", "{x}", "a,b", "*ref", "&anchor", "!tag",
           "|", ">", "'q'", '"q"', "%d", "@x", "`x", "<<", "=", "two\nlines", "cr\rhere",
-          "tab\there", "nul\0", "\x85", " ", "﻿x", "\x7f", "a?b", "what?", " ", " x"]
+          "tab\there", "nul\0", "\x85", " ", "\ufeffx", "\x7f", "a?b", "what?", "\u2028", "\u00a0x"]
 
-PLAIN = ["Bloodlust", "Ice Storm E", "Guard (rank 5)", "Tank cooldowns", "a:b", "a#b", "Ünïcödé",
+PLAIN = ["Bloodlust", "Ice Storm E", "Guard (rank 5)", "Tank cooldowns", "a:b", "a#b", "\u00dcn\u00efc\u00f6d\u00e9",
          "x-y_z/1.0", "it's", "back\\slash", 'say "hi"']
 
 
@@ -72,8 +72,8 @@ def test_ordinary_strings_stay_plain(text, loader):
 
 def test_quoted_escapes():
     assert dumps('a"b\\c\n\r\t\0') == '"a\\"b\\\\c\\n\\r\\t\\0"\n'
-    assert dumps('\x01\x7f\x85  ﻿') == '"\\u0001\\u007f\\u0085\\u2028\\u2029\\ufeff"\n'
-    assert dumps('é ü') == 'é ü\n', "other non-ASCII stays verbatim"
+    assert dumps('\x01\x7f\x85\u2028\u2029\ufeff') == '"\\u0001\\u007f\\u0085\\u2028\\u2029\\ufeff"\n'
+    assert dumps('\u00e9 \u00fc') == '\u00e9 \u00fc\n', "other non-ASCII stays verbatim"
 
 
 def test_container_shapes(loader):
@@ -131,3 +131,14 @@ def test_unreadable_text_raises_yaml_error():
         loads('a: [1, 2')
     assert issubclass(YamlError, ValueError)
     assert yaml_io.loads('') is None
+
+
+def test_loads_is_json_shaped(loader):
+    value = loads('slots:\n  1: [5]\nwhen: 2024-01-02\nids: !!set {7}\nid: 300\n')
+    assert value == {'slots': {'1': [5]}, 'when': '2024-01-02', 'ids': [7], 'id': 300}
+    assert loads(dumps(value)) == value
+
+
+def test_non_characters_are_escaped_and_read_back(loader):
+    for text in ('a\ufffeb', '\uffff', 'x\ufffe'):
+        assert loads(dumps({'k': text, text: [text]})) == {'k': text, text: [text]}

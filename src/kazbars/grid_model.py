@@ -277,10 +277,10 @@ def validate_grid(grid):
     else:
         grid['class'] = cls
 
-    # Validate grid name/id
-    grid_id = str(grid.get('id', '')).strip()
-    if not grid_id:
-        grid['id'] = defaults['id']
+    # Validate grid name/id: always text (YAML reads a bare `id: 300` as a number)
+    grid_id = grid.get('id')
+    grid_id = '' if grid_id is None else str(grid_id)
+    grid['id'] = grid_id if grid_id.strip() else defaults['id']
 
     # Ensure lists/dicts
     if not isinstance(grid.get('whitelist'), list):
