@@ -23,7 +23,8 @@
 // ally, start hint), then for each tier that has a row a header and its rows in
 // the scan's order. The wave line is the board's title: the wave's label, the
 // elapsed clock, the phase, the remaining clock and "left", one field each on
-// one bottom edge, the clocks at the Alert size. A row is a name, a value (a
+// one bottom edge, the clocks Title bold and bright beside a Body phase; the
+// fatality line's bar is the board's thickest. A row is a name, a value (a
 // skull standing on a camp shows the camp's name for its distance), a bar
 // under both (light blue while a shield buff is on the mob) and, while a heal
 // buff is on the mob, a green cross after the name. It belongs to its
@@ -70,9 +71,8 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
     // headers Small, alerts Alert, everything else Body (see KazBarsPanel).
     private var NAME_W:Number;    // 16   name column
     private var VAL_W:Number;     // 9    value column
-    private var ABAR_H:Number;    // 0.45 the thin bar under the fatality and ally lines
-    private var BARW:Number;      // every bar's width: 0.9 x PW, floored
-    private var EX:Number;        // what such a bar adds under its line
+    private var FAT_H:Number;     // 0.75 the fatality line's bar, the board's thickest
+    private var ALLY_H:Number;    // 0.5  the ally line's bar
     private var PW:Number;        // NAME_W + VAL_W
     private var AH:Number;        // an alert line: lh(ALERT_FS)
     private var AW:Number;        // 37   alert width: the longest alert at ALERT_FS
@@ -154,10 +154,9 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         applyBaseSize(Number(cfg.fontSize));
         NAME_W = rd(16);
         VAL_W = rd(9);
-        ABAR_H = rd(0.45);
-        EX = ABAR_H + 2;
+        FAT_H = rd(0.75);
+        ALLY_H = rd(0.5);
         PW = NAME_W + VAL_W;
-        BARW = Math.floor(PW * 0.9);
         AH = lh(ALERT_FS);
         // 37 x FS holds the longest alert there can be (SKULL or GUARD + the
         // longest watched name + a three-digit distance) at ALERT_FS, at every FS.
@@ -171,7 +170,7 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         FW = [PW + PAD * 2, AW];
         // The board's footprint is its preview sample: wave, fatality and ally lines, four headers,
         // five rows, and the guards' header and row when they list apart.
-        FH = [PAD * 2 + (WAVE ? AH + LINE + EX : 0) + (ALLY ? LINE + EX : 0)
+        FH = [PAD * 2 + (WAVE ? NAME_H + LINE + FAT_H + 2 : 0) + (ALLY ? LINE + ALLY_H + 2 : 0)
               + (LIST ? SMALL_H * 4 + TS.b.rh + TS.s.rh + TS.m.rh * 2 + TS.c.rh
                  + (GUARD ? SMALL_H + TS.g.rh : 0) : 0), AH * 2];
         var k:String;
@@ -469,12 +468,12 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         var pct:Number;
         var f:Number;             // when the wave bar filled, 0 = not full
         if (WAVE) {
-            title(line(0, y, false), prev ? "Wave 16" : wLab, prev ? ["1:08", "Spawning 27/36", "2:12"] : waveParts(now));
-            y += AH;
+            title(line(0, y, 0), prev ? "Wave 16" : wLab, prev ? ["1:08", "Spawning 27/36", "2:12"] : waveParts(now));
+            y += NAME_H;
             // The fatality line's bar is the game meter's: gold while it fills, red once
             // full, pulsing for 3 s from the moment it filled. A sample in preview.
-            c = line(1, y, true);
-            y += LINE + EX;
+            c = line(1, y, FAT_H);
+            y += LINE + FAT_H + 2;
             pct = prev ? 75 : wPct;
             f = prev ? 0 : wFull;
             row(c, "Fatality", 0xC8C0B0, Math.round(pct) + "%", 0xC8C0B0);
@@ -498,14 +497,14 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
                 col = (r.st == 1) ? 0x7F786C : band(r.pct);
                 pct = r.pct;
             }
-            c = line(2, y, true);
-            y += LINE + EX;
+            c = line(2, y, ALLY_H);
+            y += LINE + ALLY_H + 2;
             row(c, t, col, v, col);
             fill(c.b, pct);
             flash(c, r != null && r.st == 0 && now - r.drop < 3000);
         }
         if (src != null && src.anchor < 0) {
-            row(line(3, y, false), "Onslaught - target any NPC to start", 0x7F786C, "", 0);
+            row(line(3, y, 0), "Onslaught - target any NPC to start", 0x7F786C, "", 0);
             y += LINE;
         } else if (ln[3] != null) row(ln[3], "", 0, "", 0);
         if (LIST && src != null) {
@@ -589,12 +588,12 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
     }
 
     // A board line: a pooled clip made on first use, put at the cursor (y written
-    // only when it moved). The fatality and ally lines carry the thin bar under
-    // their text. The wave line (0) is the board's title, AH tall: five bold
-    // fields on one bottom edge, the label (w, Title, gold), the elapsed clock
-    // (c1, Alert), the phase (n, Title), the remaining clock (c2, Alert) and l
-    // (Title), the last four bright.
-    private function line(i:Number, y:Number, bar:Boolean):MovieClip {
+    // only when it moved). The fatality and ally lines carry a bar bh tall under
+    // their text (0: none). The wave line (0) is the board's title, NAME_H tall:
+    // five fields on one bottom edge, the label (w, Title bold, gold), the
+    // elapsed clock (c1, Title bold, bright), the phase (n, Body), the remaining
+    // clock (c2, Title bold, bright) and l (Body).
+    private function line(i:Number, y:Number, bh:Number):MovieClip {
         var c:MovieClip = ln[i];
         if (c == null) {
             if (i == 0) {
@@ -604,11 +603,12 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
                 var fs:Number;
                 var j:Number;
                 for (j = 0; j < 5; j++) {
-                    fs = (j == 1 || j == 3) ? ALERT_FS : NAME_FS;
-                    makeTF(c, ids[j], PAD, AH - lh(fs), PW, lh(fs), fs, true, (j == 0) ? 0xF7A22B : 0xE8E2D6, "left");
+                    fs = (j == 2 || j == 4) ? FS : NAME_FS;
+                    makeTF(c, ids[j], PAD, NAME_H - lh(fs), PW, lh(fs), fs, fs != FS,
+                           (j == 0) ? 0xF7A22B : ((fs == FS) ? 0xC8C0B0 : 0xE8E2D6), "left");
                 }
             } else c = mkRow(cl[0], PW, FS, false, LINE);
-            if (bar) c.b = mkBar(c, PAD, LINE - 1, BARW, ABAR_H);
+            if (bh > 0) c.b = mkBar(c, PAD, LINE - 1, PW, bh);
             ln[i] = c;
         }
         if (c._y != y) c._y = y;
@@ -617,7 +617,7 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
 
     // The title's texts: the label, then p = [elapsed clock, phase, remaining
     // clock] (see waveParts), "left" only after a remaining clock. When any text
-    // changed the fields are laid out again left to right from PAD, rd(0.4)
+    // changed the fields are laid out again left to right from PAD, rd(0.5)
     // apart; an empty field takes no room and adds no gap.
     private function title(c:MovieClip, lab:String, p:Array):Void {
         var ids:Array = ["w", "c1", "n", "c2", "l"];
@@ -637,7 +637,7 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         for (i = 0; i < 5; i++) {
             f = c[ids[i]];
             f._x = x;
-            if (f.text != "") x += Math.round(f.textWidth + rd(0.4));
+            if (f.text != "") x += Math.round(f.textWidth + rd(0.5));
         }
     }
 
@@ -661,7 +661,7 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         var c:MovieClip = mkRow(cl[0], NAME_W, s.fs, s.bold, h);
         var a:Number = Math.max(2, Math.round(s.fs * 0.25));   // the cross's arm, its side is three of them
         var z:Number = a * 3;
-        c.b = mkBar(c, PAD, h - 1, BARW, s.bh);
+        c.b = mkBar(c, PAD, h - 1, PW, s.bh);
         put(c.n, r.nm, s.col);
         var x:MovieClip = c.createEmptyMovieClip("x", c.getNextHighestDepth());
         solid(x, 0x1A1612, a - 1, -1, a + 2, z + 2);   // the dark outline: the plus grown by 1 px all round

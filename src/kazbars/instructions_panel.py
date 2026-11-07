@@ -1007,10 +1007,9 @@ SECTIONS: list[_Section] = [
             _sub('Five displays', [
                 'Board — Mob list: the bosses, skulls and minis in view, '
                 'with their health. Wave timer: the wave and the time to the '
-                'next spawn, with the elapsed and remaining clocks drawn '
-                'larger than the wave label. Hylda HP: Valkyrie Hylda, the '
-                'ally you defend in Skull Gate, with alerts at 50 % and '
-                '25 %.',
+                'next spawn, with the elapsed and remaining clocks in bold, '
+                'bright type. Hylda HP: Valkyrie Hylda, the ally you '
+                'defend in Skull Gate, with alerts at 50 % and 25 %.',
                 'Alerts — Spawn alerts: a banner when a watched boss, skull '
                 "or mini spawns. AoE warnings: a banner when Thugra Khotan's "
                 'AoE helpers spawn in Kuthchemes.',
