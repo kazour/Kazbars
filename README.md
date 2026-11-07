@@ -60,7 +60,7 @@ Most of what KazBars builds is set up once and runs on its own after you close t
 
 6. Launch the game from its own executable — KazBars offers to create a desktop shortcut (DX10 or DX9) after the first build. Launching this way skips the patcher, which is what keeps your setup registered.
 
-Positioning happens in-game: press Ctrl+Shift+Alt for preview mode and drag grids and panels where you want them. The game remembers positions, collapse states, and the control panel's switches across relogs and full restarts — like any other game window. Overhead grids follow their characters instead; preview shows a sample over your target.
+Positioning happens in-game: press Shift+Ctrl+Alt for preview mode and drag grids and panels where you want them. The game remembers positions, collapse states, and the control panel's switches across relogs and full restarts — like any other game window. Overhead grids follow their characters instead; preview shows a sample over your target.
 
 If the game ever patches (it hasn't in years), run the official patcher once, then **Game ▸ Repair game install** — KazBars re-registers itself and restores your saved positions.
 

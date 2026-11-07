@@ -589,7 +589,8 @@ SECTIONS: list[_Section] = [
             'A quiet status line above the extras cards reads "In game: '
             '<profile>" and turns orange when the game no longer matches '
             '— a profile imported or reset, an edit since the last build, '
-            'or a changed game resolution. It never blocks you; it just '
+            'or a changed game resolution or overhead anchor. It never '
+            'blocks you; it just '
             'says a rebuild is due.',
             'From here, two things matter: how you launch, and game patches.',
             _link('Launching the Game', 'launching'),
@@ -900,7 +901,8 @@ SECTIONS: list[_Section] = [
                 'heal rating, combat rating, bonus spell damage, ferocity. '
                 'Custom list shows the rows you pick.',
                 'Add and Remove move rows between Available and Active; '
-                'Move up and Move down order them within their section. '
+                'Add All and Clear fill or empty Active. Move up and Move '
+                'down order them within their section. '
                 'Any change pins the list as a Custom list.',
                 'Search matches a name, a group or a stat ID; Group filters '
                 'Available. Pick one row and the line under the lists says '
@@ -917,7 +919,8 @@ SECTIONS: list[_Section] = [
             ]),
             _sub('Positioning and size', [
                 'Drag by the name strip; − collapses to just the strip. The '
-                'game remembers position and fold.',
+                "game remembers position and fold — the dialog's X/Y only "
+                'seed a first-ever session. Start collapsed loads it folded.',
                 'No target? Preview mode (Shift+Ctrl+Alt) shows a '
                 'placeholder.',
                 'Size is a slider in this dialog: a percent of the Overlay '
@@ -1019,8 +1022,8 @@ SECTIONS: list[_Section] = [
                 'listed, never alerted — and a line for them in that list.',
                 'Your own names — up to 20, watched as minis. A name has to '
                 "match the game's exactly, capitals included; the dialog "
-                'says why it refuses one as you type. × deletes a name, and '
-                'the toast offers an undo.',
+                'says why it refuses one as you type. × deletes a name; '
+                "Cancel drops any change you haven't applied.",
                 'These matter when Mob list or Spawn alerts is on.',
             ]),
             _sub('Using it in-game', [

@@ -425,7 +425,8 @@ def reset_to_defaults(app):
     profile keeps its name."""
     if not confirm(
         "Reset your profile to the defaults?\n\nEvery grid and extra goes back to the "
-        "starter layout. Revert to session start brings your profile back.",
+        "starter layout. Revert to session start brings back your profile as it was "
+        "when you opened KazBars.",
         title="Reset Profile", action="Reset", parent=app, danger=True,
     ):
         return

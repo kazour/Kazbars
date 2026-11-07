@@ -14,14 +14,20 @@ Buff/debuff overlay editor for **Age of Conan**. Design icon grids or bars that 
 
 **KazBars** — custom icon overlays arranged in bars or grids that show only the buffs and debuffs you choose to track.
 - **Player and Target grids** — track effects on you and your current target
+- **Overhead grids** — icons that float over the heads of your group, friendly players and whoever you're fighting
 - **Dynamic or Static slots** — auto-fill as buffs activate, or pin specific buffs to specific slots
+- **Per-class grids** — give each class its own grids, so one profile covers every character you play
 - **Buff database** — map numeric buff IDs to readable names and classify them as Buff, Debuff, or Misc
 
 **Cast Timer** — an on-screen readout of your and your target's current cast time, ready to sit over the game's cast bars. Off by default
 
 **Stopwatch** — a simple, draggable Start / Pause / Reset count-up timer. Off by default
 
-**Inspect panel** — an in-game combat sheet for your current target: armor and protection with mitigation, crit, heal rating and spell damage, plus a PvP section and slotted perks on players; drag or fold it and the game remembers. Off by default
+**Inspect panel** — an in-game combat sheet for your current target, with the rows you pick from 112 stats and a PvP tab on players; drag or fold it and the game remembers. Off by default
+
+**Console** — an in-game log of every buff and debuff on you and your target with its buff ID, plus how each cast ended. Off by default
+
+**Onslaught tracker** — for Skull Gate and Kuthchemes: the bosses, skulls and minis in view with their health, the wave timer, Hylda's health, spawn alerts and AoE warnings. Off by default
 
 **Damage Numbers** — a leaner, faster rewrite of the game's floating combat numbers, with new layout and behavior settings. Off by default
 
@@ -35,13 +41,13 @@ Buff/debuff overlay editor for **Age of Conan**. Design icon grids or bars that 
 
 **Damage number colors** — set a color and a direction for every damage source from one place, applied the moment you hit Apply, no build
 
-**Backup & restore** — save your full Age of Conan config plus your KazBars profiles and settings to one portable zip, and restore it after a reformat or on a new PC
+**Backup & restore** — save your full Age of Conan config plus your KazBars profile and settings to one portable zip, and restore it after a reformat or on a new PC
 
 **Repair game install** — after a game patch, run the official patcher once, then Repair re-registers KazBars, restores your saved positions from a safety snapshot and puts the Damage Numbers mod back; a startup check offers it when the game stopped loading KazBars
 
 ## Install
 
-1. Download `KazBars.zip` below and extract it anywhere. Upgrading from 3.0.1 or earlier? Extract it over your existing KazBars folder instead — profiles and settings survive, and from then on KazBars offers updates itself.
+1. Download `KazBars.zip` below and extract it anywhere. Upgrading from 3.0.1 or earlier? Extract it over your existing KazBars folder instead — your profile and settings survive, and from then on KazBars offers updates itself.
 2. Run `KazBars.exe` as Administrator.
 3. The first-run setup window opens. Point it at your Age of Conan folder.
 4. Choose **Use Defaults** — ready-made grids for common raid buffs and debuffs, sized to your screen. (Or **Start Empty** to build your own from scratch.)

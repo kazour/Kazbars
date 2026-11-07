@@ -64,7 +64,7 @@
 | `src/kazbars/inspect.py` | 67 |
 | `src/kazbars/inspect_catalog.py` | 581 |
 | `src/kazbars/inspect_panel.py` | 289 |
-| `src/kazbars/instructions_panel.py` | 1462 |
+| `src/kazbars/instructions_panel.py` | 1465 |
 | `src/kazbars/live_tracker_panel.py` | 521 |
 | `src/kazbars/live_tracker_settings.py` | 175 |
 | `src/kazbars/onslaught.py` | 194 |
@@ -75,7 +75,7 @@
 | `src/kazbars/paths.py` | 46 |
 | `src/kazbars/prefs.py` | 189 |
 | `src/kazbars/profile_document.py` | 345 |
-| `src/kazbars/profile_io.py` | 438 |
+| `src/kazbars/profile_io.py` | 439 |
 | `src/kazbars/profile_share.py` | 172 |
 | `src/kazbars/profile_store.py` | 133 |
 | `src/kazbars/self_update.py` | 487 |
