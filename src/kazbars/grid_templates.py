@@ -24,12 +24,14 @@ TEMPLATE_SCHEMA = 1
 
 
 def build(grids, by_id, by_name, provenance):
-    """The grids file for `grids`: each without its `class`, and the
+    """The grids file for `grids`: each without its `class` or the card's
+    private `_` keys (a shrink's stashed slots), and the
     user-provenance buffs they reference — only when there are any."""
     out = {
         'format': GRIDS_FORMAT,
         'schema': TEMPLATE_SCHEMA,
-        'grids': [{k: copy.deepcopy(v) for k, v in g.items() if k != 'class'} for g in grids],
+        'grids': [{k: copy.deepcopy(v) for k, v in g.items()
+                   if k != 'class' and not k.startswith('_')} for g in grids],
     }
     harvest = PROFILE_SECTION.harvest_refs
     refs = harvest({'grids': grids}) if harvest else []

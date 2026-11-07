@@ -195,6 +195,8 @@ class GridPreview(tk.Canvas):
         if hand != self._hand:
             self._hand = hand
             self.configure(cursor='hand2' if hand else '')
+        if i < 0 and self._focused():
+            i = self._kept  # a gap under the pointer keeps the keyboard's slot
         if i != self._hot:
             self._set_hot(i)
             if self._static():  # a dynamic grid's tip is one line for the whole preview

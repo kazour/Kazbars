@@ -135,6 +135,7 @@ class GridEditorPanel(ttk.Frame):
         # Cleared slots still undoable: slot -> (refs, when cleared).
         self._cleared = {}
         self._names = []
+        self._names_cfg = grid_config  # what the names were read from (a draft while one is open)
         self._names_cut = (None, None)  # (names, width) the line was cut for
         self.settings_dialog = None
 
@@ -335,6 +336,7 @@ class GridEditorPanel(ttk.Frame):
         shown_at = grid_preview.ratio_text(PREVIEW_RATIO[0], self.preview.ratio, PREVIEW_RATIO[1])
         self.summary_label.configure(text=cfg.get('slotMode', 'dynamic') + shown_at)
         self._names = [self._name_of(ref) for ref in grid_preview.held_ids(cfg)]
+        self._names_cfg = cfg
         self._draw_names()
 
     def refresh_size_hint(self):
@@ -345,7 +347,7 @@ class GridEditorPanel(ttk.Frame):
     def _draw_names(self):
         """The names line, cut to the card's width: the buffs the grid holds,
         or what to click while it holds nothing. Cut once per (names, width)."""
-        nudge = grid_preview.empty_nudge(self.grid_config)
+        nudge = grid_preview.empty_nudge(self._names_cfg)
         if nudge is not None:
             self._names_cut = (None, None)
             self.names_var.set(nudge)
@@ -409,7 +411,8 @@ class GridEditorPanel(ttk.Frame):
         if dialog.result is not None:
             self.grid_config['whitelist'] = dialog.result
             self._refresh_view()  # every cell of a dynamic grid shows it holds something
-            self._buffs_changed()
+            if self._on_whitelist_changed:
+                self._on_whitelist_changed()
 
     def edit_slot(self, slot):
         """The same picker on one static slot (a click on its cell), walking
@@ -502,17 +505,21 @@ class GridEditorPanel(ttk.Frame):
         cfg = self.grid_config
         old_total = grid_preview.slot_total(cfg)
         cfg.update(draft)
+        slots_moved = False
         if not self._band:
             rows, cols, fill = settle_box(cfg['rows'], cfg['cols'], cfg.get('fillDirection'),
                                           cfg.get('type', 'player'), cfg.get('slotMode') == 'dynamic')
             cfg.update(rows=rows, cols=cols, fillDirection=fill)
-            if cfg.get('slotMode') == 'static':
-                if rows * cols < old_total:
-                    self._trim_slot_assignments(rows * cols)
-                elif rows * cols > old_total:
-                    self._restore_orphaned_assignments(rows * cols)
+            slots_moved = cfg.get('slotMode') == 'static' and rows * cols != old_total
+            if slots_moved and rows * cols < old_total:
+                self._trim_slot_assignments(rows * cols)
+            elif slots_moved:
+                self._restore_orphaned_assignments(rows * cols)
         self._refresh_view()
-        self._notify_edit()
+        if slots_moved and self._on_whitelist_changed:
+            self._on_whitelist_changed()  # the step guide re-reads the slots
+        else:
+            self._notify_edit()
 
     def _trim_slot_assignments(self, new_total):
         """Drop assignments past new_total; stash dropped IDs on the grid for later restore."""

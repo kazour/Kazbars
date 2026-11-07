@@ -224,6 +224,10 @@ def validate_grid(grid):
     """Validate and clamp a grid config on load. Returns sanitized grid."""
     defaults = create_default_grid()
 
+    # Type-dependent defaults, as a new grid of the type gets them.
+    defaults['timerStyle'] = 'bar' if is_plate(grid.get('type')) else 'digits'
+    defaults['layout'] = 'debuffFirst' if grid.get('type') in ('target', 'hostile') else 'buffFirst'
+
     # Ensure required keys exist
     for key, val in defaults.items():
         if key not in grid:
@@ -285,8 +289,18 @@ def validate_grid(grid):
     # Ensure lists/dicts
     if not isinstance(grid.get('whitelist'), list):
         grid['whitelist'] = []
-    if not isinstance(grid.get('slotAssignments'), dict):
-        grid['slotAssignments'] = {}
+    # Slot keys as the editor reads them: '0', '1', … (YAML may read a bare 0
+    # as a number); a key that names no slot is dropped.
+    raw = grid.get('slotAssignments')
+    slots: dict[str, object] = {}
+    for key, value in (raw.items() if isinstance(raw, dict) else ()):
+        try:
+            n = -1 if isinstance(key, bool) else int(key)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if n >= 0:
+            slots.setdefault(str(n), value)
+    grid['slotAssignments'] = slots
 
     return grid
 

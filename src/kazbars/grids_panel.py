@@ -323,6 +323,7 @@ class GridsPanel(ttk.Frame):
         self._overlay_font_var.set(font_label(overlay.get('font', 'Arial')))
         for panel in self.grid_panels:
             panel.refresh_size_hint()
+        self._redraw_empty_cards()
 
     def _on_overlay_changed(self):
         size = self._size_by_label.get(self._overlay_size_var.get(), DEFAULT_SIZE)
@@ -334,6 +335,7 @@ class GridsPanel(ttk.Frame):
             store.update_section('overlay', {'size': size, 'font': font})
         for panel in self.grid_panels:
             panel.refresh_size_hint()
+        self._redraw_empty_cards()
         # The deployed SWF was baked at the old size/font: un-tick Build.
         self._mark_modified()
 
@@ -848,8 +850,8 @@ class GridsPanel(ttk.Frame):
         callers that mutate self.grids flush with save_settings() first."""
         self._drag_manager.clear()
 
-        self._update_tab_counts()
         if not self.grids:
+            self._update_tab_counts()
             self._normal_view.pack_forget()
             self._empty_state.pack(fill='both', expand=True)
             self._update_tip()

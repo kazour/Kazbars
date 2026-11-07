@@ -316,3 +316,18 @@ def test_a_grid_id_is_always_text():
     assert validate_grid({"id": None})["id"] == create_default_grid()["id"]
     assert validate_grid({"id": "  "})["id"] == create_default_grid()["id"]
     assert validate_grid({"id": " Keep "})["id"] == " Keep "
+
+
+def test_a_grid_missing_type_dependent_keys_gets_its_types_defaults():
+    hostile = validate_grid({'type': 'hostile', 'id': 'H'})
+    assert (hostile['timerStyle'], hostile['layout']) == ('bar', 'debuffFirst')
+    target = validate_grid({'type': 'target', 'id': 'T'})
+    assert (target['timerStyle'], target['layout']) == ('digits', 'debuffFirst')
+    player = validate_grid({'type': 'player', 'id': 'P'})
+    assert (player['timerStyle'], player['layout']) == ('digits', 'buffFirst')
+
+
+def test_slot_keys_are_slot_numbers_as_text():
+    grid = validate_grid({'id': 'S', 'slotMode': 'static', 'rows': 2, 'cols': 2,
+                          'slotAssignments': {0: [1], '1': [2], 'a': [3], '-1': [4], True: [5]}})
+    assert grid['slotAssignments'] == {'0': [1], '1': [2]}

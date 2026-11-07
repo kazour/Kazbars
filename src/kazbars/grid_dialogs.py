@@ -53,7 +53,7 @@ from .ui_helpers import (
     TK_COLORS,
 )
 from .ui_tk_style import style_tk_listbox
-from .ui_widgets import add_tooltip, app_toast, debounced_callback, refresh_tooltip
+from .ui_widgets import add_tooltip, debounced_callback, refresh_tooltip
 from .window_position import (
     bind_window_position_save,
     fit_window_height,
@@ -196,7 +196,10 @@ class AddGridWizard(tk.Toplevel):
                                      textvariable=self.rows_var, width=INPUT_WIDTH_NUM,
                                      command=self.on_rows_changed)
         self.rows_spin.pack(side='left', padx=(PAD_BUTTON_GAP, PAD_LIST_ITEM))
-        self.rows_spin.bind('<KeyRelease>', lambda e: self.on_rows_changed())
+        # Typing only redraws the shape text; the clamp waits for focus-out, so a
+        # field can be cleared and retyped.
+        self.rows_spin.bind('<KeyRelease>', lambda e: self.update_display())
+        self.rows_spin.bind('<FocusOut>', lambda e: self.on_rows_changed())
         ttk.Label(dim_row, text="Columns:", font=FONT_FORM_LABEL,
                   foreground=THEME_COLORS['muted']).pack(side='left')
         self.cols_var = tk.StringVar(value="10")
@@ -204,7 +207,8 @@ class AddGridWizard(tk.Toplevel):
                                      textvariable=self.cols_var, width=INPUT_WIDTH_NUM,
                                      command=self.on_cols_changed)
         self.cols_spin.pack(side='left', padx=(PAD_BUTTON_GAP, 0))
-        self.cols_spin.bind('<KeyRelease>', lambda e: self.on_cols_changed())
+        self.cols_spin.bind('<KeyRelease>', lambda e: self.update_display())
+        self.cols_spin.bind('<FocusOut>', lambda e: self.on_cols_changed())
 
         self.shape_var = tk.StringVar(value="")
         ttk.Label(dim_frame, textvariable=self.shape_var, font=FONT_SECTION).pack(pady=(PAD_SMALL, PAD_BUTTON_GAP))
@@ -358,11 +362,6 @@ class AddGridWizard(tk.Toplevel):
         self._clamp_shape()
         rows = self.safe_get_int(self.rows_var, 1)
         cols = self.safe_get_int(self.cols_var, 1)
-        limit = max_slots(self.type_var.get())
-        if rows * cols > limit:
-            app_toast(self.parent, f"A grid holds at most {limit} slots. Reduce rows or columns.", 'warning')
-            return
-
         self.result = create_default_grid(
             grid_type=self.type_var.get(),
             rows=rows,

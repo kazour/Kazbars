@@ -33,6 +33,11 @@ def test_build_strips_class_and_embeds_only_user_buffs():
     assert yaml_io.dumps(value).startswith('format: kazbars-grids\nschema: 1\ngrids:\n')
 
 
+def test_build_leaves_out_the_cards_private_keys():
+    value = GT.build([_grid('A', whitelist=[1], _orphanedAssignments=[9])], {}, {}, {})
+    assert '_orphanedAssignments' not in value['grids'][0]
+
+
 def test_build_omits_buffs_when_none():
     assert 'buffs' not in GT.build([_grid('A', whitelist=[1])], {}, {}, {})
 
