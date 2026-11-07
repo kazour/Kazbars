@@ -52,7 +52,7 @@
 | `src/kazbars/game_persistence.py` | 608 |
 | `src/kazbars/game_resolution.py` | 160 |
 | `src/kazbars/grid_dialogs.py` | 795 |
-| `src/kazbars/grid_editor_panel.py` | 607 |
+| `src/kazbars/grid_editor_panel.py` | 613 |
 | `src/kazbars/grid_model.py` | 430 |
 | `src/kazbars/grid_preview.py` | 240 |
 | `src/kazbars/grid_preview_canvas.py` | 227 |
@@ -146,7 +146,7 @@
 | `tests/test_overlay_rung.py` | 145 |
 | `tests/test_overlay_size.py` | 226 |
 | `tests/test_panel_ratios.py` | 162 |
-| `tests/test_panels_construct.py` | 1749 |
+| `tests/test_panels_construct.py` | 1762 |
 | `tests/test_prefs.py` | 76 |
 | `tests/test_prefs_migration.py` | 68 |
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |

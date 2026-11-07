@@ -1480,7 +1480,20 @@ def test_applied_by_me_sits_after_the_mode(app):
     slaves = card.summary_label.master.pack_slaves()
     left = [w for w in slaves if w.pack_info()['side'] == 'left']
     assert left[-2:] == [card.summary_label, card._self_cast_cb]
-    assert slaves.index(card.cog_label) < slaves.index(card._self_cast_cb)
+    assert card.cog_label not in slaves, "the cog left the title line"
+
+
+def test_the_cog_sits_right_of_the_preview_and_opens_the_settings(app, monkeypatch):
+    card, _ = _add_seam_grid(app, 'SeamCogPlace')
+    row = card.cog_label.master
+    assert row is card.preview.master and row.master is card._body
+    assert row.pack_slaves() == [card.preview, card.cog_label]
+    assert card.cog_label.pack_info()['side'] == 'left' and card.cog_label.pack_info()['anchor'] == 'n'
+    opened = []
+    from kazbars import grid_editor_panel
+    monkeypatch.setattr(grid_editor_panel, 'open_grid_settings', lambda c: opened.append(c is card))
+    _fire_binding(card.cog_label, '<Return>')
+    assert opened == [True]
 
 
 def test_the_side_typed_since_the_last_settle_gives_way(app):
@@ -1742,7 +1755,7 @@ def test_a_cards_move_menu_ends_with_export_grid(app, monkeypatch):
     import tkinter as tk
     monkeypatch.setattr(tk.Menu, 'tk_popup', lambda *a, **k: None)  # a real popup waits
     card, _ = _add_seam_grid(app, 'SeamExportMenu')
-    card._show_move_menu(card.cog_label)
+    card._show_move_menu(card._self_cast_cb)
     menu = card._move_menu
     last = menu.index('end')
     assert menu.entrycget(last, 'label') == 'Export grid…'

@@ -4,9 +4,9 @@
 (in `grids_panel.py`) creates/destroys these as the grid list changes.
 
 A card is a row, never expanded: the title line (name, type, mode, Applied
-by me; the settings cog, Move… (move, copy or export the grid), Enabled,
-×), the grid drawn to scale
-(`GridPreview`) and the names line under it. The preview is where buffs are
+by me; Move… (move, copy or export the grid), Enabled, ×), the grid drawn to
+scale (`GridPreview`) with the settings cog at its top right, and the names
+line under it. The preview is where buffs are
 chosen: a dynamic grid's opens the Tracked Buffs picker, a static grid's cell
 opens it on that slot (walking the grid's slots from there), and a
 right-click (or Delete) clears a slot with an undo toast. The cog opens Grid
@@ -202,7 +202,7 @@ class GridEditorPanel(ttk.Frame):
     # ------------------------------------------------------------------
     def _build_title_line(self):
         """Name, type badge, mode and Applied by me on the left; on the right,
-        left to right: the settings cog, Move…, Enabled and ×."""
+        left to right: Move…, Enabled and ×."""
         header = ttk.Frame(self._row)
         header.pack(fill='x')
         self._title_label = ttk.Label(header, font=FONT_SECTION, foreground=THEME_COLORS['heading'])
@@ -240,23 +240,21 @@ class GridEditorPanel(ttk.Frame):
             for seq in ('<Return>', '<space>'):
                 move_label.bind(seq, lambda e: self._show_move_menu(move_label))
             in_view.insert(0, move_label)
-        self.cog_label = self._glyph_label(header, "⚙", FONT_BODY_LG, "This grid's settings",
-                                           self.open_settings, THEME_COLORS['heading'])
-        in_view.insert(0, self.cog_label)
         # Packed after the right cluster, so a narrow header squeezes the
-        # toggle before the cog or ×; side='left' still lands it after the mode.
+        # toggle before Move… or ×; side='left' still lands it after the mode.
         self._self_cast_cb.pack(side='left', padx=(PAD_LF, 0))
         # The right cluster is packed right to left; raise everything left to
         # right so Tab walks it as seen.
         for w in [self._self_cast_cb, *in_view]:
             w.lift()
 
-    def _glyph_label(self, header, text, font, tip, command, hover_color, padding=(PAD_XS, PAD_MICRO)):
-        """A clickable muted label on the title line (hand cursor, Tab stop,
-        Enter/space like a click)."""
-        lbl = ttk.Label(header, text=text, font=font, foreground=THEME_COLORS['muted'],
+    def _glyph_label(self, parent, text, font, tip, command, hover_color, padding=(PAD_XS, PAD_MICRO),
+                     side='right'):
+        """A clickable muted label (hand cursor, Tab stop, Enter/space like a
+        click), packed to `side` of `parent`."""
+        lbl = ttk.Label(parent, text=text, font=font, foreground=THEME_COLORS['muted'],
                         cursor='hand2', takefocus=True, padding=padding)
-        lbl.pack(side='right', padx=(PAD_XS, 0))
+        lbl.pack(side=side, padx=(PAD_XS, 0))
         if command is not None:
             for seq in ('<Button-1>', '<Return>', '<space>'):
                 lbl.bind(seq, lambda e: command())
@@ -292,13 +290,21 @@ class GridEditorPanel(ttk.Frame):
     # Preview and names line
     # ------------------------------------------------------------------
     def _build_body(self):
-        """The to-scale preview and the names line under it."""
+        """The to-scale preview with the settings cog at its top right, and
+        the names line under them."""
         body = ttk.Frame(self._row)
         body.pack(fill='x', padx=(PAD_XS, 0))
         self._body = body
-        self.preview = GridPreview(body, accent=self._accent_color, on_pick=self._on_pick,
+        row = ttk.Frame(body)
+        row.pack(fill='x')
+        self.preview = GridPreview(row, accent=self._accent_color, on_pick=self._on_pick,
                                    on_clear=self.clear_slot, tip_for=self._preview_tip)
-        self.preview.pack(anchor='w', pady=(PAD_XS, PAD_MICRO))
+        self.preview.pack(side='left', anchor='n', pady=(PAD_XS, PAD_MICRO))
+        # Its top on the preview's: Tab reaches it right after the preview.
+        self.cog_label = self._glyph_label(row, "⚙", FONT_BODY_LG, "This grid's settings",
+                                           self.open_settings, THEME_COLORS['heading'],
+                                           padding=(PAD_MICRO, 0), side='left')
+        self.cog_label.pack_configure(anchor='n', pady=(PAD_XS, 0))
         self.names_var = tk.StringVar()
         self._names_label = ttk.Label(body, textvariable=self.names_var, font=FONT_SMALL,
                                       foreground=THEME_COLORS['muted'])
