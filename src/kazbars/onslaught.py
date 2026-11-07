@@ -32,12 +32,6 @@ from .settings_core import Field, Schema, validate_all
 # skull mini (s), mini (m), or camp beast (c: listed, but it never alerts).
 BOSS, SKULL, MINI, CAMP = 'b', 's', 'm', 'c'
 
-# Where a row comes from, in catalog order (the dialog names the watched mobs
-# one line per group, in this order).
-GROUPS = ('Skull Gate boss', 'Skull Gate skull', 'Skull Gate mini', 'Kuthchemes boss',
-          'Kuthchemes skull', 'Kuthchemes mini', 'Kuthchemes camp')
-
-
 class Row(NamedTuple):
     name: str
     group: str
@@ -87,6 +81,9 @@ ROWS: tuple[Row, ...] = (
     Row('Zug-Touched Scorpion', 'Kuthchemes camp', CAMP),
 )
 _NAMES = {r.name for r in ROWS}
+# Where a row comes from, in catalog order (the dialog names the watched mobs
+# one line per group, in this order; the camps come last).
+GROUPS = tuple(dict.fromkeys(r.group for r in ROWS))
 
 
 class Instance(NamedTuple):
@@ -94,7 +91,6 @@ class Instance(NamedTuple):
     an NPC the group defends (never a watched mob); `aoe` marks an instance
     whose AOE_HELPERS spawn."""
     playfield: int
-    name: str
     start_hint: str
     spawn_ms: int
     ally: str
@@ -102,8 +98,8 @@ class Instance(NamedTuple):
 
 
 INSTANCES = (
-    Instance(20010, 'Skull Gate', 'talk to Hylda', 200_000, 'Valkyrie Hylda', False),
-    Instance(20000, 'Kuthchemes', 'click the banner', 200_000, '', True),
+    Instance(20010, 'talk to Hylda', 200_000, 'Valkyrie Hylda', False),  # Skull Gate
+    Instance(20000, 'click the banner', 200_000, '', True),  # Kuthchemes
 )
 
 # Spawns with these names are AoE-warning candidates first, watched or not.
@@ -117,10 +113,8 @@ HEAL_BUFFS = ('Healing Radiance',)
 NAME_MAX = 27
 # The most custom names a section keeps (the first ones, in the user's order).
 CUSTOM_MAX = 20
-
-
-def find(name: str) -> Row | None:
-    return next((r for r in ROWS if r.name == name), None)
+# How long a banner stays, in seconds: the range the dialog's slider offers.
+ALERT_SECONDS = (3, 15)
 
 
 def custom_refusal(name: str, held: list[str]) -> str | None:
@@ -169,7 +163,7 @@ _SCHEMA = Schema('', 1, {
     'showWave': Field(True, kind='bool'),
     'showAoe': Field(True, kind='bool'),
     'showAlly': Field(True, kind='bool'),
-    'alertSeconds': Field(6, kind='int', min=3, max=15),
+    'alertSeconds': Field(6, kind='int', min=ALERT_SECONDS[0], max=ALERT_SECONDS[1]),
     'camps': Field(False, kind='bool'),
     'custom': Field([], validate=_validate_custom),
 })

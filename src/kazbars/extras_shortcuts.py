@@ -22,8 +22,9 @@ Identity comes from the label — the cards rest neutral when off.
 import tkinter as tk
 from tkinter import ttk
 
-from . import onslaught
+from .cast_timer import is_enabled as cast_ships
 from .console import ships as console_ships
+from .onslaught import ships as onslaught_ships
 from .ui_helpers import (
     FONT_SECTION,
     FONT_SMALL,
@@ -33,40 +34,34 @@ from .ui_helpers import (
     THEME_COLORS,
     TK_COLORS,
 )
-from .ui_widgets import add_tooltip, app_toast, is_descendant
+from .ui_widgets import add_tooltip, app_toast, pointer_inside
 
 
 # ============================================================================
 # PER-FEATURE STORE ACCESS (the same writes the Extras dialogs make)
 # ============================================================================
-def _read_section(app, key):
+def _ships(app, key, ships):
+    """Whether the feature is in the next build: its section through its
+    own gate (`ships`), the one the generator reads — a console with no tab
+    or a tracker with no display shows off, as it is built."""
     # The row is built with GridsPanel, before startup_profile installs the
     # store; apply_document resyncs the cards right after, so rest off here.
     store = app.profile_store
-    return store is not None and bool(store.get_section(key).get('enabled'))
+    return store is not None and ships(store.get_section(key))
 
 
-def _read_console(app):
-    # The console ships only with a tab, so its card says so too.
-    store = app.profile_store
-    return store is not None and console_ships(store.get_section('console'))
+def _enabled(section):
+    return bool(section.get('enabled'))
 
 
-def _read_onslaught(app):
-    # The tracker ships only with a display on, so its card says so too.
-    store = app.profile_store
-    return store is not None and onslaught.ships(store.get_section('onslaught'))
+def _patch(on):
+    return {'enabled': on}
 
 
-def _make_section_setter(key, side_flags=()):
-    def _set(app, on):
-        patch = {'enabled': on}
-        # The cast timer's per-side flags ride the master (is_enabled needs
-        # master AND a side, and no UI has ever split them).
-        for flag in side_flags:
-            patch[flag] = on
-        app.profile_store.update_section(key, patch)
-    return _set
+def _cast_patch(on):
+    # The cast timer's per-side flags ride the master (is_enabled needs
+    # master AND a side, and no UI has ever split them).
+    return {'enabled': on, 'enableP': on, 'enableT': on}
 
 
 # Shared by every switch — they do the same thing on every card.
@@ -77,40 +72,29 @@ _TOGGLE_TOOLTIP = 'Whether this ships in your next Build & Install'
 _HOVER_BORDER = THEME_COLORS['heading']
 
 
-# (key, title, off-toast tail, tooltip, opener) + read/set — menu order.
-# `opener` is the KazBarsApp method the matching Extras menu item calls.
+# (key, title, off-toast tail, tooltip, opener, ships, patch) — menu order.
+# `opener` is the KazBarsApp method the matching Extras menu item calls;
+# `ships(section)` the feature's build gate; `patch(on)` what the switch writes.
 _FEATURES = (
     ('cast_timer', 'Cast timer', 'next build removes it',
      'Cast-time readout for you and your target. Click to open Extras ▸ Cast timer…',
-     '_open_cast_timer_settings',
-     lambda app: _read_section(app, 'cast_timer'),
-     _make_section_setter('cast_timer', side_flags=('enableP', 'enableT'))),
+     '_open_cast_timer_settings', cast_ships, _cast_patch),
     ('console', 'Console', 'next build removes it',
      'Buff IDs and casts, logged in game. Click to open Extras ▸ Console…',
-     '_open_console_settings',
-     _read_console,
-     _make_section_setter('console')),
+     '_open_console_settings', console_ships, _patch),
     ('damage_numbers', 'Damage numbers', 'next build restores stock',
      "Re-tunes AoC's floating combat numbers. Click to open Extras ▸ Damage number mod…",
-     '_open_damage_numbers',
-     lambda app: _read_section(app, 'damage_numbers'),
-     _make_section_setter('damage_numbers')),
+     '_open_damage_numbers', _enabled, _patch),
     ('inspect', 'Inspect panel', 'next build removes it',
      'Combat sheet for your current target. Click to open Extras ▸ Inspect panel…',
-     '_open_inspect_settings',
-     lambda app: _read_section(app, 'inspect'),
-     _make_section_setter('inspect')),
+     '_open_inspect_settings', _enabled, _patch),
     ('onslaught', 'Onslaught tracker', 'next build removes it',
      'Bosses, waves and spawn alerts in Skull Gate and Kuthchemes. '
      'Click to open Extras ▸ Onslaught tracker…',
-     '_open_onslaught_settings',
-     _read_onslaught,
-     _make_section_setter('onslaught')),
+     '_open_onslaught_settings', onslaught_ships, _patch),
     ('stopwatch', 'Stopwatch', 'next build removes it',
      'In-game Start / Pause / Reset timer panel. Click to open Extras ▸ Stopwatch…',
-     '_open_stopwatch_settings',
-     lambda app: _read_section(app, 'stopwatch'),
-     _make_section_setter('stopwatch')),
+     '_open_stopwatch_settings', _enabled, _patch),
 )
 
 
@@ -130,7 +114,7 @@ class ExtrasShortcutsRow(ttk.Frame):
         self.refresh()
 
     def _build_tile(self, col, spec):
-        key, title, off_tail, tooltip, opener, read, write = spec
+        key, title, off_tail, tooltip, opener, ships, patch = spec
         card = tk.Frame(self,
                         highlightbackground=TK_COLORS['border'],
                         highlightcolor=TK_COLORS['border'],
@@ -169,7 +153,7 @@ class ExtrasShortcutsRow(ttk.Frame):
         status_lbl.pack(anchor='w')
 
         tile = {'key': key, 'title': title, 'off_tail': off_tail,
-                'read': read, 'write': write, 'opener': opener, 'var': var,
+                'ships': ships, 'patch': patch, 'opener': opener, 'var': var,
                 'card': card, 'switch_cell': switch_cell, 'status': status_lbl,
                 'on': None, 'hover': None}
         self._tiles[key] = tile
@@ -181,26 +165,21 @@ class ExtrasShortcutsRow(ttk.Frame):
         for widget in (card, body, text, title_lbl, status_lbl):
             widget.bind('<Button-1>', lambda e, k=key: self._open_settings(k))
             widget.configure(cursor='hand2')
-            self._bind_zone(widget, key, card, 'body')
+            self._bind_zone(widget, key, 'body')
             add_tooltip(widget, tooltip)
-        self._bind_zone(switch_cell, key, card, 'switch')
+        self._bind_zone(switch_cell, key, 'switch')
         add_tooltip(toggle, _TOGGLE_TOOLTIP)
 
-    def _bind_zone(self, widget, key, card, zone):
+    def _bind_zone(self, widget, key, zone):
         """Enter always claims the zone; Leave only releases it once the
         pointer is confirmed outside the card — moving straight from the
         body onto the switch cell (or back) must not flicker through None."""
         widget.bind('<Enter>', lambda e: self._set_hover(key, zone))
-        widget.bind('<Leave>', lambda e: self._on_zone_leave(e, key, card))
+        widget.bind('<Leave>', lambda e: self._on_zone_leave(e, key))
 
-    def _on_zone_leave(self, event, key, card):
-        try:
-            under = card.winfo_containing(event.x_root, event.y_root)
-        except (tk.TclError, RuntimeError):
-            under = None
-        if under is not None and is_descendant(under, card):
-            return
-        self._set_hover(key, None)
+    def _on_zone_leave(self, event, key):
+        if not pointer_inside(self._tiles[key]['card'], event):
+            self._set_hover(key, None)
 
     def _set_hover(self, key, zone):
         tile = self._tiles[key]
@@ -224,13 +203,16 @@ class ExtrasShortcutsRow(ttk.Frame):
     def _on_toggle(self, key):
         """Write the flipped state to the feature's own store, then resync."""
         tile = self._tiles[key]
+        store = self.app.profile_store
         on = bool(tile['var'].get())
-        tile['write'](self.app, on)
-        empty = on and not tile['read'](self.app)
+        patch = tile['patch'](on)
+        # Switched on with nothing to build (a console with no tab): the card
+        # stays off, and so does the store.
+        empty = on and not tile['ships']({**store.get_section(key), **patch})
         if empty:
-            # Switched on with nothing to build (a console with no tab): the
-            # card stays off, so the store does too.
-            tile['write'](self.app, False)
+            tile['var'].set(False)
+        else:
+            store.update_section(key, patch)
         self.refresh()
         # The row's parent is GridsPanel; a flipped gate changes what the next
         # build bakes, so its status row re-checks.
@@ -248,10 +230,8 @@ class ExtrasShortcutsRow(ttk.Frame):
     def refresh(self):
         """Resync every card from its store; no-ops for unchanged tiles."""
         for tile in self._tiles.values():
-            on = tile['read'](self.app)
-            # The switch can be ahead of the state: switched on with nothing
-            # to build (a console with no tab), it falls back to off.
-            if on == tile['on'] and tile['var'].get() == on:
+            on = _ships(self.app, tile['key'], tile['ships'])
+            if on == tile['on']:
                 continue
             tile['on'] = on
             tile['var'].set(on)

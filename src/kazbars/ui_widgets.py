@@ -130,6 +130,16 @@ def is_descendant(widget, ancestor):
     return False
 
 
+def pointer_inside(widget, event):
+    """Whether the pointer `event` reports is over `widget` or a child of it
+    (a <Leave> onto a child is no leave)."""
+    try:
+        under = widget.winfo_containing(event.x_root, event.y_root)
+    except (tk.TclError, RuntimeError):
+        return False
+    return under is not None and is_descendant(under, widget)
+
+
 def bind_card_events(card_border, color, hover_color=None):
     """Bind hover highlight on a card frame.
 
@@ -149,12 +159,8 @@ def bind_card_events(card_border, color, hover_color=None):
         card_border.config(highlightbackground=_hover, highlightcolor=_hover)
 
     def on_leave(e):
-        try:
-            w = card_border.winfo_containing(e.x_root, e.y_root)
-            if w is not None and is_descendant(w, card_border):
-                return
-        except (tk.TclError, RuntimeError):
-            pass
+        if pointer_inside(card_border, e):
+            return
         normal = _resting()
         card_border.config(highlightbackground=normal, highlightcolor=normal)
 

@@ -484,12 +484,8 @@ def select(keys: list[str]) -> list[Row]:
     """The rows `keys` name in the panel's order: section by section in Group
     order, each section in the order `keys` gives it. Unknown keys skipped,
     duplicates collapsed (first kept)."""
-    picked: list[Row] = []
-    for key in keys:
-        row = _BY_KEY.get(key)
-        if row is not None and row not in picked:
-            picked.append(row)
-    return sorted(picked, key=lambda r: r.group.index)
+    picked = {row.key: row for key in keys if (row := _BY_KEY.get(key)) is not None}
+    return sorted(picked.values(), key=lambda r: r.group.index)
 
 
 def default_keys() -> list[str]:

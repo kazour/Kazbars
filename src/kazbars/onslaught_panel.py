@@ -11,10 +11,11 @@ alerts is on): the 27 catalog mobs watched in every run, named by group
 under their count, Include Kuthchemes camps (greyed unless Mob list is on;
 the camps' own line shows while it is ticked), and the user's own names — Add (or
 Enter) only when `onslaught.custom_refusal` accepts the trimmed text, whose
-reason shows as a hint while typing; each name has a delete with an Undo
-toast. Reads/writes the profile document's `onslaught` section (data layer:
-`onslaught.py`; the store autosaves). No position fields: the board and the
-alerts are placed in game, in preview mode. The build bakes the values.
+reason shows as a hint while typing; each name has a delete (Cancel drops
+every unapplied change). Reads/writes the profile document's `onslaught`
+section (data layer: `onslaught.py`; the store autosaves). No position
+fields: the board and the alerts are placed in game, in preview mode. The
+build bakes the values. The shell is `extras_dialog.ExtrasShell`.
 Functions take the KazBarsApp instance as first arg.
 """
 
@@ -22,15 +23,13 @@ import tkinter as tk
 from tkinter import ttk
 
 from . import onslaught
+from .extras_dialog import ExtrasShell, raise_if_open
 from .overlay_size import panel_fs
 from .ui_forms import create_card, create_slider_row, size_slider
-from .ui_headers import create_dialog_header, create_tip_bar
 from .ui_helpers import (
-    BTN_DIALOG,
     BTN_SMALL,
     FONT_BODY,
     FONT_SMALL,
-    MODULE_COLORS,
     PAD_INNER,
     PAD_MICRO,
     PAD_ROW,
@@ -40,9 +39,8 @@ from .ui_helpers import (
     THEME_COLORS,
     TK_COLORS,
 )
-from .ui_tk_style import apply_dark_titlebar
 from .ui_widgets import add_tooltip, app_toast, debounced_callback
-from .window_position import center_on_parent, fit_window_height
+from .window_position import fit_window_height
 
 _WIDTH = 720
 _HEIGHT = 500
@@ -63,50 +61,20 @@ _ALERTS = (
 def open_onslaught_dialog(app):
     """Open or focus the Onslaught Tracker settings dialog (modal). On apply,
     persist the config — it takes effect in-game on the next Build & Install."""
-    existing = app.onslaught_dialog
-    if existing is not None:
-        try:
-            if existing.winfo_exists():
-                existing.deiconify()
-                existing.lift()
-                existing.focus_force()
-                return existing
-        except tk.TclError:
-            pass
+    if raise_if_open(app.onslaught_dialog):
+        return app.onslaught_dialog
 
     cfg = onslaught.validate_config(app.profile_store.get_section('onslaught'))
-
-    dialog = tk.Toplevel(app)
-    app.onslaught_dialog = dialog
-    dialog.withdraw()
-    dialog.title("Onslaught Tracker")
-    dialog.resizable(False, False)
-    dialog.transient(app)
-    dialog.grab_set()
-
-    create_dialog_header(dialog, "Onslaught Tracker", MODULE_COLORS['grids'], width=_WIDTH)
-    create_tip_bar(dialog, "Bosses, waves and spawn alerts in Skull Gate and Kuthchemes. "
-                           "Apply, then Build & Install to see it.")
-
-    enabled_var = tk.BooleanVar(value=cfg['enabled'])
-    master = ttk.Frame(dialog)
-    master.pack(fill='x', padx=PAD_TAB, pady=(0, PAD_XS))
-    enable_cb = ttk.Checkbutton(master, text="Include the onslaught tracker in builds",
-                                variable=enabled_var)
-    enable_cb.pack(side='left')
-    add_tooltip(enable_cb, "Adds the tracker to the in-game overlay; it shows itself in the "
-                           "Onslaught instances only. Place the board and the alerts in "
-                           "preview mode (Shift+Ctrl+Alt).")
-
-    footer = ttk.Frame(dialog, padding=(PAD_TAB, PAD_XS))
-    footer.pack(fill='x', side='bottom')
-    content = ttk.Frame(dialog, padding=(PAD_TAB, 0))
-    content.pack(fill='both', expand=True)
-
-    # (widget, rule) pairs: the rule says whether the widget is live on top of
-    # the master gate, so the whole dialog greys from one place.
-    controls: list = []
-    labels: list = []
+    shell = ExtrasShell(
+        app, 'onslaught_dialog', title="Onslaught Tracker",
+        tip="Bosses, waves and spawn alerts in Skull Gate and Kuthchemes. "
+            "Apply, then Build & Install to see it.",
+        gate_text="Include the onslaught tracker in builds",
+        gate_tip="Adds the tracker to the in-game overlay; it shows itself in the "
+                 "Onslaught instances only. Place the board and the alerts in "
+                 "preview mode (Shift+Ctrl+Alt).",
+        enabled=cfg['enabled'], width=_WIDTH)
+    dialog, content, enabled_var = shell.dialog, shell.content, shell.enabled_var
 
     display = create_card(content, "Display")
     # Display takes its own width, Watched mobs the rest: the roster's wrap
@@ -115,17 +83,16 @@ def open_onslaught_dialog(app):
     watched = create_card(content, "Watched mobs")
     watched.pack(side='left', fill='both', expand=True, pady=(0, PAD_ROW))
 
-    base = app.profile_store.get_section('overlay')['size']
     size_row = ttk.Frame(display)
     size_row.pack(anchor='w', pady=(0, PAD_XS))
     size_sink: list = []
     size_scale, size_var = size_slider(
-        size_row, cfg['scale'], lambda p: f"{panel_fs(base, p)} pt text",
+        size_row, cfg['scale'], lambda p: f"{panel_fs(shell.base, p)} pt text",
         tooltip="The board's text, a percent of the overlay size (Overlay, top of the "
                 "Grids tab); the alerts draw 1.6 times as large.",
         label_sink=size_sink)
-    controls.append((size_scale, None))
-    labels.extend((lbl, None) for lbl in size_sink)
+    shell.gate(size_scale)
+    shell.dim(*size_sink)
 
     show_vars = {}
     for title, items in (("Board:", _BOARD), ("Alerts:", _ALERTS)):
@@ -133,20 +100,14 @@ def open_onslaught_dialog(app):
         row.pack(anchor='w', pady=PAD_MICRO)
         lbl = ttk.Label(row, text=title, font=FONT_BODY, foreground=THEME_COLORS['body'], width=7)
         lbl.pack(side='left')
-        labels.append((lbl, None))
+        shell.dim(lbl)
         for key, text, tip in items:
             var = tk.BooleanVar(value=cfg[key])
-            cb = ttk.Checkbutton(row, text=text, variable=var, command=lambda: _sync())
+            cb = ttk.Checkbutton(row, text=text, variable=var, command=shell.sync)
             cb.pack(side='left', padx=(0, PAD_SMALL))
             add_tooltip(cb, tip)
             show_vars[key] = var
-            controls.append((cb, None))
-
-    alert_sink: list = []
-    alert_scale, alert_label = create_slider_row(
-        display, "Alert time:", 3, 15, cfg['alertSeconds'], " s",
-        on_drag=lambda v: alert_label.configure(text=f"{round(float(v))} s"),
-        value_width=5, label_sink=alert_sink)
+            shell.gate(cb)
 
     def _alerts_on():
         return show_vars['showAlerts'].get() or show_vars['showAlly'].get()
@@ -154,24 +115,30 @@ def open_onslaught_dialog(app):
     def _list_or_alerts():
         return show_vars['showList'].get() or show_vars['showAlerts'].get()
 
+    list_on = show_vars['showList'].get
+
+    alert_sink: list = []
+    alert_scale, alert_label = create_slider_row(
+        display, "Alert time:", *onslaught.ALERT_SECONDS, cfg['alertSeconds'], " s",
+        on_drag=lambda v: alert_label.configure(text=f"{round(float(v))} s"),
+        label_sink=alert_sink)
     add_tooltip(alert_scale, "How long a banner stays: a spawn alert, or Hylda's 50 % and 25 % alerts")
-    controls.append((alert_scale, _alerts_on))
-    labels.extend((lbl, _alerts_on) for lbl in alert_sink)
+    shell.gate(alert_scale, rule=_alerts_on)
+    shell.dim(*alert_sink, rule=_alerts_on)
 
     # ---- Watched mobs --------------------------------------------------------
     always_n = sum(1 for r in onslaught.ROWS if r.kind != onslaught.CAMP)
     always = ttk.Label(watched, text=f"{always_n} always", font=FONT_SMALL,
                        foreground=THEME_COLORS['muted'])
     always.pack(anchor='w')
-    labels.append((always, _list_or_alerts))
+    shell.dim(always, rule=_list_or_alerts)
     hint = ttk.Label(watched, text="Mob list or Spawn alerts reads these.", font=FONT_SMALL,
                      foreground=THEME_COLORS['muted'])
     # The names themselves, one wrapped line per group in catalog order; the
-    # camps' line only while they are included.
+    # camps' line (the last group) only while they are included.
     roster = ttk.Frame(watched)
     roster.pack(fill='x')
     roster_lines = []
-    camp_line = None
     for group in onslaught.GROUPS:
         rows = [r for r in onslaught.ROWS if r.group == group]
         line = ttk.Label(roster, text=f"{group}: {', '.join(r.name for r in rows)}",
@@ -179,10 +146,10 @@ def open_onslaught_dialog(app):
         roster_lines.append(line)
         if rows[0].kind == onslaught.CAMP:
             camp_line = line
-            labels.append((line, lambda: show_vars['showList'].get()))
+            shell.dim(line, rule=list_on)
         else:
             line.pack(anchor='w')
-            labels.append((line, _list_or_alerts))
+            shell.dim(line, rule=_list_or_alerts)
 
     def _refit():
         # The dialog follows its content (the roster's lines, the user's
@@ -209,10 +176,7 @@ def open_onslaught_dialog(app):
 
     def _show_camps():
         if camps_var.get():
-            # In its catalog place: after the group before it (GROUPS lists
-            # the camps last, so there always is one).
-            at = roster_lines.index(camp_line)
-            camp_line.pack(anchor='w', **({'after': roster_lines[at - 1]} if at else {}))
+            camp_line.pack(anchor='w')  # the last group: appended is in catalog order
         else:
             camp_line.pack_forget()
         _refit()
@@ -223,49 +187,56 @@ def open_onslaught_dialog(app):
     _show_camps()
     add_tooltip(camps_cb, "Listed on the board, never alerted: " + ", ".join(
         r.name for r in onslaught.ROWS if r.kind == onslaught.CAMP))
-    controls.append((camps_cb, lambda: show_vars['showList'].get()))
+    shell.gate(camps_cb, rule=list_on)
 
     own_row = ttk.Frame(watched)
     own_row.pack(fill='x')
     own_lbl = ttk.Label(own_row, text="Your own names:", font=FONT_BODY,
                         foreground=THEME_COLORS['body'])
     own_lbl.pack(side='left')
-    labels.append((own_lbl, _list_or_alerts))
+    shell.dim(own_lbl, rule=_list_or_alerts)
     name_var = tk.StringVar()
     name_entry = ttk.Entry(own_row, textvariable=name_var, width=24)
     name_entry.pack(side='left', padx=PAD_XS)
     add_tooltip(name_entry, "A mob's exact in-game name, watched as a mini")
-    controls.append((name_entry, _list_or_alerts))
+    shell.gate(name_entry, rule=_list_or_alerts)
     add_btn = ttk.Button(own_row, text="Add", width=BTN_SMALL, command=lambda: _add())
     add_btn.pack(side='left')
-    reason_var = tk.StringVar()
-    reason = ttk.Label(watched, textvariable=reason_var, font=FONT_SMALL,
-                       foreground=THEME_COLORS['muted'])
+    reason = ttk.Label(watched, font=FONT_SMALL, foreground=THEME_COLORS['muted'])
     reason.pack(anchor='w')
     names_frame = ttk.Frame(watched)
     names_frame.pack(fill='both', expand=True, pady=(PAD_XS, 0))
     custom = list(cfg['custom'])
+    name_rows: list = []  # (label, delete button) per custom name
 
     def _refusal():
         return onslaught.custom_refusal(name_var.get().strip(), custom)
 
+    def _paint_names():
+        """The names' rows follow the gate and the displays that read them."""
+        live = enabled_var.get() and _list_or_alerts()
+        for lbl, btn in name_rows:
+            lbl.configure(foreground=THEME_COLORS['body'] if live else TK_COLORS['dim_text'])
+            btn.configure(state='normal' if live else 'disabled')
+
     def _draw_names():
         for w in names_frame.winfo_children():
             w.destroy()
-        live = enabled_var.get() and _list_or_alerts()
+        name_rows.clear()
         for name in custom:
             row = ttk.Frame(names_frame)
             row.pack(fill='x', pady=PAD_MICRO)
-            ttk.Label(row, text=name, font=FONT_BODY,
-                      foreground=THEME_COLORS['body'] if live else TK_COLORS['dim_text']
-                      ).pack(side='left')
+            lbl = ttk.Label(row, text=name, font=FONT_BODY)
+            lbl.pack(side='left')
             btn = ttk.Button(row, text="×", width=2, bootstyle='secondary',  # type: ignore[call-arg]
-                             command=lambda n=name: _delete(n), state='normal' if live else 'disabled')
+                             command=lambda n=name: _delete(n))
             btn.pack(side='right')
             add_tooltip(btn, f"Stop watching {name}")
+            name_rows.append((lbl, btn))
+        _paint_names()
 
     def _names_changed():
-        # A name added, removed or restored: the list's rows, then the height.
+        # A name added or removed: the list's rows, then the height.
         _draw_names()
         _refit()
 
@@ -277,48 +248,39 @@ def open_onslaught_dialog(app):
         return 'break'
 
     def _delete(name):
-        # No undo toast: the toasts live in the main window, out of reach of
-        # this modal dialog; Cancel drops every unapplied change.
         custom.remove(name)
         _names_changed()
 
     def _on_name_typed(*_):
-        text = name_var.get().strip()
-        reason_var.set((_refusal() or "") if text else "")
-        add_btn.configure(state='normal' if (enabled_var.get() and _list_or_alerts()
-                                             and _refusal() is None) else 'disabled')
+        refusal = _refusal()
+        reason.configure(text=(refusal or "") if name_var.get().strip() else "")
+        live = enabled_var.get() and _list_or_alerts() and refusal is None
+        add_btn.configure(state='normal' if live else 'disabled')
 
     name_var.trace_add('write', _on_name_typed)
     name_entry.bind('<Return>', _add)
 
-    resting = [(lbl, rule, str(lbl.cget('foreground'))) for lbl, rule in labels]
-
-    def _sync(*_):
+    def _after_sync(on):
         hinted = bool(hint.winfo_manager())
-        on = enabled_var.get()
-        for widget, rule in controls:
-            widget.configure(state='normal' if on and (rule is None or rule()) else 'disabled')
-        for lbl, rule, fg in resting:
-            live = on and (rule is None or rule())
-            lbl.configure(foreground=fg if live else TK_COLORS['dim_text'])
         if on and not _list_or_alerts():
             hint.pack(anchor='w', after=always)
         else:
             hint.pack_forget()
         _on_name_typed()
-        _draw_names()
+        _paint_names()
         if bool(hint.winfo_manager()) != hinted:  # a line came or went; a recolour never re-fits
             _refit()
 
-    enable_cb.configure(command=_sync)
-    _sync()
+    shell.on_sync = _after_sync
+    _draw_names()
+    shell.sync()
 
     def _apply():
         new_cfg = onslaught.validate_config({
             'enabled': enabled_var.get(),
             'scale': size_var.get(),
             **{key: var.get() for key, var in show_vars.items()},
-            'alertSeconds': round(float(alert_scale.get())),
+            'alertSeconds': round(alert_scale.get()),
             'camps': camps_var.get(),
             'custom': custom,
         })
@@ -334,27 +296,11 @@ def open_onslaught_dialog(app):
             app_toast(app, "Onslaught tracker off — next build removes it", 'info')
         dialog.destroy()
 
-    ttk.Button(footer, text="Apply", bootstyle="success",
-               command=_apply, width=BTN_DIALOG).pack(side='right')
-    ttk.Button(footer, text="Cancel", bootstyle="secondary",
-               command=dialog.destroy, width=BTN_DIALOG
-               ).pack(side='right', padx=(0, PAD_SMALL))
-
     # The roster's first wrap, before the card has a width to read: what
     # Display leaves, less the paddings around it — content's sides (PAD_TAB
     # each), the gap after Display (PAD_SMALL), the card's own (PAD_INNER
     # each). Its <Configure> then re-wraps to the width the card really got.
     dialog.update_idletasks()
     _wrap_to(_WIDTH - 2 * PAD_TAB - PAD_SMALL - display.winfo_reqwidth() - 2 * PAD_INNER)
-    dialog.update_idletasks()
-    center_on_parent(dialog, app, _WIDTH, max(_HEIGHT, dialog.winfo_reqheight()))
-    dialog.deiconify()
-
-    dialog.bind("<Return>", lambda e: _apply() if e.widget is not name_entry else None)
-    dialog.bind("<Escape>", lambda e: dialog.destroy())
-    dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
-    dialog.bind("<Map>",
-                lambda e: apply_dark_titlebar(dialog) if e.widget is dialog else None,
-                add="+")
-    dialog.after(0, enable_cb.focus_set)
+    shell.finish(_apply, _HEIGHT, enter_except=name_entry, fit=True)
     return dialog

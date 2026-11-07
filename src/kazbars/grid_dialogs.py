@@ -24,6 +24,7 @@ from .grid_model import (
     snap_row_cap,
 )
 from .settings_manager import get_setting, set_setting
+from .ui_forms import picker_list
 from .ui_headers import create_dialog_header
 from .ui_helpers import (
     BTN_DIALOG,
@@ -53,7 +54,6 @@ from .ui_helpers import (
     THEME_COLORS,
     TK_COLORS,
 )
-from .ui_tk_style import style_tk_listbox
 from .ui_widgets import add_tooltip, debounced_callback, refresh_tooltip
 from .window_position import (
     bind_window_position_save,
@@ -489,16 +489,8 @@ class BuffSelectorDialog(tk.Toplevel):
         lists_frame.pack(fill='both', expand=True)
 
         def _make_listbox(parent, label, padx, on_activate):
-            frame = ttk.LabelFrame(parent, text=label, padding=PAD_SMALL)
+            frame, lb = picker_list(parent, label, BUFF_LIST_WIDTH, BUFF_LIST_HEIGHT)
             frame.pack(side='left', fill='both', expand=True, padx=padx)
-            scroll = ttk.Scrollbar(frame)
-            scroll.pack(side='right', fill='y')
-            lb = tk.Listbox(frame, yscrollcommand=scroll.set,
-                            selectmode='extended',
-                            width=BUFF_LIST_WIDTH, height=BUFF_LIST_HEIGHT)
-            style_tk_listbox(lb)
-            lb.pack(side='left', fill='both', expand=True)
-            scroll.config(command=lb.yview)
             lb.bind('<Double-1>', lambda e: on_activate())
 
             def _on_return(event):

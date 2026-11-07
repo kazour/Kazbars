@@ -26,7 +26,7 @@ def test_the_catalog_has_its_35_names_in_seven_groups_and_27_always_watched():
     assert [r.group for r in ons.ROWS] == sorted((r.group for r in ons.ROWS), key=ons.GROUPS.index)
     assert sum(1 for r in ons.ROWS if r.kind != ons.CAMP) == 27
     assert max(len(r.name) for r in ons.ROWS) == ons.NAME_MAX
-    assert ons.find("Louhi").kind == ons.BOSS and ons.find("louhi") is None
+    assert next(r for r in ons.ROWS if r.name == "Louhi").kind == ons.BOSS
     assert [(i.playfield, i.ally, i.aoe) for i in ons.INSTANCES] == [
         (20010, "Valkyrie Hylda", False), (20000, "", True)]
 

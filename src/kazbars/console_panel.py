@@ -6,40 +6,24 @@ gate, its Size (a percent of the profile's overlay size, hinted in pt) and the
 tabs it holds, in the strip's order. Reads/writes the profile document's
 `console` section (data layer: `console.py`; the store autosaves). No position
 fields: the console is placed in game, in preview mode. The build bakes the
-values into the generated SWF.
+values into the generated SWF. The shell is `extras_dialog.ExtrasShell`.
 Functions take the KazBarsApp instance as first arg.
 
 Tabs: one row per tab — the chosen ones first, in the strip's order, then the
 others. Ticking a tab adds it after the chosen ones, unticking removes it;
 the up/down buttons move a chosen tab past a chosen neighbour. With no tab
 ticked the console does not ship.
-
-Layout follows the Damage Numbers panel conventions: tip bar under the header,
-a master gate row above titled cards, and every control greying with the gate.
 """
 
 import tkinter as tk
 from tkinter import ttk
 
-from .console import TABS, validate_config
+from .console import TABS, ships, validate_config
+from .extras_dialog import ExtrasShell, raise_if_open
 from .overlay_size import panel_fs
 from .ui_forms import create_card, size_slider
-from .ui_headers import create_dialog_header, create_tip_bar
-from .ui_helpers import (
-    BTN_DIALOG,
-    FONT_SMALL,
-    MODULE_COLORS,
-    PAD_MICRO,
-    PAD_ROW,
-    PAD_SMALL,
-    PAD_TAB,
-    PAD_XS,
-    THEME_COLORS,
-    TK_COLORS,
-)
-from .ui_tk_style import apply_dark_titlebar
+from .ui_helpers import FONT_SMALL, PAD_MICRO, PAD_ROW, PAD_XS, THEME_COLORS
 from .ui_widgets import add_tooltip, app_toast
-from .window_position import center_on_parent
 
 _WIDTH = 470
 _HEIGHT = 380
@@ -56,60 +40,29 @@ _TAB_INFO = {
 def open_console_dialog(app):
     """Open or focus the Console settings dialog (modal). On apply, persist the
     config — it takes effect in-game on the next Build & Install."""
-    existing = app.console_dialog
-    if existing is not None:
-        try:
-            if existing.winfo_exists():
-                existing.deiconify()
-                existing.lift()
-                existing.focus_force()
-                return existing
-        except tk.TclError:
-            pass
+    if raise_if_open(app.console_dialog):
+        return app.console_dialog
 
     cfg = validate_config(app.profile_store.get_section('console'))
-
-    dialog = tk.Toplevel(app)
-    app.console_dialog = dialog
-    dialog.withdraw()
-    dialog.title("Console")
-    dialog.resizable(False, False)
-    dialog.transient(app)
-    dialog.grab_set()
-
-    create_dialog_header(dialog, "Console", MODULE_COLORS['grids'], width=_WIDTH)
-    create_tip_bar(dialog, "Buff IDs and casts, logged in-game. "
-                           "Apply, then Build & Install to see it.")
-
-    enabled_var = tk.BooleanVar(value=cfg['enabled'])
-    master = ttk.Frame(dialog)
-    master.pack(fill='x', padx=PAD_TAB, pady=(0, PAD_XS))
-    enable_cb = ttk.Checkbutton(master, text="Include the console in builds",
-                                variable=enabled_var)
-    enable_cb.pack(side='left')
-    add_tooltip(enable_cb,
-                "Adds an in-game console of tabs to the overlay. Show or hide it from "
-                "the preview panel (Shift+Ctrl+Alt).")
-
-    footer = ttk.Frame(dialog, padding=(PAD_TAB, PAD_XS))
-    footer.pack(fill='x', side='bottom')
-    content = ttk.Frame(dialog, padding=(PAD_TAB, 0))
-    content.pack(fill='both', expand=True)
-
-    gated: list = []
-    dim_labels: list[tuple[ttk.Label, str]] = []
+    shell = ExtrasShell(
+        app, 'console_dialog', title="Console",
+        tip="Buff IDs and casts, logged in-game. Apply, then Build & Install to see it.",
+        gate_text="Include the console in builds",
+        gate_tip="Adds an in-game console of tabs to the overlay. Show or hide it from "
+                 "the preview panel (Shift+Ctrl+Alt).",
+        enabled=cfg['enabled'], width=_WIDTH)
+    dialog, content, enabled_var = shell.dialog, shell.content, shell.enabled_var
     sink: list = []
 
     size_card = create_card(content, "Size")
     size_card.pack(fill='x', pady=(0, PAD_ROW))
-    base = app.profile_store.get_section('overlay')['size']
     size_row = ttk.Frame(size_card)
     size_row.pack(anchor='w')
     size_scale, size_var = size_slider(
-        size_row, cfg['scale'], lambda p: f"{panel_fs(base, p)} pt text",
+        size_row, cfg['scale'], lambda p: f"{panel_fs(shell.base, p)} pt text",
         tooltip="A percent of the overlay size (Overlay, top of the Grids tab).",
         label_sink=sink)
-    gated.append(size_scale)
+    shell.gate(size_scale)
 
     tabs_card = create_card(content, "Tabs")
     tabs_card.pack(fill='x', pady=(0, PAD_ROW))
@@ -147,9 +100,10 @@ def open_console_dialog(app):
                 add_tooltip(btn, hint)
 
     def _on_tick(tab, ticked):
-        if ticked and tab not in chosen:
+        # The row's var is set from `chosen` on every draw, so a click always flips it.
+        if ticked:
             chosen.append(tab)
-        elif not ticked and tab in chosen:
+        else:
             chosen.remove(tab)
         _draw_rows()
 
@@ -158,19 +112,9 @@ def open_console_dialog(app):
         chosen[i], chosen[i + delta] = chosen[i + delta], chosen[i]
         _draw_rows()
 
-    for lbl in sink:
-        dim_labels.append((lbl, str(lbl.cget('foreground'))))
-
-    def _sync_enabled(*_):
-        on = enabled_var.get()
-        for widget in gated:
-            widget.configure(state='normal' if on else 'disabled')
-        for lbl, normal_fg in dim_labels:
-            lbl.configure(foreground=normal_fg if on else TK_COLORS['dim_text'])
-        _draw_rows()
-
-    enable_cb.configure(command=_sync_enabled)
-    _sync_enabled()
+    shell.dim(*sink)
+    shell.on_sync = lambda on: _draw_rows()
+    shell.sync()
 
     def _apply():
         new_cfg = validate_config({'enabled': enabled_var.get(), 'scale': size_var.get(),
@@ -179,7 +123,7 @@ def open_console_dialog(app):
         app.grids_panel.refresh_extras_shortcuts()
         if new_cfg == cfg:
             app_toast(app, "No changes to apply", 'info')
-        elif new_cfg['enabled'] and new_cfg['tabs']:
+        elif ships(new_cfg):
             app_toast(app, "Console saved — Build & Install to apply", 'success')
         elif new_cfg['enabled']:
             app_toast(app, "Console has no tab — the next build leaves it out", 'warning')
@@ -187,20 +131,5 @@ def open_console_dialog(app):
             app_toast(app, "Console off — next build removes it", 'info')
         dialog.destroy()
 
-    ttk.Button(footer, text="Apply", bootstyle="success",
-               command=_apply, width=BTN_DIALOG).pack(side='right')
-    ttk.Button(footer, text="Cancel", bootstyle="secondary",
-               command=dialog.destroy, width=BTN_DIALOG
-               ).pack(side='right', padx=(0, PAD_SMALL))
-
-    center_on_parent(dialog, app, _WIDTH, _HEIGHT)
-    dialog.deiconify()
-
-    dialog.bind("<Return>", lambda e: _apply())
-    dialog.bind("<Escape>", lambda e: dialog.destroy())
-    dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
-    dialog.bind("<Map>",
-                lambda e: apply_dark_titlebar(dialog) if e.widget is dialog else None,
-                add="+")
-    dialog.after(0, enable_cb.focus_set)
+    shell.finish(_apply, _HEIGHT)
     return dialog

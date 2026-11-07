@@ -10,6 +10,7 @@ and Live Tracker config panels.
 import tkinter as tk
 from tkinter import ttk
 
+from .grid_model import project_px, unproject_px
 from .overlay_size import SCALE_MAX, SCALE_MIN, SCALE_STEP, snap_scale
 from .ui_helpers import (
     FONT_BODY,
@@ -22,6 +23,7 @@ from .ui_helpers import (
     THEME_COLORS,
     TK_COLORS,
 )
+from .ui_tk_style import style_tk_listbox
 from .ui_widgets import add_tooltip, blend_alpha
 
 
@@ -141,6 +143,43 @@ def labeled_combobox(
     if tooltip:
         add_tooltip(combo, tooltip)
     return combo
+
+
+def position_fields(parent, fx, fy, game_w, game_h, *, label_sink=None):
+    """X / Y spinboxes for a position stored as fractions of the game
+    resolution, shown as px at `game_w` x `game_h` (the grid editor
+    convention). Returns `(x_spin, y_spin, read)`: `read()` is `(fx, fy)` as
+    the fields stand — a typed overshoot lands on the edge (`unproject_px`
+    clamps), an emptied field keeps its loaded fraction."""
+    x_var = tk.IntVar(value=project_px(fx, game_w))
+    y_var = tk.IntVar(value=project_px(fy, game_h))
+    x_spin = labeled_spinbox(parent, "X ", x_var, from_=0, to=game_w, width=6,
+                             padx=(0, PAD_SMALL * 2), label_sink=label_sink)
+    y_spin = labeled_spinbox(parent, "Y ", y_var, from_=0, to=game_h, width=6,
+                             label_sink=label_sink)
+
+    def _frac(var, loaded, extent):
+        try:
+            return unproject_px(int(var.get()), extent)
+        except (ValueError, tk.TclError):
+            return loaded
+
+    return x_spin, y_spin, lambda: (_frac(x_var, fx, game_w), _frac(y_var, fy, game_h))
+
+
+def picker_list(parent, label, width, height, *, exportselection=True):
+    """One list of a two-list picker: a titled frame holding a themed
+    multi-select Listbox and its scrollbar. Returns `(frame, listbox)`; the
+    caller packs the frame and binds the list."""
+    frame = ttk.LabelFrame(parent, text=label, padding=PAD_SMALL)
+    scroll = ttk.Scrollbar(frame)
+    scroll.pack(side='right', fill='y')
+    lb = tk.Listbox(frame, yscrollcommand=scroll.set, selectmode='extended',
+                    width=width, height=height, exportselection=exportselection)
+    style_tk_listbox(lb)
+    lb.pack(side='left', fill='both', expand=True)
+    scroll.config(command=lb.yview)
+    return frame, lb
 
 
 def position_entry(
