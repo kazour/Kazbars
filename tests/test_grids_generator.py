@@ -445,6 +445,12 @@ def test_archive_key_dedupes_grids_that_sanitize_the_same():
     assert 'key: "a_b_2"' in data
 
 
+def test_archive_key_holds_when_an_earlier_grid_is_left_out():
+    _, data = _gen([_grid(id="a-b", whitelist=[]), _grid(id="a b")]).generate()
+    assert 'key: "a_b_2"' in data
+    assert 'key: "a_b"' not in data
+
+
 # --------------------------------------------------------------------------
 # Inert refs
 # --------------------------------------------------------------------------
@@ -454,6 +460,20 @@ def test_a_bare_scalar_slot_assignment_resolves_like_a_list():
     grid = dict(_grid(), slotMode="static", slotAssignments={"0": BUFF})
     _, data = _gen([grid]).generate()
     assert "G_0.slots[0] = [222609, 222610];" in data
+
+
+def test_a_slot_past_the_shape_is_not_built():
+    grid = dict(_grid(), slotMode="static", slotAssignments={"0": [BUFF], "5": [LASH]})
+    _, data = _gen([grid]).generate()
+    assert "G_0.slots[5]" not in data
+    assert str(LASH) not in data
+
+
+def test_a_dynamic_grid_ignores_its_old_slots():
+    grid = dict(_grid(), slotAssignments={"0": [LASH]})
+    _, data = _gen([grid]).generate()
+    assert str(LASH) not in data
+    assert unresolved_refs([dict(grid, slotAssignments={"0": [99999901]})], _db()) == []
 
 
 def test_a_malformed_slot_value_is_skipped_not_raised():
@@ -529,7 +549,6 @@ def test_generate_files_splits_a_large_profile_into_consecutive_data_classes():
         ["KazBars.as", "KazBarsData.as"] + [f"KazBarsData{k}.as" for k in range(1, n + 1)])
     assert re.findall(r"KazBarsData(\d+)\.fill\(d\);", files[1][1]) == [
         str(k) for k in range(1, n + 1)]
-    gen._used_keys = set()
     longest = max(len(u) for u in gen._data_units())
     for name, src in files[2:]:
         assert f"class {name[:-3]} {{" in src

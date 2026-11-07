@@ -148,15 +148,41 @@ def grid_ships(grid):
         return False
     if grid.get("slotMode") != "static":
         return bool(grid.get("whitelist"))
+    return any(value for _, value in _slots_in_shape(grid))
+
+
+def _slots_in_shape(grid):
+    """A static grid's `(slot key, value)` pairs whose key is a slot inside its
+    rows × cols; a slot left past the edge by a shrink is never built."""
     cells = grid.get("rows", 1) * grid.get("cols", 1)
+    out = []
     for key, value in (grid.get("slotAssignments") or {}).items():
         try:
             inside = 0 <= int(key) < cells
         except (TypeError, ValueError):
             inside = False
-        if inside and value:
-            return True
-    return False
+        if inside:
+            out.append((key, value))
+    return out
+
+
+def _archive_keys(grids):
+    """Each grid's in-game archive key, by `id()` of its dict: its sanitized
+    id, deduped (`_2`, `_3`, …) in profile order over every grid, built or
+    not, so a key never moves when another grid empties or a band sorts last
+    (two ids that sanitize the same way, e.g. "a-b" and "a b", still get
+    distinct archive slots)."""
+    used: set[str] = set()
+    keys = {}
+    for grid in grids:
+        base = sanitize_id(grid.get("id", "Grid"))
+        key, suffix = base, 2
+        while key in used:
+            key = f"{base}_{suffix}"
+            suffix += 1
+        used.add(key)
+        keys[id(grid)] = key
+    return keys
 
 
 def _pack_units(units, budget):
@@ -214,7 +240,9 @@ class CodeGenerator:
         # Bands last, stable: KazBarsOverhead stacks a character's views in bake
         # order, so its static grids sit at the bottom against the nameplate
         # and the bands above them. Screen grids keep their order.
+        grids = list(grids)
         self.grids = sorted((g for g in grids if grid_ships(g)), key=is_band)
+        self._keys = _archive_keys(grids)
         self.include_overhead = any(is_plate(g["type"]) for g in self.grids)
         self.database = database
         self.app_version = app_version
@@ -243,20 +271,6 @@ class CodeGenerator:
         self.onslaught_config = onslaught.validate_config(onslaught_config)
         self.include_onslaught = onslaught.ships(self.onslaught_config)
 
-    def _archive_key(self, grid_id):
-        """Stable per-build archive key for a grid's persisted position — a
-        sanitized id, deduped against every other key already emitted this
-        generate() call (two ids that sanitize the same way, e.g. "a-b" and
-        "a b", still need distinct archive slots)."""
-        base = sanitize_id(grid_id)
-        key = base
-        suffix = 2
-        while key in self._used_keys:
-            key = f"{base}_{suffix}"
-            suffix += 1
-        self._used_keys.add(key)
-        return key
-
     def generate_files(self):
         """Every AS2 source of a build as `(file name, source)`, main class
         first: `KazBars.as` (the hand-written template with its feature gates
@@ -265,10 +279,6 @@ class CodeGenerator:
         `KazBarsData1..N.as` — the grid configs and custom icons packed under
         DATA_CHUNK_BUDGET per class so no profile hits as2c's per-class
         bytecode cap. as2c binds file name == class name."""
-        # Archive keys are stable across a rebuild only within one call —
-        # reset here so re-using a CodeGenerator instance can't leak collision
-        # suffixes from a previous run into this one.
-        self._used_keys: set[str] = set()
         header = self._header()
         chunks = _pack_units(self._data_units(), DATA_CHUNK_BUDGET)
         files = [
@@ -401,7 +411,7 @@ class CodeGenerator:
             if r.group not in groups:
                 groups.append(r.group)
         groups_line = "        d.INS.groups = [{}];".format(", ".join(
-            f'{{n: "{g.label}", p: {_bool(g.player_gated)}}}' for g in groups))
+            f'{{n: "{escape_as2_string(g.label)}", p: {_bool(g.player_gated)}}}' for g in groups))
         if selected:
             entries = ",\n".join(
                 f'            {{g: {groups.index(r.group)}, l: "{escape_as2_string(r.label)}", '
@@ -418,7 +428,8 @@ class CodeGenerator:
         and `ids` (what the view reads plus the always-polled ids; not
         `watch`, a method every AS2 object has)."""
         groups = ", ".join(
-            "{{n: \"{}\", c: [{}]}}".format(title, ", ".join(f'"{c}"' for c in cols))
+            "{{n: \"{}\", c: [{}]}}".format(
+                escape_as2_string(title), ", ".join(f'"{escape_as2_string(c)}"' for c in cols))
             for title, cols, _ in inspect_catalog.PVP_VIEW)
         labels = [(g, label) for g, (_, _, lines) in enumerate(inspect_catalog.PVP_VIEW)
                   for label, _ in lines]
@@ -478,20 +489,18 @@ class CodeGenerator:
         """The data-class body as self-contained source units, in emit order:
         one per grid (its config and its id set with each id's facts), then one
         per custom icon. A unit never splits across chunks, so a `while` loop
-        stays whole. `_archive_key` claims keys as it goes, so one pass."""
+        stays whole."""
         units = []
         icons: set[int] = set()
         for idx, grid in enumerate(self.grids):
             labels: dict = {}
-            whitelist = self._expand_primary_ids(grid.get("whitelist", []), labels)
-            slots = {
-                k: self._expand_primary_ids(ref_list(v), labels)
-                for k, v in grid.get("slotAssignments", {}).items()
-            }
+            slots = {}
             if grid["slotMode"] == "static":
+                slots = {k: self._expand_primary_ids(ref_list(v), labels)
+                         for k, v in _slots_in_shape(grid)}
                 ids = [bid for slot_ids in slots.values() for bid in slot_ids]
             else:
-                ids = whitelist
+                ids = self._expand_primary_ids(grid.get("whitelist", []), labels)
             codes = self._fact_codes(ids, labels)
             icons.update(bid for bid, _ in codes if bid in CUSTOM_ICON_LINKAGE)
             units.append(self._generate_grid_config(grid, idx, slots, codes))
@@ -557,7 +566,7 @@ class CodeGenerator:
         gid = grid["id"]
         gid_lit = escape_as2_string(gid)
         vid = f"{sanitize_id(gid)}_{idx}"
-        key = self._archive_key(gid)
+        key = self._keys[id(grid)]
         m = grid_metrics(self.base_size, grid["scale"])
         is_static = grid["slotMode"] == "static"
         lines = []
@@ -635,7 +644,7 @@ class CodeGenerator:
 
 
 def unresolved_refs(grids, database) -> list:
-    """Every ref in the enabled grids' whitelists/slot assignments the database
+    """Every ref in the enabled grids' whitelists (dynamic) or in-shape slots (static) the database
     can't resolve — exactly what `_expand_primary_ids` will skip at emit. Pure;
     `build_action` runs it pre-build so the summary can report the count. int
     refs check `by_id`, preserved legacy strings check by name; deduped, first
@@ -645,9 +654,10 @@ def unresolved_refs(grids, database) -> list:
     for g in grids:
         if not g.get('enabled', True):
             continue
-        refs = list(g.get('whitelist') or [])
-        for val in (g.get('slotAssignments') or {}).values():
-            refs.extend(ref_list(val))
+        if g.get('slotMode') == 'static':
+            refs = [ref for _, val in _slots_in_shape(g) for ref in ref_list(val)]
+        else:
+            refs = list(g.get('whitelist') or [])
         for ref in refs:
             if isinstance(ref, bool) or ref in seen:
                 continue

@@ -58,7 +58,7 @@
 | `src/kazbars/grid_preview_canvas.py` | 227 |
 | `src/kazbars/grid_settings_dialog.py` | 532 |
 | `src/kazbars/grid_templates.py` | 81 |
-| `src/kazbars/grids_generator.py` | 781 |
+| `src/kazbars/grids_generator.py` | 791 |
 | `src/kazbars/grids_panel.py` | 970 |
 | `src/kazbars/inspect.py` | 79 |
 | `src/kazbars/inspect_catalog.py` | 618 |
@@ -133,7 +133,7 @@
 | `tests/test_grid_model.py` | 318 |
 | `tests/test_grid_preview.py` | 143 |
 | `tests/test_grid_templates.py` | 95 |
-| `tests/test_grids_generator.py` | 603 |
+| `tests/test_grids_generator.py` | 622 |
 | `tests/test_hud_overlay.py` | 141 |
 | `tests/test_imports.py` | 33 |
 | `tests/test_inspect.py` | 103 |
