@@ -373,5 +373,5 @@ _BUFF_BARS_SCHEMA = Schema('', 1, {
 # The Default Buff Bars editor's slice of the profile document — sparse:
 # `{}` default, one sub-dict per file label, absent field = "no opinion" (the
 # editor shows whatever the file already says). PATCH lane: written to game
-# XML only on explicit Apply, never on profile switch. Registered by app.py.
+# XML only on explicit Apply, never on a profile import or reset. Registered by app.py.
 PROFILE_SECTION = ProfileSectionSpec('buff_bars', _BUFF_BARS_SCHEMA, LANE_PATCH, sparse=True)

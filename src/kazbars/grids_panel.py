@@ -353,7 +353,7 @@ class GridsPanel(ttk.Frame):
 
     def load_overlay(self):
         """Show the loaded profile's overlay size and font, and redraw every
-        card's Size hint (profile switch, first-launch seeding)."""
+        card's Size hint (profile load or import, first-launch seeding)."""
         overlay = self._overlay()
         self._overlay_size_var.set(self._size_labels.get(overlay.get('size', DEFAULT_SIZE), ''))
         self._overlay_font_var.set(font_label(overlay.get('font', 'Arial')))
@@ -645,7 +645,7 @@ class GridsPanel(ttk.Frame):
 
     def refresh_extras_shortcuts(self):
         """Resync the extras shortcut cards after an Extras dialog Apply (and,
-        via apply_document, on every profile switch). The status row rides
+        via apply_document, on every profile load, import or reset). The status row rides
         along — every path that changes a BUILD section goes through here or
         `_mark_modified`."""
         if self.extras_row is not None:

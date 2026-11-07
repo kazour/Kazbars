@@ -5,7 +5,7 @@ Floating) starts fully *inherited* — every field shows whatever the live XML
 file says. Touching a field makes it this profile's *override*: an explicit
 value the panel enforces on Apply, persisted per-label in the profile
 document's ``buff_bars`` section (PATCH lane — never written to XML by a mere
-profile switch, only by this dialog's own Apply). Apply writes only the
+profile load or import, only by this dialog's own Apply). Apply writes only the
 fields a section currently overrides, never the untouched rest — mirrors
 ``damageinfo_colors_panel``'s override tracking, scoped per ``_Section``.
 """
@@ -608,7 +608,7 @@ class BuffDisplayDialog(tk.Toplevel):
     def _diverged(self):
         """This profile carries `buff_bars` overrides this game folder's XML
         hasn't received — `last_patch` records what Apply last wrote here, and
-        PATCH never fires on a profile switch. Empty sub-dicts count as no
+        PATCH never fires on a profile import or reset. Empty sub-dicts count as no
         opinion on both sides. Drives both the sync hint and the Apply gate,
         so the hint's "Apply to sync" is always actionable."""
         profile_state = {s.label: s._baseline_override
@@ -658,7 +658,7 @@ class BuffDisplayDialog(tk.Toplevel):
                 failures.append((section.label, str(e)))
         if successes:
             # PATCH lane: persisted on the profile document, never dispatched
-            # on a mere profile switch — only this Apply writes it.
+            # on a profile import or reset — only this Apply writes it.
             buff_bars = dict(self.app.profile_store.get_section('buff_bars'))
             for section in successes:
                 buff_bars[section.label] = section._baseline_override

@@ -20,7 +20,7 @@ preserved. Requires a game folder (the opener warns and bails without one).
 says, same as any other tool's edit would. Touching a row's color/direction, or clicking its
 ↺, makes that field this profile's *override*: an explicit value the panel enforces on
 Apply, persisted in the profile document's ``damage_colors`` section (PATCH lane — never
-written to XML by a mere profile switch, only by this dialog's own Apply). ↺ is
+written to XML by a profile import or reset, only by this dialog's own Apply). ↺ is
 context-sensitive: on an inherited row it reads "reset to game default" and *creates* an
 override pinned to the stock value (``Default/``); on an already-overridden row it reads
 "remove override" and un-manages the field, restoring whatever the file held the moment
@@ -382,7 +382,7 @@ class DamageNumberColorsPanel(tk.Toplevel):
     def _diverged(self) -> bool:
         """This profile carries overrides this game folder's XML hasn't
         received — `last_patch` is the machine-local record of what Apply last
-        wrote here, and PATCH never fires on a profile switch, so a
+        wrote here, and PATCH never fires on a profile import or reset, so a
         switched-to profile can sit un-applied indefinitely. A profile with no
         overrides has no opinion. Drives both the sync hint and the Apply
         gate, so the hint's "Apply to sync" is always actionable."""
@@ -534,7 +534,7 @@ class DamageNumberColorsPanel(tk.Toplevel):
             return
         section = {'colors': dict(colors_to_write), 'directions': dict(dirs_to_write)}
         # PATCH lane: persisted on the profile document, never dispatched on a
-        # mere profile switch — only this Apply writes it.
+        # profile import or reset — only this Apply writes it.
         self.master.profile_store.set_section('damage_colors', section)  # type: ignore[attr-defined]
         record_last_patch(self.master.settings, self.game_path,  # type: ignore[attr-defined]
                           'damage_colors', section)

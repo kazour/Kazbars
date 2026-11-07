@@ -428,7 +428,7 @@ class DeepsPanel(tk.Toplevel):
         return dict(self.settings)
 
     def load_profile_data(self, config: dict) -> None:
-        """Apply an incoming profile's `deeps` section — profile switch
+        """Apply an incoming profile's `deeps` section — profile load or import
         restyles the open panel and its overlay live."""
         if not config:
             return
@@ -444,7 +444,7 @@ class DeepsPanel(tk.Toplevel):
         self._push_thresholds()
 
     def _sync_widgets_from_settings(self) -> None:
-        """Resync every control to `self.settings` (profile switch)."""
+        """Resync every control to `self.settings` (profile load or import)."""
         self._survival_var.set(str(self.settings["survival_preset"]))
         self._pet_var.set(bool(self.settings["include_pet_damage"]))
         self._layout_var.set(str(self.settings["layout"]))

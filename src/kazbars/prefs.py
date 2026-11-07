@@ -109,7 +109,7 @@ def _validate_last_patch(value: Any) -> dict:
     entries; drop anything malformed. Machine-local mirror of what a PATCH-lane
     section (``damage_colors``/``buff_bars``) last actually wrote into *this
     game folder's* XML — the active profile's own section is the loadout-level
-    intent, which can drift from this once a profile switch skips re-Applying
+    intent, which can drift from this once a profile import or reset skips re-Applying
     (PATCH lane never fires on switch). Written by the XML editors' Apply;
     consumption (a divergence badge) is a later phase."""
     if not isinstance(value, dict):

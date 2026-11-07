@@ -538,7 +538,7 @@ class DeepsOverlay:
         return self._hud.is_locked()
 
     def apply_settings(self, settings: dict) -> None:
-        """Bulk apply (used by profile switch) — mirrors
+        """Bulk apply (used when a profile loads or is imported) — mirrors
         `TimerOverlay.apply_settings`. Quiet: none of this fires the
         position/lock change callbacks (the panel is the caller, already
         holding the incoming settings as truth)."""

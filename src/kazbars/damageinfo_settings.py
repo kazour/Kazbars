@@ -24,7 +24,7 @@ the Damage Number Colors panel (``damageinfo_colors_panel.py``) writes into
 ``TextColors.xml``. Colors/directions themselves are never baked or
 build-gated — this is a separate section from ``damage_numbers`` because it
 lives on a different lane (PATCH: written to game XML only on explicit Apply,
-never on profile switch) and is sparse (absent source = "no opinion, follow
+never on a profile import or reset) and is sparse (absent source = "no opinion, follow
 whatever the file already says" — most sources are never touched by a given
 profile).
 """
@@ -418,7 +418,7 @@ _DAMAGE_COLORS_SCHEMA = Schema('', 1, {
 # The Damage Number Colors panel's slice of the profile document — sparse:
 # `{}` default, absent source = "no opinion" (the panel shows whatever
 # TextColors.xml already says). PATCH lane: written to game XML only on
-# explicit Apply, never on profile switch. Registered by app.py.
+# explicit Apply, never on a profile import or reset. Registered by app.py.
 DAMAGE_COLORS_SECTION = ProfileSectionSpec(
     'damage_colors', _DAMAGE_COLORS_SCHEMA, LANE_PATCH, sparse=True)
 

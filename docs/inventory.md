@@ -63,7 +63,7 @@
 | `src/kazbars/inspect.py` | 79 |
 | `src/kazbars/inspect_catalog.py` | 618 |
 | `src/kazbars/inspect_panel.py` | 387 |
-| `src/kazbars/instructions_panel.py` | 1431 |
+| `src/kazbars/instructions_panel.py` | 1462 |
 | `src/kazbars/live_tracker_panel.py` | 521 |
 | `src/kazbars/live_tracker_settings.py` | 175 |
 | `src/kazbars/onslaught.py` | 204 |

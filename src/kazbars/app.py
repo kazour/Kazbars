@@ -147,7 +147,7 @@ class KazBarsApp(ttkb.Window):
         self.registry.register(console.PROFILE_SECTION)
         self.registry.register(onslaught.PROFILE_SECTION)
         # The XML editors' sparse PATCH-lane overrides — never dispatched on
-        # profile switch (profile_io.apply_document only touches BUILD/LIVE).
+        # profile load or import (profile_io.apply_document only touches BUILD/LIVE).
         self.registry.register(damageinfo_settings.DAMAGE_COLORS_SECTION)
         self.registry.register(buff_xml.PROFILE_SECTION)
 

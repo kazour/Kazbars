@@ -38,7 +38,7 @@ DOC_SCHEMA_VERSION = 3
 
 # Apply lanes — how a section's settings reach the game. BUILD is baked into
 # the SWF by Build & Install; PATCH writes game XML only on an explicit Apply
-# (never on profile switch); LIVE retunes desktop overlays immediately.
+# (never on a profile import or reset); LIVE retunes desktop overlays immediately.
 LANE_BUILD = 'build'
 LANE_PATCH = 'patch'
 LANE_LIVE = 'live'

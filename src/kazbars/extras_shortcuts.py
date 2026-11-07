@@ -9,7 +9,7 @@ card carries two controls, not one: the **card body** opens that feature's
 Extras dialog (the same opener the menu item calls), and the **round switch**
 flips whether it ships in the next Build & Install, writing the same
 profile-document section that dialog writes (autosaved by the profile store;
-`apply_document` resyncs the cards on every profile switch). The switch's hit
+`apply_document` resyncs the cards on every profile load, import or reset). The switch's hit
 area is the switch — a click anywhere else on the card opens settings, so the
 two never race. Configuration still lives in the dialogs, which push `refresh()`
 back through `GridsPanel.refresh_extras_shortcuts()` on Apply.

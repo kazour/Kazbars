@@ -140,39 +140,56 @@ SECTIONS: list[_Section] = [
     {
         'cat': 'Getting Started',
         'id': 'profiles',
-        'title': 'Profiles',
+        'title': 'Your Profile',
         'body': [
-            'A profile is a complete layout — every grid, plus the extras '
-            'and live overlays that go with it. The File menu lists every '
-            'profile you have; click one to switch, or use the commands '
-            'under the list to manage them.',
-            _sub('Switching, creating and organizing', [
-                'New profile starts a blank one. New from template starts '
-                'from the curated starter layout. Duplicate profile makes a '
-                'safety copy of the one you have open.',
-                "Delete profile… moves it to the profile trash "
-                "(userdata/profiles/trash) rather than erasing it outright.",
-                'Revert to session start undoes every edit back to how this '
-                'profile looked when you opened it this session.',
-            ]),
+            'KazBars keeps one profile — every grid, plus the extras and '
+            'live overlays that go with it. It lives in '
+            'userdata/profile.yml.',
             _sub("No Save button — it autosaves", [
                 'Every edit writes to disk about a second after you stop '
                 "typing or dragging. There's nothing to lose by closing the "
-                'app or switching profiles.',
+                'app. Ctrl+S saves right now.',
             ]),
-            _sub('Which profile opens on launch', [
-                'KazBars reopens whichever profile you last had loaded.',
+            _sub('Starting over, and getting back', [
+                'File ▸ Reset profile to defaults… asks first, then replaces '
+                'your profile with the starter layout, sized for your game '
+                'resolution.',
+                'File ▸ Revert to session start brings back the profile you '
+                'had when KazBars opened — after edits, an Import or a '
+                'Reset. It lasts until you close the app.',
             ]),
             _sub('Sharing a profile', [
                 'File ▸ Export profile… writes one self-contained '
-                '.kazbars.json file. File ▸ Import profile… reads one back.',
-                'Custom buffs the profile tracks travel inside the file, so '
-                "the importer's own database doesn't need to know them "
-                "first (if they can't be added, the profile still imports "
-                'and the toast says so). Screen positions travel too, as '
-                'fractions of your '
-                'resolution — a shared profile lands proportionally on any '
-                'screen.',
+                '<name>.kazbars.yml file. File ▸ Import profile… opens one '
+                'and replaces the profile you have open; Revert to session '
+                'start undoes it.',
+                'Import also opens a .kazbars.json export from 3.1, or a '
+                'profile file copied from a 3.1 userdata/profiles folder.',
+                'Custom buffs the profile tracks travel inside the file and '
+                "are added to your database on import, so it doesn't need "
+                "to know them first (if they can't be added, the profile "
+                'still imports and the toast says so). Screen positions '
+                'travel too, as fractions of your resolution — a shared '
+                'profile lands proportionally on any screen.',
+                'To share a few grids instead of the whole profile, use '
+                'Export grid… or Export tab… on the Grids tab.',
+                _link('Class Tabs', 'class-tabs'),
+            ]),
+            _sub('Updating from 3.1', [
+                'On the first launch after the update, KazBars takes the '
+                'profile you were using as your profile and says which one '
+                'in a toast. Your other old profiles stay untouched in '
+                'userdata/profiles; File ▸ Import profile… opens any of '
+                'them.',
+            ]),
+            _sub('If the profile file is damaged', [
+                'KazBars loads the copy from your last session instead, '
+                'keeps the damaged file as profile.damaged.yml, and says so '
+                'in a toast.',
+            ]),
+            _sub('Your data folder', [
+                'File ▸ Open data folder opens userdata — the profile, your '
+                'settings and your custom buffs.',
             ]),
             _sub('What travels with a profile', [
                 'Grids, the Overlay size and font, Stopwatch, Inspect panel, '
@@ -264,6 +281,17 @@ SECTIONS: list[_Section] = [
                 'listing All classes and the twelve classes. Copy leaves the '
                 'original and makes a second grid named after it and the '
                 'class.',
+            ]),
+            _sub('Sharing grids', [
+                'The Move… menu ends with Export grid…, which saves that '
+                'grid to a <grid name>.kazbars-grids.yml file.',
+                'At the right end of the tab strip, Export tab… saves every '
+                'grid on the current tab to one file (greyed while the tab '
+                'is empty). Import grids… adds the grids from a grids file '
+                'to the current tab.',
+                'A grid whose name is taken gets _2 added to it on import, '
+                'and the toast says so. Custom buffs travel inside the file '
+                'and are added to your database.',
             ]),
             'KazBars reopens on the tab you left.',
         ],
@@ -560,7 +588,7 @@ SECTIONS: list[_Section] = [
              (' After that, rebuild anytime and /reloadui.', None)],
             'A quiet status line above the extras cards reads "In game: '
             '<profile>" and turns orange when the game no longer matches '
-            '— a different profile installed, an edit since the last build, '
+            '— a profile imported or reset, an edit since the last build, '
             'or a changed game resolution. It never blocks you; it just '
             'says a rebuild is due.',
             'From here, two things matter: how you launch, and game patches.',
@@ -1046,7 +1074,7 @@ SECTIONS: list[_Section] = [
                 'unsaved-changes prompts still apply — cancel, and the '
                 'downloaded update waits. Next launch: "KazBars updated to '
                 'vX — click for what\'s new".',
-                'Nothing you own moves. Profiles, settings, custom buffs and '
+                'Nothing you own moves. Your profile, settings, custom buffs and '
                 'buff-database updates all stay — no first-run setup again, '
                 'no old folder to delete, no SmartScreen prompt on the '
                 'relaunch.',
@@ -1073,11 +1101,13 @@ SECTIONS: list[_Section] = [
         'title': 'Backup and Restore',
         'body': [
             'Game ▸ Backup & restore game settings... writes one portable '
-            '.zip: your full Age of Conan config plus KazBars profiles and '
-            'settings. Your recovery path after a reformat.',
+            '.zip: your full Age of Conan config plus your KazBars profile '
+            'and settings. Your recovery path after a reformat.',
             _sub('Restoring', [
                 'Restore snapshots your current settings first, so a bad '
                 'restore is reversible. Close the game before either.',
+                'A backup made by 3.1 brings back its profiles, and KazBars '
+                'adopts the one that was active.',
             ]),
         ],
     },
@@ -1090,7 +1120,8 @@ SECTIONS: list[_Section] = [
             'put in the game folder. Every changed game file is restored '
             'byte-for-byte; Damage Numbers reverts to stock.',
             'Two things stay on purpose: your damage-number colors, and '
-            'everything on this PC — profiles, database entries, settings.',
+            'everything on this PC — your profile, database entries, '
+            'settings.',
             _link('Damage Number Colors', 'damage-number-colors'),
         ],
     },
