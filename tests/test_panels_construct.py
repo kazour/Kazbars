@@ -689,9 +689,13 @@ class _StubWindow:
     def __init__(self, height, reqheight):
         self._height, self._reqheight = height, reqheight
         self.geometry_calls = []
+        self.log = []  # idle passes and geometry calls, in order
 
     def update_idletasks(self):
-        self.geometry_calls.append('idle')
+        self.log.append('idle')
+
+    def overrideredirect(self):
+        return False
 
     def winfo_reqheight(self):
         return self._reqheight
@@ -710,6 +714,7 @@ class _StubWindow:
 
     def geometry(self, spec):
         self.geometry_calls.append(spec)
+        self.log.append(spec)
 
 
 def test_fit_window_height_follows_its_content():
@@ -720,7 +725,7 @@ def test_fit_window_height_follows_its_content():
 
     settled = _StubWindow(height=744, reqheight=744)
     fit_window_height(settled, 440)
-    assert settled.geometry_calls == ['idle']    # no churn on the status tick
+    assert settled.geometry_calls == []          # no churn on the status tick
 
 
 def test_center_on_parent_runs_the_idle_pass_before_placing():
@@ -732,8 +737,13 @@ def test_center_on_parent_runs_the_idle_pass_before_placing():
     parent.winfo_rootx = lambda: 100
     parent.winfo_width = lambda: 800
     center_on_parent(window, parent, 420, 340)
-    assert window.geometry_calls[0] == 'idle'
-    assert window.geometry_calls[1].startswith('420x340+')
+    assert window.log[0] == 'idle'
+    assert window.log[1].startswith('420x340+')
+    framed_y = int(window.log[1].rsplit('+', 1)[1])
+    frameless = _StubWindow(height=1, reqheight=1)
+    frameless.overrideredirect = lambda: True
+    center_on_parent(frameless, parent, 420, 340)
+    assert int(frameless.geometry_calls[0].rsplit('+', 1)[1]) == framed_y + 15,         "a frameless window has no bar of its own: its box is the client's centre"
 
 
 def test_fit_window_height_floors_and_grows_about_its_centre(monkeypatch):
@@ -743,10 +753,10 @@ def test_fit_window_height_floors_and_grows_about_its_centre(monkeypatch):
                         lambda x, y, w, h: boxes.append((x, y, w, h)) or (x, y))
     short = _StubWindow(height=500, reqheight=300)
     window_position.fit_window_height(short, 720, 500)
-    assert short.geometry_calls == ['idle'], "never under the floor"
+    assert short.geometry_calls == [], "never under the floor"
     tall = _StubWindow(height=500, reqheight=560)
     window_position.fit_window_height(tall, 720, 500, about_centre=True)
-    assert tall.geometry_calls == ['idle', '720x560+100+70'], "60 px more: 30 up, 30 down"
+    assert tall.geometry_calls == ['720x560+100+70'], "60 px more: 30 up, 30 down"
     assert boxes[-1] == (100, 70, 720, 590), "the title bar is clamped with it"
 
 
@@ -1487,6 +1497,8 @@ def test_the_side_typed_since_the_last_settle_gives_way(app):
         dlg.cols_var.set('10')
         assert (dlg.draft()['rows'], dlg.draft()['cols']) == (8, 8)
         assert dlg.rows_var.get() == '8', "the draft never writes the fields"
+        dlg.cols_var.set('')         # cleared mid-edit: its settled value, as Enter restores
+        assert (dlg.draft()['rows'], dlg.draft()['cols']) == (8, 8)
     finally:
         dlg.cancel()
 
@@ -1511,6 +1523,19 @@ def test_an_emptied_number_field_gets_its_value_back(app):
         _fire_binding(spin, '<Return>')
         assert var.get() == '40', "half-typed: the last committed value"
         assert changes == ['7', '40', '40']
+        var.set('12')
+        _fire_binding(spin, '<FocusIn>')
+        var.set('')
+        _fire_binding(spin, '<FocusOut>')
+        assert var.get() == '12', "focusing commits what the field shows"
+        settle = labeled_spinbox(top, None, var2 := tk.StringVar(value='3'), from_=1, to=9,
+                                 on_change=lambda: var2.set(min(int(var2.get()), 5)))
+        var2.set('8')
+        _fire_binding(settle, '<Return>')
+        assert var2.get() == '5'
+        var2.set('')
+        _fire_binding(settle, '<Return>')
+        assert var2.get() == '5', "what on_change settled, not what was typed"
     finally:
         top.destroy()
 

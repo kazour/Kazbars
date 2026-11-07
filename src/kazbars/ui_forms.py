@@ -79,18 +79,21 @@ def labeled_spinbox(
         except (ValueError, tk.TclError):
             return None
 
-    # The field's last committed value (as built, stepped, entered or
-    # clamped): a field left empty or half-typed ("-") gets it back.
+    # The field's last committed value (as built, focused, stepped, entered
+    # or clamped — read after `on_change`, which may rewrite it): a field
+    # left empty or half-typed ("-") gets it back.
     last = _read()
 
     def _commit():
         nonlocal last
-        last = _read()
+        v = _read()
+        if v is not None:
+            last = v
 
     def _stepped():
-        _commit()
         if on_change is not None:
             on_change()
+        _commit()
 
     vcmd = (parent.register(_validate), "%P")
     spin = ttk.Spinbox(
@@ -106,14 +109,14 @@ def labeled_spinbox(
     spin.pack(side="left", padx=padx)
 
     def _clamp(_evt=None):
-        nonlocal last
         v = _read()
         if v is None:
             v = from_ if last is None else last
-        last = max(from_, min(to, v))
-        var.set(str(last) if is_str_var else last)
+        clamped = max(from_, min(to, v))
+        var.set(str(clamped) if is_str_var else clamped)
         if on_change is not None:
             on_change()
+        _commit()
 
     spin.bind("<FocusIn>", lambda _e: _commit(), add="+")
     spin.bind("<FocusOut>", _clamp)

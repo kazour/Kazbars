@@ -73,14 +73,15 @@ def center_on_parent(window, parent, width=None, height=None):
     remembered spot. A given width / height is set; a missing one is the
     window's requested size, and with neither only the position is set, so
     the window keeps sizing to its content. The frame's title bar (the client
-    area winfo_reqheight leaves out) is counted, the parent wearing the same.
+    area winfo_reqheight leaves out) is counted, the parent wearing the same;
+    a frameless (override-redirect) window has none.
     """
     # Always, sizes given or not: an override-redirect window (the build
     # screen) is placed and shown only once the idle pass has applied the flag.
     window.update_idletasks()
     w = window.winfo_reqwidth() if width is None else width
     h = window.winfo_reqheight() if height is None else height
-    bar = max(0, parent.winfo_rooty() - parent.winfo_y())
+    bar = 0 if window.overrideredirect() else max(0, parent.winfo_rooty() - parent.winfo_y())
     x = parent.winfo_rootx() + (parent.winfo_width() - w) // 2
     y = parent.winfo_rooty() + (parent.winfo_height() - h - bar) // 2
     x, y = clamp_to_screen(x, y, w, h + bar)

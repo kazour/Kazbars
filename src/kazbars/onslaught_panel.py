@@ -209,7 +209,8 @@ def open_onslaught_dialog(app):
 
     def _show_camps():
         if camps_var.get():
-            # In its catalog place, whatever follows it in GROUPS.
+            # In its catalog place: after the group before it (GROUPS lists
+            # the camps last, so there always is one).
             at = roster_lines.index(camp_line)
             camp_line.pack(anchor='w', **({'after': roster_lines[at - 1]} if at else {}))
         else:

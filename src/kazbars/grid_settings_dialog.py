@@ -263,7 +263,9 @@ class GridSettingsDialog(tk.Toplevel):
                             tooltip=f"Grid columns (width). A grid holds up to {limit} slots.",
                             on_change=lambda: self._on_shape('cols'))
             # The shape as last settled: a side typed into since (no arrow,
-            # focus-out or Enter yet) is the one `draft` lets give way.
+            # focus-out or Enter yet) is the one `draft` lets give way, and a
+            # field read as nothing mid-edit reads as its settled value.
+            self._settled = (cfg.get('rows', 1), cfg.get('cols', 1))
             self._settled = self._shape()
 
         if not self._plate:
@@ -391,10 +393,11 @@ class GridSettingsDialog(tk.Toplevel):
     # Field rules
     # ------------------------------------------------------------------
     def _shape(self):
-        """(rows, cols) as the fields read now, each inside its max."""
+        """(rows, cols) as the fields read now, each inside its max; one that
+        reads as nothing mid-edit is its settled value, as its Enter restores."""
         max_rows, max_cols = max_shape(self._type)
-        return (_int(self.rows_var, self._cfg.get('rows', 1), 1, max_rows),
-                _int(self.cols_var, self._cfg.get('cols', 1), 1, max_cols))
+        return (_int(self.rows_var, self._settled[0], 1, max_rows),
+                _int(self.cols_var, self._settled[1], 1, max_cols))
 
     def _on_shape(self, dim):
         """Rows or Cols (`dim`) moved: the shape rules (`settle_box`, the
