@@ -1,4 +1,4 @@
-"""KazBars — grids files: one grid or a class tab's grids, shared on their own
+"""KazBars — grids files: one grid, or several, shared on their own
 (pure data layer, no Tk).
 
 A grids file (`*.kazbars-grids.yml`) is ``{format: kazbars-grids, schema,

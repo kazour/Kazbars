@@ -12,8 +12,8 @@ database has never heard of them.
     the profile file, the older export envelope ``{format:
     kazbars-profile-export, export_schema, profile, buffs}`` and a bare
     document (a 3.1 ``profiles/*.json``); raises ``ValueError`` with a
-    user-presentable message otherwise (a grids file gets pointed at Import
-    grids…). The profile itself is validated downstream by
+    user-presentable message otherwise (a grids file gets pointed at File ▸
+    Import grid…). The profile itself is validated downstream by
     ``profile_document.validate_document`` (which is also what gives an
     old-format profile its "older KazBars" rejection).
   - ``collect_embedded_buffs(...)`` / ``collect_for_refs(...)`` → exactly the
@@ -83,7 +83,7 @@ def parse_profile_file(raw):
         return inner, _buff_list(raw.get('buffs'))
     if fmt == GRIDS_FORMAT:
         raise ValueError("That file is a grids file, not a profile. "
-                         "Use Import grids… on the Grids tab.")
+                         "Use File ▸ Import grid… instead.")
     if any(key in raw for key in ('modules', 'schema', 'profile_schema', 'grids')):
         return raw, []
     raise ValueError("That file isn't a KazBars profile.")

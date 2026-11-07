@@ -94,7 +94,7 @@ def test_parse_passes_old_format_through_for_gate_rejection():
 
 
 def test_parse_points_a_grids_file_at_import_grids():
-    with pytest.raises(ValueError, match="grids file, not a profile"):
+    with pytest.raises(ValueError, match="Use File ▸ Import grid… instead"):
         PS.parse_profile_file({"format": PS.GRIDS_FORMAT, "grids": []})
 
 

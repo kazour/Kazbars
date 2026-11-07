@@ -29,7 +29,7 @@ from tkinter import filedialog
 
 from ttkbootstrap.dialogs import Messagebox, MessageDialog
 
-from . import content_update, profile_share, yaml_io
+from . import content_update, grid_templates, profile_share, yaml_io
 from .buff_db_layers import DeltaStore
 from .grid_model import get_game_resolution_or_default
 from .overlay import size_for_height
@@ -352,6 +352,39 @@ def import_profile(app):
     apply_document(app)
     app_toast(app, " — ".join([f"Imported “{doc['name']}”", *buff_merge_parts(added, skipped, failed)]),
               'success')
+
+
+def import_grids(app):
+    """File ▸ Import grid… — a grids file's grids onto the class tab the Grids
+    view shows (`GridsPanel.append_grids`), its custom buffs merged first so
+    the grids' refs resolve. True once grids landed; False on cancel or a
+    refused file."""
+    path = filedialog.askopenfilename(
+        title="Import Grid",
+        filetypes=[("KazBars grids", "*.kazbars-grids.yml"), ("YAML files", "*.yml *.yaml"),
+                   ("All files", "*.*")],
+    )
+    if not path:
+        return False
+    try:
+        raw = yaml_io.read_file(path)
+    except (OSError, ValueError):
+        Messagebox.show_error("That file couldn't be read as a KazBars grids file.",
+                              title="Import Failed")
+        return False
+    try:
+        grids, buffs = grid_templates.parse(raw)
+    except ValueError as e:
+        Messagebox.show_error(str(e), title="Import Failed")
+        return False
+    merged = merge_embedded_buffs(app, buffs)
+    panel = app.grids_panel
+    appended, renames = panel.append_grids(grids)
+    n = len(appended)
+    parts = [f"Imported {n} grid{'s' if n != 1 else ''} into {panel.tab_name()}"]
+    parts += [f"renamed ‘{old}’ to ‘{new}’ (name taken)" for old, new in renames]
+    app_toast(app, " — ".join([*parts, *buff_merge_parts(*merged)]), 'success')
+    return True
 
 
 def merge_embedded_buffs(app, embedded):

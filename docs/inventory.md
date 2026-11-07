@@ -13,7 +13,7 @@
 |---|---:|
 | `src/kazbars/__init__.py` | 11 |
 | `src/kazbars/__main__.py` | 71 |
-| `src/kazbars/app.py` | 815 |
+| `src/kazbars/app.py` | 823 |
 | `src/kazbars/app_popups.py` | 491 |
 | `src/kazbars/boss_timer.py` | 399 |
 | `src/kazbars/buff_database.py` | 189 |
@@ -59,7 +59,7 @@
 | `src/kazbars/grid_settings_dialog.py` | 532 |
 | `src/kazbars/grid_templates.py` | 81 |
 | `src/kazbars/grids_generator.py` | 781 |
-| `src/kazbars/grids_panel.py` | 1016 |
+| `src/kazbars/grids_panel.py` | 974 |
 | `src/kazbars/inspect.py` | 79 |
 | `src/kazbars/inspect_catalog.py` | 618 |
 | `src/kazbars/inspect_panel.py` | 387 |
@@ -74,7 +74,7 @@
 | `src/kazbars/paths.py` | 46 |
 | `src/kazbars/prefs.py` | 223 |
 | `src/kazbars/profile_document.py` | 345 |
-| `src/kazbars/profile_io.py` | 407 |
+| `src/kazbars/profile_io.py` | 440 |
 | `src/kazbars/profile_share.py` | 174 |
 | `src/kazbars/profile_store.py` | 136 |
 | `src/kazbars/self_update.py` | 487 |
@@ -146,7 +146,7 @@
 | `tests/test_overlay_rung.py` | 145 |
 | `tests/test_overlay_size.py` | 226 |
 | `tests/test_panel_ratios.py` | 162 |
-| `tests/test_panels_construct.py` | 1727 |
+| `tests/test_panels_construct.py` | 1749 |
 | `tests/test_prefs.py` | 76 |
 | `tests/test_prefs_migration.py` | 68 |
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |

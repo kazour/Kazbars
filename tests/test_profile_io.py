@@ -243,7 +243,7 @@ def test_import_shows_the_reason_and_keeps_the_profile(app, root, monkeypatch, t
     for path in (grids_file, tmp_path / "missing.yml"):
         monkeypatch.setattr(profile_io.filedialog, "askopenfilename", lambda p=path, **k: str(p))
         profile_io.import_profile(app)
-    assert "Use Import grids…" in errors[0]
+    assert "Use File ▸ Import grid… instead." in errors[0]
     assert errors[1] == "That file couldn't be read as a KazBars profile."
     assert store.document["name"] == "Home"
 

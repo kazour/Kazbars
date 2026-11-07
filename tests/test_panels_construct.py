@@ -1641,38 +1641,35 @@ def test_a_tooltip_with_nothing_to_say_shows_nothing(app):
 
 
 # ============================================================================
-# GRIDS FILES: EXPORT GRID… / EXPORT TAB… / IMPORT GRIDS…
+# GRIDS FILES: EXPORT GRID… (MOVE… MENU) / FILE ▸ IMPORT GRID…
 # ============================================================================
-def test_export_tab_writes_the_tabs_grids_without_their_class(app, monkeypatch, tmp_path):
+def test_the_tab_strip_ends_with_its_last_class(app):
+    from tkinter import ttk
+    gp = app.grids_panel
+    row = next(iter(gp._tab_buttons.values()))[0].master
+    slaves = row.pack_slaves()
+    assert all(isinstance(w, ttk.Radiobutton) for w in slaves), "no file buttons on the strip"
+
+
+def test_export_grid_writes_the_grid_without_its_class(app, monkeypatch, tmp_path):
     from kazbars import grids_panel, yaml_io
     from kazbars.grid_model import create_default_grid
     gp = app.grids_panel
     gp.grids.append(dict(create_default_grid('player', 1, 5, 'dynamic', 'ShareDT'), **{'class': 31}))
     gp.refresh_panels()
-    gp._tab_var.set(30)  # a tab with nothing on it
-    gp._on_tab_changed()
-    try:
-        assert gp._export_tab_btn.instate(['disabled']), "nothing to export on an empty tab"
-        gp._tab_var.set(31)
-        gp._on_tab_changed()
-        assert not gp._export_tab_btn.instate(['disabled'])
-        out = tmp_path / 'dt.kazbars-grids.yml'
-        seen = {}
-        monkeypatch.setattr(grids_panel.filedialog, 'asksaveasfilename',
-                            lambda **k: seen.update(k) or str(out))
-        gp.export_tab()
-        assert seen['initialfile'] == 'DT grids.kazbars-grids.yml'
-        value = yaml_io.loads(out.read_text(encoding='utf-8'))
-        assert value['format'] == 'kazbars-grids'
-        assert [g['id'] for g in value['grids']] == ['ShareDT']
-        assert all('class' not in g for g in value['grids'])
-    finally:
-        gp._tab_var.set(0)
-        gp._on_tab_changed()
+    out = tmp_path / 'dt.kazbars-grids.yml'
+    seen = {}
+    monkeypatch.setattr(grids_panel.filedialog, 'asksaveasfilename',
+                        lambda **k: seen.update(k) or str(out))
+    gp.export_grid(gp.grid_panels[-1])
+    assert seen['initialfile'] == 'ShareDT.kazbars-grids.yml'
+    value = yaml_io.loads(out.read_text(encoding='utf-8'))
+    assert value['format'] == 'kazbars-grids'
+    assert [g['id'] for g in value['grids']] == ['ShareDT'] and 'class' not in value['grids'][0]
 
 
-def test_import_grids_appends_to_the_tab_and_renames_a_taken_id(app, monkeypatch, tmp_path):
-    from kazbars import grid_templates, grids_panel, yaml_io
+def test_import_grid_lands_on_the_tab_shows_the_grids_and_names_renames(app, monkeypatch, tmp_path):
+    from kazbars import grid_templates, profile_io, yaml_io
     from kazbars.grid_model import create_default_grid
     gp = app.grids_panel
     gp.grids.append(dict(create_default_grid('player', 1, 5, 'dynamic', 'Shared Raid'), **{'class': 31}))
@@ -1683,13 +1680,15 @@ def test_import_grids_appends_to_the_tab_and_renames_a_taken_id(app, monkeypatch
                                  {}, {}, {})
     value['grids'][1].update(whitelist=None, slotAssignments=[])  # a hand-edited file
     src.write_text(yaml_io.dumps(value), encoding='utf-8')
-    monkeypatch.setattr(grids_panel.filedialog, 'askopenfilename', lambda **k: str(src))
+    monkeypatch.setattr(profile_io.filedialog, 'askopenfilename', lambda **k: str(src))
     toasts = []
-    monkeypatch.setattr(grids_panel, 'app_toast', lambda w, msg, *a, **k: toasts.append(msg))
+    monkeypatch.setattr(profile_io, 'app_toast', lambda w, msg, *a, **k: toasts.append(msg))
     gp._tab_var.set(31)
     gp._on_tab_changed()
+    app._switch_view('database')
     try:
-        gp.import_grids()
+        app._import_grid()
+        assert app.current_view == 'grids', "the Grids view comes up to show them"
         landed = [g for g in gp.grids if g['id'] in ('Shared_Raid_2', 'Shared Fresh')]
         assert [g['id'] for g in landed] == ['Shared_Raid_2', 'Shared Fresh']
         assert all(g['class'] == 31 for g in landed)
@@ -1703,17 +1702,40 @@ def test_import_grids_appends_to_the_tab_and_renames_a_taken_id(app, monkeypatch
         gp._on_tab_changed()
 
 
-def test_import_grids_refuses_a_profile_file(app, monkeypatch, tmp_path):
-    from kazbars import grids_panel
+def test_import_grid_reports_false_on_cancel_or_a_refused_file(app, monkeypatch, tmp_path):
+    from kazbars import profile_io
     src = tmp_path / 'p.kazbars.yml'
     src.write_text('format: kazbars-profile\nschema: 3\n', encoding='utf-8')
     errors = []
-    monkeypatch.setattr(grids_panel.filedialog, 'askopenfilename', lambda **k: str(src))
-    monkeypatch.setattr(grids_panel.Messagebox, 'show_error', lambda msg, **k: errors.append(msg))
+    monkeypatch.setattr(profile_io.Messagebox, 'show_error', lambda msg, **k: errors.append(msg))
     before = len(app.grids_panel.grids)
-    app.grids_panel.import_grids()
-    assert 'is a profile, not a grids file' in errors[0]
-    assert len(app.grids_panel.grids) == before
+    monkeypatch.setattr(profile_io.filedialog, 'askopenfilename', lambda **k: '')
+    assert profile_io.import_grids(app) is False and errors == []
+    monkeypatch.setattr(profile_io.filedialog, 'askopenfilename', lambda **k: str(src))
+    app._switch_view('database')
+    try:
+        app._import_grid()
+        assert app.current_view == 'database', "a refused file switches nothing"
+        assert 'is a profile, not a grids file. Use File ▸ Import profile' in errors[0]
+        assert len(app.grids_panel.grids) == before
+    finally:
+        app._switch_view('grids')
+
+
+def test_append_grids_returns_the_renames(app):
+    from kazbars.grid_model import create_default_grid
+    gp = app.grids_panel
+    gp.grids.append(create_default_grid('player', 1, 5, 'dynamic', 'AppendMe'))
+    gp.refresh_panels()
+    appended, renames = gp.append_grids([create_default_grid('player', 1, 2, 'dynamic', 'AppendMe')])
+    assert [g['id'] for g in appended] == ['AppendMe_2'] and renames == [('AppendMe', 'AppendMe_2')]
+    assert gp.grids[-1] is appended[0]
+
+
+def test_file_menu_offers_import_grid_after_import_profile(app):
+    file_menu = app._menubar._cascades[0][3]  # File is the first cascade
+    labels = [row.get('label') for row in file_menu]
+    assert labels.index('Import grid…') == labels.index('Import profile…') + 1
 
 
 def test_a_cards_move_menu_ends_with_export_grid(app, monkeypatch):

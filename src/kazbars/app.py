@@ -461,12 +461,14 @@ class KazBarsApp(ttkb.Window):
 
     def _build_file_menu(self):
         """The File menu: the one profile's export, import, reset and revert,
-        the data folder, Exit."""
+        a grids file's import, the data folder, Exit."""
         self._menubar.add_cascade(label="File", menu_def=[
             {'type': 'command', 'label': 'Export profile…',
              'command': self._export_profile},
             {'type': 'command', 'label': 'Import profile…',
              'command': self._import_profile},
+            {'type': 'command', 'label': 'Import grid…',
+             'command': self._import_grid},
             {'type': 'separator'},
             {'type': 'command', 'label': 'Reset profile to defaults…',
              'command': self._reset_profile},
@@ -757,6 +759,12 @@ class KazBarsApp(ttkb.Window):
 
     def _import_profile(self):
         return profile_io.import_profile(self)
+
+    def _import_grid(self):
+        """File ▸ Import grid…: the grids land on the current class tab, and the
+        Grids view comes up so they are seen."""
+        if profile_io.import_grids(self):
+            self._switch_view('grids')
 
     # ========================================================================
     # BUILD PIPELINE
