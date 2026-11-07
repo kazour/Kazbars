@@ -42,7 +42,7 @@ from .ui_helpers import (
 )
 from .ui_tk_style import apply_dark_titlebar
 from .ui_widgets import add_tooltip, app_toast, debounced_callback
-from .window_position import center_on_parent, clamp_to_screen
+from .window_position import center_on_parent, fit_window_height
 
 _WIDTH = 720
 _HEIGHT = 500
@@ -188,14 +188,8 @@ def open_onslaught_dialog(app):
         # The dialog follows its content (the roster's lines, the user's
         # names) about its own centre; _HEIGHT stays the floor so a short
         # list keeps its room.
-        if not dialog.winfo_ismapped():
-            return
-        dialog.update_idletasks()
-        needed = max(_HEIGHT, dialog.winfo_reqheight())
-        grow = needed - dialog.winfo_height()
-        if grow:
-            x, y = clamp_to_screen(dialog.winfo_x(), dialog.winfo_y() - grow // 2, _WIDTH, needed)
-            dialog.geometry(f'{_WIDTH}x{needed}+{x}+{y}')
+        if dialog.winfo_ismapped():
+            fit_window_height(dialog, _WIDTH, _HEIGHT, about_centre=True)
 
     def _wrap_to(width):
         for line in roster_lines:
@@ -215,9 +209,10 @@ def open_onslaught_dialog(app):
 
     def _show_camps():
         if camps_var.get():
-            # In its catalog place, whatever follows it in GROUPS.
+            # In its catalog place, wherever GROUPS puts it.
             at = roster_lines.index(camp_line)
-            camp_line.pack(anchor='w', **({'after': roster_lines[at - 1]} if at else {}))
+            camp_line.pack(anchor='w', **({'after': roster_lines[at - 1]} if at
+                                          else {'before': roster_lines[1]}))
         else:
             camp_line.pack_forget()
         _refit()
@@ -268,24 +263,26 @@ def open_onslaught_dialog(app):
                              command=lambda n=name: _delete(n), state='normal' if live else 'disabled')
             btn.pack(side='right')
             add_tooltip(btn, f"Stop watching {name}")
-        _refit()
 
     def _add(_e=None):
         if _refusal() is None:
             custom.append(name_var.get().strip())
             name_var.set("")
             _draw_names()
+            _refit()
         return 'break'
 
     def _delete(name):
         before = list(custom)
         custom.remove(name)
         _draw_names()
+        _refit()
 
         def _undo():
             if dialog.winfo_exists():
                 custom[:] = before
                 _draw_names()
+                _refit()
         app_toast(dialog, f"Removed {name} — click to undo", 'info', 8,
                   key='onslaught-custom-undo', on_click=_undo)
 
@@ -345,7 +342,9 @@ def open_onslaught_dialog(app):
                ).pack(side='right', padx=(0, PAD_SMALL))
 
     # The roster's first wrap, before the card has a width to read: what
-    # Display leaves, less the card's padding (its <Configure> then confirms).
+    # Display leaves, less the paddings around it — content's sides (PAD_TAB
+    # each), the gap after Display (PAD_SMALL), the card's own (PAD_INNER
+    # each). Its <Configure> then re-wraps to the width the card really got.
     dialog.update_idletasks()
     _wrap_to(_WIDTH - 2 * PAD_TAB - PAD_SMALL - display.winfo_reqwidth() - 2 * PAD_INNER)
     dialog.update_idletasks()

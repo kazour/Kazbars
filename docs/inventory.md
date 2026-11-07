@@ -22,7 +22,7 @@
 | `src/kazbars/buff_xml.py` | 377 |
 | `src/kazbars/build_action.py` | 362 |
 | `src/kazbars/build_executor.py` | 392 |
-| `src/kazbars/build_loading.py` | 521 |
+| `src/kazbars/build_loading.py` | 512 |
 | `src/kazbars/build_utils.py` | 62 |
 | `src/kazbars/cast_timer.py` | 94 |
 | `src/kazbars/cast_timer_panel.py` | 298 |
@@ -45,7 +45,7 @@
 | `src/kazbars/deeps_settings.py` | 336 |
 | `src/kazbars/deeps_trackers.py` | 182 |
 | `src/kazbars/extras_shortcuts.py` | 282 |
-| `src/kazbars/first_launch.py` | 405 |
+| `src/kazbars/first_launch.py` | 400 |
 | `src/kazbars/focus_watcher.py` | 85 |
 | `src/kazbars/foreground.py` | 111 |
 | `src/kazbars/game_folder.py` | 430 |
@@ -53,10 +53,10 @@
 | `src/kazbars/game_resolution.py` | 160 |
 | `src/kazbars/grid_dialogs.py` | 795 |
 | `src/kazbars/grid_editor_panel.py` | 641 |
-| `src/kazbars/grid_model.py` | 418 |
+| `src/kazbars/grid_model.py` | 430 |
 | `src/kazbars/grid_preview.py` | 240 |
 | `src/kazbars/grid_preview_canvas.py` | 227 |
-| `src/kazbars/grid_settings_dialog.py` | 530 |
+| `src/kazbars/grid_settings_dialog.py` | 523 |
 | `src/kazbars/grids_generator.py` | 781 |
 | `src/kazbars/grids_panel.py` | 923 |
 | `src/kazbars/inspect.py` | 79 |
@@ -66,7 +66,7 @@
 | `src/kazbars/live_tracker_panel.py` | 521 |
 | `src/kazbars/live_tracker_settings.py` | 175 |
 | `src/kazbars/onslaught.py` | 204 |
-| `src/kazbars/onslaught_panel.py` | 362 |
+| `src/kazbars/onslaught_panel.py` | 361 |
 | `src/kazbars/overlay.py` | 122 |
 | `src/kazbars/overlay_engine.py` | 800 |
 | `src/kazbars/overlay_size.py` | 126 |
@@ -87,7 +87,7 @@
 | `src/kazbars/timer_overlay.py` | 372 |
 | `src/kazbars/ui_collapsible.py` | 232 |
 | `src/kazbars/ui_components.py` | 677 |
-| `src/kazbars/ui_forms.py` | 520 |
+| `src/kazbars/ui_forms.py` | 524 |
 | `src/kazbars/ui_headers.py` | 197 |
 | `src/kazbars/ui_helpers.py` | 203 |
 | `src/kazbars/ui_tk_style.py` | 67 |
@@ -95,7 +95,7 @@
 | `src/kazbars/update_check.py` | 64 |
 | `src/kazbars/update_orchestrator.py` | 148 |
 | `src/kazbars/userdata.py` | 110 |
-| `src/kazbars/window_position.py` | 155 |
+| `src/kazbars/window_position.py` | 160 |
 | `tests/test_app_contract.py` | 104 |
 | `tests/test_app_icon.py` | 43 |
 | `tests/test_as2_class_names.py` | 77 |
@@ -128,7 +128,7 @@
 | `tests/test_foreground.py` | 95 |
 | `tests/test_game_folder.py` | 137 |
 | `tests/test_game_persistence.py` | 748 |
-| `tests/test_grid_model.py` | 291 |
+| `tests/test_grid_model.py` | 308 |
 | `tests/test_grid_preview.py` | 143 |
 | `tests/test_grids_generator.py` | 603 |
 | `tests/test_hud_overlay.py` | 141 |
@@ -143,7 +143,7 @@
 | `tests/test_overlay_rung.py` | 145 |
 | `tests/test_overlay_size.py` | 226 |
 | `tests/test_panel_ratios.py` | 162 |
-| `tests/test_panels_construct.py` | 1483 |
+| `tests/test_panels_construct.py` | 1530 |
 | `tests/test_prefs.py` | 76 |
 | `tests/test_prefs_migration.py` | 68 |
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |

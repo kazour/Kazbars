@@ -119,6 +119,16 @@ def valid_fills(rows, cols):
     return ('TL-BR', 'TR-BL', 'BL-TR', 'BR-TL'), 'BL-TR'
 
 
+def snap_fill(rows, cols, fill):
+    """A box's fill as its renderers draw it: one the shape offers is kept, an
+    unfit one becomes the order `grid_preview.slot_pos` and the AS2 `place()`
+    already read it as — a row left to right, a column top down, anything else
+    from the top-left corner."""
+    if fill in valid_fills(rows, cols)[0]:
+        return fill
+    return 'LR' if rows == 1 else 'TB' if cols == 1 else 'TL-BR'
+
+
 def settle_box(rows, cols, fill, grid_type, dynamic, give='cols'):
     """A box grid's (rows, cols, fill) after its shape rules: each side inside
     its max, the `give` side ('rows' or 'cols', the one just edited) giving
@@ -248,6 +258,8 @@ def validate_grid(grid):
             grid[key] = enum_default
 
     _validate_overhead(grid)
+    if not is_band(grid):
+        grid['fillDirection'] = snap_fill(grid['rows'], grid['cols'], grid['fillDirection'])
 
     # Validate booleans
     for bool_key in ('enabled', 'enableFlashing'):
@@ -290,7 +302,7 @@ def _clamp_int(grid, key, default, lo, hi):
 def _validate_overhead(grid):
     """The overhead keys, where they apply and nowhere else: an overhead box's
     shape through `settle_box` (inside 4 x 8, its columns giving way to its 16
-    slots; its fill only validated, as a screen grid's), an overhead grid's height
+    slots; its fill then snapped as a screen grid's), an overhead grid's height
     (`plateOffset`, px of room for the nameplate) and range (`maxDistance`, m);
     a band's `rowCap` and `maxSlots` and the shape and centred fill derived from
     them; a friendly grid's `showSelf`."""

@@ -29,7 +29,7 @@ from .ui_helpers import (
     TK_COLORS,
 )
 from .ui_widgets import bind_label_press_effect
-from .window_position import clamp_to_screen, restore_window_position
+from .window_position import fit_window_height, restore_window_position
 
 FIRST_LAUNCH_SIZE = (520, 480)
 
@@ -328,12 +328,7 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
     # the bottom-packed "Set up later" row. Never shrinks below the design size,
     # and re-clamps — restore_window_position only placed the design height, so
     # growing without this can push that same row off the bottom of the screen.
-    dialog.update_idletasks()
-    width, height = FIRST_LAUNCH_SIZE
-    if dialog.winfo_reqheight() > height:
-        height = dialog.winfo_reqheight()
-        x, y = clamp_to_screen(dialog.winfo_x(), dialog.winfo_y(), width, height)
-        dialog.geometry(f'{width}x{height}+{x}+{y}')
+    fit_window_height(dialog, *FIRST_LAUNCH_SIZE)
 
 
 def run_first_launch(app, app_name):

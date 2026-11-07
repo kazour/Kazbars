@@ -705,6 +705,9 @@ class _StubWindow:
     def winfo_y(self):
         return 100
 
+    def winfo_rooty(self):
+        return 130  # a 30 px title bar
+
     def geometry(self, spec):
         self.geometry_calls.append(spec)
 
@@ -718,6 +721,20 @@ def test_fit_window_height_follows_its_content():
     settled = _StubWindow(height=744, reqheight=744)
     fit_window_height(settled, 440)
     assert settled.geometry_calls == []          # no churn on the status tick
+
+
+def test_fit_window_height_floors_and_grows_about_its_centre(monkeypatch):
+    from kazbars import window_position
+    boxes = []
+    monkeypatch.setattr(window_position, 'clamp_to_screen',
+                        lambda x, y, w, h: boxes.append((x, y, w, h)) or (x, y))
+    short = _StubWindow(height=500, reqheight=300)
+    window_position.fit_window_height(short, 720, 500)
+    assert short.geometry_calls == [], "never under the floor"
+    tall = _StubWindow(height=500, reqheight=560)
+    window_position.fit_window_height(tall, 720, 500, about_centre=True)
+    assert tall.geometry_calls == ['720x560+100+70'], "60 px more: 30 up, 30 down"
+    assert boxes[-1] == (100, 70, 720, 590), "the title bar is clamped with it"
 
 
 def test_deeps_status_render_refits_the_panel(app, monkeypatch):
@@ -1442,14 +1459,44 @@ def test_applied_by_me_sits_after_the_mode(app):
     assert slaves.index(card.cog_label) < slaves.index(card._self_cast_cb)
 
 
+def _fire_binding(widget, sequence):
+    """Run `widget`'s own `sequence` binding as Tk would on the event: a
+    generated key event never reaches a window that is not mapped."""
+    import re
+    script = widget.bind(sequence)
+    widget.tk.eval(re.sub(r'%[^W]', '0', script).replace('%W', str(widget)))
+
+
 def test_rows_typed_last_give_way_to_the_slot_limit(app):
+    from tkinter import ttk
+
     from kazbars.grid_model import create_default_grid
     card = _card_for(app, create_default_grid('player', 1, 5, 'static', 'SeamGiveRows'))
+    idx = len(app.grids_panel.grids) - 1
     dlg = _settings(card)
     try:
         dlg.cols_var.set('8')
         dlg.rows_var.set('10')  # typed, then Enter: no arrow, no focus-out
-        assert (dlg.draft()['rows'], dlg.draft()['cols']) == (8, 8)
+        # Enter runs the field's own binding first (the clamp settles the
+        # shape), then the dialog's, which applies.
+        _fire_binding(_find_widget(dlg, ttk.Spinbox, dlg.rows_var), '<Return>')
+        assert (dlg.rows_var.get(), dlg.cols_var.get()) == ('8', '8')
+        dlg._on_return(None)
+        assert not dlg.winfo_exists()
+        assert (lambda g: (g['rows'], g['cols']))(_stored_grid(app, idx)) == (8, 8)
+    finally:
+        if dlg.winfo_exists():
+            dlg.cancel()
+
+
+def test_a_loaded_grid_previews_and_applies_the_fill_it_draws(app):
+    from kazbars.grid_model import create_default_grid, validate_grid
+    grid = validate_grid({**create_default_grid('player', 2, 3, 'static', 'SeamLoadedFill'),
+                          'fillDirection': 'LR'})
+    card = _card_for(app, grid)
+    dlg = _settings(card)
+    try:
+        assert dlg.draft()['fillDirection'] == grid['fillDirection'] == 'TL-BR'
     finally:
         dlg.cancel()
 

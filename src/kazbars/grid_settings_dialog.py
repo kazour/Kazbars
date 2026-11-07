@@ -153,8 +153,6 @@ class GridSettingsDialog(tk.Toplevel):
         self.grab_set()
         self._label_font = tkfont.Font(root=self, font=FONT_FORM_LABEL)
         self._label_w = 0  # the widest label `_field` has made
-        # The side Rows / Cols gives way on: the one typed into last.
-        self._give = 'cols'
 
         create_dialog_header(self, f"GRID SETTINGS — {cfg.get('id', 'Grid')}",
                              MODULE_COLORS['grids'], width=_WIDTH)
@@ -256,10 +254,6 @@ class GridSettingsDialog(tk.Toplevel):
             limit = max_slots(self._type)
             self.rows_var = tk.StringVar(value=str(cfg.get('rows', 1)))
             self.cols_var = tk.StringVar(value=str(cfg.get('cols', 1)))
-            # A value typed and applied with Enter never reaches `_on_shape`:
-            # the draft still lets the side typed into give way.
-            self.rows_var.trace_add('write', lambda *_: setattr(self, '_give', 'rows'))
-            self.cols_var.trace_add('write', lambda *_: setattr(self, '_give', 'cols'))
             cell, _ = self._field(card, "Rows × Cols:")
             labeled_spinbox(cell, None, self.rows_var, from_=1, to=max_rows, width=4,
                             tooltip=f"Grid rows (height). A grid holds up to {limit} slots.",
@@ -408,7 +402,6 @@ class GridSettingsDialog(tk.Toplevel):
         if (new_rows, new_cols) != (rows, cols):
             self.rows_var.set(str(new_rows))
             self.cols_var.set(str(new_cols))
-            self._give = dim
             msg = (f"A grid holds at most {max_slots(self._type)} slots" if rows * cols > 1
                    else "Dynamic grids need at least 2 slots, switched to 1×2")
             app_toast(self.card, msg, 'info', key='grid_resize')
@@ -460,7 +453,7 @@ class GridSettingsDialog(tk.Toplevel):
             fill = (_FILL_CODE_BY_LABEL.get(self.fill_var.get(), cfg.get('fillDirection'))
                     if not self._static else cfg.get('fillDirection'))
             out['rows'], out['cols'], out['fillDirection'] = settle_box(
-                *self._shape(), fill, self._type, not self._static, give=self._give)
+                *self._shape(), fill, self._type, not self._static)
         if not self._plate:
             x = _int(self.x_var, self._px0[0], 0, self._res[0])
             y = _int(self.y_var, self._px0[1], 0, self._res[1])

@@ -40,11 +40,14 @@ def labeled_spinbox(
     padx=0,
     label_sink=None,
 ):
-    """Labeled spinbox with key-validation and focus-out clamp.
+    """Labeled spinbox with key-validation and a clamp on focus-out or Enter.
 
     `var` is a caller-owned StringVar or IntVar; the helper reads its type
     to drive the clamp. `on_change`, if given, fires on spinbox arrows AND
-    after focus-out clamp. Returns the Spinbox so callers can bind extras.
+    after the clamp. Enter clamps before any toplevel `<Return>` binding runs
+    (widget bindings fire first), so a dialog that applies on Enter applies
+    the typed value already settled. Returns the Spinbox so callers can bind
+    extras.
 
     `label_sink`, when given a list, receives the descriptor label so a caller
     can grey it in step with the control (as `create_slider_row`).
@@ -93,6 +96,7 @@ def labeled_spinbox(
             on_change()
 
     spin.bind("<FocusOut>", _clamp)
+    spin.bind("<Return>", _clamp)
     if tooltip:
         add_tooltip(spin, tooltip)
     return spin

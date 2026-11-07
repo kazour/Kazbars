@@ -34,6 +34,7 @@ from kazbars.grid_model import (
     ref_list,
     settle_box,
     slot_count,
+    snap_fill,
     snap_row_cap,
     unproject_px,
     valid_fills,
@@ -220,16 +221,32 @@ def test_a_box_has_no_cap_and_keeps_its_shape():
     assert "rowCap" not in g and "maxSlots" not in g
     assert (g["rows"], g["cols"], slot_count(g)) == (2, 8, 16)
     g = validate_grid({"type": "player", "rows": 2, "cols": 8, "rowCap": 5})
-    assert "rowCap" not in g and g["fillDirection"] == "LR"
+    assert "rowCap" not in g and g["fillDirection"] == "TL-BR", "a box's fill, never a band's C"
 
 
-def test_a_box_fill_is_validated_on_load_never_settled():
-    """The fill a shape offers is the settings dialog's to settle, for an
-    overhead box as for a screen one."""
-    assert validate_grid({"type": "hostile", "slotMode": "static", "rows": 2, "cols": 3,
-                          "fillDirection": "LR"})["fillDirection"] == "LR"
-    assert validate_grid({"type": "player", "rows": 2, "cols": 3,
-                          "fillDirection": "LR"})["fillDirection"] == "LR"
+def test_an_unfit_box_fill_snaps_on_load_to_the_order_it_draws_in():
+    """A fill the shape does not offer reads as the renderers already draw it,
+    for an overhead box as for a screen one; a fit one is untouched."""
+    for gtype in ("player", "hostile"):
+        def fill(rows, cols, code):
+            return validate_grid({"type": gtype, "slotMode": "static", "rows": rows,
+                                  "cols": cols, "fillDirection": code})["fillDirection"]
+        assert fill(2, 3, "LR") == "TL-BR"
+        assert fill(3, 1, "LR") == "TB"
+        assert fill(1, 3, "TL-BR") == "LR"
+        assert fill(2, 3, "BR-TL") == "BR-TL"
+        assert fill(1, 3, "RL") == "RL"
+        assert fill(3, 1, "BT") == "BT"
+
+
+def test_a_snapped_fill_draws_every_slot_where_the_unfit_code_did():
+    from kazbars.grid_preview import slot_pos
+    codes = ('LR', 'RL', 'TB', 'BT', 'BL-TR', 'BR-TL', 'TL-BR', 'TR-BL')
+    for rows, cols in ((1, 4), (4, 1), (2, 3), (1, 1)):
+        for code in codes:
+            snapped = snap_fill(rows, cols, code)
+            assert snapped in valid_fills(rows, cols)[0]
+            assert [slot_pos(rows, cols, snapped, i) for i in range(rows * cols)] ==                 [slot_pos(rows, cols, code, i) for i in range(rows * cols)], (rows, cols, code)
 
 
 def test_an_overhead_box_is_capped_at_sixteen_slots():
