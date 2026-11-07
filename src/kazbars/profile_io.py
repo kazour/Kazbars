@@ -14,7 +14,7 @@ session snapshot `profile.yml.bak` (the damaged file kept as
 (`userdata/profiles/`, read once, never written), else the template seed.
 
 `apply_document` is the dispatch step (grids panel, live overlays, extras
-cards, title). It runs before `app.deiconify()` at startup so panels are
+cards). It runs before `app.deiconify()` at startup so panels are
 populated before the window shows. Unresolved buff refs raise no dialog —
 they surface as greyed rows in the buff selector and as the build summary's
 skipped-count line.
@@ -219,10 +219,12 @@ def _adopt_library(app, active_hint=None):
         active = json.loads(prefs_path().read_text(encoding='utf-8')).get('active_profile')
     except (OSError, ValueError, AttributeError):
         active = None
-    active = active or active_hint
-    for _path, doc in entries:
-        if active and doc['id'] == active:
-            return doc
+    # The prefs id, then the hint, then the newest: a stale prefs id that names
+    # none of the files never hides the hint.
+    by_id = {doc['id']: doc for _path, doc in entries}
+    for wanted in (active, active_hint):
+        if wanted in by_id:
+            return by_id[wanted]
     return max(entries, key=lambda e: file_mtime(e[0]))[1]
 
 
@@ -261,7 +263,7 @@ def apply_document(app):
     """Dispatch the store's document into the running app.
 
     Side effects: grids panel, live BossTimer + Deeps overlays (if open),
-    extras shortcut cards, window title. Positions are fractions — no
+    extras shortcut cards. Positions are fractions — no
     resolution rescale exists; `authored_at` is display-only provenance.
     """
     store = app.profile_store
@@ -281,7 +283,6 @@ def apply_document(app):
     # The baked extras (stopwatch/inspect/cast timer) travel with the profile —
     # resync the main-screen shortcut cards to the incoming sections.
     app.grids_panel.refresh_extras_shortcuts()
-    app._update_title()
 
 
 # ============================================================================
@@ -318,7 +319,7 @@ def export_profile(app):
         app.database.provenance)
     try:
         safe_write_text(Path(path), yaml_io.dumps(profile_share.build_profile_file(doc, buffs)))
-    except OSError as e:
+    except (OSError, TypeError) as e:  # a disk error, or a value YAML can't hold
         Messagebox.show_error(f"Could not write the export file.\n\n({e})",
                               title="Export Failed")
         return
@@ -422,7 +423,8 @@ def buff_merge_parts(added, skipped, failed):
 
 def reset_to_defaults(app):
     """File ▸ Reset profile to defaults… — the stock (or OTA) template in place
-    of the open profile, sized for the game resolution, after a confirm."""
+    of the open profile, sized for the game resolution, after a confirm. The
+    profile keeps its name."""
     dialog = MessageDialog(
         "Reset your profile to the defaults?\n\nEvery grid and extra goes back to the "
         "starter layout. Revert to session start brings your profile back.",
@@ -430,7 +432,7 @@ def reset_to_defaults(app):
     dialog.show()
     if dialog.result != 'Reset':
         return
-    doc = _from_template(app, 'Default', get_game_resolution_or_default())
+    doc = _from_template(app, app.profile_store.document['name'], get_game_resolution_or_default())
     if doc is None:
         Messagebox.show_warning("No profile template is available.", title="Reset Profile")
         return

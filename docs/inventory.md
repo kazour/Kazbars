@@ -13,7 +13,7 @@
 |---|---:|
 | `src/kazbars/__init__.py` | 11 |
 | `src/kazbars/__main__.py` | 71 |
-| `src/kazbars/app.py` | 823 |
+| `src/kazbars/app.py` | 819 |
 | `src/kazbars/app_popups.py` | 491 |
 | `src/kazbars/boss_timer.py` | 399 |
 | `src/kazbars/buff_database.py` | 189 |
@@ -74,7 +74,7 @@
 | `src/kazbars/paths.py` | 46 |
 | `src/kazbars/prefs.py` | 223 |
 | `src/kazbars/profile_document.py` | 345 |
-| `src/kazbars/profile_io.py` | 440 |
+| `src/kazbars/profile_io.py` | 442 |
 | `src/kazbars/profile_share.py` | 174 |
 | `src/kazbars/profile_store.py` | 136 |
 | `src/kazbars/self_update.py` | 487 |
@@ -96,7 +96,7 @@
 | `src/kazbars/update_orchestrator.py` | 148 |
 | `src/kazbars/userdata.py` | 119 |
 | `src/kazbars/window_position.py` | 162 |
-| `src/kazbars/yaml_io.py` | 189 |
+| `src/kazbars/yaml_io.py` | 193 |
 | `tests/test_app_contract.py` | 104 |
 | `tests/test_app_icon.py` | 43 |
 | `tests/test_as2_class_names.py` | 77 |
@@ -146,12 +146,12 @@
 | `tests/test_overlay_rung.py` | 145 |
 | `tests/test_overlay_size.py` | 226 |
 | `tests/test_panel_ratios.py` | 162 |
-| `tests/test_panels_construct.py` | 1762 |
+| `tests/test_panels_construct.py` | 1776 |
 | `tests/test_prefs.py` | 76 |
 | `tests/test_prefs_migration.py` | 68 |
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |
 | `tests/test_profile_document.py` | 249 |
-| `tests/test_profile_io.py` | 331 |
+| `tests/test_profile_io.py` | 348 |
 | `tests/test_profile_share.py` | 234 |
 | `tests/test_profile_store.py` | 152 |
 | `tests/test_projection.py` | 89 |
@@ -169,4 +169,4 @@
 | `tests/test_update_check.py` | 83 |
 | `tests/test_update_orchestrator.py` | 226 |
 | `tests/test_userdata.py` | 73 |
-| `tests/test_yaml_io.py` | 144 |
+| `tests/test_yaml_io.py` | 149 |

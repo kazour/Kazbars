@@ -94,7 +94,9 @@ class KazBarsApp(ttkb.Window):
         super().__init__(themename="darkly", iconphoto=None)
         self.withdraw()
 
-        self.title(f"{APP_NAME} — Untitled")
+        # Just the app: there is one profile, and its name (kept in the
+        # document, used by exports and toasts) has nowhere to be changed.
+        self.title(APP_NAME)
         self.iconname(APP_NAME)
         try:
             # default= : every Toplevel (dialogs included) inherits it.
@@ -731,12 +733,6 @@ class KazBarsApp(ttkb.Window):
         """Deeps pushes its profile slice on every settings change."""
         if self.profile_store:
             self.profile_store.set_section('deeps', data)
-
-    def _update_title(self):
-        """Window title = app + active profile name (no dirty marker — the
-        profile autosaves)."""
-        name = self.profile_store.document['name'] if self.profile_store else "…"
-        self.title(f"{APP_NAME} — {name}")
 
     def _save_now(self):
         """Ctrl+S: mirror the grid cards into the store, flush, confirm."""

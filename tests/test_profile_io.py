@@ -287,7 +287,8 @@ def test_reset_puts_the_template_in_place_and_revert_undoes_it(app, root, monkey
     store = _open_store(app, _doc(app, "Home", A=1))
     monkeypatch.setattr(profile_io, "MessageDialog", type("D", (_Dialog,), {"result": "Reset"}))
     profile_io.reset_to_defaults(app)
-    assert store.document["name"] == "Default"
+    assert store.document["name"] == "Home", "the profile keeps its name"
+    assert store.document["modules"]["grids"]["grids"], "the starter grids"
     assert store.document["modules"]["overlay"]["size"] == size_for_height(1440)
     assert app.toasts[-1] == ("Reset to defaults", "info")
     store.revert_to_session_start()
@@ -323,6 +324,22 @@ def test_startup_adopts_the_hinted_library_profile(app, root):
     _library(root, a, b)
     profile_io.startup_profile(app, active_hint=a["id"])
     assert app.profile_store.document["id"] == a["id"]
+
+
+def test_a_stale_prefs_id_never_hides_the_hint(app, root):
+    a, b = _doc(app, "Raid"), _doc(app, "Solo")  # Solo is newest
+    _library(root, a, b)
+    (root / "prefs.json").write_text(json.dumps({"active_profile": "deadbeef"}), encoding="utf-8")
+    profile_io.startup_profile(app, active_hint=a["id"])
+    assert app.profile_store.document["id"] == a["id"]
+
+
+def test_the_prefs_id_wins_over_the_hint(app, root):
+    a, b = _doc(app, "Raid"), _doc(app, "Solo")
+    _library(root, a, b)
+    (root / "prefs.json").write_text(json.dumps({"active_profile": b["id"]}), encoding="utf-8")
+    profile_io.startup_profile(app, active_hint=a["id"])
+    assert app.profile_store.document["id"] == b["id"]
 
 
 def test_a_value_yaml_cannot_hold_is_a_failed_write_not_a_crash(app, root):

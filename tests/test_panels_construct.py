@@ -1760,3 +1760,17 @@ def test_a_cards_move_menu_ends_with_export_grid(app, monkeypatch):
     last = menu.index('end')
     assert menu.entrycget(last, 'label') == 'Export grid…'
     assert menu.type(last - 1) == 'separator'
+
+
+def test_the_title_bar_is_the_app_name(app):
+    from kazbars import profile_io
+    from kazbars.app import APP_NAME
+    assert app.title() == APP_NAME
+    doc = app.profile_store.document
+    old = doc['name']
+    doc['name'] = 'Imported Elsewhere'
+    try:
+        profile_io.apply_document(app)
+        assert app.title() == APP_NAME, "the profile's name never reaches the title"
+    finally:
+        doc['name'] = old

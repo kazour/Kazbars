@@ -12,6 +12,7 @@ data file by its extension. No Tk.
 
 import json
 import math
+import re
 from decimal import Decimal
 from pathlib import Path
 
@@ -22,6 +23,7 @@ _PLAIN_FIRST_BANNED = set('-?:,[]{}#&*!|>\'"%@`<=~+.')
 # list (libyaml does not), so `[a?b]` would not read back there.
 _FLOW_BANNED = set(',[]{}?')
 _ODD_SPACES = set('\u0085\u00a0\u2028\u2029\ufeff')
+_SURROGATES = re.compile('[\ud800-\udfff]')
 _RESERVED = {'null', 'true', 'false', 'yes', 'no', 'on', 'off', 'y', 'n'}
 _ESCAPES = {'"': '\\"', '\\': '\\\\', '\n': '\\n', '\r': '\\r', '\t': '\\t', '\0': '\\0'}
 
@@ -149,15 +151,17 @@ def _float(value):
 
 
 def _str(text):
+    # A lone surrogate can't be written or read back in any form (libyaml
+    # refuses even its escape): it becomes U+FFFD, the replacement character.
+    text = _SURROGATES.sub('\ufffd', text)
     return text if _plain_ok(text) else _quoted(text)
 
 
 def _is_control(ch):
-    """A character a YAML reader refuses raw: C0/C1 controls, lone
-    surrogates and the non-characters U+FFFE / U+FFFF — escaped instead."""
+    """A character a YAML reader refuses raw: C0/C1 controls and the
+    non-characters U+FFFE / U+FFFF — escaped instead."""
     code = ord(ch)
-    return (code < 0x20 or 0x7f <= code <= 0x9f or 0xd800 <= code <= 0xdfff
-            or code in (0xfffe, 0xffff))
+    return code < 0x20 or 0x7f <= code <= 0x9f or code in (0xfffe, 0xffff)
 
 
 def _plain_ok(text):

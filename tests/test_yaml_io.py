@@ -142,3 +142,8 @@ def test_loads_is_json_shaped(loader):
 def test_non_characters_are_escaped_and_read_back(loader):
     for text in ('a\ufffeb', '\uffff', 'x\ufffe'):
         assert loads(dumps({'k': text, text: [text]})) == {'k': text, text: [text]}
+
+
+def test_a_lone_surrogate_is_written_as_the_replacement_character(loader):
+    lone = 'a' + chr(0xd800) + 'b'
+    assert loads(dumps({'k': lone, lone: [lone]})) == {'k': 'a\ufffdb', 'a\ufffdb': ['a\ufffdb']}
