@@ -282,6 +282,12 @@ class GridsPanel(ttk.Frame):
         self.grids.extend(appended)
         self._mark_modified()
         self.refresh_panels()
+        if appended:
+            # The new cards land at the end of the tab: bring the first into view
+            # once the Grids view shows.
+            first = self.grid_panels[len(self.grids) - len(appended)]
+            self.after_idle(lambda: first.winfo_exists()
+                            and scroll_widget_into_view(self.grids_canvas, first))
         return appended, renames
 
     def tab_name(self):

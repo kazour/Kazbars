@@ -221,9 +221,11 @@ def _adopt_library(app, active_hint=None):
         active = None
     # The prefs id, then the hint, then the newest: a stale prefs id that names
     # none of the files never hides the hint.
-    by_id = {doc['id']: doc for _path, doc in entries}
+    by_id: dict = {}
+    for _path, doc in entries:  # sorted by path: the first file with an id wins
+        by_id.setdefault(doc['id'], doc)
     for wanted in (active, active_hint):
-        if wanted in by_id:
+        if isinstance(wanted, str) and wanted in by_id:
             return by_id[wanted]
     return max(entries, key=lambda e: file_mtime(e[0]))[1]
 

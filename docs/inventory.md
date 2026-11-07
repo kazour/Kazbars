@@ -59,7 +59,7 @@
 | `src/kazbars/grid_settings_dialog.py` | 532 |
 | `src/kazbars/grid_templates.py` | 81 |
 | `src/kazbars/grids_generator.py` | 781 |
-| `src/kazbars/grids_panel.py` | 964 |
+| `src/kazbars/grids_panel.py` | 970 |
 | `src/kazbars/inspect.py` | 79 |
 | `src/kazbars/inspect_catalog.py` | 618 |
 | `src/kazbars/inspect_panel.py` | 387 |
@@ -74,7 +74,7 @@
 | `src/kazbars/paths.py` | 46 |
 | `src/kazbars/prefs.py` | 223 |
 | `src/kazbars/profile_document.py` | 345 |
-| `src/kazbars/profile_io.py` | 442 |
+| `src/kazbars/profile_io.py` | 444 |
 | `src/kazbars/profile_share.py` | 174 |
 | `src/kazbars/profile_store.py` | 136 |
 | `src/kazbars/self_update.py` | 487 |
@@ -151,7 +151,7 @@
 | `tests/test_prefs_migration.py` | 68 |
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |
 | `tests/test_profile_document.py` | 249 |
-| `tests/test_profile_io.py` | 348 |
+| `tests/test_profile_io.py` | 356 |
 | `tests/test_profile_share.py` | 234 |
 | `tests/test_profile_store.py` | 152 |
 | `tests/test_projection.py` | 89 |

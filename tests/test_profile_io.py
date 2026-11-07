@@ -334,6 +334,14 @@ def test_a_stale_prefs_id_never_hides_the_hint(app, root):
     assert app.profile_store.document["id"] == a["id"]
 
 
+def test_a_junk_prefs_id_falls_back_to_the_hint(app, root):
+    a, b = _doc(app, "Raid"), _doc(app, "Solo")
+    _library(root, a, b)
+    (root / "prefs.json").write_text(json.dumps({"active_profile": {"not": "an id"}}), encoding="utf-8")
+    profile_io.startup_profile(app, active_hint=a["id"])
+    assert app.profile_store.document["id"] == a["id"]
+
+
 def test_the_prefs_id_wins_over_the_hint(app, root):
     a, b = _doc(app, "Raid"), _doc(app, "Solo")
     _library(root, a, b)
