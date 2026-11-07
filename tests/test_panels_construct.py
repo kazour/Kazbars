@@ -1205,16 +1205,16 @@ def test_a_band_card_redraws_when_its_row_cap_changes(app):
     assert card.grid_config['rowCap'] == 3
 
 
-def test_step_arrows_move_a_card_and_grey_at_the_ends(app):
-    from kazbars.ui_helpers import TK_COLORS
+def test_cards_carry_no_step_arrows_and_alt_arrows_still_reorder(app):
     gp = app.grids_panel
     _add_seam_grid(app, 'SeamStepA')
     _add_seam_grid(app, 'SeamStepB')
-    first, last = gp.grid_panels[0], gp.grid_panels[-1]
-    assert not first._step_labels[-1].live and first._step_labels[1].live
-    assert not last._step_labels[1].live
-    assert str(last._step_labels[1].cget('foreground')) == TK_COLORS['menu_disabled_fg']
-    last._on_step(last, -1)
+    last = gp.grid_panels[-1]
+    assert not hasattr(last, '_step_labels')
+    assert not any(str(w.cget('text')) in ('▲', '▼') for w in last.summary_label.master.winfo_children()
+                   if 'text' in w.keys())
+    visible = gp._visible()
+    gp._move_grid(len(visible) - 1, -1)  # Alt+↑ on the last card's handle
     ids = [g['id'] for g in app.profile_store.get_section('grids')['grids']]
     assert ids[-2:] == ['SeamStepB', 'SeamStepA']
 

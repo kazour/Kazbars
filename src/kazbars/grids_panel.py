@@ -866,7 +866,6 @@ class GridsPanel(ttk.Frame):
                 name_in_use=self._grid_name_in_use,
                 on_edit=self._mark_modified,
                 on_move=self.move_or_copy,
-                on_step=self._step_card,
                 find_card=self._card_for,
                 on_export=self.export_grid,
             )
@@ -893,14 +892,6 @@ class GridsPanel(ttk.Frame):
             if grid is config:
                 return panel
         return None
-
-    def _step_card(self, panel, delta):
-        """A card's ▲ / ▼: the same move as Alt+↑/↓ on its handle. Focus stays
-        on the pressed glyph, so Enter repeats the move."""
-        visible = self._visible()
-        n = visible.index(self.grid_panels.index(panel))
-        self._move_grid(n, delta)
-        panel.focus_step(delta)
 
     def _move_grid(self, index, delta):
         """Keyboard equivalent of dragging the ☰ handle. Clamps at both ends
@@ -939,7 +930,6 @@ class GridsPanel(ttk.Frame):
         visible = self._visible()
         for n, i in enumerate(visible):
             self._attach_panel(self.grid_panels[i], n)
-            self.grid_panels[i].set_step_state(n > 0, n < len(visible) - 1)
         if self.grids and not visible:
             tab = by_id(self._tab_var.get())
             self._tab_empty_lbl.configure(

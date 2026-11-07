@@ -5,7 +5,7 @@
 
 A card is a row, never expanded: the title line (name, type, mode, Applied
 by me; the settings cog, Move… (move, copy or export the grid), Enabled,
-▲ ▼, ×), the grid drawn to scale
+×), the grid drawn to scale
 (`GridPreview`) and the names line under it. The preview is where buffs are
 chosen: a dynamic grid's opens the Tracked Buffs picker, a static grid's cell
 opens it on that slot (walking the grid's slots from there), and a
@@ -113,7 +113,7 @@ class GridEditorPanel(ttk.Frame):
 
     def __init__(self, parent, database, grid_config, on_delete=None,
                  get_base_size=None, on_whitelist_changed=None,
-                 name_in_use=None, on_edit=None, on_move=None, on_step=None, find_card=None,
+                 name_in_use=None, on_edit=None, on_move=None, find_card=None,
                  on_export=None):
         super().__init__(parent)
         self.database = database
@@ -129,8 +129,6 @@ class GridEditorPanel(ttk.Frame):
         self._on_move = on_move
         # on_export(card): the Move… menu's Export grid… — the grid to a grids file.
         self._on_export = on_export
-        # on_step(card, delta): ▲ / ▼, one place up or down the listed cards.
-        self._on_step = on_step
         # find_card(config): the card showing that config now, None once it left
         # the list — a rebuild within the undo toast's life replaces this card.
         self._find_card = find_card
@@ -204,7 +202,7 @@ class GridEditorPanel(ttk.Frame):
     # ------------------------------------------------------------------
     def _build_title_line(self):
         """Name, type badge, mode and Applied by me on the left; on the right,
-        left to right: the settings cog, Move…, Enabled, ▲ ▼ and ×."""
+        left to right: the settings cog, Move…, Enabled and ×."""
         header = ttk.Frame(self._row)
         header.pack(fill='x')
         self._title_label = ttk.Label(header, font=FONT_SECTION, foreground=THEME_COLORS['heading'])
@@ -227,16 +225,12 @@ class GridEditorPanel(ttk.Frame):
                                          lambda: self.delete_grid(), THEME_COLORS['danger_text'],
                                          padding=(PAD_XS, PAD_MICRO))
         bind_label_press_effect(delete_label, THEME_COLORS['danger_text'])
-        self._step_labels = {}
-        for glyph, delta, tip in (("▼", 1, "Move this grid down the list"),
-                                  ("▲", -1, "Move this grid up the list")):
-            self._step_labels[delta] = self._make_step_label(header, glyph, delta, tip)
         enabled_cb = ttk.Checkbutton(header, text="Enabled",
                                      variable=self.enabled_var,
                                      command=self._on_enabled_toggled,
                                      bootstyle="success-round-toggle")  # type: ignore[call-arg]
         enabled_cb.pack(side='right', padx=(0, PAD_XS))
-        in_view = [enabled_cb, self._step_labels[-1], self._step_labels[1], delete_label]
+        in_view = [enabled_cb, delete_label]
         if self._on_move is not None:
             move_label = self._glyph_label(header, "Move…", FONT_SMALL,
                                            "Move this grid to another class tab, copy it there, "
@@ -269,43 +263,6 @@ class GridEditorPanel(ttk.Frame):
         bind_label_hover_colors(lbl, THEME_COLORS['muted'], hover_color)
         add_tooltip(lbl, tip)
         return lbl
-
-    def _make_step_label(self, header, glyph, delta, tip):
-        """▲ or ▼: a glyph label like ×, live unless the card sits at that end
-        of the list (`set_step_state`)."""
-        lbl = ttk.Label(header, text=glyph, font=FONT_SMALL, foreground=THEME_COLORS['muted'],
-                        cursor='hand2', takefocus=True, padding=(PAD_MICRO, PAD_MICRO))
-        lbl.pack(side='right', padx=(PAD_XS, 0))
-        lbl.live = True  # type: ignore[attr-defined]
-
-        def paint(hot):
-            if lbl.live:  # type: ignore[attr-defined]
-                lbl.configure(foreground=THEME_COLORS['heading'] if hot else THEME_COLORS['muted'])
-
-        def fire(_e):
-            if lbl.live and self._on_step is not None:  # type: ignore[attr-defined]
-                self._on_step(self, delta)
-
-        for seq in ('<Button-1>', '<Return>', '<space>'):
-            lbl.bind(seq, fire)
-        for seq, hot in (('<Enter>', True), ('<FocusIn>', True), ('<Leave>', False), ('<FocusOut>', False)):
-            lbl.bind(seq, lambda e, h=hot: paint(h), add='+')
-        add_tooltip(lbl, tip)
-        return lbl
-
-    def set_step_state(self, can_up, can_down):
-        """Grey ▲ at the top of the list and ▼ at the bottom."""
-        for delta, live in ((-1, can_up), (1, can_down)):
-            lbl = self._step_labels[delta]
-            lbl.live = live  # type: ignore[attr-defined]
-            lbl.configure(foreground=THEME_COLORS['muted'] if live else TK_COLORS['menu_disabled_fg'],
-                          cursor='hand2' if live else '', takefocus=live)
-
-    def focus_step(self, delta):
-        """Keyboard focus to ▲ (-1) or ▼ (1) after a move by it, so Enter
-        repeats; the ☰ handle once the move reached the end and greyed it."""
-        lbl = self._step_labels[delta]
-        (lbl if lbl.live else self.drag_handle).focus_set()  # type: ignore[attr-defined]
 
     def _show_move_menu(self, anchor):
         """Move to / Copy to, each listing All classes and the twelve classes;
