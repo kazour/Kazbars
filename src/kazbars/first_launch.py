@@ -9,9 +9,10 @@ from tkinter import filedialog, ttk
 
 from ttkbootstrap.dialogs import Messagebox
 
-from . import game_folder, update_orchestrator
+from . import game_folder, profile_io, update_orchestrator
 from .app_popups import show_welcome_popup
-from .grid_model import apply_seed_sizes, parse_resolution
+from .grid_model import parse_resolution
+from .overlay import size_for_height
 from .ui_headers import create_dialog_header
 from .ui_helpers import (
     BTN_SMALL,
@@ -28,7 +29,19 @@ from .ui_helpers import (
     TK_COLORS,
 )
 from .ui_widgets import bind_label_press_effect
-from .window_position import restore_window_position
+from .window_position import fit_window_height, restore_window_position
+
+FIRST_LAUNCH_SIZE = (520, 480)
+
+COMMON_INSTALL_PATHS = [
+    r"C:\Funcom\Age of Conan",
+    r"D:\Games\Age of Conan",
+    r"C:\Program Files (x86)\Funcom\Age of Conan",
+    r"C:\Program Files (x86)\Steam\steamapps\common\Age of Conan - Unchained",
+    r"C:\Steam\steamapps\common\Age of Conan - Unchained",
+    r"D:\Steam\steamapps\common\Age of Conan - Unchained",
+    r"D:\SteamLibrary\steamapps\common\Age of Conan - Unchained",
+]
 
 
 def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
@@ -49,11 +62,12 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
     dialog.transient(parent)
     dialog.grab_set()
 
-    restore_window_position(dialog, 'first_launch', 520, 480, parent, resizable=False)
+    restore_window_position(dialog, 'first_launch', *FIRST_LAUNCH_SIZE, parent,
+                            resizable=False)
 
     # Header
     create_dialog_header(dialog, f"Welcome to {app_name}",
-                         MODULE_COLORS['grids'], width=520)
+                         MODULE_COLORS['grids'], width=FIRST_LAUNCH_SIZE[0])
 
     content = ttk.Frame(dialog)
     content.pack(fill='both', expand=True, padx=PAD_TAB * 2, pady=(PAD_TAB, PAD_LF))
@@ -89,29 +103,24 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
 
     def _validate_path_hint():
         p = path_var.get().strip()
-        if p and not (Path(p) / "Data" / "Gui" / "Default").exists():
+        if p and not game_folder.is_game_folder(p):
             warn_label.configure(
                 text="This doesn't look like an AoC install — missing Data/Gui/Default/",
                 foreground=THEME_COLORS['warning'])
         else:
             warn_label.configure(text="")
 
-    # Common locations (only show paths that exist)
-    common_paths = [
-        r"C:\Funcom\Age of Conan",
-        r"D:\Games\Age of Conan",
-        r"C:\Program Files (x86)\Funcom\Age of Conan",
-        r"C:\Program Files (x86)\Steam\steamapps\common\Age of Conan - Unchained",
-        r"C:\Steam\steamapps\common\Age of Conan - Unchained",
-        r"D:\Steam\steamapps\common\Age of Conan - Unchained",
-        r"D:\SteamLibrary\steamapps\common\Age of Conan - Unchained",
-    ]
-    existing_paths = [cp for cp in common_paths if Path(cp).exists()]
+    # Common locations (only show paths that exist). Its own frame, not packed
+    # straight on content, so it can hide once the entry already holds one of
+    # these paths — repeating a path the user just typed or clicked is noise,
+    # not help.
+    existing_paths = [cp for cp in COMMON_INSTALL_PATHS if Path(cp).exists()]
+    found_frame = ttk.Frame(content)
     if existing_paths:
-        ttk.Label(content, text="Found on this PC:", font=FONT_SMALL,
+        ttk.Label(found_frame, text="Found on this PC:", font=FONT_SMALL,
                   foreground=THEME_COLORS['muted']).pack(anchor='w', pady=(PAD_XS, PAD_TINY))
         for cp in existing_paths:
-            lbl = ttk.Label(content, text=f"  {cp}", font=FONT_SMALL,
+            lbl = ttk.Label(found_frame, text=f"  {cp}", font=FONT_SMALL,
                             foreground=THEME_COLORS['body'], cursor='hand2',
                             takefocus=True)
             lbl.pack(anchor='w')
@@ -123,6 +132,7 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
             lbl.bind('<FocusOut>', lambda e, l=lbl: l.config(
                 foreground=THEME_COLORS['body']))
             bind_label_press_effect(lbl)
+        found_frame.pack(fill='x')
 
     # Separator
     sep = ttk.Separator(content, orient='horizontal')
@@ -145,9 +155,9 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
     res_var = tk.StringVar(value=detected)
 
     # --- Shared actions ---
-    def _set_game_if_provided():
+    def _set_game_if_provided(unless=None):
         p = path_var.get().strip()
-        if p:
+        if p and p != unless:
             on_game_set(str(Path(p).resolve()))
         if on_resolution_set:
             on_resolution_set(res_var.get())
@@ -176,8 +186,9 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
 
     def skip():
         # Keep a typed game path even on "Set up later" / X — losing it because
-        # the user closed the dialog is worse than skipping the re-arm.
-        _set_game_if_provided()
+        # the user closed the dialog is worse than skipping the re-arm. The
+        # path filled in for them is not kept: they never confirmed it.
+        _set_game_if_provided(unless=auto_path)
         _close()
 
     # --- Two equal-weight option cards ---
@@ -249,23 +260,53 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
                            state='disabled')
     btn_empty.pack(anchor='w')
 
+    # Says why both buttons are off. Always packed (empty when a path is set) so
+    # the cards don't shift as the user types.
+    gate_label = ttk.Label(content, text="", font=FONT_SMALL,
+                           foreground=THEME_COLORS['muted'])
+    gate_label.pack(anchor='w', pady=(0, PAD_TINY))
+
     # Enable/disable action buttons based on game path
     def _on_path_changed(*_):
-        has_path = bool(path_var.get().strip())
+        p = path_var.get().strip()
+        has_path = bool(p)
         state = 'normal' if has_path else 'disabled'
         if btn_defaults:
             btn_defaults.configure(state=state)
         btn_empty.configure(state=state)
+        gate_label.configure(
+            text="" if has_path else "Set your game folder above to start.")
         _validate_path_hint()
+        # The entry already shows one of these paths verbatim — repeating it
+        # in the list below is noise, not help. Clearing or editing it away
+        # from every listed path brings the list back.
+        if existing_paths:
+            if p in existing_paths:
+                found_frame.pack_forget()
+            else:
+                found_frame.pack(fill='x', before=sep)
 
     path_var.trace_add('write', _on_path_changed)
+    _on_path_changed()
+
+    # One unambiguous install → fill it in and arm the buttons, so Enter starts
+    # the app. Two candidates is a choice only the user can make; zero leaves
+    # the entry as the one thing to do. Set after the trace so it wires through
+    # the same enable path as typing.
+    _detected = [cp for cp in existing_paths if game_folder.is_game_folder(cp)]
+    auto_path = _detected[0] if len(_detected) == 1 else None
+    if auto_path:
+        path_var.set(auto_path)
+        (btn_defaults or btn_empty).focus_set()
+    else:
+        path_entry.focus_set()
 
     # Skip at the bottom
     ttk.Separator(content, orient='horizontal').pack(fill='x', side='bottom')
     skip_frame = ttk.Frame(content)
     skip_frame.pack(fill='x', side='bottom', pady=(PAD_SMALL, 0))
     skip_lbl = ttk.Label(skip_frame, text="Set up later",
-                         font=FONT_SMALL, foreground=THEME_COLORS['muted'],
+                         font=FONT_BODY, foreground=THEME_COLORS['accent'],
                          cursor='hand2', takefocus=True)
     skip_lbl.pack(side='right')
     skip_lbl.bind('<Button-1>', lambda e: skip())
@@ -274,16 +315,23 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
     skip_lbl.bind('<Enter>', lambda e: skip_lbl.config(
         foreground=THEME_COLORS['heading']))
     skip_lbl.bind('<Leave>', lambda e: skip_lbl.config(
-        foreground=THEME_COLORS['muted']))
+        foreground=THEME_COLORS['accent']))
     bind_label_press_effect(skip_lbl)
 
     dialog.protocol("WM_DELETE_WINDOW", skip)
+    dialog.bind('<Escape>', lambda e: skip())
+
+    # "Found on this PC" is as long as the PC makes it; grow rather than clip
+    # the bottom-packed "Set up later" row. Never shrinks below the design size,
+    # and re-clamps — restore_window_position only placed the design height, so
+    # growing without this can push that same row off the bottom of the screen.
+    fit_window_height(dialog, *FIRST_LAUNCH_SIZE)
 
 
 def run_first_launch(app, app_name):
     """Coordinate first-launch flow: show the dialog, then handle the chosen
-    path. Startup already seeded the library ('My Setup' from the template —
-    the never-empty invariant), so "Use Defaults" re-anchors that seed to the
+    path. Startup already seeded the profile ('My Setup' from the template),
+    so "Use Defaults" re-anchors that seed to the
     chosen resolution, and "Start Empty" empties it. Owns the callbacks the
     dialog dispatches to."""
     welcome_data = {}
@@ -299,25 +347,23 @@ def run_first_launch(app, app_name):
         game_folder.save_game_path(app)
         game_folder.refresh_game_path_label(app)
 
-    def _restamp_seed_sizes(resolution_str):
-        """Re-stamp the seed's icon/timer/stack sizes for the resolution the
-        user just picked. Startup seeded the library before this dialog opened,
-        so those px sizes came from the pre-dialog default — positions need no
-        rescale (fractions), sizes do. Only ever the pristine seed."""
+    def _seed_overlay_size(resolution_str):
+        """Set the seed's overlay size for the resolution the user just
+        picked. Startup seeded the profile before this dialog opened, so its
+        size came from the pre-dialog default — positions need nothing
+        (fractions), the base size every in-game size derives from does. Only
+        ever the pristine seed."""
         parsed = parse_resolution(resolution_str)
-        grids = app.grids_panel.grids
-        if not parsed or not grids:
-            return grids
-        apply_seed_sizes(grids, parsed[1])
-        app.grids_panel.load_profile_data(grids)
-        app._on_grids_edited()
-        return app.grids_panel.grids
+        if parsed:
+            app.profile_store.update_section('overlay', {'size': size_for_height(parsed[1])})
+            app.grids_panel.load_overlay()
 
     def on_load_default(resolution_str):
-        # Positions are fractions and fit any resolution as-is; sizes are px,
-        # so the seed's icon/font sizes get re-stamped for the chosen one.
+        # Positions are fractions and fit any resolution as-is; the overlay
+        # size is set for the chosen one.
         _save_resolution(resolution_str)
-        grids = _restamp_seed_sizes(resolution_str)
+        _seed_overlay_size(resolution_str)
+        grids = app.grids_panel.grids
         welcome_data['grid_count'] = len(grids)
         welcome_data['enabled_count'] = sum(1 for g in grids if g.get('enabled', True))
         welcome_data['resolution'] = None
@@ -347,5 +393,5 @@ def run_first_launch(app, app_name):
 
     show_first_launch_dialog(
         app, app_name, on_game_set, on_load_default, on_resolution_set,
-        app.library.has_template(), on_dialog_closed, on_start_empty,
+        profile_io.template_doc(app) is not None, on_dialog_closed, on_start_empty,
     )

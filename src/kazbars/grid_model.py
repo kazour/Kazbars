@@ -4,7 +4,10 @@ Constants, validation specs, and default grid configuration.
 """
 
 import copy
+import math
 
+from .classes import id_of as class_id_of
+from .overlay_size import SCALE_DEFAULT, SCALE_MAX, SCALE_MIN
 from .profile_document import LANE_BUILD
 from .profile_document import SectionSpec as ProfileSectionSpec
 from .settings_core import Field, Schema
@@ -12,124 +15,223 @@ from .settings_core import Field, Schema
 # ============================================================================
 # CONSTANTS
 # ============================================================================
-MAX_TOTAL_SLOTS = 64
+# A grid's own slot limit (rows x cols): the card's cell preview and the slot
+# picker stay readable. There is no total across grids — in game a slot that
+# shows nothing costs nothing (slots are made lazily).
+MAX_GRID_SLOTS = 64
 MAX_ROWS = 64
 MAX_COLS = 64
+# An overhead grid is drawn once per character it floats over, so its own
+# shape is capped well below a screen grid's: 16 slots, at most 4 rows of 8.
+PLATE_MAX_ROWS = 4
+PLATE_MAX_COLS = 8
+PLATE_MAX_SLOTS = 16
+PLATE_OFFSET_DEFAULT = 75
+PLATE_DISTANCE_DEFAULT = 40
+# A band (an overhead dynamic grid) has no shape of its own: it grows sideways
+# from the head's centre, `rowCap` icons to a row (odd, so one icon and a full
+# row both centre) before the next row starts above, up to `maxSlots`.
+BAND_ROW_CAPS = (3, 5, 7)
+BAND_ROW_CAP_DEFAULT = 5
+BAND_SLOTS_DEFAULT = 10
 
 DEFAULT_GAME_RESOLUTION = (1920, 1080)
 
-# Declarative validation specs: key → (default, min, max)
+# Declarative validation specs: key → (default, min, max). A grid has no pixel
+# or point size of its own: `scale` is a percent of the profile's overlay size
+# and the generator derives icon, timer and stack sizes from it
+# (overlay_size.grid_metrics).
 CLAMP_SPECS = {
     'rows': (1, 1, MAX_ROWS), 'cols': (10, 1, MAX_COLS),
-    'iconSize': (56, 8, 128), 'gap': (-1, -5, 10),
-    'timerFontSize': (18, 8, 48), 'timerFlashThreshold': (6, 0, 11),
+    'scale': (SCALE_DEFAULT, SCALE_MIN, SCALE_MAX), 'gap': (-1, -5, 10),
+    'timerFlashThreshold': (6, 0, 11),
     'timerYOffset': (-3, -10, 10),
-    'stackFontSize': (16, 8, 24),
+}
+# The overhead keys, the same shape: height (`plateOffset`, px of room for the
+# nameplate) and range (`maxDistance`, m).
+PLATE_SPECS = {
+    'plateOffset': (PLATE_OFFSET_DEFAULT, 0, 400),
+    'maxDistance': (PLATE_DISTANCE_DEFAULT, 5, 100),
 }
 # Fraction position specs: key → default. Positions are stored as fractions of
 # the game resolution (full floats, clamped to [0.0, 1.0]); pixels exist only
 # at display/emit via project_px/unproject_px, so a document is never rewritten
-# by a resolution change. Sizes stay pixels — icon art has a native size.
+# by a resolution change.
 FRACTION_SPECS = {
     'fx': 100 / 1920,
     'fy': 400 / 1080,
 }
-# Seed sizes per game-resolution tier: (max_height, {key: px}); the last entry
-# is the open-ended top tier. Positions are fractions and need no rescale, but
-# sizes stay px (icon art has a native size), so a template authored at 1080p
-# would seed pin-sized icons on a 1440p or 4K screen. These are the shipped
-# starting points, stamped when a template is instantiated and when first
-# launch re-anchors the seed to the chosen resolution. A later resolution
-# change carries a tuned document across tiers by the tiers' ratio instead
-# (rescale_seed_sizes). The steps are deliberate, not a linear scale of the
-# pixel count: 4K gets 1.33× the 1080p icon, not 2×.
-SEED_SIZE_TIERS = (
-    (1080, {'iconSize': 48, 'timerFontSize': 17, 'stackFontSize': 16}),
-    (1440, {'iconSize': 56, 'timerFontSize': 20, 'stackFontSize': 19}),
-    (None, {'iconSize': 64, 'timerFontSize': 23, 'stackFontSize': 21}),
-)
+# Retired per-grid keys: popped on load so a hand-added one can't zombie along
+# (schema-3 documents never carry them).
+_RETIRED_KEYS = ('iconSize', 'timerFontSize', 'stackFontSize', 'showTimers', 'x', 'y')
+
+# `timerStyle`: `bar` (a line inside the icon's bottom edge that shrinks as time
+# runs out), `digits` (seconds left), `off`.
+TIMER_STYLES = ('bar', 'digits', 'off')
 
 # key → (default, valid_values)
 ENUM_SPECS = {
-    'type': ('player', ('player', 'target')),
+    'type': ('player', ('player', 'target', 'friendly', 'hostile')),
     'slotMode': ('dynamic', ('dynamic', 'static')),
     'fillDirection': ('LR', ('LR', 'RL', 'TB', 'BT', 'BL-TR', 'BR-TL', 'TL-BR', 'TR-BL')),
     'sortOrder': ('longest', ('longest', 'shortest', 'application')),
     'layout': ('buffFirst', ('buffFirst', 'debuffFirst', 'mixed')),
+    'timerStyle': ('digits', TIMER_STYLES),
 }
+
+
+# ============================================================================
+# OVERHEAD GRIDS AND BANDS
+# ============================================================================
+def is_plate(grid_type):
+    """`friendly` / `hostile`: an overhead grid, drawn over each known character
+    of that relation instead of at a screen position."""
+    return grid_type in ('friendly', 'hostile')
+
+
+def is_band(grid):
+    """An overhead dynamic grid: a band, centred over the head."""
+    return is_plate(grid.get('type')) and grid.get('slotMode') == 'dynamic'
+
+
+def snap_row_cap(v):
+    """The nearest of BAND_ROW_CAPS, a tie going up (4 reads 5, 6 reads 7)."""
+    return 3 if v <= 3 else 5 if v <= 5 else 7
+
+
+def max_shape(grid_type):
+    """The largest (rows, cols) a grid of `grid_type` may have."""
+    return (PLATE_MAX_ROWS, PLATE_MAX_COLS) if is_plate(grid_type) else (MAX_ROWS, MAX_COLS)
+
+
+def max_slots(grid_type):
+    """The most slots a grid of `grid_type` may have: 64 on screen, 16 overhead."""
+    return PLATE_MAX_SLOTS if is_plate(grid_type) else MAX_GRID_SLOTS
+
+
+def slot_count(grid):
+    """The slots a grid can show: a band's `maxSlots`, else rows x cols."""
+    return grid['maxSlots'] if is_band(grid) else grid['rows'] * grid['cols']
+
+
+def valid_fills(rows, cols):
+    """The fill directions a box of this shape offers, and the one it falls
+    back to when its own stops fitting: a row fills sideways, a column up or
+    down, anything else from a corner."""
+    if rows == 1:
+        return ('LR', 'RL'), 'LR'
+    if cols == 1:
+        return ('TB', 'BT'), 'BT'
+    return ('TL-BR', 'TR-BL', 'BL-TR', 'BR-TL'), 'BL-TR'
+
+
+def snap_fill(rows, cols, fill):
+    """A box's fill as its renderers draw it: one the shape offers is kept, an
+    unfit one becomes the order `grid_preview.slot_pos` and the AS2 `place()`
+    already read it as — a row left to right, a column top down, anything else
+    from the top-left corner."""
+    if fill in valid_fills(rows, cols)[0]:
+        return fill
+    return 'LR' if rows == 1 else 'TB' if cols == 1 else 'TL-BR'
+
+
+def settle_box(rows, cols, fill, grid_type, dynamic, give='cols'):
+    """A box grid's (rows, cols, fill) after its shape rules: each side inside
+    its max, the `give` side ('rows' or 'cols', the one just edited) giving
+    way to the slot limit, a dynamic grid never
+    1x1 (it becomes 1x2), and a fill that no longer fits the shape falls back
+    to the shape's default. The settings dialog's draft and its Apply both
+    run it, so the preview shows what Apply stores."""
+    max_rows, max_cols = max_shape(grid_type)
+    rows, cols = max(1, min(rows, max_rows)), max(1, min(cols, max_cols))
+    limit = max_slots(grid_type)
+    if rows * cols > limit:
+        if give == 'rows':
+            rows = max(1, limit // cols)
+        else:
+            cols = max(1, limit // rows)
+    if dynamic and rows == 1 and cols == 1:
+        cols = 2
+    codes, default = valid_fills(rows, cols)
+    return rows, cols, fill if fill in codes else default
+
+
+def ref_list(value):
+    """A whitelist or slot-assignment value as a list of buff refs: a bare
+    scalar (an imported or hand-edited profile can carry one known id instead
+    of a list) reads as one, nothing as none, and an empty entry is no ref."""
+    if isinstance(value, list):
+        return [v for v in value if v]
+    return [value] if value else []
+
+
+def band_fields(row_cap, slots):
+    """A band's keys from its row cap and slot count: the two, its derived
+    shape (`rowCap` to a row, rows as needed) and its centred fill."""
+    return {'rowCap': row_cap, 'maxSlots': slots,
+            'rows': math.ceil(slots / row_cap), 'cols': row_cap, 'fillDirection': 'C'}
+
+
+def set_class(grid, class_id):
+    """Put the grid on class `class_id` (classes.CLASSES); None or 0 — every
+    class (All) — drops the key, so a classless grid never carries one."""
+    if class_id:
+        grid['class'] = class_id
+    else:
+        grid.pop('class', None)
 
 
 # ============================================================================
 # DEFAULT GRID CONFIGURATION
 # ============================================================================
+def _type_defaults(grid_type):
+    """The defaults that follow the type: an overhead grid's timers are a
+    bar; a target's or a hostile's debuffs come first."""
+    return {'timerStyle': 'bar' if is_plate(grid_type) else 'digits',
+            'layout': 'debuffFirst' if grid_type in ('target', 'hostile') else 'buffFirst'}
+
+
 def create_default_grid(grid_type="player", rows=1, cols=10, mode="dynamic", grid_id=None):
-    """Return a grid configuration dictionary with sensible defaults."""
-    if rows == 1 and cols == 1:
+    """Return a grid configuration dictionary with sensible defaults. An
+    overhead dynamic grid is a band: its row cap from `cols` (snapped to 3, 5
+    or 7), its max slots `rows x cols`; a screen grid's 1x1 is static."""
+    plate = is_plate(grid_type)
+    if rows == 1 and cols == 1 and not plate:
         mode = "static"
 
-    if rows == 1:
-        fill_dir = "LR"
-    elif cols == 1:
-        fill_dir = "BT"
-    else:
-        fill_dir = "BL-TR"
+    fill_dir = valid_fills(rows, cols)[1]
+    by_type = _type_defaults(grid_type)
 
-    return {
+    grid = {
         'id': grid_id or f"{grid_type.title()}Grid 1",
         'enabled': True,
         'type': grid_type,
         'rows': rows,
         'cols': cols,
-        'iconSize': 56,
+        'scale': SCALE_DEFAULT,
         'gap': -1,
         'fx': (100 if grid_type == "player" else 300) / 1920,
         'fy': 400 / 1080,
         'slotMode': mode,
-        'showTimers': True,
-        'timerFontSize': 18,
+        'timerStyle': by_type['timerStyle'],
         'timerFlashThreshold': 6,
         'timerYOffset': -3,
-        'stackFontSize': 16,
         'enableFlashing': True,
         'fillDirection': fill_dir,
         'sortOrder': 'longest',
-        'layout': 'buffFirst' if grid_type == "player" else 'debuffFirst',
+        'layout': by_type['layout'],
         'whitelist': [],
         'slotAssignments': {}
     }
-
-
-def seed_sizes_for_height(height):
-    """The shipped icon/timer/stack sizes for a game-resolution height."""
-    for limit, sizes in SEED_SIZE_TIERS:
-        if limit is None or height <= limit:
-            return dict(sizes)
-    return dict(SEED_SIZE_TIERS[-1][1])
-
-
-def apply_seed_sizes(grids, height):
-    """Stamp the height's tier sizes onto every grid, in place. For freshly
-    instantiated templates only — it overwrites whatever the file carried."""
-    sizes = seed_sizes_for_height(height)
-    for grid in grids:
-        grid.update(sizes)
-    return grids
-
-
-def rescale_seed_sizes(grids, old_height, new_height):
-    """Carry every grid's icon/timer/stack size from one resolution tier to
-    another by the tiers' ratio, clamped to CLAMP_SPECS — a grid still on the
-    old seed lands exactly on the new one, a tuned grid keeps its tuning."""
-    old = seed_sizes_for_height(old_height)
-    new = seed_sizes_for_height(new_height)
-    if old == new:
-        return grids
-    for grid in grids:
-        for key, seed in new.items():
-            _, lo, hi = CLAMP_SPECS[key]
-            scaled = round(grid.get(key, old[key]) * seed / old[key])
-            grid[key] = max(lo, min(hi, scaled))
-    return grids
+    if plate:
+        grid.update({key: default for key, (default, _, _) in PLATE_SPECS.items()})
+        if mode == 'dynamic':
+            cap = snap_row_cap(cols)
+            slots = max(1, min(rows * cols, PLATE_MAX_SLOTS))
+            grid.update(band_fields(cap, slots))
+    if grid_type == 'friendly':
+        grid['showSelf'] = True
+    return grid
 
 
 def default_grid_name(grid_type, existing_ids):
@@ -144,25 +246,19 @@ def default_grid_name(grid_type, existing_ids):
 def validate_grid(grid):
     """Validate and clamp a grid config on load. Returns sanitized grid."""
     defaults = create_default_grid()
+    # Type-dependent defaults, as a new grid of the type gets them.
+    defaults.update(_type_defaults(grid.get('type')))
 
     # Ensure required keys exist
     for key, val in defaults.items():
         if key not in grid:
             grid[key] = val
 
-    # Clamp numeric ranges. Profiles are hand-editable JSON, so a junk value
-    # (null, "abc", 1e999 — json parses that to inf, and int(inf) raises
-    # OverflowError) falls back to the default instead of crashing the load.
     for key, (default, lo, hi) in CLAMP_SPECS.items():
-        try:
-            value = int(grid.get(key, default))
-        except (TypeError, ValueError, OverflowError):
-            value = default
-        grid[key] = max(lo, min(value, hi))
+        grid[key] = _clamp_int(grid, key, default, lo, hi)
 
     # Fraction positions: full-float clamp to the unit range (NaN → default;
-    # inf lands on the clamp bound). Legacy pixel keys are popped — schema-2
-    # documents never carry them, and a hand-added one must not zombie along.
+    # inf lands on the clamp bound).
     for key, frac_default in FRACTION_SPECS.items():
         try:
             frac = float(grid.get(key, frac_default))
@@ -171,31 +267,95 @@ def validate_grid(grid):
         if frac != frac:
             frac = frac_default
         grid[key] = max(0.0, min(frac, 1.0))
-    grid.pop('x', None)
-    grid.pop('y', None)
+    for key in _RETIRED_KEYS:
+        grid.pop(key, None)
 
     # Validate enums
     for key, (enum_default, valid) in ENUM_SPECS.items():
         if grid.get(key) not in valid:
             grid[key] = enum_default
 
+    _validate_overhead(grid)
+    if not is_band(grid):
+        grid['fillDirection'] = snap_fill(grid['rows'], grid['cols'], grid['fillDirection'])
+
     # Validate booleans
-    for bool_key in ('enabled', 'showTimers', 'enableFlashing'):
+    for bool_key in ('enabled', 'enableFlashing'):
         if not isinstance(grid.get(bool_key), bool):
             grid[bool_key] = defaults[bool_key]
+    # `selfCastOnly`: show an effect only while you are its caster. Written only
+    # when true, so a grid that never set it reads and saves unchanged.
+    if grid.get('selfCastOnly') is not True:
+        grid.pop('selfCastOnly', None)
+    # `class`: the class this grid is built for in game (classes.CLASSES);
+    # absent is every class (All). Written only when set.
+    set_class(grid, class_id_of(grid.get('class')))
 
-    # Validate grid name/id
-    grid_id = str(grid.get('id', '')).strip()
-    if not grid_id:
-        grid['id'] = defaults['id']
+    # Validate grid name/id: always text (YAML reads a bare `id: 300` as a number)
+    grid_id = grid.get('id')
+    grid_id = '' if grid_id is None else str(grid_id)
+    grid['id'] = grid_id if grid_id.strip() else defaults['id']
 
     # Ensure lists/dicts
     if not isinstance(grid.get('whitelist'), list):
         grid['whitelist'] = []
-    if not isinstance(grid.get('slotAssignments'), dict):
-        grid['slotAssignments'] = {}
+    # Slot keys as the editor reads them: '0', '1', … (YAML may read a bare 0
+    # as a number); a key that names no slot is dropped.
+    raw = grid.get('slotAssignments')
+    slots: dict[str, object] = {}
+    for key, value in (raw.items() if isinstance(raw, dict) else ()):
+        try:
+            n = -1 if isinstance(key, bool) else int(key)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if n >= 0:
+            slots.setdefault(str(n), value)
+    grid['slotAssignments'] = slots
 
     return grid
+
+
+def _clamp_int(grid, key, default, lo, hi):
+    """`grid[key]` as an int inside [lo, hi]. Profiles are hand-editable, so
+    a junk value (null, "abc", 1e999 — YAML reads that as inf, and int(inf)
+    raises OverflowError) reads as the default instead of crashing the load."""
+    try:
+        value = int(grid.get(key, default))
+    except (TypeError, ValueError, OverflowError):
+        value = default
+    return max(lo, min(value, hi))
+
+
+def _validate_overhead(grid):
+    """The overhead keys, where they apply and nowhere else: an overhead box's
+    shape through `settle_box` (inside 4 x 8, its columns giving way to its 16
+    slots; its fill then snapped as a screen grid's), an overhead grid's height
+    (`plateOffset`, px of room for the nameplate) and range (`maxDistance`, m);
+    a band's `rowCap` and `maxSlots` and the shape and centred fill derived from
+    them; a friendly grid's `showSelf`."""
+    gtype = grid['type']
+    if is_plate(gtype):
+        for key, spec in PLATE_SPECS.items():
+            grid[key] = _clamp_int(grid, key, *spec)
+        if is_band(grid):
+            # A band saved without its keys reads them off its shape, clamped first.
+            grid['rows'] = min(grid['rows'], PLATE_MAX_ROWS)
+            grid['cols'] = min(grid['cols'], PLATE_MAX_COLS)
+            cap = snap_row_cap(_clamp_int(grid, 'rowCap', grid['cols'], 1, BAND_ROW_CAPS[-1]))
+            slots = _clamp_int(grid, 'maxSlots', grid['rows'] * grid['cols'], 1, PLATE_MAX_SLOTS)
+            grid.update(band_fields(cap, slots))
+        else:
+            grid['rows'], grid['cols'], _ = settle_box(grid['rows'], grid['cols'], '', gtype, False)
+            grid.pop('rowCap', None)
+            grid.pop('maxSlots', None)
+    else:
+        for key in (*PLATE_SPECS, 'rowCap', 'maxSlots'):
+            grid.pop(key, None)
+    if gtype == 'friendly':
+        if not isinstance(grid.get('showSelf'), bool):
+            grid['showSelf'] = True
+    else:
+        grid.pop('showSelf', None)
 
 
 def dedupe_grid_ids(grids):
@@ -277,12 +437,9 @@ def _harvest_grid_refs(section):
     assignments, scalar or list) — the export layer resolves and filters."""
     refs = []
     for g in section.get('grids', []):
-        refs.extend(g.get('whitelist', []))
+        refs.extend(ref_list(g.get('whitelist')))
         for val in g.get('slotAssignments', {}).values():
-            if isinstance(val, list):
-                refs.extend(val)
-            elif val is not None:
-                refs.append(val)
+            refs.extend(ref_list(val))
     return refs
 
 

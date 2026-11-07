@@ -34,6 +34,7 @@ from .ui_helpers import (
     TK_COLORS,
 )
 from .ui_widgets import blend_alpha
+from .window_position import center_on_parent
 
 # Layout
 HEIGHT_PROGRESS = 340
@@ -80,7 +81,7 @@ class BuildLoadingScreen(tk.Toplevel):
         self.bind('<FocusIn>', lambda e: self.lift())
 
         self._build_progress_ui()
-        self._center_on_parent(HEIGHT_PROGRESS)
+        center_on_parent(self, self._parent, WIDTH, HEIGHT_PROGRESS)
         self.deiconify()
         self.grab_set()
         self._animate()
@@ -197,16 +198,6 @@ class BuildLoadingScreen(tk.Toplevel):
             fill=THEME_COLORS['muted'],
             tags='subtitle',
         )
-
-    def _center_on_parent(self, height):
-        self.update_idletasks()
-        px = self._parent.winfo_x()
-        py = self._parent.winfo_y()
-        pw = self._parent.winfo_width()
-        ph = self._parent.winfo_height()
-        x = px + (pw - WIDTH) // 2
-        y = py + (ph - height) // 2
-        self.geometry(f"{WIDTH}x{height}+{x}+{y}")
 
     # ------------------------------------------------------------------
     # Animation loop
@@ -358,7 +349,7 @@ class BuildLoadingScreen(tk.Toplevel):
             canvas.create_text(46, y, text="Compilation", anchor='w',
                                 font=FONT_SECTION, fill=THEME_COLORS['heading'])
             canvas.create_text(WIDTH - 40, y, text='\u2716', anchor='e',
-                                font=FONT_BODY, fill=THEME_COLORS['danger'])
+                                font=FONT_BODY, fill=THEME_COLORS['danger_text'])
             canvas.create_text(WIDTH - 50, y, text="Failed", anchor='e',
                                 font=FONT_BODY, fill=THEME_COLORS['warning'])
             y += 22
@@ -394,7 +385,7 @@ class BuildLoadingScreen(tk.Toplevel):
             for name, ok, err in client_results:
                 dot_color = _ACCENT if ok else THEME_COLORS['danger']
                 icon = '\u2713' if ok else '\u2716'
-                icon_color = THEME_COLORS['success'] if ok else THEME_COLORS['danger']
+                icon_color = THEME_COLORS['success'] if ok else THEME_COLORS['danger_text']
                 label = "Updated" if ok else "Failed"
                 label_color = THEME_COLORS['body'] if ok else THEME_COLORS['warning']
 
@@ -494,7 +485,7 @@ class BuildLoadingScreen(tk.Toplevel):
         canvas.delete('border')
         canvas.create_rectangle(1, 1, WIDTH - 1, final_height - 1,
                                  outline=BORDER_COLOR, width=1)
-        self._center_on_parent(final_height)
+        center_on_parent(self, self._parent, WIDTH, final_height)
         self.update()
 
     def destroy(self):

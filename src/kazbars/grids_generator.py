@@ -9,13 +9,20 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
+from . import inspect_catalog, onslaught
 from .build_utils import compile_as2, resolve_assets_path
 from .cast_timer import is_enabled as cast_is_enabled
 from .cast_timer import validate_config as validate_cast_config
-from .grid_model import DEFAULT_GAME_RESOLUTION, MAX_TOTAL_SLOTS, project_px
+from .console import ships as console_ships
+from .console import validate_config as validate_console_config
+from .grid_model import DEFAULT_GAME_RESOLUTION, is_band, is_plate, project_px, ref_list
 from .inspect import validate_config as validate_inspect_config
-from .prefs import validate_panel_font_size
+from .overlay import VERDANA, as2_face, font_blob_path
+from .overlay import validate_config as validate_overlay
+from .overlay_size import cast_fs, grid_metrics, panel_fs
+from .prefs import ANCHOR_SIDE_DEFAULT, ANCHOR_UP_DEFAULT
 from .stopwatch import validate_config as validate_stopwatch_config
+from .swf_font import SwfFontError, import_game_font, splice
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +38,8 @@ CUSTOM_ICON_LINKAGE = {
     5077889: "IcoSlow60",  # Ice Cloak L
 }
 
-# as2c caps every class at 32 KB of bytecode. The grid configs and buff
-# lookups are packed into KazBarsData1..N, each built from whole units up to
+# as2c caps every class at 32 KB of bytecode. The grid configs and custom icons
+# are packed into KazBarsData1..N, each built from whole units up to
 # this many source chars. Measured AVM1 density is ~0.6 byte per source char
 # and the pessimistic bound (no push merging) is 1.0, so 24K chars keeps at
 # least 1.36x headroom under the cap. Don't raise it.
@@ -57,8 +64,9 @@ def _apply_feature_gates(template, flags):
     """Keep or strip the template's ``//#if FLAG ... //#end`` blocks: body lines
     stay verbatim when the flag is on, the whole block disappears when it is
     off, and marker lines (which may carry a trailing comment) never reach the
-    output. Deliberately capped: exactly the four build-gate flags, no nesting,
-    no else — a need for more is a design change, not a preprocessor patch."""
+    output. A marker names one flag; an unknown flag, a nested //#if, a stray
+    //#end or an unclosed block is a template bug and fails the build. No
+    nesting, no else."""
     out = []
     active = None
     keep = True
@@ -100,12 +108,81 @@ def escape_as2_string(value):
     )
 
 
-def _as_list(value):
-    """Normalize a whitelist/slot-assignment value that may be a bare scalar
-    (an imported or hand-edited profile can carry one known id instead of a
-    list) into a list — the shape `_expand_primary_ids` and the unresolved-ref
-    scan both need."""
-    return value if isinstance(value, list) else [value]
+def sanitize_id(grid_id):
+    """A grid id as a safe AS2 identifier: ASCII alphanumerics and `_` kept,
+    every other character `_`, a leading digit prefixed with `_`, empty → `Grid`."""
+    safe = "".join(c if (c.isascii() and c.isalnum()) or c == "_" else "_" for c in grid_id)
+    if safe and safe[0].isdigit():
+        safe = "_" + safe
+    return safe or "Grid"
+
+
+def free_id(taken, base):
+    """`base`, or `base_2`, `base_3`, …: the first whose in-game archive key
+    (`sanitize_id`) no id in `taken` makes (`Buffs DT` and `Buffs_DT` are one
+    key), so a copied grid gets saved positions of its own."""
+    keys = {sanitize_id(t) for t in taken}
+    grid_id, n = base, 2
+    while sanitize_id(grid_id) in keys:
+        grid_id = f"{base}_{n}"
+        n += 1
+    return grid_id
+
+
+def fact_code(btype, stack):
+    """An id's facts for one grid, the value of `d.WL[gid][id]`: bits 0-1 its
+    type (1 buff, 2 debuff, 3 misc; any other word is a buff), bits 2-11 its
+    stack level (0: not stacking; capped at 1023), bits 12 and up its stacking
+    family's index in the grid (1-based; 0 none). `stack` is (level, family
+    index), or None for an id that does not stack."""
+    t = {"debuff": 2, "misc": 3}.get(btype, 1)
+    level, family = stack or (0, 0)
+    return t | (max(0, min(level, 1023)) << 2) | (family << 12)
+
+
+def grid_holds(grid):
+    """Whether a grid tracks something: a dynamic grid a whitelist entry, a
+    static one a buff in a slot inside its shape. The one rule behind
+    `grid_ships`, the card's nudge and the step guide."""
+    if grid.get("slotMode") != "static":
+        return bool(grid.get("whitelist"))
+    return any(value for _, value in _slots_in_shape(grid))
+
+
+def grid_ships(grid):
+    """A grid is baked only when enabled and it holds something. An empty grid
+    is left out as it is, never turned off."""
+    return bool(grid.get("enabled", True)) and grid_holds(grid)
+
+
+def _slots_in_shape(grid):
+    """A static grid's `(slot key, value)` pairs whose key is a slot inside its
+    rows × cols; a slot left past the edge by a shrink is never built."""
+    cells = grid.get("rows", 1) * grid.get("cols", 1)
+    out = []
+    for key, value in (grid.get("slotAssignments") or {}).items():
+        try:
+            inside = 0 <= int(key) < cells
+        except (TypeError, ValueError):
+            inside = False
+        if inside:
+            out.append((key, value))
+    return out
+
+
+def _archive_keys(grids):
+    """Each grid's in-game archive key, by `id()` of its dict: its sanitized
+    id, deduped (`_2`, `_3`, …) in profile order over every grid, built or
+    not, so a key never moves when another grid empties or a band sorts last
+    (two ids that sanitize the same way, e.g. "a-b" and "a b", still get
+    distinct archive slots)."""
+    used: set[str] = set()
+    keys = {}
+    for grid in grids:
+        key = free_id(used, sanitize_id(grid.get("id", "Grid")))
+        used.add(key)
+        keys[id(grid)] = key
+    return keys
 
 
 def _pack_units(units, budget):
@@ -137,6 +214,21 @@ def _stack_bound(value, fallback):
     return value if value >= 1 else fallback
 
 
+def _bool(value):
+    return "true" if value else "false"
+
+
+def _as2_strs(items):
+    """`items` as a comma-joined run of AS2 string literals."""
+    return ", ".join(f'"{escape_as2_string(s)}"' for s in items)
+
+
+def _row_literal(group, label, row):
+    """An inspect row as `d.INS.rows` / `d.INS.pvp.rows` carries it: `g` its
+    group's index, `l` its label, then the row's own AS2 fields."""
+    return f'{{g: {group}, l: "{escape_as2_string(label)}", {row.as2_fields()}}}'
+
+
 class CodeGenerator:
     """Generate AS2 source code for the KazBars buff-tracking grid system."""
 
@@ -146,81 +238,58 @@ class CodeGenerator:
         database,
         app_version,
         assets_path=None,
-        include_console=False,
         cast_config=None,
         stopwatch_config=None,
         inspect_config=None,
-        panel_font_size=None,
+        console_config=None,
+        onslaught_config=None,
+        overlay=None,
+        anchor=None,
         game_resolution=None,
     ):
         """Initialize the code generator with grid configs and the buff database."""
-        # Filter out disabled grids
-        self.grids = [g for g in grids if g.get("enabled", True)]
+        # Bands last, stable: KazBarsOverhead stacks a character's views in bake
+        # order, so its static grids sit at the bottom against the nameplate
+        # and the bands above them. Screen grids keep their order.
+        grids = list(grids)
+        self.grids = sorted((g for g in grids if grid_ships(g)), key=is_band)
+        self._keys = _archive_keys(grids)
+        self.include_overhead = any(is_plate(g["type"]) for g in self.grids)
         self.database = database
         self.app_version = app_version
         self._assets_path = assets_path
-        self._stack_labels = {}
-        self.include_console = include_console
         # Grid and extras positions are stored as fractions; bake-time is the projection
         # boundary — the emitted AS2 carries px at this resolution.
         game_w, game_h = game_resolution or DEFAULT_GAME_RESOLUTION
         self.game_w = int(game_w)
         self.game_h = int(game_h)
-        # Cast-timer overlay: validated config + build gate. include_cast_timer is
-        # False unless the player or target timer is enabled, so the SWF carries no
-        # cast-timer code when the feature is off (mirrors include_console).
+        # The profile's base size and face: every size baked below derives from
+        # the base size and the module's own scale (overlay_size).
+        self.overlay = validate_overlay(overlay)
+        self.base_size = self.overlay["size"]
+        # The overhead anchor (this PC's prefs, never the profile's).
+        self.anchor = anchor or (ANCHOR_SIDE_DEFAULT, ANCHOR_UP_DEFAULT)
+        # Each extra's validated config and build gate: off means none of its
+        # code compiles into the SWF.
         self.cast_config = validate_cast_config(cast_config)
         self.include_cast_timer = cast_is_enabled(self.cast_config)
-        # In-game stopwatch: same gate pattern — off means no stopwatch code compiles.
         self.stopwatch_config = validate_stopwatch_config(stopwatch_config)
         self.include_stopwatch = self.stopwatch_config["enabled"]
-        # Target inspect panel: same gate pattern again.
         self.inspect_config = validate_inspect_config(inspect_config)
         self.include_inspect = self.inspect_config["enabled"]
-        # Shared text size for the four in-game panels. The console and the
-        # preview control panel have no config of their own and always take it;
-        # the stopwatch and inspect panel take it unless their own fontSize is
-        # set. Baking is the only place the two are resolved into one number.
-        self.panel_font_size = validate_panel_font_size(panel_font_size)
-
-    def sanitize_id(self, grid_id):
-        """Convert a grid ID to a safe AS2 identifier by replacing invalid characters."""
-        safe = ""
-        for c in grid_id:
-            if (c.isascii() and c.isalnum()) or c == "_":
-                safe += c
-            else:
-                safe += "_"
-        if safe and safe[0].isdigit():
-            safe = "_" + safe
-        return safe or "Grid"
-
-    def _archive_key(self, grid_id):
-        """Stable per-build archive key for a grid's persisted position — a
-        sanitized id, deduped against every other key already emitted this
-        generate() call (two ids that sanitize the same way, e.g. "a-b" and
-        "a b", still need distinct archive slots)."""
-        base = self.sanitize_id(grid_id)
-        key = base
-        suffix = 2
-        while key in self._used_keys:
-            key = f"{base}_{suffix}"
-            suffix += 1
-        self._used_keys.add(key)
-        return key
+        self.console_config = validate_console_config(console_config)
+        self.include_console = console_ships(self.console_config)
+        self.onslaught_config = onslaught.validate_config(onslaught_config)
+        self.include_onslaught = onslaught.ships(self.onslaught_config)
 
     def generate_files(self):
         """Every AS2 source of a build as `(file name, source)`, main class
-        first: `KazBars.as` (the hand-written template with its feature
-        tokens filled — the class calls `KazBarsData.init()`), `KazBarsData.as`
+        first: `KazBars.as` (the hand-written template with its feature gates
+        applied — the class calls `KazBarsData.init()`), `KazBarsData.as`
         (init + feature blocks, calling each chunk in turn), then
-        `KazBarsData1..N.as` — the grid configs and buff lookups packed under
+        `KazBarsData1..N.as` — the grid configs and custom icons packed under
         DATA_CHUNK_BUDGET per class so no profile hits as2c's per-class
         bytecode cap. as2c binds file name == class name."""
-        # Archive keys are stable across a rebuild only within one call —
-        # reset here so re-using a CodeGenerator instance can't leak collision
-        # suffixes from a previous run into this one.
-        self._used_keys: set[str] = set()
         header = self._header()
         chunks = _pack_units(self._data_units(), DATA_CHUNK_BUDGET)
         files = [
@@ -239,16 +308,17 @@ class CodeGenerator:
 
     def _header(self):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-        total_slots = sum(g["rows"] * g["cols"] for g in self.grids)
         return f"""// ============================================================================
 // KZGRIDS - Generated by KazBars v{self.app_version}
 // Generated: {timestamp}
-// Total slots: {total_slots} / {MAX_TOTAL_SLOTS}
+// Grids: {len(self.grids)}
 // ============================================================================
 """
 
-    def _expand_primary_ids(self, primary_ids):
-        """Expand primary spell IDs to full ID lists (respecting stacking)."""
+    def _expand_primary_ids(self, primary_ids, labels):
+        """Refs → full id lists (stacking respected), deduped, ascending. Each
+        stacking id's (level, family) goes into `labels`, the family named by
+        the first id of its entry."""
         ids = []
         for pid in primary_ids:
             try:
@@ -262,57 +332,44 @@ class CodeGenerator:
                 entry_ids = entry.get("ids", [])
                 if entry.get("stacking", False):
                     start = _stack_bound(entry.get("stackStart", 1), 1)
-                    if entry.get("partialList", False):
-                        for i, bid in enumerate(entry_ids):
-                            self._stack_labels[bid] = start + i
-                    else:
+                    family = entry_ids[0] if entry_ids else 0
+                    if not entry.get("partialList", False):
                         end = _stack_bound(entry.get("stackEnd", 0), len(entry_ids))
-                        filtered = entry_ids[start - 1 : end]
-                        for i, bid in enumerate(filtered):
-                            self._stack_labels[bid] = start + i
-                        entry_ids = filtered
+                        entry_ids = entry_ids[start - 1 : end]
+                    for i, bid in enumerate(entry_ids):
+                        labels[bid] = (start + i, family)
                 ids.extend(entry_ids)
             else:
                 # Inert ref (see unresolved_refs) — skipped from the emitted
                 # tables; %s because a preserved legacy ref can be a name string.
                 logger.warning("Primary ID %s not in database — skipped", pid)
+        return sorted(set(ids))
 
-        seen = set()
-        result = []
-        for bid in ids:
-            if bid not in seen:
-                seen.add(bid)
-                result.append(bid)
-        return sorted(result)
-
-    def _resolve_grid(self, grid):
-        resolved = dict(grid)
-        whitelist = grid.get("whitelist", [])
-        if whitelist:
-            resolved["whitelist"] = self._expand_primary_ids(whitelist)
-        slot_assignments = grid.get("slotAssignments", {})
-        if slot_assignments:
-            resolved_sa = {}
-            for k, v in slot_assignments.items():
-                resolved_sa[k] = self._expand_primary_ids(_as_list(v)) if v else v
-            resolved["slotAssignments"] = resolved_sa
-        return resolved
-
-    def _resolved_font_size(self, config):
-        """The size actually baked for one panel: its own `fontSize` when it set
-        one, otherwise the shared `panel_font_size`. The single place the shared
-        value and a per-panel override are collapsed into one number."""
-        own = config.get("fontSize")
-        return self.panel_font_size if own is None else int(own)
+    def _fact_codes(self, ids, labels):
+        """The grid's id set as (id, fact code), ascending. A stacking family's
+        index is its rank by its lowest id in the grid."""
+        families: dict = {}
+        codes = []
+        for bid in sorted(set(ids)):
+            stack = None
+            if bid in labels:
+                level, family = labels[bid]
+                stack = (level, families.setdefault(family, len(families) + 1))
+            codes.append((bid, fact_code(self.database.get_type(bid), stack)))
+        return codes
 
     def _panel_font_data_block(self):
-        """AS2 `d.PF = {...}` literal — the shared panel text size, for the two
-        panels with no config of their own to override it from, plus the app
-        version the control panel's footer credit shows. Emitted
-        unconditionally: `KazBarsPreviewPanel` is not gated and compiles into
-        every build."""
-        return (f"\n        d.PF = {{fontSize: {self.panel_font_size}, "
-                f'version: "{escape_as2_string(self.app_version)}"}};')
+        """AS2 `d.PF = {...}` literal — the base size itself (the preview
+        control panel and the layout-preview labels are drawn at it), the face
+        every text field asks for, the version the control panel's footer
+        credits, and the overhead anchor (`KazBarsRelations.side` / `.lift`).
+        Emitted unconditionally: `KazBarsPreviewPanel` is not gated and
+        compiles into every build."""
+        side, up = self.anchor
+        return (f"\n        d.PF = {{fontSize: {self.base_size}, "
+                f'face: "{as2_face(self.overlay["font"])}", '
+                f'version: "{escape_as2_string(self.app_version)}", '
+                f"side: {int(side)}, up: {int(up)}}};")
 
     def _cast_data_block(self):
         """AS2 `d.CAST = {...}` literal for the cast-timer overlay. Positions
@@ -320,17 +377,14 @@ class CodeGenerator:
         stay playerX/…). Color is emitted as a numeric hex literal (0xRRGGBB)
         so the stub's Number(...) coercion yields a real color, not NaN."""
         c = self.cast_config
-        bp = "true" if c["enableP"] else "false"
-        bt = "true" if c["enableT"] else "false"
-        bd = "true" if c["bold"] else "false"
         return (
             "\n        d.CAST = {"
-            f"enableP: {bp}, enableT: {bt}, "
+            f"enableP: {_bool(c['enableP'])}, enableT: {_bool(c['enableT'])}, "
             f"playerX: {project_px(c['playerFx'], self.game_w)}, "
             f"playerY: {project_px(c['playerFy'], self.game_h)}, "
             f"targetX: {project_px(c['targetFx'], self.game_w)}, "
             f"targetY: {project_px(c['targetFy'], self.game_h)}, "
-            f"bold: {bd}, fontSize: {int(c['fontSize'])}, "
+            f"bold: {_bool(c['bold'])}, fontSize: {cast_fs(self.base_size, c['scale'])}, "
             f'display: "{c["display"]}", color: 0x{c["color"]}'
             "};"
         )
@@ -339,55 +393,120 @@ class CodeGenerator:
         """AS2 `d.SW = {...}` literal for the in-game stopwatch panel. The
         stored fraction position projects to px here."""
         c = self.stopwatch_config
-        collapsed = "true" if c["startCollapsed"] else "false"
         return (
             f"\n        d.SW = {{x: {project_px(c['fx'], self.game_w)}, "
             f"y: {project_px(c['fy'], self.game_h)}, "
-            f"fontSize: {self._resolved_font_size(c)}, collapsed: {collapsed}}};"
+            f"fontSize: {panel_fs(self.base_size, c['scale'])}, "
+            f"collapsed: {_bool(c['startCollapsed'])}}};"
         )
 
     def _inspect_data_block(self):
         """AS2 `d.INS = {...}` literal for the target inspect panel. The
         stored fraction position projects to px here."""
         c = self.inspect_config
-        collapsed = "true" if c["startCollapsed"] else "false"
-        show_pvp = "true" if c["showPvp"] else "false"
-        show_perks = "true" if c["showPerks"] else "false"
         return (
             f"\n        d.INS = {{x: {project_px(c['fx'], self.game_w)}, "
             f"y: {project_px(c['fy'], self.game_h)}, "
-            f"fontSize: {self._resolved_font_size(c)}, collapsed: {collapsed}, "
-            f"showPvp: {show_pvp}, showPerks: {show_perks}}};"
+            f"fontSize: {panel_fs(self.base_size, c['scale'])}, "
+            f"collapsed: {_bool(c['startCollapsed'])}}};"
         )
+
+    def _inspect_rows_block(self):
+        """`d.INS.groups` / `.rows` / `.watch`: the groups that own a shown row
+        (`{n, p}`, p the PvP player gate), the rows in the panel's order (`g`
+        indexing those groups, `l` the label, then the row's own AS2 fields),
+        and every id they read plus the always-polled ones."""
+        selected = inspect_catalog.shown(self.inspect_config["rows"])
+        groups = list(dict.fromkeys(r.group for r in selected))
+        groups_line = "        d.INS.groups = [{}];".format(", ".join(
+            f'{{n: "{escape_as2_string(g.label)}", p: {_bool(g.player_gated)}}}' for g in groups))
+        if selected:
+            entries = ",\n".join(
+                "            " + _row_literal(groups.index(r.group), r.label, r) for r in selected)
+            rows_lines = f"        d.INS.rows = [\n{entries}\n        ];"
+        else:
+            rows_lines = "        d.INS.rows = [];"
+        watch = ", ".join(str(i) for i in inspect_catalog.watch_ids(selected))
+        return f"\n{groups_line}\n{rows_lines}\n        d.INS.watch = [{watch}];"
+
+    def _pvp_view_block(self):
+        """`d.INS.pvp`, the PvP tab's fixed view: `groups` (`{n: title, c:
+        [column titles]}`), `rows` (as `d.INS.rows`, `l` the view's own label)
+        and `ids` (what the view reads plus the always-polled ids; not
+        `watch`, a method every AS2 object has)."""
+        groups = ", ".join(
+            f'{{n: "{escape_as2_string(title)}", c: [{_as2_strs(cols)}]}}'
+            for title, cols, _ in inspect_catalog.PVP_VIEW)
+        labels = [(g, label) for g, (_, _, lines) in enumerate(inspect_catalog.PVP_VIEW)
+                  for label, _ in lines]
+        pvp_rows = inspect_catalog.pvp_rows()
+        rows = ", ".join(_row_literal(g, label, row) for (g, label), row in zip(labels, pvp_rows))
+        ids = ", ".join(str(i) for i in inspect_catalog.watch_ids(pvp_rows))
+        return f"\n        d.INS.pvp = {{groups: [{groups}], rows: [{rows}], ids: [{ids}]}};"
+
+    def _onslaught_data_block(self):
+        """`d.ONS`: the board's and the alerts' first-load spots (fixed
+        fractions — both are placed in game), the text size and displays;
+        `d.ONS.watch`, one array per kind (`b`, `s`, `m`, `c`), each the watched
+        names of that kind, a kind no display reads left empty (bosses, skulls
+        and minis feed the list and the alerts, camps only the list); the AoE
+        helpers, the heal buffs and the per-playfield facts."""
+        c = self.onslaught_config
+
+        def names(kind, wanted):
+            return _as2_strs(onslaught.names_of(c, kind)) if wanted else ""
+
+        listed = c["showList"] or c["showAlerts"]
+        lines = [
+            f"        d.ONS = {{x: {project_px(1560 / 1920, self.game_w)}, "
+            f"y: {project_px(300 / 1080, self.game_h)}, "
+            f"ax: {project_px(960 / 1920, self.game_w)}, ay: {project_px(200 / 1080, self.game_h)}, "
+            f"fontSize: {panel_fs(self.base_size, c['scale'])}, list: {_bool(c['showList'])}, "
+            f"alerts: {_bool(c['showAlerts'])}, wave: {_bool(c['showWave'])}, "
+            f"aoe: {_bool(c['showAoe'])}, ally: {_bool(c['showAlly'])}, "
+            f"alertMs: {c['alertSeconds'] * 1000}}};",
+            "        d.ONS.watch = {",
+            f"            b: [{names(onslaught.BOSS, listed)}],",
+            f"            s: [{names(onslaught.SKULL, listed)}],",
+            f"            m: [{names(onslaught.MINI, listed)}],",
+            f"            c: [{names(onslaught.CAMP, c['showList'])}]",
+            "        };",
+            f"        d.ONS.helpers = [{_as2_strs(onslaught.AOE_HELPERS)}];",
+            f"        d.ONS.heal = [{_as2_strs(onslaught.HEAL_BUFFS)}];",
+            "        d.ONS.pf = {};",
+        ]
+        lines += [f'        d.ONS.pf[{i.playfield}] = {{start: "{escape_as2_string(i.start_hint)}", '
+                  f'spawnMs: {i.spawn_ms}, ally: "{escape_as2_string(i.ally)}", aoe: {_bool(i.aoe)}}};'
+                  for i in onslaught.INSTANCES]
+        return "\n" + "\n".join(lines)
+
+    def _console_data_block(self):
+        """`d.CON`: the console's text size and its tabs in the strip's order."""
+        c = self.console_config
+        return (f"\n        d.CON = {{fontSize: {panel_fs(self.base_size, c['scale'])}, "
+                f"tabs: [{_as2_strs(c['tabs'])}]}};")
 
     def _data_units(self):
         """The data-class body as self-contained source units, in emit order:
-        one per grid (config + whitelist), then one per referenced buff id
-        (its debuff / type / stack-level / custom-icon rows). A unit never
-        splits across chunks, so a whitelist `while` loop stays whole. Grids
-        go first in one pass because `_resolve_grid` fills `_stack_labels`
-        and `_archive_key` claims keys as it goes."""
+        one per grid (its config and its id set with each id's facts), then one
+        per custom icon. A unit never splits across chunks, so a `while` loop
+        stays whole."""
         units = []
-        all_buff_ids = set()
+        icons: set[int] = set()
         for idx, grid in enumerate(self.grids):
-            resolved = self._resolve_grid(grid)
-            units.append(self._generate_grid_config(resolved, idx, var_prefix="d."))
-            all_buff_ids.update(resolved.get("whitelist", []))
-            for slot_ids in resolved.get("slotAssignments", {}).values():
-                all_buff_ids.update(slot_ids)
-
-        for bid in sorted(all_buff_ids):
-            is_deb = "true" if self.database.is_debuff(bid) else "false"
-            lines = [
-                f"        d.ISDEB[{bid}] = {is_deb};",
-                f'        d.BUFFTYPE[{bid}] = "{self.database.get_type(bid)}";',
-            ]
-            stack_level = self._stack_labels.get(bid)
-            if stack_level is not None:
-                lines.append(f"        d.STACK_LEVEL[{bid}] = {stack_level};")
-            if bid in CUSTOM_ICON_LINKAGE:
-                lines.append(f'        d.CUSTOMICON[{bid}] = "{CUSTOM_ICON_LINKAGE[bid]}";')
-            units.append("\n".join(lines))
+            labels: dict = {}
+            slots = {}
+            if grid["slotMode"] == "static":
+                slots = {k: self._expand_primary_ids(ref_list(v), labels)
+                         for k, v in _slots_in_shape(grid)}
+                ids = [bid for slot_ids in slots.values() for bid in slot_ids]
+            else:
+                ids = self._expand_primary_ids(grid.get("whitelist", []), labels)
+            codes = self._fact_codes(ids, labels)
+            icons.update(bid for bid, _ in codes if bid in CUSTOM_ICON_LINKAGE)
+            units.append(self._generate_grid_config(grid, idx, slots, codes))
+        for bid in sorted(icons):
+            units.append(f'        d.CUSTOMICON[{bid}] = "{CUSTOM_ICON_LINKAGE[bid]}";')
         return units
 
     def _data_chunk_class(self, n, units):
@@ -412,9 +531,6 @@ class CodeGenerator:
         d.CFG = {};
         d.CFG.grids = new Array();
         d.WL = {};
-        d.ISDEB = {};
-        d.BUFFTYPE = {};
-        d.STACK_LEVEL = {};
         d.CUSTOMICON = {};"""
         ]
 
@@ -425,6 +541,12 @@ class CodeGenerator:
             lines.append(self._stopwatch_data_block())
         if self.include_inspect:
             lines.append(self._inspect_data_block())
+            lines.append(self._inspect_rows_block())
+            lines.append(self._pvp_view_block())
+        if self.include_onslaught:
+            lines.append(self._onslaught_data_block())
+        if self.include_console:
+            lines.append(self._console_data_block())
 
         if chunk_count:
             lines.append("")
@@ -436,16 +558,21 @@ class CodeGenerator:
         lines.append("}")
         return "\n".join(lines)
 
-    def _generate_grid_config(self, grid, idx, var_prefix=""):
+    def _generate_grid_config(self, grid, idx, slots, codes):
+        """One grid's unit: its config object, its static slots, and its id set
+        `d.WL[gid]` as `[id, code, …]` pairs read in by a loop. A dynamic grid
+        gets its set even empty (the pick reads it), a static one only with
+        ids. `iconSize`, `timerFont` and `stackFont` are the on-screen values
+        `grid_metrics` derives from the base size and the grid's scale."""
         gid = grid["id"]
         gid_lit = escape_as2_string(gid)
-        vid = f"{self.sanitize_id(gid)}_{idx}"
-        key = self._archive_key(gid)
-        cfg = f"{var_prefix}CFG"
-        wl = f"{var_prefix}WL"
+        vid = f"{sanitize_id(gid)}_{idx}"
+        key = self._keys[id(grid)]
+        m = grid_metrics(self.base_size, grid["scale"])
+        is_static = grid["slotMode"] == "static"
         lines = []
 
-        lines.append(f'''
+        unit = f'''
         // {gid_lit}
         var {vid}:Object = {{
             id: "{gid_lit}",
@@ -453,7 +580,7 @@ class CodeGenerator:
             type: "{grid["type"]}",
             rows: {grid["rows"]},
             cols: {grid["cols"]},
-            iconSize: {grid["iconSize"]},
+            iconSize: {m.icon},
             gap: {grid["gap"]},
             x: {project_px(grid["fx"], self.game_w)},
             y: {project_px(grid["fy"], self.game_h)},
@@ -461,59 +588,64 @@ class CodeGenerator:
             fillDir: "{grid["fillDirection"]}",
             sortOrder: "{grid["sortOrder"]}",
             layout: "{grid["layout"]}",
-            showTimers: {"true" if grid["showTimers"] else "false"},
-            timerFont: {grid.get("timerFontSize", 18)},
-            timerFlashThreshold: {grid.get("timerFlashThreshold", 6)},
-            timerYOffset: {grid.get("timerYOffset", 0)},
-            stackFont: {grid.get("stackFontSize", 14)},
-            enableFlashing: {"true" if grid.get("enableFlashing", True) else "false"}''')
+            timerStyle: "{grid["timerStyle"]}",
+            timerFont: {m.timer},
+            timerFlashThreshold: {grid["timerFlashThreshold"]},
+            timerYOffset: {grid["timerYOffset"]},
+            stackFont: {m.stack},
+            enableFlashing: {_bool(grid["enableFlashing"])}'''
+        # Only where they apply, so a screen grid without selfCastOnly bakes as before.
+        if is_plate(grid["type"]):
+            unit += (f",\n            plateOffset: {grid['plateOffset']},"
+                     f"\n            maxDistance: {grid['maxDistance']}")
+            # A band: rows x cols are its derived shape (cols the row cap), fillDir "C".
+            if is_band(grid):
+                unit += f",\n            maxSlots: {grid['maxSlots']}"
+        if grid["type"] == "friendly":
+            unit += f",\n            showSelf: {_bool(grid['showSelf'])}"
+        if grid.get("selfCastOnly") is True:
+            unit += ",\n            selfCastOnly: true"
+        if "class" in grid:
+            unit += f",\n            cls: {grid['class']}"
 
-        if grid["slotMode"] == "static":
-            lines[-1] += ",\n            slots: {}\n        };"
-            for slot_idx, buff_ids in grid.get("slotAssignments", {}).items():
+        if is_static:
+            lines.append(unit + ",\n            slots: {}\n        };")
+            for slot_idx, buff_ids in slots.items():
                 if buff_ids:
                     ids_str = ", ".join(str(bid) for bid in buff_ids)
                     lines.append(f"        {vid}.slots[{int(slot_idx)}] = [{ids_str}];")
         else:
-            lines[-1] += "\n        };"
+            lines.append(unit + "\n        };")
+        lines.append(f"        d.CFG.grids.push({vid});")
 
-        lines.append(f"        {cfg}.grids.push({vid});")
-
-        whitelist = grid.get("whitelist", [])
-        if whitelist or grid["slotMode"] == "dynamic":
-            lines.append(f'\n        {wl}["{gid_lit}"] = {{}};')
-            if whitelist:
-                ids_str = ", ".join(str(bid) for bid in whitelist)
-                lines.append(f"        var {vid}_ids:Array = [{ids_str}];")
-                lines.append(f'''        i = 0;
+        if not is_static or codes:
+            lines.append(f'\n        d.WL["{gid_lit}"] = {{}};')
+        if codes:
+            pairs = ", ".join(f"{bid}, {code}" for bid, code in codes)
+            lines.append(f"        var {vid}_ids:Array = [{pairs}];")
+            lines.append(f'''        i = 0;
         while (i < {vid}_ids.length) {{
-            {wl}["{gid_lit}"][{vid}_ids[i]] = true;
-            i++;
+            d.WL["{gid_lit}"][{vid}_ids[i]] = {vid}_ids[i + 1];
+            i += 2;
         }}''')
-
-        if grid["slotMode"] == "static":
-            all_ids = set()
-            for slot_ids in grid.get("slotAssignments", {}).values():
-                all_ids.update(slot_ids)
-            if all_ids:
-                lines.append(f'\n        {wl}["{gid_lit}"] = {{}};')
-                for bid in sorted(all_ids):
-                    lines.append(f'        {wl}["{gid_lit}"][{bid}] = true;')
-
         return "\n".join(lines)
 
     def _main_class(self):
         template = _load_template(self._assets_path)
         return _apply_feature_gates(template, {
             "CONSOLE": self.include_console,
+            "CONBUFFS": self.include_console and "buffs" in self.console_config["tabs"],
+            "CONCASTS": self.include_console and "casts" in self.console_config["tabs"],
             "CAST": self.include_cast_timer,
-            "SW": self.include_stopwatch,
             "INS": self.include_inspect,
+            "ONS": self.include_onslaught,
+            "PLATE": self.include_overhead,
+            "SW": self.include_stopwatch,
         })
 
 
 def unresolved_refs(grids, database) -> list:
-    """Every ref in the enabled grids' whitelists/slot assignments the database
+    """Every ref in the enabled grids' whitelists (dynamic) or in-shape slots (static) the database
     can't resolve — exactly what `_expand_primary_ids` will skip at emit. Pure;
     `build_action` runs it pre-build so the summary can report the count. int
     refs check `by_id`, preserved legacy strings check by name; deduped, first
@@ -523,10 +655,10 @@ def unresolved_refs(grids, database) -> list:
     for g in grids:
         if not g.get('enabled', True):
             continue
-        refs = list(g.get('whitelist') or [])
-        for val in (g.get('slotAssignments') or {}).values():
-            if val:
-                refs.extend(_as_list(val))
+        if g.get('slotMode') == 'static':
+            refs = [ref for _, val in _slots_in_shape(g) for ref in ref_list(val)]
+        else:
+            refs = list(g.get('whitelist') or [])
         for ref in refs:
             if isinstance(ref, bool) or ref in seen:
                 continue
@@ -546,6 +678,19 @@ def unresolved_refs(grids, database) -> list:
 # ============================================================================
 # BUILD FUNCTION
 # ============================================================================
+def font_base(base_swf: Path, font: str) -> bytes:
+    """The SWF the compiler injects into for the overlay `font`: `base.swf` as
+    shipped for Arial; for the game's Verdana, `base.swf` importing it in place
+    of its two Arials; for a baked face, `base.swf` with that face's outlines
+    (`fonts/<slug>.bin` beside it) spliced over them. The AS2 is the same for
+    every font — only `d.PF.face` names Verdana's `_StandardFont`."""
+    base = base_swf.read_bytes()
+    if font == VERDANA:
+        return import_game_font(base)
+    blob = font_blob_path(base_swf.parent, font)
+    return base if blob is None else splice(base, blob.read_bytes())
+
+
 def build_grids(
     grids: list,
     database,
@@ -554,11 +699,13 @@ def build_grids(
     output_swf: str | Path,
     app_version: str = "3.6.0",
     assets_path=None,
-    include_console: bool = False,
     cast_config: dict | None = None,
     stopwatch_config: dict | None = None,
     inspect_config: dict | None = None,
-    panel_font_size: int | None = None,
+    console_config: dict | None = None,
+    onslaught_config: dict | None = None,
+    overlay: dict | None = None,
+    anchor: tuple[int, int] | None = None,
     game_resolution: tuple[int, int] | None = None,
 ) -> tuple[bool, str]:
     """
@@ -590,11 +737,13 @@ def build_grids(
             database,
             app_version,
             assets_path=assets_path,
-            include_console=include_console,
             cast_config=cast_config,
             stopwatch_config=stopwatch_config,
             inspect_config=inspect_config,
-            panel_font_size=panel_font_size,
+            console_config=console_config,
+            onslaught_config=onslaught_config,
+            overlay=overlay,
+            anchor=anchor,
             game_resolution=game_resolution,
         )
         files = generator.generate_files()
@@ -609,10 +758,14 @@ def build_grids(
                 f.write(src)
             sources.append(path)
 
-        # Step 3: Copy base.swf to temp
+        # Step 3: The base for the overlay font, written to temp
         output_swf.parent.mkdir(parents=True, exist_ok=True)
         temp_swf = Path(temp_dir) / "KazBars.swf"
-        shutil.copy2(base_swf, temp_swf)
+        font = generator.overlay["font"]
+        try:
+            temp_swf.write_bytes(font_base(base_swf, font))
+        except (OSError, SwfFontError) as e:
+            return False, f"Couldn't set the overlay in {font}:\n{e}"
 
         # Step 4: Compile (main class + every data class)
         common_stubs = base_swf.parent.parent / "common_stubs"

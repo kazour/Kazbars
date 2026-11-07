@@ -26,8 +26,8 @@ def test_ensure_layout_creates_tree_and_seeds(monkeypatch, tmp_path):
     # settings/ is retired — Deeps/Live Tracker/Damage Numbers live in the
     # profile document now.
     assert not (root / "settings").exists()
-    assert (root / "profiles").is_dir()
-    assert (root / "profiles" / "trash").is_dir()
+    # One profile file now: no profiles/ library, no trash.
+    assert not (root / "profiles").exists()
     assert (root / "content").is_dir()
     assert (root / "content" / ".bak").is_dir()
     db = root / "database_user.json"
@@ -65,7 +65,9 @@ def test_subpaths_resolve_under_userdata(monkeypatch, tmp_path):
     assert root == tmp_path / "userdata"
     assert userdata.prefs_path() == root / "prefs.json"
     assert userdata.profiles_dir() == root / "profiles"
-    assert userdata.profiles_trash_dir() == root / "profiles" / "trash"
+    assert userdata.profile_path() == root / "profile.yml"
+    assert userdata.profile_bak_path() == root / "profile.yml.bak"
+    assert userdata.profile_damaged_path() == root / "profile.damaged.yml"
     assert userdata.database_user_path() == root / "database_user.json"
     assert userdata.content_dir() == root / "content"
     assert userdata.content_backup_dir() == root / "content" / ".bak"

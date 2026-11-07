@@ -29,19 +29,19 @@ FONT_STATUS_ICON_LG = ('Segoe UI', 28, 'bold')   # Build status icon (glow layer
 # Semantic colors for ttk widget foreground text
 THEME_COLORS = {
     'heading':    '#FFFFFF',   # Section headings
-    'body':       '#C0C7CE',   # Body/descriptions (~7.2:1 WCAG AAA on #222)
-    'muted':      '#B0B0B0',   # Hints, placeholders (~6.0:1 on #222)
+    'body':       '#C0C7CE',   # Body/descriptions (9.32:1 WCAG AAA on #222)
+    'muted':      '#B0B0B0',   # Hints, placeholders (7.34:1 AAA on #222)
     'accent':     '#3498db',   # Links, emphasis
     'warning':    '#f39c12',   # Warnings
     'danger':     '#e74c3c',   # Errors — fills/borders/dots (~4.2:1 on #222, below AA for text)
-    'danger_text': '#f06a5d',  # Error text on #222 (~5.3:1 AA) — use for readable danger labels
+    'danger_text': '#f06a5d',  # Error text on #222 (5.25:1 AA) — use for readable danger labels
     'success':    '#00bc8c',   # Success
     'info_value': '#3498db',   # Info display values
     'purple':     '#9b59b6',   # Database nav accent
     # Buff classification tints — paired with the type label, never standalone.
     # Buff stays at 'body'; debuff/misc carry a desaturated hue at AAA contrast on #222.
-    'type_debuff': '#F0A0A0',  # Muted red (~7.6:1 AAA)
-    'type_misc':   '#E0C880',  # Warm gold (~9.3:1 AAA)
+    'type_debuff': '#F0A0A0',  # Muted red (7.76:1 AAA)
+    'type_misc':   '#E0C880',  # Warm gold (9.65:1 AAA)
 }
 
 # Colors for raw tk widgets (Canvas, Listbox, Text) that ttkbootstrap can't theme
@@ -80,11 +80,16 @@ PAD_SECTION_GAP = 20      # Visual separation between button groups
 
 # Canvas-drawn geometry — pixel sizes for canvases (mini-previews, step badges).
 # Distinct from PAD_*: these size canvases, not widget padding.
-GRID_PREVIEW_PX = 80           # Mini preview canvas inside each editor card
+CARD_STRIPE_PX = 3             # Grid-card left identity stripe (player/target accent)
+GRID_PREVIEW_PX = 80           # Cast timer dialog: its text-sample canvas
 STEP_BADGE_PX = 20             # Numbered step badge in the tip bar
-CELL_PX = 10                   # Default mini-grid cell side
-CELL_PX_LARGE = 20             # Mini-grid cell side for 1x1 grids
-CELL_GAP = 2                   # Gap between mini-grid cells
+PREVIEW_RATIO = (2, 3)         # A grid card's preview: app px per game px of the baked icon
+PREVIEW_MAX_H = 128            # Tallest a card's preview grows before it steps down a ratio
+PREVIEW_MAX_W = 600            # Widest (a 1x64 bar), same rule
+PREVIEW_SLOT_SPACING = 4       # Game px added to every gap, so overlapping icons read apart
+PREVIEW_NUMBER_MIN = 16        # A preview cell this wide or wider carries its slot number
+SLOT_CHIP_PX = 22              # A slot chip in the picker's slot strip (a static grid's cell opened it)
+SLOT_CHIP_GAP = 4              # Between two slot chips
 PRESET_CARD_SQUARE = 130       # 3x3 grid, 1x1 slot, and Custom preset
 PRESET_CARD_BAR_LONG = 200     # Long axis for bar-shaped preset previews
 PRESET_CARD_BAR_SHORT = 100    # Short axis for bar-shaped preset previews
@@ -95,6 +100,7 @@ BTN_SMALL = 7             # Add, Edit, Delete, Clear, Copy
 BTN_DIALOG = 10           # Cancel + verb pair in dialog footers
 BTN_MEDIUM = 12           # Export, Import, Reset, Browse
 BTN_LARGE = 20            # Build & Install, Generate & Install
+BTN_GLYPH = 3             # A one-glyph button (◀ ▶)
 
 # Form input widths (input text in chars). Reserved for inputs reused 2+ places.
 # One-off widths (a name field, a stack spinbox) stay as literal numbers.
@@ -102,6 +108,7 @@ INPUT_WIDTH_NUM    = 5    # Numeric spinboxes
 INPUT_WIDTH_TYPE   = 10   # Compact type/state dropdowns
 INPUT_WIDTH_FILTER = 18   # Filter category combobox
 INPUT_WIDTH_SEARCH = 20   # Search entries
+INPUT_WIDTH_SORTING = 24  # Grid Settings' Fill / Sort / Order (the longest fill label)
 LABEL_WIDTH_FORM   = 14   # Left-column form labels (fits "Icon spacing:" + 1ch)
 
 # Scanline overlay alpha (0-255). Used for CRT decorative scanline overlays.
@@ -132,12 +139,11 @@ _RETRO_COLORS = {
 GRID_TYPE_COLORS = {
     'player': '#3498db',   # Blue
     'target': '#e67e22',   # Orange
+    # Overhead grids: green over friendly characters, red over hostile ones
+    # (the readable danger red: the badge carries it as text).
+    'friendly': '#00bc8c',
+    'hostile': '#f06a5d',
 }
-
-# Cast-timer strip identity. A muted dusty rose — the hue furthest from the
-# blue Player / orange Target / purple Database palette, so the frozen strip
-# reads as clearly its own thing among the grid cards it sits among.
-CAST_TIMER_ACCENT = '#CF6F93'
 
 
 # ============================================================================
@@ -183,9 +189,8 @@ def style_treeview_heading():
 
     # Type-tinted Radiobutton labels (Add Grid wizard). Bold so the colored
     # label reads as semantic identity, not as just "decorated text".
-    for name, color in (('Player', GRID_TYPE_COLORS['player']),
-                        ('Target', GRID_TYPE_COLORS['target'])):
-        style_name = f'{name}.TRadiobutton'
+    for grid_type, color in GRID_TYPE_COLORS.items():
+        style_name = f'{grid_type.title()}.TRadiobutton'
         style.configure(style_name, foreground=color, font=FONT_SECTION)
         style.map(style_name,
                   foreground=[('disabled', TK_COLORS['dim_text']),

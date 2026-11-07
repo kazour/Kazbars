@@ -1,6 +1,6 @@
 """KazBars — runtime profile store: the in-memory document + debounced autosave.
 
-One `ProfileStore` per open profile. Panels are views: they read sections via
+One `ProfileStore` for the open profile. Panels are views: they read sections via
 `get_section` (treat as read-only) and write through `set_section` /
 `update_section`, which arm a debounced atomic write — there is no dirty flag,
 no Save prompt, and no gather-at-save step, so section data exists independent
@@ -11,9 +11,9 @@ Scheduling is injected (`schedule(ms, fn) -> token` / `cancel(token)`; app.py
 passes `after`/`after_cancel`) so the debounce is deterministic under test.
 On the first mutation of a session the pre-mutation document is handed to
 `write_bak` once — the snapshot behind `revert_to_session_start` and the
-corrupt-load fallback. A failed write keeps the document dirty, sets
-`last_write_failed` (the exit path shows a rescue offer while it's set), and
-retries on a slower cadence until a write lands.
+corrupt-load fallback. A failed write keeps the document dirty and retries
+on a slower cadence until a write lands; `flush()` returns False meanwhile, so
+the exit path can offer a rescue.
 """
 
 import copy
@@ -35,7 +35,11 @@ class ProfileStore:
         schedule: Callable[[int, Callable[[], None]], Any],
         cancel: Callable[[Any], None],
         write_bak: Callable[[dict], None] | None = None,
+        dirty: bool = False,
     ) -> None:
+        """`dirty`: the document is not on disk yet (a seed, an adopted library
+        profile, the `.bak` fallback) — the first `flush()` writes it, and a
+        failed write retries as any autosave does."""
         self._doc = document
         self._writer = writer
         self._schedule = schedule
@@ -44,8 +48,7 @@ class ProfileStore:
         self._session_start = copy.deepcopy(document)
         self._bak_written = False
         self._pending: Any = None
-        self._dirty = False
-        self.last_write_failed = False
+        self._dirty = dirty
 
     # ------------------------------------------------------------------ #
     # READ
@@ -76,8 +79,10 @@ class ProfileStore:
         self._doc['modules'].setdefault(key, {}).update(patch)
         self._touch()
 
-    def set_name(self, name: str) -> None:
-        self._doc['name'] = str(name).strip() or self._doc['name']
+    def replace_document(self, doc: dict) -> None:
+        """Put `doc` in place of the document (Import, Reset). The session
+        snapshot stays, so Revert to session start brings the old one back."""
+        self._doc = doc
         self._touch()
 
     def revert_to_session_start(self) -> None:
@@ -114,9 +119,7 @@ class ProfileStore:
             result = None
         if result:
             self._dirty = False
-            self.last_write_failed = False
         else:
-            self.last_write_failed = True
             self._arm(RETRY_MS)
 
     def flush(self) -> bool:

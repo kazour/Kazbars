@@ -16,26 +16,38 @@ Run: `pytest tests/test_grid_model.py` (from repo root).
 """
 
 from kazbars.grid_model import (
+    BAND_ROW_CAP_DEFAULT,
+    BAND_ROW_CAPS,
+    BAND_SLOTS_DEFAULT,
     CLAMP_SPECS,
     FRACTION_SPECS,
-    SEED_SIZE_TIERS,
-    apply_seed_sizes,
+    MAX_GRID_SLOTS,
+    PLATE_DISTANCE_DEFAULT,
+    PLATE_OFFSET_DEFAULT,
+    TIMER_STYLES,
     create_default_grid,
     dedupe_grid_ids,
+    is_band,
+    max_shape,
+    max_slots,
     project_px,
-    rescale_seed_sizes,
-    seed_sizes_for_height,
+    ref_list,
+    settle_box,
+    slot_count,
+    snap_fill,
+    snap_row_cap,
     unproject_px,
+    valid_fills,
     validate_grid,
 )
 
 
 def test_junk_numeric_values_fall_back_to_defaults():
-    grid = validate_grid({"rows": None, "cols": "abc", "fx": [], "iconSize": {}})
+    grid = validate_grid({"rows": None, "cols": "abc", "fx": [], "scale": {}})
     assert grid["rows"] == CLAMP_SPECS["rows"][0]
     assert grid["cols"] == CLAMP_SPECS["cols"][0]
     assert grid["fx"] == FRACTION_SPECS["fx"]
-    assert grid["iconSize"] == CLAMP_SPECS["iconSize"][0]
+    assert grid["scale"] == CLAMP_SPECS["scale"][0]
 
 
 def test_fractions_clamp_and_reject_nan_and_pop_legacy_px():
@@ -140,73 +152,182 @@ def test_projection_is_proportional_across_resolutions():
 
 
 # --------------------------------------------------------------------------- #
-# Seed size tiers — px sizes for a template instantiated on a given screen
+# Size, timer style, Applied by me, slot cap
 # --------------------------------------------------------------------------- #
 
-def test_seed_sizes_pick_the_tier_by_height():
-    assert seed_sizes_for_height(1080)["iconSize"] == 48
-    assert seed_sizes_for_height(1440)["iconSize"] == 56
-    assert seed_sizes_for_height(2160)["iconSize"] == 64
-    # Boundaries are inclusive-upper, and the top tier is open-ended.
-    assert seed_sizes_for_height(1081)["iconSize"] == 56
-    assert seed_sizes_for_height(1441)["iconSize"] == 64
-    assert seed_sizes_for_height(4320)["iconSize"] == 64
-    # An ultrawide is keyed on height, so 3440x1440 seeds like any 1440p screen.
-    assert seed_sizes_for_height(1440) == seed_sizes_for_height(1440)
-    # Below the lowest tier still lands on it rather than falling through.
-    assert seed_sizes_for_height(720)["iconSize"] == 48
+def test_scale_clamps_and_the_retired_pixel_sizes_never_zombie():
+    grid = validate_grid({"scale": 999, "iconSize": 64, "timerFontSize": 20,
+                          "stackFontSize": 18, "showTimers": True})
+    assert grid["scale"] == CLAMP_SPECS["scale"][2]
+    assert validate_grid({"scale": 10})["scale"] == CLAMP_SPECS["scale"][1]
+    assert validate_grid({"scale": "junk"})["scale"] == 100
+    for key in ("iconSize", "timerFontSize", "stackFontSize", "showTimers"):
+        assert key not in grid, key
 
 
-def test_every_seed_size_survives_validate_grid():
-    # The tier table must stay inside CLAMP_SPECS or a seeded grid would be
-    # silently clamped on its first load.
-    for _, sizes in SEED_SIZE_TIERS:
-        grid = validate_grid(dict(sizes))
-        for key, value in sizes.items():
-            assert grid[key] == value, key
+def test_timer_style_reads_bar_digits_or_off():
+    # The retired `showTimers` is the schema 2 -> 3 rung's to convert (test_overlay_rung).
+    def style(raw):
+        return validate_grid(raw)["timerStyle"]
+    assert style({"timerStyle": "bar"}) == "bar"
+    assert style({"timerStyle": "off"}) == "off"
+    assert style({}) == "digits"
+    assert style({"timerStyle": "BAR"}) == "digits"
+    assert TIMER_STYLES == ("bar", "digits", "off")
 
 
-def test_apply_seed_sizes_overwrites_every_grid_in_place():
-    grids = [create_default_grid(), create_default_grid("target")]
-    returned = apply_seed_sizes(grids, 2160)
-    assert returned is grids
-    for grid in grids:
-        assert grid["iconSize"] == 64
-        assert grid["timerFontSize"] == 23
-        assert grid["stackFontSize"] == 21
-    # Non-size fields are untouched — this only restamps the three px sizes.
-    assert grids[1]["type"] == "target"
+def test_applied_by_me_is_kept_only_when_true():
+    assert "selfCastOnly" not in validate_grid({})
+    assert validate_grid({"selfCastOnly": True})["selfCastOnly"] is True
+    assert "selfCastOnly" not in validate_grid({"selfCastOnly": False})
+    assert "selfCastOnly" not in validate_grid({"selfCastOnly": 1})
 
 
-def test_seed_sizes_are_returned_as_copies():
-    first = seed_sizes_for_height(1080)
-    first["iconSize"] = 999
-    assert seed_sizes_for_height(1080)["iconSize"] == 48
+def test_the_slot_cap_is_per_grid():
+    assert MAX_GRID_SLOTS == 64
 
 
-def test_rescale_seed_sizes_moves_a_pristine_seed_onto_the_new_tier():
-    grids = apply_seed_sizes([create_default_grid(), create_default_grid("target")], 1080)
-    returned = rescale_seed_sizes(grids, 1080, 2160)
-    assert returned is grids
-    for grid in grids:
-        sizes = {k: grid[k] for k in ("iconSize", "timerFontSize", "stackFontSize")}
-        assert sizes == seed_sizes_for_height(2160)
+# --------------------------------------------------------------------------- #
+# Overhead grids and bands
+# --------------------------------------------------------------------------- #
+
+def test_a_band_reads_its_cap_and_slots_and_derives_its_shape():
+    g = validate_grid({"type": "hostile", "rowCap": 5, "maxSlots": 12})
+    assert is_band(g)
+    assert (g["rowCap"], g["maxSlots"], g["rows"], g["cols"], g["fillDirection"]) == (5, 12, 3, 5, "C")
+    assert slot_count(g) == 12
+    g = validate_grid({"type": "friendly", "rowCap": 4, "maxSlots": 99})
+    assert (g["rowCap"], g["maxSlots"]) == (5, 16)
+    assert validate_grid({"type": "friendly", "rowCap": 6})["rowCap"] == 7
+    assert validate_grid({"type": "friendly", "rowCap": 1})["rowCap"] == 3
+    assert validate_grid({"type": "friendly", "rowCap": 70})["rowCap"] == 7
+    g = validate_grid({"type": "friendly", "rowCap": 7, "maxSlots": 3})
+    assert (g["rows"], g["cols"]) == (1, 7)
 
 
-def test_rescale_seed_sizes_keeps_a_tuned_grid_proportional():
-    # 60 px icons on the 48 px tier = 1.25x the seed; on the 56 px tier that is 70.
-    grid = dict(create_default_grid(), iconSize=60, timerFontSize=17, stackFontSize=8)
-    rescale_seed_sizes([grid], 1080, 1440)
-    assert grid["iconSize"] == 70
-    assert grid["timerFontSize"] == 20          # exactly the new seed
-    assert grid["stackFontSize"] == 10          # round(8 * 19 / 16)
-    assert grid["gap"] == create_default_grid()["gap"]   # not a tier size
+def test_a_band_saved_as_a_box_reads_its_cap_off_its_columns_and_its_slots_off_its_shape():
+    g = validate_grid({"type": "hostile", "rows": 2, "cols": 8})
+    assert (g["rowCap"], g["maxSlots"], g["rows"], g["cols"]) == (7, 16, 3, 7)
+    g = validate_grid({"type": "friendly", "rows": 1, "cols": 4})
+    assert (g["rowCap"], g["maxSlots"], g["rows"], g["cols"]) == (5, 4, 1, 5)
+    g = validate_grid({"type": "friendly"})
+    assert (g["rowCap"], g["maxSlots"]) == (7, 8), "the default 1x10 clamps to 1x8 first"
 
 
-def test_rescale_seed_sizes_clamps_and_noops_within_a_tier():
-    grid = dict(create_default_grid(), iconSize=120)
-    rescale_seed_sizes([grid], 1080, 2160)
-    assert grid["iconSize"] == CLAMP_SPECS["iconSize"][2]      # 160 clamped to 128
-    same = dict(create_default_grid(), iconSize=33)
-    rescale_seed_sizes([same], 1080, 720)                      # both on the 1080 tier
-    assert same["iconSize"] == 33
+def test_a_box_has_no_cap_and_keeps_its_shape():
+    g = validate_grid({"type": "hostile", "slotMode": "static", "rows": 2, "cols": 8,
+                       "rowCap": 5, "maxSlots": 3})
+    assert not is_band(g)
+    assert "rowCap" not in g and "maxSlots" not in g
+    assert (g["rows"], g["cols"], slot_count(g)) == (2, 8, 16)
+    g = validate_grid({"type": "player", "rows": 2, "cols": 8, "rowCap": 5})
+    assert "rowCap" not in g and g["fillDirection"] == "TL-BR", (
+        "a box with a stray band key and no fill snaps the default LR to its 2x8 shape")
+
+
+def test_an_unfit_box_fill_snaps_on_load_to_the_order_it_draws_in():
+    """A fill the shape does not offer reads as the renderers already draw it,
+    for an overhead box as for a screen one; a fit one is untouched."""
+    for gtype in ("player", "hostile"):
+        def fill(rows, cols, code):
+            return validate_grid({"type": gtype, "slotMode": "static", "rows": rows,
+                                  "cols": cols, "fillDirection": code})["fillDirection"]
+        assert fill(2, 3, "LR") == "TL-BR"
+        assert fill(3, 1, "LR") == "TB"
+        assert fill(1, 3, "TL-BR") == "LR"
+        assert fill(2, 3, "BR-TL") == "BR-TL"
+        assert fill(1, 3, "RL") == "RL"
+        assert fill(3, 1, "BT") == "BT"
+
+
+def test_a_snapped_fill_draws_every_slot_where_the_unfit_code_did():
+    from kazbars.grid_preview import slot_pos
+    codes = ('LR', 'RL', 'TB', 'BT', 'BL-TR', 'BR-TL', 'TL-BR', 'TR-BL')
+    for rows, cols in ((1, 4), (4, 1), (2, 3), (1, 1)):
+        for code in codes:
+            snapped = snap_fill(rows, cols, code)
+            assert snapped in valid_fills(rows, cols)[0]
+            def order(fill):
+                return [slot_pos(rows, cols, fill, i) for i in range(rows * cols)]
+            assert order(snapped) == order(code), (rows, cols, code)
+
+
+def test_an_overhead_box_is_capped_at_sixteen_slots():
+    assert (lambda g: (g["rows"], g["cols"]))(validate_grid(
+        {"type": "friendly", "slotMode": "static", "rows": 10, "cols": 10})) == (4, 4)
+    assert (lambda g: (g["rows"], g["cols"]))(validate_grid(
+        {"type": "hostile", "slotMode": "static", "rows": 3, "cols": 8})) == (3, 5)
+    assert (lambda g: (g["rows"], g["cols"]))(validate_grid(
+        {"type": "hostile", "slotMode": "static"})) == (1, 8)
+    assert validate_grid({"type": "target", "rows": 10})["rows"] == 10
+    assert (max_slots("hostile"), max_slots("player")) == (16, 64)
+    assert max_shape("friendly") == (4, 8) and max_shape("target") == (64, 64)
+
+
+def test_only_an_overhead_grid_carries_height_and_range():
+    g = validate_grid({"type": "hostile"})
+    assert (g["plateOffset"], g["maxDistance"]) == (PLATE_OFFSET_DEFAULT, PLATE_DISTANCE_DEFAULT)
+    g = validate_grid({"type": "hostile", "plateOffset": 9999, "maxDistance": 1})
+    assert (g["plateOffset"], g["maxDistance"]) == (400, 5)
+    g = validate_grid({"type": "target", "plateOffset": 90, "maxDistance": 30})
+    assert "plateOffset" not in g and "maxDistance" not in g
+
+
+def test_only_a_friendly_grid_carries_over_me():
+    assert validate_grid({"type": "friendly"})["showSelf"] is True
+    assert validate_grid({"type": "friendly", "showSelf": False})["showSelf"] is False
+    assert validate_grid({"type": "friendly", "showSelf": 0})["showSelf"] is True
+    assert "showSelf" not in validate_grid({"type": "hostile", "showSelf": False})
+    assert "showSelf" not in validate_grid({"type": "player", "showSelf": False})
+
+
+def test_a_new_overhead_grid_is_a_band_or_a_box_with_bar_timers():
+    band = create_default_grid("friendly", 2, 5, "dynamic", "F")
+    assert (band["rowCap"], band["maxSlots"], band["rows"], band["cols"]) == (5, 10, 2, 5)
+    assert band["timerStyle"] == "bar" and band["showSelf"] is True
+    assert validate_grid(dict(band)) == band
+    single = create_default_grid("hostile", 1, 1, "dynamic", "H")
+    assert (single["slotMode"], single["rowCap"], single["maxSlots"]) == ("dynamic", 3, 1)
+    assert single["layout"] == "debuffFirst" and "showSelf" not in single
+    box = create_default_grid("hostile", 3, 3, "static", "B")
+    assert "rowCap" not in box and (box["rows"], box["cols"]) == (3, 3)
+    assert validate_grid(dict(box)) == box
+    assert create_default_grid("player", 1, 1)["slotMode"] == "static"
+    assert snap_row_cap(4) == 5 and snap_row_cap(2) == 3 and snap_row_cap(6) == 7
+    assert (BAND_ROW_CAPS, BAND_ROW_CAP_DEFAULT, BAND_SLOTS_DEFAULT) == ((3, 5, 7), 5, 10)
+
+
+def test_a_box_settles_inside_its_limits_with_a_fill_that_fits():
+    assert settle_box(10, 8, 'LR', 'player', False) == (10, 6, 'BL-TR')  # 64 slots
+    assert settle_box(9, 8, 'LR', 'player', False, give='rows') == (8, 8, 'BL-TR')  # rows were edited
+    assert settle_box(1, 1, 'LR', 'player', True) == (1, 2, 'LR')  # never a dynamic 1x1
+    assert settle_box(1, 1, 'LR', 'player', False) == (1, 1, 'LR')
+    assert settle_box(5, 9, 'TB', 'hostile', False) == (4, 4, 'BL-TR')
+    assert valid_fills(3, 1) == (('TB', 'BT'), 'BT')
+
+
+def test_a_ref_list_reads_a_scalar_as_one_and_drops_empty_entries():
+    assert ref_list(5) == [5] and ref_list(None) == [] and ref_list(0) == []
+    assert ref_list([7, None, '', 0, 8]) == [7, 8]
+
+
+def test_a_grid_id_is_always_text():
+    assert validate_grid({"id": 300})["id"] == "300"
+    assert validate_grid({"id": None})["id"] == create_default_grid()["id"]
+    assert validate_grid({"id": "  "})["id"] == create_default_grid()["id"]
+    assert validate_grid({"id": " Keep "})["id"] == " Keep "
+
+
+def test_a_grid_missing_type_dependent_keys_gets_its_types_defaults():
+    hostile = validate_grid({'type': 'hostile', 'id': 'H'})
+    assert (hostile['timerStyle'], hostile['layout']) == ('bar', 'debuffFirst')
+    target = validate_grid({'type': 'target', 'id': 'T'})
+    assert (target['timerStyle'], target['layout']) == ('digits', 'debuffFirst')
+    player = validate_grid({'type': 'player', 'id': 'P'})
+    assert (player['timerStyle'], player['layout']) == ('digits', 'buffFirst')
+
+
+def test_slot_keys_are_slot_numbers_as_text():
+    grid = validate_grid({'id': 'S', 'slotMode': 'static', 'rows': 2, 'cols': 2,
+                          'slotAssignments': {0: [1], '1': [2], 'a': [3], '-1': [4], True: [5]}})
+    assert grid['slotAssignments'] == {'0': [1], '1': [2]}

@@ -43,6 +43,56 @@ def clamp_to_screen(x, y, width, height):
         return x, y
 
 
+def fit_window_height(window, width, min_height=None, about_centre=False):
+    """Re-fit a fixed-width window to the height its content needs right now.
+
+    A panel that locks its geometry once at construction clips its last row the
+    moment a runtime string wraps to a second line — a two-line status, a long
+    log filename — because the window never follows the content. Call this
+    wherever that text is written, not just at build time. Cheap: it reconfigures
+    only when the needed height actually moved, and re-clamps (title bar
+    counted) so growing can't push the window off the bottom of the screen.
+    `min_height` is a floor the window never fits under; `about_centre` grows
+    and shrinks it both ways about its centre instead of from its top edge.
+    """
+    window.update_idletasks()
+    needed = max(min_height or 0, window.winfo_reqheight())
+    grow = needed - window.winfo_height()
+    if not grow:
+        return
+    bar = max(0, window.winfo_rooty() - window.winfo_y())
+    y = window.winfo_y() - (grow // 2 if about_centre else 0)
+    x, y = clamp_to_screen(window.winfo_x(), y, width, needed + bar)
+    window.geometry(f'{width}x{needed}+{x}+{y}')
+
+
+def center_on_parent(window, parent, width=None, height=None, min_height=None):
+    """Centre `window` on `parent`'s current geometry, inside the screen.
+
+    The dialogs the app opens over itself come up here every time, never at a
+    remembered spot. A given width / height is set; `min_height` sets the
+    height the content needs, never under that floor; a missing size is the
+    window's requested size, and with none only the position is set, so the
+    window keeps sizing to its content. The frame's title bar (the client
+    area winfo_reqheight leaves out) is counted, the parent wearing the same;
+    a frameless (override-redirect) window has none.
+    """
+    # Always, sizes given or not: an override-redirect window (the build
+    # screen) is placed and shown only once the idle pass has applied the flag.
+    window.update_idletasks()
+    w = window.winfo_reqwidth() if width is None else width
+    if min_height is not None:
+        h = max(min_height, window.winfo_reqheight())
+    else:
+        h = window.winfo_reqheight() if height is None else height
+    bar = 0 if window.overrideredirect() else max(0, parent.winfo_rooty() - parent.winfo_y())
+    x = parent.winfo_rootx() + (parent.winfo_width() - w) // 2
+    y = parent.winfo_rooty() + (parent.winfo_height() - h - bar) // 2
+    x, y = clamp_to_screen(x, y, w, h + bar)
+    size = '' if width is None and height is None and min_height is None else f'{w}x{h}'
+    window.geometry(f'{size}+{x}+{y}')
+
+
 def save_window_position(window_name, x, y, width=None, height=None):
     """Persist a window's position and optional size into the shared
     ``window_positions`` prefs dict, keyed by window name."""

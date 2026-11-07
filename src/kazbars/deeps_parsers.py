@@ -7,16 +7,15 @@ no shared state — pure functions on log lines.
 
 Five parser entry points:
 
-- `parse_outgoing_damage(line)` — damage authored by the logger
+- `parse_outgoing_damage_with_target(line)` — damage authored by the logger
 - `parse_incoming_damage(line)` — damage targeting the logger
 - `parse_incoming_heal(line)`   — heals targeting the logger (classified)
-- `parse_pet_hit(line)`         — damage authored by a known pet
+- `parse_pet_hit_with_target(line)` — damage authored by a known pet
 - `parse_outgoing_heal(line)`   — heals authored by the logger to other players
 
-`parse_outgoing_damage` and `parse_pet_hit` have `_with_target` siblings
-that return the target name alongside the amount, so the meter can
-populate a known-mobs set used to filter bubble-boss heal-conversion
-lines out of HPS-out.
+The two `_with_target` parsers return the target name alongside the amount,
+so the meter can populate a known-mobs set used to filter bubble-boss
+heal-conversion lines out of HPS-out.
 
 Plus `strip_log_timestamp(line)` for callers that haven't already
 stripped the `[YYYY-MM-DD HH:MM:SS] ` prefix.
@@ -201,9 +200,16 @@ def strip_log_timestamp(line: str) -> str:
 def parse_outgoing_damage_with_target(line: str) -> tuple[int, str] | None:
     """Return `(amount, target)` iff `line` is a hit authored by the logger.
 
-    Same filtering as `parse_outgoing_damage`; the target is surfaced for the
-    meter's known-mobs registry (used to filter bubble-boss heal-conversion
-    lines out of HPS-out).
+    Mirrors Deeps's parse_me_damage. Rejection rules (in order):
+      - heal verbs (`Your Word of Command heals X for N`)
+      - self-damage (`Your X hits you for N` — Layer 2 owns it)
+      - own-pet target (`Your X hits Your Cacodemon for N` — drain cost)
+      - own-pet actor  (`Your Mutilator hits Y for N` — pet parser owns it)
+
+    Drain-ability classification (PR 1 §6.2 in Deeps) is a no-op because
+    Deeps's `abilities.json` ships empty; we skip it entirely. The target is
+    surfaced for the meter's known-mobs registry (used to filter bubble-boss
+    heal-conversion lines out of HPS-out).
     """
     if line.startswith("Your "):
         m = _RE_DMG.match(line)
@@ -219,7 +225,7 @@ def parse_outgoing_damage_with_target(line: str) -> tuple[int, str] | None:
         # Drain-to-own-pet: resource cost, not real outgoing damage.
         if target_is_own_pet(target):
             return None
-        # Own-pet actor: route to parse_pet_hit instead.
+        # Own-pet actor: route to parse_pet_hit_with_target instead.
         actor = m.group(1)
         if actor_is_pet(actor):
             return None
@@ -235,22 +241,6 @@ def parse_outgoing_damage_with_target(line: str) -> tuple[int, str] | None:
         return int(m.group(3)), m.group(2)
 
     return None
-
-
-def parse_outgoing_damage(line: str) -> int | None:
-    """Return the damage amount iff `line` is a hit authored by the logger.
-
-    Mirrors Deeps's parse_me_damage. Rejection rules (in order):
-      - heal verbs (`Your Word of Command heals X for N`)
-      - self-damage (`Your X hits you for N` — Layer 2 owns it)
-      - own-pet target (`Your X hits Your Cacodemon for N` — drain cost)
-      - own-pet actor  (`Your Mutilator hits Y for N` — pet parser owns it)
-
-    Drain-ability classification (PR 1 §6.2 in Deeps) is a no-op because
-    Deeps's `abilities.json` ships empty; we skip it entirely.
-    """
-    result = parse_outgoing_damage_with_target(line)
-    return result[0] if result is not None else None
 
 
 # =========================================================================== #
@@ -336,8 +326,11 @@ def parse_pet_hit_with_target(line: str) -> tuple[int, str] | None:
     Only the logger's own pet counts. AoC prefixes the logger's pet lines with
     `Your ` (`Your Cacodemon's Hellfire hits X for N`); group-mates' pets of
     the same kind appear without it, so the `Your ` gate isolates your pet and
-    excludes team-mates'. The target is surfaced for the meter's known-mobs
-    registry.
+    excludes team-mates'. Used by the meter when the `include_pet_damage`
+    toggle is enabled. Rejects heal verbs, target == `you` (Layer 2 owns those)
+    and actors whose pet-name doesn't resolve to a known pet; accepts the
+    possessive (`Your Cacodemon's Hellfire`) and bare (`Your Mutilator`)
+    own-pet shapes. The target is surfaced for the meter's known-mobs registry.
     """
     if not line.startswith("Your "):
         return None
@@ -356,22 +349,6 @@ def parse_pet_hit_with_target(line: str) -> tuple[int, str] | None:
     if not is_pet(_extract_pet_name(actor)):
         return None
     return int(m.group(4)), target
-
-
-def parse_pet_hit(line: str) -> int | None:
-    """Return the damage amount iff `line` is a hit authored by your own pet.
-
-    Used by the meter when the `include_pet_damage` toggle is enabled. Rejects:
-      - lines not prefixed `Your ` (team-mates' pets of the same kind)
-      - heal verbs
-      - target == `you` (Layer 2 owns those)
-      - actors whose pet-name doesn't resolve to a known pet
-
-    Accepts the possessive (`Your Cacodemon's Hellfire`) and bare
-    (`Your Mutilator`) own-pet shapes.
-    """
-    result = parse_pet_hit_with_target(line)
-    return result[0] if result is not None else None
 
 
 # =========================================================================== #

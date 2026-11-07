@@ -45,7 +45,11 @@ def test_backup_restore_round_trip(tmp_path) -> None:
             "scratch.tmp": b"transient - must be skipped",
         },
     )
-    # The userdata/ allowlist: profiles/, database_user.json, prefs.json.
+    # The userdata/ allowlist: profile.yml, a 3.1 profiles/, database_user.json,
+    # prefs.json.
+    profile = tmp_path / "profile.yml"
+    profile.write_bytes(b"format: kazbars-profile\n")
+    (tmp_path / "profile.yml.bak").write_bytes(b"session snapshot - local only")
     profiles = tmp_path / "profiles"
     _make_tree(profiles, {"Default.json": b'{"grids": []}', "Alt.json": b"{}"})
     database_user = tmp_path / "database_user.json"
@@ -60,6 +64,7 @@ def test_backup_restore_round_trip(tmp_path) -> None:
     sections = write_backup_zip(
         zip_path,
         funcom_dir=funcom,
+        profile_file=profile,
         profiles_dir=profiles,
         database_user=database_user,
         prefs_file=prefs,
@@ -67,7 +72,7 @@ def test_backup_restore_round_trip(tmp_path) -> None:
     )
 
     assert sections["funcom"]["files"] == 4  # .tmp excluded
-    assert sections["kazbars"] == {"profiles": 2, "database_user": 1, "prefs": 1}
+    assert sections["kazbars"] == {"profile": 1, "profiles": 2, "database_user": 1, "prefs": 1}
 
     # content/ never leaks into the archive.
     with zipfile.ZipFile(zip_path) as zf:
@@ -81,7 +86,9 @@ def test_backup_restore_round_trip(tmp_path) -> None:
     funcom_dest = tmp_path / "restored_prefs"
     userdata_dest = tmp_path / "restored_userdata"
     restored = restore_zip(zip_path, funcom_dest=funcom_dest, userdata_dest=userdata_dest)
-    assert restored == {"funcom": 4, "kazbars": 3}  # 2 profiles + db_user, NOT prefs
+    assert restored == {"funcom": 4, "kazbars": 4}  # profile + 2 library + db_user, NOT prefs
+    assert (userdata_dest / "profile.yml").read_bytes() == b"format: kazbars-profile\n"
+    assert not (userdata_dest / "profile.yml.bak").exists()
 
     assert (funcom_dest / "Prefs_3.xml").read_bytes() == b"<Root/>"
     assert (funcom_dest / "acct/Char1/preview.bin").read_bytes() == b"\x00\x01\x02"
@@ -96,7 +103,7 @@ def test_backup_restore_round_trip(tmp_path) -> None:
     restored2 = restore_zip(
         zip_path, funcom_dest=tmp_path / "fp2", userdata_dest=with_prefs, include_prefs=True
     )
-    assert restored2["kazbars"] == 4  # + prefs.json
+    assert restored2["kazbars"] == 5  # + prefs.json
     assert (with_prefs / "prefs.json").read_bytes() == b'{"game_path": "X"}'
 
 
@@ -182,6 +189,7 @@ def _stub_restore_settings_deps(monkeypatch, tmp_path, order, *, release_store_o
     monkeypatch.setattr(settings_backup, "database_user_path", lambda: tmp_path / "db.json")
     monkeypatch.setattr(settings_backup, "prefs_path", lambda: tmp_path / "prefs.json")
     monkeypatch.setattr(settings_backup, "userdata_root", lambda: tmp_path)
+    monkeypatch.setattr(settings_backup, "profile_bak_path", lambda: tmp_path / "profile.yml.bak")
     monkeypatch.setattr(
         settings_backup, "restore_zip",
         lambda *a, **k: order.append("restore_zip") or {"funcom": 1, "kazbars": 1})
@@ -190,14 +198,14 @@ def _stub_restore_settings_deps(monkeypatch, tmp_path, order, *, release_store_o
         lambda app: order.append("release_store") or release_store_ok)
     monkeypatch.setattr(
         settings_backup.profile_io, "startup_profile",
-        lambda app: order.append("startup_profile"))
+        lambda app, active_hint=None: order.append(f"startup_profile:{active_hint}"))
     monkeypatch.setattr(settings_backup, "Messagebox", SimpleNamespace(
         show_info=lambda *a, **k: None, show_error=lambda *a, **k: None))
 
 
 def _restore_app(order, tmp_path):
     return SimpleNamespace(
-        app_path=tmp_path, app_version="3.0.0", profiles_path=tmp_path / "profiles",
+        app_path=tmp_path, app_version="3.0.0",
         settings=SimpleNamespace(reload=lambda: order.append("settings.reload")),
         database=SimpleNamespace(reload=lambda: order.append("database.reload")),
         db_panel=None,
@@ -208,11 +216,13 @@ def test_restore_settings_flushes_before_restoring_then_reopens(monkeypatch, tmp
     order = []
     _stub_restore_settings_deps(monkeypatch, tmp_path, order)
     app = _restore_app(order, tmp_path)
+    (tmp_path / "profile.yml.bak").write_text("pre-restore", encoding="utf-8")
 
     restore_settings(app, SimpleNamespace(destroy=lambda: None))
 
     assert order == [
-        "release_store", "restore_zip", "settings.reload", "database.reload", "startup_profile"]
+        "release_store", "restore_zip", "settings.reload", "database.reload", "startup_profile:None"]
+    assert not (tmp_path / "profile.yml.bak").exists(), "an unreadable restore never falls back to it"
 
 
 def test_restore_settings_aborts_before_restore_zip_when_release_store_fails(
@@ -224,3 +234,54 @@ def test_restore_settings_aborts_before_restore_zip_when_release_store_fails(
     restore_settings(app, SimpleNamespace(destroy=lambda: None))
 
     assert order == ["release_store"]  # never reached restore_zip or anything after
+
+
+def test_a_3_1_backup_restores_its_library_and_the_next_startup_adopts(monkeypatch, tmp_path) -> None:
+    """A backup from 3.1 holds `kazbars/profiles/`, no `profile.yml`: restore
+    drops the current profile.yml so the startup step adopts from the
+    restored library."""
+    import json
+
+    from kazbars import grid_model, profile_io, userdata
+    from kazbars.profile_document import SectionRegistry, new_document
+
+    monkeypatch.setattr(userdata, "app_path", lambda: tmp_path)
+    userdata.ensure_layout()
+    root = userdata.userdata_root()
+    (root / "profile.yml").write_text("format: kazbars-profile\n", encoding="utf-8")
+    registry = SectionRegistry()
+    registry.register(grid_model.PROFILE_SECTION)
+    raid = new_document(registry, "Raid", (1920, 1080))
+    z = tmp_path / "backup.zip"
+    with zipfile.ZipFile(z, "w") as zf:
+        zf.writestr("kazbars/profiles/Raid.json", json.dumps(raid))
+        zf.writestr("kazbars/prefs.json", json.dumps({"active_profile": raid["id"]}))
+        zf.writestr("manifest.json", json.dumps({
+            "format": "kazbars-settings-backup",
+            "sections": {"kazbars": {"profiles": 1, "prefs": 1}}}))
+
+    order = []
+    _stub_restore_settings_deps(monkeypatch, tmp_path, order)
+    monkeypatch.setattr(settings_backup, "read_manifest", read_manifest)
+    monkeypatch.setattr(settings_backup, "filedialog",
+                        SimpleNamespace(askopenfilename=lambda **k: str(z)))
+    monkeypatch.setattr(settings_backup, "userdata_root", userdata.userdata_root)
+    monkeypatch.setattr(settings_backup, "restore_zip", restore_zip)
+    restore_settings(_restore_app(order, tmp_path), SimpleNamespace(destroy=lambda: None))
+    assert order[-1] == f"startup_profile:{raid['id']}", "the zip's own pointer, prefs restored or not"
+    assert not (root / "profile.yml").exists()
+    assert (root / "profiles" / "Raid.json").exists()
+
+    adopted = profile_io._adopt_library(SimpleNamespace(registry=registry))
+    assert adopted["id"] == raid["id"]
+
+
+def test_a_backup_with_profile_yml_is_not_a_library_backup() -> None:
+    def manifest(kz):
+        return {"format": "kazbars-settings-backup", "sections": {"kazbars": kz}}
+
+    assert not settings_backup._is_library_backup(manifest({"profile": 1, "profiles": 2}))
+    # profile.yml failed to add: still this version's backup, never a 3.1 one.
+    assert not settings_backup._is_library_backup(manifest({"profile": 0, "profiles": 2}))
+    assert settings_backup._is_library_backup(manifest({"profiles": 2, "prefs": 1}))
+    assert not settings_backup._is_library_backup({"format": "kazbars-settings-backup"})

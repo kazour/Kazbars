@@ -1,33 +1,46 @@
 """
 KazBars — Grid Editor Panel
-Grid configuration UI: add/edit/delete grids, whitelist editing, slot assignment.
+Grid configuration UI: the class tabs and the list of grid cards (add, delete,
+reorder by drag or Alt+arrows), the empty state's presets, and grids files (a
+card's Export grid…; File ▸ Import grid… lands in `append_grids`).
 """
 
+import copy
 import logging
 import tkinter as tk
 from tkinter import ttk
 
 logger = logging.getLogger(__name__)
 
-from ttkbootstrap.dialogs import Messagebox
 
+from . import grid_preview, grid_templates
+from .classes import CLASSES, by_id
 from .extras_shortcuts import ExtrasShortcutsRow
 from .grid_dialogs import AddGridWizard
-from .grid_editor_panel import (
-    GridEditorPanel,
-)
+from .grid_editor_panel import GridEditorPanel
 from .grid_model import (
-    MAX_TOTAL_SLOTS,
     create_default_grid,
     dedupe_grid_ids,
     default_grid_name,
     get_game_resolution_or_default,
+    is_plate,
+    set_class,
+    snap_row_cap,
     validate_grid,
 )
+from .grids_generator import free_id, grid_holds
+from .overlay import DEFAULT_FONT, DEFAULT_SIZE, FONT_CHOICES, SIZE_CHOICES, font_label
+from .overlay_size import SCALE_DEFAULT, grid_metrics
+from .prefs import ANCHOR_SIDE_DEFAULT, ANCHOR_UP_DEFAULT
 from .profile_document import build_signature
-from .settings_manager import get_setting
-from .ui_components import DragReorderManager, create_scrollable_frame
-from .ui_forms import draw_grid_cells
+from .profile_io import custom_buffs_suffix, save_yaml_file
+from .profile_share import GRIDS_EXT
+from .settings_manager import get_setting, set_setting
+from .ui_components import (
+    DragReorderManager,
+    create_scrollable_frame,
+    scroll_widget_into_view,
+)
 from .ui_helpers import (
     BTN_MEDIUM,
     FONT_BODY,
@@ -47,6 +60,8 @@ from .ui_helpers import (
     PRESET_CARD_BAR_SHORT,
     PRESET_CARD_SQUARE,
     PRESET_LABEL_AREA,
+    PREVIEW_RATIO,
+    PREVIEW_SLOT_SPACING,
     STEP_BADGE_PX,
     THEME_COLORS,
     TK_COLORS,
@@ -90,29 +105,33 @@ class GridsPanel(ttk.Frame):
         """Build normal view (toolbar + scroll) and empty state frame."""
         self._normal_view = ttk.Frame(self)
 
-        toolbar = ttk.Frame(self._normal_view)
+        # A child of self, packed first: the Overlay row sizes the extras too,
+        # so it stays on screen in the zero-grids empty state.
+        toolbar = ttk.Frame(self)
         toolbar.pack(fill='x', padx=PAD_TAB, pady=PAD_SMALL)
         ttk.Button(toolbar, text="+ Add Grid", command=self.add_grid,
                    width=BTN_MEDIUM).pack(side='left', padx=PAD_BUTTON_GAP)
-        self.slot_count_label = tk.StringVar(value=f"0 / {MAX_TOTAL_SLOTS} slots")
-        self._slot_count_lbl = ttk.Label(toolbar, textvariable=self.slot_count_label,
-                                          font=FONT_BODY, foreground=THEME_COLORS['muted'])
-        self._slot_count_lbl.pack(side='right')
+        self._build_overlay_row(toolbar)
+        self._build_class_tabs()
 
         self._build_tip_bar()
 
         # Extras shortcuts — a child of self (not _normal_view) packed once
         # right here, so the row stays on screen in the zero-grids empty state
-        # too. The state widgets pack after it and land below; the tip bar
-        # anchors `before` it.
+        # too. `side='bottom'` before the state widgets claims the bottom strip
+        # next to Build & Install, so off-by-default add-ons never push the
+        # grids down the page; the state widgets take what is left, and the tip
+        # bar still anchors `before` it (pack order, not position).
         self.extras_row = None
-        self._build_status_lbl = None
+        self.build_status_lbl = None
         if self.app is not None:
             self.extras_row = ExtrasShortcutsRow(self, self.app)
-            self.extras_row.pack(fill='x', padx=PAD_TAB, pady=(PAD_XS, 0))
-            # In-game status line under the cards — packed by
+            self.extras_row.pack(side='bottom', fill='x', padx=PAD_TAB,
+                                 pady=(PAD_XS, 0))
+            # In-game status line above the cards (both pack side='bottom',
+            # so `after` puts this one on top of them) — packed by
             # refresh_build_status() once a build has been recorded.
-            self._build_status_lbl = ttk.Label(self, font=FONT_SMALL,
+            self.build_status_lbl = ttk.Label(self, font=FONT_SMALL,
                                                foreground=THEME_COLORS['muted'])
 
         content = ttk.Frame(self._normal_view)
@@ -123,11 +142,182 @@ class GridsPanel(ttk.Frame):
         outer, self.grids_frame, self.grids_canvas = create_scrollable_frame(
             grids_container)
         outer.pack(fill='both', expand=True)
+        self._tab_empty_lbl = ttk.Label(self.grids_frame, font=FONT_BODY,
+                                        foreground=THEME_COLORS['muted'])
 
         self._drag_manager = DragReorderManager(
             self.grids_canvas, self.grids_frame, self._reorder_grid)
 
         self._empty_state = self._build_empty_state()
+
+    def _build_overlay_row(self, toolbar):
+        """`Overlay: [size] Font: [face]` — the profile-wide base size every
+        in-game size derives from, and the face of every text KazBars.swf
+        draws. Written to the `overlay` section on selection."""
+        self._size_labels = {size: label for size, label in SIZE_CHOICES}
+        self._size_by_label = {label: size for size, label in SIZE_CHOICES}
+        self._font_by_label = {font_label(f): f for f in FONT_CHOICES}
+        self._overlay_font_var = tk.StringVar()
+        font_combo = ttk.Combobox(toolbar, textvariable=self._overlay_font_var,
+                                  values=list(self._font_by_label), width=22, state='readonly')
+        font_combo.pack(side='right')
+        font_combo.bind('<<ComboboxSelected>>', lambda _e: self._on_overlay_changed())
+        add_tooltip(font_combo, "The font of everything KazBars draws in game")
+        ttk.Label(toolbar, text="Font:", font=FONT_BODY,
+                  foreground=THEME_COLORS['muted']).pack(side='right', padx=(PAD_TAB, PAD_XS))
+        self._overlay_size_var = tk.StringVar()
+        size_combo = ttk.Combobox(toolbar, textvariable=self._overlay_size_var,
+                                  values=list(self._size_by_label), width=20, state='readonly')
+        size_combo.pack(side='right')
+        size_combo.bind('<<ComboboxSelected>>', lambda _e: self._on_overlay_changed())
+        add_tooltip(size_combo,
+                    "The base size of everything KazBars draws in game. Each grid and "
+                    "panel has its own Size, a percent of this.")
+        ttk.Label(toolbar, text="Overlay:", font=FONT_BODY,
+                  foreground=THEME_COLORS['muted']).pack(side='right', padx=(0, PAD_XS))
+
+    def _build_class_tabs(self):
+        """`All | Guard Conq DT | PoM ToS BS | Barb Sin Ranger | Demo Necro HoX`:
+        one group per archetype, each tab showing a count of its own grids. A tab
+        lists its own grids only — All the All grids, a class tab the grids with
+        its class (in game a class builds both). The tab is the `grids_tab`
+        pref, so the panel reopens where it was left."""
+        row = ttk.Frame(self)
+        row.pack(fill='x', padx=PAD_TAB, pady=(0, PAD_XS))
+        self._tab_var = tk.IntVar(value=get_setting('grids_tab') or 0)
+        self._tab_buttons: dict[int, tuple[ttk.Radiobutton, str]] = {}
+        groups = [[(0, "All", "Grids built for every class. In game each class gets "
+                              "these as well as its own.")]]
+        for archetype in range(4):
+            groups.append([(c.id, c.short, f"{c.name}: its own grids.")
+                           for c in CLASSES if c.archetype == archetype])
+        for gi, group in enumerate(groups):
+            for k, (cid, short, tip) in enumerate(group):
+                rb = ttk.Radiobutton(row, text=short, value=cid, variable=self._tab_var,
+                                     command=self._on_tab_changed,
+                                     bootstyle='toolbutton')  # type: ignore[call-arg]
+                rb.pack(side='left', padx=(PAD_TAB if gi and k == 0 else 0, 0))
+                add_tooltip(rb, tip)
+                self._tab_buttons[cid] = (rb, short)
+
+    def _tab_class(self):
+        """The current tab's class id, or None for All."""
+        return self._tab_var.get() or None
+
+    def _visible(self):
+        """Indexes into `self.grids` of the grids the current tab lists."""
+        cls = self._tab_class()
+        return [i for i, g in enumerate(self.grids) if g.get('class') == cls]
+
+    def _update_tab_counts(self):
+        for cid, (rb, short) in self._tab_buttons.items():
+            n = sum(1 for g in self.grids if g.get('class') == (cid or None))
+            rb.configure(text=f"{short} {n}" if n else short)
+
+    def _on_tab_changed(self):
+        set_setting('grids_tab', self._tab_var.get())
+        self._repack_panels()
+
+    def move_or_copy(self, panel, class_id, copy_it):
+        """Move to… (the grid's `class` set to `class_id`, 0 All) or Copy to… (a
+        duplicate for that class, its id `<id> <short>` kept clear of every
+        other grid's archive key). Says what it did in a toast."""
+        grid = panel.grid_config
+        short = by_id(class_id).short if class_id else "All"
+        if copy_it:
+            dup = copy.deepcopy(grid)
+            dup['id'] = free_id([g['id'] for g in self.grids], f"{grid['id']} {short}")
+            set_class(dup, class_id)
+            self.grids.append(dup)
+            self._mark_modified()
+            self.refresh_panels()
+            app_toast(self, f"Copied '{grid['id']}' to {short} as '{dup['id']}'", 'info',
+                      key='grids_class')
+        else:
+            set_class(grid, class_id)
+            self._mark_modified()
+            self._repack_panels()
+            app_toast(self, f"Moved '{grid['id']}' to {short}", 'info', key='grids_class')
+
+    # ------------------------------------------------------------------
+    # Grids files: Export grid… (a card's Move… menu); File ▸ Import grid…
+    # lands in `append_grids`
+    # ------------------------------------------------------------------
+    def export_grid(self, panel):
+        """One grid, with the custom buffs it references, to a grids file."""
+        grid = panel.grid_config
+        db = self.database
+        value = grid_templates.build([grid], db.by_id, db.by_name, db.provenance)
+        path = save_yaml_file(value, title="Export Grid", ext=GRIDS_EXT, label="KazBars grids",
+                              stem=grid['id'], noun="grids")
+        if path is None:
+            return
+        suffix = custom_buffs_suffix(len(value.get('buffs', [])))
+        app_toast(self, f"Exported ‘{grid['id']}’ to “{path.name}”{suffix}", 'success')
+
+    def append_grids(self, grids):
+        """A grids file's grids appended to the current tab: each validated,
+        on the tab's class, under a free name (`grid_templates.import_into`),
+        its refs normalised as a load does (unresolved ones kept, greyed).
+        Returns ``(appended, renames)``."""
+        appended, renames = grid_templates.import_into(self.grids, grids, self._tab_class())
+        for grid in appended:
+            self._migrate_grid(grid, [])
+        self.grids.extend(appended)
+        self._mark_modified()
+        self.refresh_panels()
+        if appended:
+            # The new cards land at the end of the tab: bring the first into view
+            # once the Grids view shows.
+            first = self.grid_panels[-len(appended)]
+            self.after_idle(lambda: first.winfo_exists()
+                            and scroll_widget_into_view(self.grids_canvas, first))
+        return appended, renames
+
+    def tab_name(self):
+        """The current tab's class name, or "All"."""
+        tab = by_id(self._tab_var.get())
+        return tab.name if tab else "All"
+
+    def _join_current_tab(self, grid):
+        """A new grid joins the tab it was made on."""
+        set_class(grid, self._tab_var.get())
+        return grid
+
+    def _store(self):
+        return self.app.profile_store if self.app is not None else None
+
+    def _overlay(self):
+        store = self._store()
+        return store.get_section('overlay') if store is not None else {}
+
+    def base_size(self):
+        """The profile's overlay size (the grid cards' previews read it live)."""
+        return self._overlay().get('size', DEFAULT_SIZE)
+
+    def load_overlay(self):
+        """Show the loaded profile's overlay size and font, and redraw every
+        card's preview (profile load or import, first-launch seeding)."""
+        overlay = self._overlay()
+        self._overlay_size_var.set(self._size_labels.get(overlay.get('size', DEFAULT_SIZE), ''))
+        self._overlay_font_var.set(font_label(overlay.get('font', DEFAULT_FONT)))
+        for panel in self.grid_panels:
+            panel.refresh_view()
+        self._redraw_empty_cards()
+
+    def _on_overlay_changed(self):
+        size = self._size_by_label.get(self._overlay_size_var.get(), DEFAULT_SIZE)
+        font = self._font_by_label.get(self._overlay_font_var.get(), DEFAULT_FONT)
+        store = self._store()
+        if store is not None:
+            if store.get_section('overlay') == {'size': size, 'font': font}:
+                return
+            store.update_section('overlay', {'size': size, 'font': font})
+        for panel in self.grid_panels:
+            panel.refresh_view()
+        self._redraw_empty_cards()
+        # The deployed SWF was baked at the old size/font: un-tick Build.
+        self._mark_modified()
 
     def _build_tip_bar(self):
         """Build the contextual next-step guide (tip bar) shown above grids/empty state."""
@@ -203,46 +393,34 @@ class GridsPanel(ttk.Frame):
                       pady=(0, PAD_SECTION_GAP))
 
         self._empty_type_var = tk.StringVar(value="player")
-        self._radio_player, self._radio_target = self._build_radio_row(
+        radios = self._build_radio_row(
             center, "Source:", self._empty_type_var,
-            [("Player", "player"), ("Target", "target")],
-            command=self._redraw_empty_cards, pady=(0, PAD_LF))
+            [("Player", "player"), ("Target", "target"),
+             ("Friendly", "friendly"), ("Hostile", "hostile")],
+            command=self._on_empty_type_changed, pady=(0, PAD_LF))
         # ttkbootstrap strips custom style= at construction; apply via configure() after.
-        self._radio_player.configure(style='Player.TRadiobutton')
-        self._radio_target.configure(style='Target.TRadiobutton')
+        for rb, (style, tip) in zip(radios, (
+            ('Player', "Track buffs/debuffs on yourself"),
+            ('Target', "Track buffs/debuffs on your current target"),
+            ('Friendly', "Overhead: over you, your group and friendly players"),
+            ('Hostile', "Overhead: over your target and anyone fighting you"),
+        )):
+            rb.configure(style=f'{style}.TRadiobutton')
+            add_tooltip(rb, tip)
 
         self._empty_mode_var = tk.StringVar(value="dynamic")
         self._radio_dynamic, self._radio_static = self._build_radio_row(
             center, "Mode:", self._empty_mode_var,
             [("Dynamic", "dynamic"), ("Static", "static")],
-            command=None, pady=(0, PAD_TAB))
+            command=self._redraw_empty_cards, pady=(0, PAD_TAB))
 
-        cards_frame = ttk.Frame(center)
-        cards_frame.pack(pady=(0, PAD_SECTION_GAP), fill='x')
-
-        presets = [
-            ("1\u00d710 Bar", 1, 10, "dynamic", PRESET_CARD_BAR_LONG, PRESET_CARD_BAR_SHORT,
-             "Horizontal bar, great for tracking player buffs across the top"),
-            ("10\u00d71 Bar", 10, 1, "dynamic", PRESET_CARD_BAR_SHORT, PRESET_CARD_SQUARE,
-             "Vertical bar, stack buffs along the side of your screen"),
-            ("3\u00d73 Grid", 3, 3, "dynamic", PRESET_CARD_SQUARE, PRESET_CARD_SQUARE,
-             "Compact grid, fits many buffs in a small area"),
-            ("1\u00d71 Slot \u00b7 static", 1, 1, "static", PRESET_CARD_SQUARE, PRESET_CARD_SQUARE,
-             "Single slot. Pin one specific buff. Mode is locked to Static."),
-            ("Custom", None, None, None, PRESET_CARD_SQUARE, PRESET_CARD_SQUARE,
-             "Open the Add Grid wizard to set custom rows, columns, and options"),
-        ]
+        self._cards_frame = ttk.Frame(center)
+        self._cards_frame.pack(pady=(0, PAD_SECTION_GAP), fill='x')
+        self._cards_frame.bind('<Configure>', self._reflow_preset_cards)
         self._empty_cards = []
-        for i, (label, rows, cols, mode, w, h, desc) in enumerate(presets):
-            card = self._build_preset_card(cards_frame, label, rows, cols, mode, w, h, desc)
-            card.grid(row=0, column=i, padx=PAD_LF, sticky='s')
+        self._cards_overhead = None
+        self._on_empty_type_changed()
 
-        cards_frame.bind('<Configure>', self._reflow_preset_cards)
-
-        self._redraw_empty_cards()
-
-        add_tooltip(self._radio_player, "Track buffs/debuffs on yourself")
-        add_tooltip(self._radio_target, "Track buffs/debuffs on your current target")
         add_tooltip(self._radio_dynamic,
                     "Slots fill automatically as buffs activate. "
                     "You control fill direction, sort order, and grouping.")
@@ -251,6 +429,49 @@ class GridsPanel(ttk.Frame):
                     "Shows the buff when active, stays empty when it's not.")
 
         return frame
+
+    # (label, rows, cols, card w, card h, description) per kind: floating, overhead.
+    _PRESETS = {
+        False: (
+            ("1\u00d710 Bar", 1, 10, PRESET_CARD_BAR_LONG, PRESET_CARD_BAR_SHORT,
+             "Horizontal bar, great for tracking player buffs across the top"),
+            ("10\u00d71 Bar", 10, 1, PRESET_CARD_BAR_SHORT, PRESET_CARD_SQUARE,
+             "Vertical bar, stack buffs along the side of your screen"),
+            ("3\u00d73 Grid", 3, 3, PRESET_CARD_SQUARE, PRESET_CARD_SQUARE,
+             "Compact grid, fits many buffs in a small area"),
+            ("1\u00d71 Slot \u00b7 static", 1, 1, PRESET_CARD_SQUARE, PRESET_CARD_SQUARE,
+             "Single slot. Pin one specific buff. Mode is locked to Static."),
+        ),
+        True: (
+            ("1\u00d73 Row", 1, 3, PRESET_CARD_SQUARE, PRESET_CARD_SQUARE,
+             "Three icons over each head"),
+            ("2\u00d75 Band", 2, 5, PRESET_CARD_SQUARE, PRESET_CARD_SQUARE,
+             "Up to ten icons, five to a row"),
+            ("3\u00d73 Grid", 3, 3, PRESET_CARD_SQUARE, PRESET_CARD_SQUARE,
+             "Up to nine icons, three to a row"),
+            ("1\u00d71 Single", 1, 1, PRESET_CARD_SQUARE, PRESET_CARD_SQUARE,
+             "One icon over each head"),
+        ),
+    }
+
+    def _on_empty_type_changed(self):
+        """Floating and overhead grids have their own presets: rebuild the cards
+        when the source moves between the two kinds, else just recolour them."""
+        overhead = is_plate(self._empty_type_var.get())
+        if overhead != self._cards_overhead:
+            self._cards_overhead = overhead
+            for card, *_ in self._empty_cards:
+                card.destroy()
+            self._empty_cards = []
+            presets = (*self._PRESETS[overhead],
+                       ("Custom", None, None, PRESET_CARD_SQUARE, PRESET_CARD_SQUARE,
+                        "Open the Add Grid wizard to set custom rows, columns, and options"))
+            for i, (label, rows, cols, w, h, desc) in enumerate(presets):
+                card = self._build_preset_card(self._cards_frame, label, rows, cols, w, h, desc)
+                card.grid(row=0, column=i, padx=PAD_LF, sticky='s')
+            self._last_cards_width = None
+            self._reflow_preset_cards()
+        self._redraw_empty_cards()
 
     def _build_radio_row(self, parent, label_text, var, options, command, pady):
         """Pack a label + horizontal Radiobutton group; return the Radiobutton widgets."""
@@ -266,7 +487,7 @@ class GridsPanel(ttk.Frame):
             radios.append(rb)
         return radios
 
-    def _build_preset_card(self, parent, label, rows, cols, mode, card_w, card_h, description):
+    def _build_preset_card(self, parent, label, rows, cols, card_w, card_h, description):
         """Create a preset shape card. Caller grid()s it so _reflow_preset_cards can re-row on resize."""
         border = TK_COLORS['border']
         accent = THEME_COLORS['accent']
@@ -281,12 +502,8 @@ class GridsPanel(ttk.Frame):
 
         self._empty_cards.append((card, rows, cols, card_w, card_h))
 
-        def _on_click(e, r=rows, c=cols, m=mode):
-            if r is None:
-                self._create_from_empty_state(r, c, m)
-                return
-            effective_mode = 'static' if (r == 1 and c == 1) else self._empty_mode_var.get()
-            self._create_from_empty_state(r, c, effective_mode)
+        def _on_click(e, r=rows, c=cols):
+            self._create_from_empty_state(r, c, self._empty_mode_var.get())
 
         def _highlight(e, color, c=card):
             c.configure(highlightbackground=color)
@@ -300,9 +517,10 @@ class GridsPanel(ttk.Frame):
         card.bind('<FocusOut>', lambda e: _highlight(e, border))
         return card
 
-    def _reflow_preset_cards(self, event):
-        """Wrap preset cards into multiple grid rows when the wrapper is too narrow."""
-        avail = event.width
+    def _reflow_preset_cards(self, event=None):
+        """Wrap preset cards into multiple grid rows when the wrapper is too narrow
+        (on resize, and when the cards are rebuilt for another kind of grid)."""
+        avail = event.width if event is not None else self._cards_frame.winfo_width()
         if avail < 100 or not getattr(self, '_empty_cards', None):
             return
         if getattr(self, '_last_cards_width', None) == avail:
@@ -322,8 +540,14 @@ class GridsPanel(ttk.Frame):
             col += 1
 
     def _redraw_empty_cards(self):
-        """Redraw grid shape previews on empty state cards using current type color."""
-        type_color = GRID_TYPE_COLORS[self._empty_type_var.get()]
+        """Redraw grid shape previews on empty state cards using current type
+        color; an overhead dynamic preset draws as the band it makes. Drawn
+        like a grid card's preview (`grid_preview.layout`, a new grid's icons),
+        stepped down to fit the card."""
+        gtype = self._empty_type_var.get()
+        type_color = GRID_TYPE_COLORS[gtype]
+        band = is_plate(gtype) and self._empty_mode_var.get() == 'dynamic'
+        icon = grid_metrics(self.base_size(), SCALE_DEFAULT).icon
         for card, rows, cols, card_w, card_h in self._empty_cards:
             card.delete('cells')
             preview_h = card_h - PRESET_LABEL_AREA
@@ -332,7 +556,15 @@ class GridsPanel(ttk.Frame):
                                  anchor='center', fill=type_color,
                                  font=FONT_HEADING, tags='cells')
                 continue
-            draw_grid_cells(card, rows, cols, type_color, card_w, preview_h)
+            lay = grid_preview.layout(
+                rows, cols, icon=icon, gap=-1,
+                band=(snap_row_cap(cols), rows * cols) if band else None,
+                num=PREVIEW_RATIO[0], den=PREVIEW_RATIO[1], spacing=PREVIEW_SLOT_SPACING,
+                max_w=card_w - 2 * PAD_LF, max_h=preview_h - PAD_LF)
+            ox, oy = (card_w - lay.width) // 2, (preview_h - lay.height) // 2
+            for x0, y0, x1, y1 in lay.rects:
+                card.create_rectangle(ox + x0, oy + y0, ox + x1 - 1, oy + y1 - 1, fill=type_color,
+                                      outline=TK_COLORS['separator'], tags='cells')
 
     def _dismiss_tip(self):
         """Dismiss the tip bar permanently for this session."""
@@ -354,7 +586,7 @@ class GridsPanel(ttk.Frame):
 
     def refresh_extras_shortcuts(self):
         """Resync the extras shortcut cards after an Extras dialog Apply (and,
-        via apply_document, on every profile switch). The status row rides
+        via apply_document, on every profile load, import or reset). The status row rides
         along — every path that changes a BUILD section goes through here or
         `_mark_modified`."""
         if self.extras_row is not None:
@@ -366,12 +598,12 @@ class GridsPanel(ttk.Frame):
         built from, and whether the live document (BUILD sections + target
         resolution) still matches it. No modal anywhere — staleness is a quiet
         row, not an interruption. Hidden until a build is recorded."""
-        if self._build_status_lbl is None:
+        if self.build_status_lbl is None:
             return
         last = self.app.settings.get('last_build') or {}
         store = self.app.profile_store
         if not last or store is None:
-            self._build_status_lbl.pack_forget()
+            self.build_status_lbl.pack_forget()
             return
         name = last.get('profile_name') or 'another profile'
         if last.get('profile_id') != store.document['id']:
@@ -380,15 +612,19 @@ class GridsPanel(ttk.Frame):
         elif (
             build_signature(self.app.registry, store.document) != last.get('hash')
             or list(get_game_resolution_or_default()) != last.get('target_resolution')
+            or [self.app.settings.get('anchor_side'), self.app.settings.get('anchor_up')]
+            != last.get('anchor', [ANCHOR_SIDE_DEFAULT, ANCHOR_UP_DEFAULT])
         ):
             text = f"In game: {name} — differs from the current setup"
             fg = THEME_COLORS['warning']
         else:
             text = f"In game: {name}"
             fg = THEME_COLORS['muted']
-        self._build_status_lbl.configure(text=text, foreground=fg)
-        self._build_status_lbl.pack(fill='x', padx=PAD_TAB, pady=(PAD_XS, 0),
-                                    after=self.extras_row)
+        self.build_status_lbl.configure(text=text, foreground=fg)
+        # `after` is pack order; with side='bottom' that lands it directly
+        # above the extras tiles, under the cards it describes.
+        self.build_status_lbl.pack(side='bottom', fill='x', padx=PAD_TAB,
+                                    pady=(PAD_XS, 0), after=self.extras_row)
 
     def _update_tip(self):
         """Update step guide state and show/hide the tip panel."""
@@ -398,19 +634,7 @@ class GridsPanel(ttk.Frame):
 
         has_game_path = bool(get_setting('game_path'))
         has_grids = bool(self.grids)
-
-        needs_setup = False
-        if has_grids:
-            for g in self.grids:
-                if g.get('slotMode') == 'static':
-                    if not any(v for v in g.get('slotAssignments', {}).values()):
-                        needs_setup = True
-                        break
-                elif not g.get('whitelist'):
-                    needs_setup = True
-                    break
-
-        buffs_done = has_grids and not needs_setup
+        buffs_done = has_grids and all(grid_holds(g) for g in self.grids)
         self._update_step_guide([has_game_path, has_grids, buffs_done, self._build_done])
 
         ready = has_game_path and buffs_done
@@ -433,7 +657,9 @@ class GridsPanel(ttk.Frame):
                                  before=anchor)
 
     def _create_from_empty_state(self, rows, cols, mode):
-        """Create a grid from the empty state preset shortcuts."""
+        """Create a grid from the empty state preset shortcuts (the Custom
+        card, with no shape, opens the wizard; a floating 1x1 is static
+        whatever the mode picked, as `create_default_grid` makes it)."""
         if rows is None:
             self.add_grid()
             return
@@ -443,13 +669,13 @@ class GridsPanel(ttk.Frame):
             grid_type=grid_type, rows=rows, cols=cols, mode=mode,
             grid_id=default_grid_name(grid_type, existing)
         )
-        self.grids.append(grid_config)
+        self.grids.append(self._join_current_tab(grid_config))
         self._mark_modified()
-        self.refresh_panels(expand_index=len(self.grids) - 1)
+        self.refresh_panels()
 
     def get_profile_data(self):
-        """Return current grid configurations (save all panel values first)."""
-        self.save_settings()
+        """The grid configs as they are: a card writes its one live control
+        (Enabled) the moment it is toggled, so nothing needs flushing."""
         return self.grids
 
     def _migrate_whitelist(self, whitelist, missing):
@@ -527,58 +753,24 @@ class GridsPanel(ttk.Frame):
         self.refresh_panels()
         return missing_by_grid
 
-    def get_total_slots(self):
-        """Return total slot count across all grids."""
-        return sum(g['rows'] * g['cols'] for g in self.grids)
-
-    def _update_slot_counter(self):
-        total = self.get_total_slots()
-        pct = total / MAX_TOTAL_SLOTS
-        base = f"{total} / {MAX_TOTAL_SLOTS} slots"
-        if pct >= 0.95:
-            color = THEME_COLORS['danger']
-            text = f"! {base}"
-        elif pct >= 0.80:
-            color = THEME_COLORS['warning']
-            text = base
-        else:
-            color = THEME_COLORS['muted']
-            text = base
-        self.slot_count_label.set(text)
-        self._slot_count_lbl.configure(foreground=color)
-
-    def save_settings(self):
-        """Persist all panel UI values back to grid configs."""
-        for panel in self.grid_panels:
-            panel.save_to_config()
-
     def add_grid(self):
         """Open AddGridWizard dialog."""
         existing_ids = {g['id'] for g in self.grids}
-        current_slots = self.get_total_slots()
-        if current_slots >= MAX_TOTAL_SLOTS:
-            Messagebox.show_warning(f"Maximum {MAX_TOTAL_SLOTS} total slots reached.\n\nRemove a grid or reduce grid sizes to free up slots.", title="Slot Limit")
-            return
-        wizard = AddGridWizard(self.winfo_toplevel(), existing_ids, current_slots,
+        wizard = AddGridWizard(self.winfo_toplevel(), existing_ids,
                                name_in_use=self._grid_name_in_use)
         self.winfo_toplevel().wait_window(wizard)
         if wizard.result:
-            # refresh_panels() rebuilds every card from self.grids, so flush the
-            # live widget state of existing cards first — otherwise their unsaved
-            # edits (Enabled, icon size, position, …) revert to the last save.
-            self.save_settings()
-            self.grids.append(wizard.result)
+            self.grids.append(self._join_current_tab(wizard.result))
             self._mark_modified()
-            self.refresh_panels(expand_index=len(self.grids) - 1)
+            self.refresh_panels()
 
     def delete_grid(self, panel):
         """Delete a single grid — undoable via toast instead of a confirm."""
         for i, p in enumerate(self.grid_panels):
             if p == panel:
-                self.save_settings()  # flush sibling cards before refresh_panels rebuilds them
                 removed = self.grids.pop(i)
                 self._mark_modified()
-                self.refresh_panels(expand_index=-1)
+                self.refresh_panels()
                 gen = self._profile_generation
                 app_toast(self, f"Deleted grid '{removed['id']}' — click to undo",
                           'info', 8, key='grid-delete-undo',
@@ -590,8 +782,8 @@ class GridsPanel(ttk.Frame):
 
         A profile loaded since the delete invalidates the undo — reinserting would
         drop the old profile's grid into the new one. Re-check the insert
-        invariants too: grids added since the delete may have taken the name
-        (names key the AS2 whitelist tables) or the slot budget."""
+        invariant too: a grid added since the delete may have taken the name
+        (names key the AS2 whitelist tables)."""
         if generation != self._profile_generation:
             app_toast(self, "Undo expired — a different profile was loaded", 'info', 4)
             return
@@ -599,29 +791,21 @@ class GridsPanel(ttk.Frame):
             app_toast(self, f"Can't undo — a grid named '{grid.get('id')}' exists now",
                       'warning', 4)
             return
-        if self.get_total_slots() + grid['rows'] * grid['cols'] > MAX_TOTAL_SLOTS:
-            app_toast(self, "Can't undo — not enough free slots", 'warning', 4)
-            return
         index = min(index, len(self.grids))
-        self.save_settings()  # flush live cards before the rebuild
         self.grids.insert(index, grid)
         self._mark_modified()
-        self.refresh_panels(expand_index=index)
+        self.refresh_panels()
 
-    def refresh_panels(self, expand_index=-1):
+    def refresh_panels(self):
         """Rebuild GridEditorPanel widgets or show empty state.
 
-        Destroys and recreates every card from self.grids, so the live widget
-        state of existing cards is discarded. Callers that mutate self.grids
-        while cards are open must save_settings() first or in-progress edits
-        revert to the last save (load/clear deliberately skip the flush).
-
-        Cards collapse by default; only an explicit expand_index (a just-created
-        or restored grid) opens one. Startup and profile loads pass no index, so
-        every card starts collapsed."""
+        Destroys and recreates every card from self.grids: a card holds no
+        state of its own (Enabled is written as it is toggled, everything
+        else by Grid Settings' Apply), so nothing is lost."""
         self._drag_manager.clear()
 
         if not self.grids:
+            self._update_tab_counts()
             self._normal_view.pack_forget()
             self._empty_state.pack(fill='both', expand=True)
             self._update_tip()
@@ -631,35 +815,64 @@ class GridsPanel(ttk.Frame):
         self._normal_view.pack(fill='both', expand=True)
 
         for widget in self.grids_frame.winfo_children():
-            widget.destroy()
+            if widget is not self._tab_empty_lbl:
+                widget.destroy()
         self.grid_panels.clear()
 
-        for i, grid_config in enumerate(self.grids):
+        for grid_config in self.grids:
             panel = GridEditorPanel(
                 self.grids_frame, self.database, grid_config,
-                on_delete=self.delete_grid, initially_open=(i == expand_index),
-                get_total_slots=self.get_total_slots,
-                on_resize=self._on_grid_resized,
+                on_delete=self.delete_grid,
+                get_base_size=self.base_size,
                 on_whitelist_changed=self._on_card_buffs_changed,
                 name_in_use=self._grid_name_in_use,
                 on_edit=self._mark_modified,
+                on_move=self.move_or_copy,
+                find_card=self._card_for,
+                on_export=self.export_grid,
             )
             self.grid_panels.append(panel)
-            self._attach_panel(panel, i)
+        self._repack_panels()
 
-        self._update_slot_counter()
         self._update_tip()
 
     def _attach_panel(self, panel, index):
-        """Pack a grid panel at index with separator and drag handle binding."""
+        """Pack a grid panel at its index among the listed cards, with separator
+        and drag handle binding."""
         if index > 0:
             tk.Frame(self.grids_frame, height=1, bg=TK_COLORS['border']).pack(
                 fill='x', padx=PAD_LIST_ITEM, pady=PAD_ROW)
         panel.pack(fill='x', pady=(0, PAD_ROW), padx=PAD_SMALL)
         self._drag_manager.bind_handle(panel.drag_handle, index, panel_widget=panel)
+        panel.drag_handle.bind('<Alt-Up>', lambda e, i=index: self._move_grid(i, -1))
+        panel.drag_handle.bind('<Alt-Down>', lambda e, i=index: self._move_grid(i, 1))
+
+    def _card_for(self, config):
+        """The card showing `config` now, or None once that grid left the list
+        (deleted, or another profile loaded)."""
+        for grid, panel in zip(self.grids, self.grid_panels):
+            if grid is config:
+                return panel
+        return None
+
+    def _move_grid(self, index, delta):
+        """Keyboard equivalent of dragging the ☰ handle. Clamps at both ends
+        (no wrap) and moves focus with the grid, so Alt+↓ can be repeated to
+        walk a card down the list."""
+        new_index = index + delta
+        visible = self._visible()
+        if 0 <= new_index < len(visible):
+            self._reorder_grid(index, new_index)
+            moved = self.grid_panels[self._visible()[new_index]]
+            moved.drag_handle.focus_set()
+            scroll_widget_into_view(self.grids_canvas, moved)
+        return 'break'
 
     def _reorder_grid(self, old_index, new_index):
-        """Move a grid from old_index to new_index and repack panels."""
+        """Move the listed grid at old_index to new_index (indexes among the
+        current tab's cards) and repack panels."""
+        visible = self._visible()
+        old_index, new_index = visible[old_index], visible[new_index]
         grid = self.grids.pop(old_index)
         self.grids.insert(new_index, grid)
         panel = self.grid_panels.pop(old_index)
@@ -668,26 +881,31 @@ class GridsPanel(ttk.Frame):
         self._repack_panels()
 
     def _repack_panels(self):
-        """Repack existing panels in current order without destroying them."""
+        """Repack the current tab's cards in order without destroying any: a
+        tab switch only changes which cards are packed."""
         self._drag_manager.clear()
         for widget in self.grids_frame.winfo_children():
             if isinstance(widget, tk.Frame) and not isinstance(widget, GridEditorPanel):
                 widget.destroy()
             else:
                 widget.pack_forget()  # type: ignore[attr-defined]
-        for i, panel in enumerate(self.grid_panels):
-            self._attach_panel(panel, i)
+        visible = self._visible()
+        for n, i in enumerate(visible):
+            self._attach_panel(self.grid_panels[i], n)
+        if self.grids and not visible:
+            tab = by_id(self._tab_var.get())
+            self._tab_empty_lbl.configure(
+                text=f"No grids for {tab.name} yet. + Add Grid makes one for this class."
+                if tab else "No grids for every class. + Add Grid makes one.")
+            self._tab_empty_lbl.pack(pady=PAD_SECTION_GAP)
+        self._update_tab_counts()
 
     def _grid_name_in_use(self, name, exclude_config):
         """True if a grid other than `exclude_config` already uses `name`.
         Names key the generated AS2 whitelist tables, so they must stay unique
-        — the card's rename validator calls this to block duplicates (the Add
-        Grid wizard has its own check)."""
+        — Grid Settings asks it (through the card's `name_problem`) to block
+        duplicates (the Add Grid wizard has its own check)."""
         return any(g is not exclude_config and g.get('id') == name for g in self.grids)
-
-    def _on_grid_resized(self):
-        self._update_slot_counter()
-        self._mark_modified()
 
     def _on_card_buffs_changed(self):
         """A card's whitelist / slot-assignment dialog committed — refresh the

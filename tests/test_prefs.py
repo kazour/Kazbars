@@ -7,6 +7,9 @@ shapes outright rather than let a corrupt prefs.json poison the comparisons.
 Run: `pytest tests/test_prefs.py` (from repo root).
 """
 
+import json
+
+from kazbars import settings_core
 from kazbars.prefs import PREFS_SCHEMA, record_last_patch
 from kazbars.settings_core import Store, validate_all
 
@@ -56,3 +59,37 @@ def test_record_last_patch_merges_per_game_and_saves(tmp_path):
                    "buff_bars": {"Player": {"icon_size": 40}}},
         "D:/AoC": {"damage_colors": {"colors": {"self_healed": "00FF00"}}},
     }
+
+
+def test_last_build_keeps_the_overhead_anchor_it_baked():
+    rec = {"profile_id": "a3f81c2e", "hash": "ab" * 32, "anchor": [389, -13]}
+    assert _coerce("last_build", rec)["anchor"] == [389, -13]
+    for junk in ([389], ["389", -13], [True, 0], "389,-13"):
+        assert "anchor" not in _coerce("last_build", dict(rec, anchor=junk)), junk
+
+
+def test_the_overhead_anchor_prefs_clamp_and_default():
+    assert (_coerce("anchor_side", None), _coerce("anchor_up", "x")) == (389, -13)
+    assert (_coerce("anchor_side", 9999), _coerce("anchor_up", -9999)) == (2000, -2000)
+    assert _coerce("anchor_side", "120") == 120
+
+
+def test_the_retired_panel_prefs_are_gone():
+    for key in ("panel_font_size", "build_console"):
+        assert key not in PREFS_SCHEMA.fields
+
+
+def test_v1_prefs_load_without_rung(tmp_path):
+    # A 3.1 prefs.json (schema 1) loads with an empty ladder: live keys kept,
+    # the retired ones erased by strict validation, re-stamped 2 on save.
+    path = tmp_path / PREFS_SCHEMA.filename
+    path.write_text(json.dumps({
+        "schema_version": 1, "game_path": "C:/Games/AoC", "panel_font_size": 16,
+        "stopwatch": {"enabled": True, "fontSize": 16}, "inspect": {"fontSize": 20},
+    }), encoding="utf-8")
+    out = settings_core.load(PREFS_SCHEMA, tmp_path)
+    assert out["game_path"] == "C:/Games/AoC"
+    for key in ("stopwatch", "inspect", "panel_font_size"):
+        assert key not in out
+    settings_core.save(PREFS_SCHEMA, tmp_path, out)
+    assert json.loads(path.read_text(encoding="utf-8"))["schema_version"] == PREFS_SCHEMA.version == 2

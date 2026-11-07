@@ -1,19 +1,23 @@
-// KazBarsCastTimer.as - Timer-only cast overlay (no bar) for player + target.
-// Lifts the cast-tracking + EMA estimate logic from the old KzCastbars module,
-// dropping the bar/mask/color visuals. Pure dynamic text fields (device fonts),
-// so it needs no new symbols in base.swf.
+// KazBarsCastTimer.as - The Casting Timer: a text timer (no bar) for your casts and your target's. A HUD module on the
+// shared runtime: World names the player and the target, each side (KazBarsCastSide) follows one Character's cast
+// signals and measures the cast and its estimate, and one clock task runs every frame while a cast is under way, so
+// idle costs nothing. Device-font text fields, so it needs no symbols in base.swf.
 //
-// Positioning mirrors grids: PLAYER_X/Y + TARGET_X/Y baked into config are the
-// defaults a first-ever session starts from; preview drag persists via the
-// config archive (permanent since the persistence era), as does the preview
-// control panel's master switch (ctv) — inactive renders nothing, live
-// casts included.
+// Display: "elapsed" (the time since the start), "total" (the estimate) or "both" ("1.2 / 2.5"); a total shows once
+// the side has one, and follows the elapsed time when the end comes late. A side's text is written only when it
+// changes. After a retarget, a cast already under way is looked for 120 ms later (a one-shot clock task, the side's
+// probe).
 //
-// Driven from KazBars: create() in onLoad, connectPlayer()/setTarget()
-// from the existing player/target lifecycle, previewOn()/previewOff() from the
-// shared Shift+Ctrl+Alt preview, loadState()/saveState() from the module archive.
+// A HUD element: mouse-transparent, dragged only in preview through the shared overlay (KazBarsPreview). PLAYER_X/Y
+// and TARGET_X/Y baked into config are the first session's; the archive keeps ctpx, ctpy, cttx, ctty and the master
+// switch ctv (off: nothing shows, live casts included). Every engine call sits in a try.
 class KazBarsCastTimer implements KazBarsModule {
     private var rootClip:MovieClip;
+    private var w:KazBarsWorld;
+    private var kF:Object;        // the clock task: every frame while a side casts
+    private var kP:Object;        // the retarget's check: once, 120 ms after it
+    private var pS:KazBarsCastSide;
+    private var tS:KazBarsCastSide;
 
     // Config (set by configure())
     private var ENABLE_P:Boolean;
@@ -26,19 +30,9 @@ class KazBarsCastTimer implements KazBarsModule {
     private var SIZE:Number;
     private var DISPLAY:String;   // "elapsed" | "total" | "both"
     private var COLOR:Number;
+    private var TW:Number;        // the text box: wide enough for the longest
+    private var TH:Number;        // display string at SIZE, one line box tall
 
-    // Display clips
-    private var m_PlayerClip:MovieClip;
-    private var m_TargetClip:MovieClip;
-
-    // Tracked characters (mirrors KazBars m_Player/m_Target so we can read progress)
-    private var playerChar:Object;
-    private var targetChar:Object;
-
-    // Cast state
-    private var playerData:Object;
-    private var targetData:Object;
-    private var driverClip:MovieClip;
     private var previewMode:Boolean;
     private var active:Boolean;
 
@@ -46,21 +40,18 @@ class KazBarsCastTimer implements KazBarsModule {
         rootClip = root;
         previewMode = false;
         active = true;
-        playerData = newCastData();
-        targetData = newCastData();
-    }
-
-    private function newCastData():Object {
-        return {casting:false, startTime:0, initialProgress:0, smoothedEstimate:0,
-                lastEstimateTime:0, lockCount:0, estimateLocked:false, midCast:false};
+        pS = new KazBarsCastSide(this, "P");
+        tS = new KazBarsCastSide(this, "T");
     }
 
     // =========================================================================
     // Setup
     // =========================================================================
 
-    public function configure(cfg:Object):Void {
-        if (cfg == null) return;
+    public function configure(cfg:Object, world:KazBarsWorld, clock:KazBarsClock):Void {
+        w = world;
+        kF = clock.add(tick, this, 1, false, 0);
+        kP = clock.add(probe, this, 120, true, 120);
         ENABLE_P = (cfg.enableP == true);
         ENABLE_T = (cfg.enableT == true);
         PLAYER_X = Number(cfg.playerX);
@@ -71,23 +62,23 @@ class KazBarsCastTimer implements KazBarsModule {
         SIZE = Number(cfg.fontSize);
         DISPLAY = cfg.display;
         COLOR = Number(cfg.color);
+        // The widest string the display can show is "both" with a three-digit
+        // seconds on each side ("888.8 / 888.8": eight digits at 0.5566 em, two
+        // points and the " / " at 0.2783 em each, 5.85 em in all; the same
+        // advances in bold and regular). The box is that plus Flash's 2 px
+        // gutter a side, made even so it centres on the clip's origin on whole
+        // pixels, and one line box tall (the grids' rule, ceil(1.2 x size) + 4).
+        TW = Math.ceil((Math.ceil(SIZE * 5.85) + 4) / 2) * 2;
+        TH = Math.ceil(SIZE * 6 / 5) + 4;
+        if (ENABLE_P) world.onPlayer(onPlayer, this);
+        if (ENABLE_T) world.onTarget(onTarget, this);
     }
 
+    // The host runs onLoad again on this instance after a deactivation: the old clips go first.
     public function create():Void {
-        // The host re-runs onLoad on this same instance; without this the old
-        // clips leak. Inlined rather than calling cleanup() — that also stops
-        // the driver, disconnects player/target and clears previewMode, state
-        // this method must leave alone.
-        if (m_PlayerClip != null) { m_PlayerClip.removeMovieClip(); m_PlayerClip = null; }
-        if (m_TargetClip != null) { m_TargetClip.removeMovieClip(); m_TargetClip = null; }
-        if (driverClip != null) { driverClip.removeMovieClip(); driverClip = null; }
-        if (ENABLE_P) m_PlayerClip = makeClip("kbCastP", PLAYER_X, PLAYER_Y);
-        if (ENABLE_T) m_TargetClip = makeClip("kbCastT", TARGET_X, TARGET_Y);
-        // Frame-coherent update driver. Its own onEnterFrame reads getTimer() and
-        // GetCommandProgress() on the same engine tick, so the EMA estimate can't
-        // see a fresh clock against a stale progress -- the desync a free-running
-        // setInterval produced, which spiked the estimate during lag/interrupts.
-        driverClip = rootClip.createEmptyMovieClip("kbCastDrv", rootClip.getNextHighestDepth());
+        dropClips();
+        if (ENABLE_P) pS.mc = makeClip("kbCastP", PLAYER_X, PLAYER_Y);
+        if (ENABLE_T) tS.mc = makeClip("kbCastT", TARGET_X, TARGET_Y);
     }
 
     private function makeClip(name:String, px:Number, py:Number):MovieClip {
@@ -95,208 +86,103 @@ class KazBarsCastTimer implements KazBarsModule {
         c._x = px;
         c._y = py;
         c._visible = false;
-        var W:Number = 200;  // wide box, centered on origin so text grows symmetrically
-        var h:Number = SIZE + 8;
-        makeTF(c, "tmrShadow", -W / 2 + 1, 1, W, h, 0x000000);
-        makeTF(c, "tmr", -W / 2, 0, W, h, COLOR);
+        // Centered on the origin so text grows symmetrically.
+        makeTF(c, "tmrShadow", -TW / 2 + 1, 1, TW, TH, 0x000000);
+        makeTF(c, "tmr", -TW / 2, 0, TW, TH, COLOR);
         return c;
     }
 
-    private function makeTF(c:MovieClip, id:String, x:Number, y:Number, w:Number, h:Number, col:Number):Void {
-        var tf:TextField = c.createTextField(id, c.getNextHighestDepth(), x, y, w, h);
+    private function makeTF(c:MovieClip, id:String, x:Number, y:Number, wd:Number, ht:Number, col:Number):Void {
+        var tf:TextField = c.createTextField(id, c.getNextHighestDepth(), x, y, wd, ht);
         tf.selectable = false;
         tf.embedFonts = false;
         tf.textColor = col;
         var fmt:TextFormat = new TextFormat();
-        fmt.font = "Arial";
+        fmt.font = KazBarsPreview.FACE;
         fmt.size = SIZE;
         fmt.bold = BOLD;
         fmt.align = "center";
         tf.setNewTextFormat(fmt);
     }
 
-    // =========================================================================
-    // Signal wiring (called from KazBars player/target lifecycle)
-    // =========================================================================
-
-    public function connectPlayer(ch:Object):Void {
-        disconnectPlayer();
-        playerChar = ch;
-        resetSide(playerData, m_PlayerClip);
-        if (ch == null || !ENABLE_P) return;
-        try {
-            ch.SignalCommandStarted.Connect(slotPCastStart, this);
-            ch.SignalCommandEnded.Connect(slotPCastEnd, this);
-            ch.SignalCommandAborted.Connect(slotPCastEnd, this);
-            if (ch.ConnectToCommandQueue) ch.ConnectToCommandQueue();
-        } catch (e:Object) {}
+    private function dropClips():Void {
+        if (pS.mc != null) pS.mc.removeMovieClip();
+        if (tS.mc != null) tS.mc.removeMovieClip();
+        pS.mc = null;
+        tS.mc = null;
+        pS.txt = "";
+        tS.txt = "";
     }
-
-    public function disconnectPlayer():Void {
-        if (playerChar != null && ENABLE_P) {
-            try {
-                playerChar.SignalCommandStarted.Disconnect(slotPCastStart, this);
-                playerChar.SignalCommandEnded.Disconnect(slotPCastEnd, this);
-                playerChar.SignalCommandAborted.Disconnect(slotPCastEnd, this);
-            } catch (e:Object) {}
-        }
-        playerChar = null;
-    }
-
-    public function setTarget(ch:Object):Void {
-        if (targetChar != null && ENABLE_T) {
-            try {
-                targetChar.SignalCommandStarted.Disconnect(slotTCastStart, this);
-                targetChar.SignalCommandEnded.Disconnect(slotTCastEnd, this);
-                targetChar.SignalCommandAborted.Disconnect(slotTCastEnd, this);
-            } catch (e:Object) {}
-        }
-        targetChar = ch;
-        resetSide(targetData, m_TargetClip);
-        if (ch == null || !ENABLE_T) return;
-        try {
-            ch.SignalCommandStarted.Connect(slotTCastStart, this);
-            ch.SignalCommandEnded.Connect(slotTCastEnd, this);
-            ch.SignalCommandAborted.Connect(slotTCastEnd, this);
-            if (ch.ConnectToCommandQueue) ch.ConnectToCommandQueue();
-        } catch (e:Object) {}
-        // Mid-cast: timer should appear even if we target someone already casting.
-        var self:KazBarsCastTimer = this;
-        setTimeout(function() { self.checkTargetMidCast(); }, 120);
-    }
-
-    private function checkTargetMidCast():Void {
-        if (targetChar == null || targetData.casting) return;
-        var p:Number;
-        try { p = targetChar.GetCommandProgress(); } catch (e:Object) { return; }
-        if (p > 0 && p < 1) startCast(targetData, m_TargetClip, false, true);
-    }
-
-    private function resetSide(data:Object, clip:MovieClip):Void {
-        data.casting = false;
-        if (clip != null && !previewMode) { clip._visible = false; setText(clip, ""); }
-    }
-
-    private function slotPCastStart(spellName:String):Void { startCast(playerData, m_PlayerClip, true, false); }
-    private function slotPCastEnd():Void { endCast(playerData, m_PlayerClip); }
-    private function slotTCastStart(spellName:String):Void { startCast(targetData, m_TargetClip, false, false); }
-    private function slotTCastEnd():Void { endCast(targetData, m_TargetClip); }
 
     // =========================================================================
-    // Cast tracking
+    // World's player and target
     // =========================================================================
 
-    private function startCast(data:Object, clip:MovieClip, isPlayer:Boolean, midCast:Boolean):Void {
-        if (clip == null) return;
-        data.casting = true;
-        data.startTime = getTimer();
-        data.initialProgress = 0;
-        data.smoothedEstimate = 0;
-        data.lastEstimateTime = 0;
-        data.lockCount = 0;
-        data.estimateLocked = false;
-        data.midCast = midCast;
-        var ch:Object = isPlayer ? playerChar : targetChar;
-        if (ch != null) {
-            try { data.initialProgress = clamp01(ch.GetCommandProgress()); } catch (e:Object) {}
+    public function onPlayer(ch:Object, id:Number):Void {
+        pS.wire(ch);
+    }
+
+    public function onTarget(t:Object):Void {
+        if (t == tS.ch) return;
+        tS.wire(t);
+        w.clock.off(kP);
+        if (t != null) w.clock.go(kP);
+    }
+
+    // Once per retarget, the delay restarted by each.
+    public function probe():Void {
+        w.clock.off(kP);
+        tS.probe();
+    }
+
+    // =========================================================================
+    // The frame task, and the sides' starts and ends
+    // =========================================================================
+
+    public function began(s:KazBarsCastSide):Void {
+        w.clock.go(kF);
+    }
+
+    public function ended(s:KazBarsCastSide):Void {
+        draw(s);
+    }
+
+    public function tick():Void {
+        var now:Number = w.clock.now;
+        pS.tick(now);
+        tS.tick(now);
+        draw(pS);
+        draw(tS);
+        if (!pS.busy && !tS.busy) w.clock.off(kF);
+    }
+
+    // A side's text and visibility: its cast's, else preview's placeholder, else hidden.
+    private function draw(s:KazBarsCastSide):Void {
+        var mc:MovieClip = s.mc;
+        if (mc == null) return;
+        var t:String = (s.busy && (s.el > 0 || s.tot > 0)) ? text(s.el, s.tot) : "";
+        if (t == "" && previewMode) t = placeholder();
+        if (t != s.txt) {
+            s.txt = t;
+            mc.tmr.text = t;
+            mc.tmrShadow.text = t;
         }
-        clip._visible = active;
-        setText(clip, "");
-        startDriver();
-        update();
+        var v:Boolean = active && t != "";
+        if (mc._visible != v) mc._visible = v;
     }
 
-    private function endCast(data:Object, clip:MovieClip):Void {
-        data.casting = false;
-        if (clip != null) {
-            if (previewMode) setText(clip, placeholder());
-            else { clip._visible = false; setText(clip, ""); }
-        }
-        if (!playerData.casting && !targetData.casting) stopDriver();
+    private function text(el:Number, tot:Number):String {
+        if (tot > 0 && el > tot) tot = el;
+        if (DISPLAY == "total") return (tot > 0) ? sec(tot) : "";
+        var e:String = sec(el);
+        if (DISPLAY == "elapsed" || !(tot > 0)) return e;
+        return e + " / " + sec(tot);
     }
 
-    private function startDriver():Void {
-        if (driverClip == null) return;
-        var self:KazBarsCastTimer = this;
-        driverClip.onEnterFrame = function() { self.update(); };
-    }
-
-    private function stopDriver():Void {
-        if (driverClip != null) driverClip.onEnterFrame = null;
-    }
-
-    private function update():Void {
-        if (!playerData.casting && !targetData.casting) { stopDriver(); return; }
-        var now:Number = getTimer();
-        if (playerData.casting && playerChar != null && m_PlayerClip != null) {
-            setText(m_PlayerClip, render(playerData, clamp01(safeProgress(playerChar)), now));
-        }
-        if (targetData.casting && targetChar != null && m_TargetClip != null) {
-            setText(m_TargetClip, render(targetData, clamp01(safeProgress(targetChar)), now));
-        }
-    }
-
-    private function safeProgress(ch:Object):Number {
-        var p:Number;
-        try { p = ch.GetCommandProgress(); } catch (e:Object) { return 0; }
-        return p;
-    }
-
-    // Returns the timer text for the active display mode, refreshing the EMA estimate.
-    private function render(data:Object, progress:Number, now:Number):String {
-        var elapsedMs:Number = Math.max(0, now - data.startTime);
-        refreshEstimate(data, progress, elapsedMs, now);
-
-        var est:Number = data.smoothedEstimate;
-        var elapsedSec:Number;
-        if (data.midCast && est > 0) {
-            elapsedSec = progress * est;
-        } else {
-            elapsedSec = elapsedMs / 1000;
-            // Elapsed is wall-clock truth; clipping it down to a low estimate is
-            // what stalled a real 2.0s cast at "1.9". Let it reach the true time
-            // and pull the shown total up to match (keeps "both" consistent). The
-            // +1s tolerance still bounds a stuck cast whose end signal was missed.
-            if (est > 0) {
-                if (elapsedSec > est + 1) elapsedSec = est + 1;
-                if (elapsedSec > est) est = Math.round(elapsedSec * 10) / 10;
-            }
-        }
-
-        if (DISPLAY == "total") return (est > 0) ? formatTime(est) : "";
-        var e:String = formatTime(Math.round(elapsedSec * 10) / 10);
-        if (DISPLAY == "elapsed") return e;
-        // "both"
-        return (est > 0) ? (e + " / " + formatTime(est)) : e;
-    }
-
-    // EMA-smoothed estimate with convergence lock (ported from KzCastbars).
-    private function refreshEstimate(data:Object, progress:Number, elapsedMs:Number, now:Number):Void {
-        if (data.estimateLocked || (now - data.lastEstimateTime) <= 80) return;
-        data.lastEstimateTime = now;
-        var pd:Number = progress - data.initialProgress;
-        if (elapsedMs > 50 && pd > 0.005 && progress < 0.85) {
-            var raw:Number = Math.round(10 * elapsedMs / pd / 1000) / 10;
-            if (data.smoothedEstimate == 0) data.smoothedEstimate = raw;
-            else data.smoothedEstimate = Math.round((data.smoothedEstimate * 0.7 + raw * 0.3) * 10) / 10;
-            var diff:Number = raw - data.smoothedEstimate;
-            if (diff < 0) diff = -diff;
-            if (diff <= 0.15) data.lockCount = data.lockCount + 1;
-            else data.lockCount = 0;
-            if (data.lockCount >= 3) data.estimateLocked = true;
-        }
-    }
-
-    private function formatTime(seconds:Number):String {
-        var s:String = String(seconds);
-        if (s.indexOf(".") == -1) s = s + ".0";
-        return s;
-    }
-
-    private function setText(clip:MovieClip, txt:String):Void {
-        if (clip == null) return;
-        if (clip.tmr != null) clip.tmr.text = txt;
-        if (clip.tmrShadow != null) clip.tmrShadow.text = txt;
+    // ms as seconds with one decimal ("2.0").
+    private function sec(ms:Number):String {
+        var d:Number = Math.round(ms / 100);
+        return Math.floor(d / 10) + "." + (d % 10);
     }
 
     private function placeholder():String {
@@ -312,55 +198,48 @@ class KazBarsCastTimer implements KazBarsModule {
     public function previewOn():Void {
         previewMode = true;
         if (!active) return;
-        dressForDrag(m_PlayerClip, 0x0066FF, "Player Cast");
-        dressForDrag(m_TargetClip, 0xFF0066, "Target Cast");
+        dressForDrag(pS, 0x0066FF, "Player Cast");
+        dressForDrag(tS, 0xFF0066, "Target Cast");
     }
 
     public function previewOff():Void {
         previewMode = false;
-        // An inactive timer must not survive preview exit on the strength of a
-        // live cast — the master switch outranks the cast state.
-        hidePreview(m_PlayerClip, playerData.casting && active);
-        hidePreview(m_TargetClip, targetData.casting && active);
+        if (pS.mc != null) KazBarsPreview.detach(pS.mc);
+        if (tS.mc != null) KazBarsPreview.detach(tS.mc);
+        draw(pS);
+        draw(tS);
     }
 
     public function previewKey():String { return "cast"; }
     public function previewLabel():String { return "Cast Timer"; }
 
-    // Master switch (preview control panel + archive). Hiding is a hard hide of
-    // both clips (the drag overlay is a child, so it follows); re-activating
-    // mid-preview rebuilds the placeholders, mid-cast re-shows the live timer.
+    // The master switch (control panel and archive) outranks a live cast: off hides both clips (the drag overlay is
+    // a child, so it follows); on again mid-preview dresses them for the drag again.
     public function isActive():Boolean {
         return active;
     }
 
     public function setActive(shown:Boolean):Void {
         active = shown;
-        if (shown) {
-            if (previewMode) { previewOn(); return; }
-            if (playerData.casting && m_PlayerClip != null) m_PlayerClip._visible = true;
-            if (targetData.casting && m_TargetClip != null) m_TargetClip._visible = true;
-        } else {
-            if (m_PlayerClip != null) m_PlayerClip._visible = false;
-            if (m_TargetClip != null) m_TargetClip._visible = false;
+        if (shown && previewMode) {
+            previewOn();
+            return;
         }
+        draw(pS);
+        draw(tS);
     }
 
-    // The footprint is the timer's own: the text is anchored on its centre, the
-    // title sits above it and the coordinate row below, so the box runs from 32
-    // above the anchor to 28 below the text.
-    private function dressForDrag(clip:MovieClip, col:Number, title:String):Void {
-        if (clip == null) return;
-        clip._visible = true;
-        setText(clip, placeholder());
-        KazBarsPreview.attach({mc: clip, x: -48, y: -32, w: 96, h: SIZE + 60,
+    // The footprint is the timer's own: the text box (TW x TH, anchored on its
+    // centre) with the room the overlay's name needs above it and an edge
+    // below, so the label clears the text and the box is the
+    // same width the text has — and the clamp below uses.
+    private function dressForDrag(s:KazBarsCastSide, col:Number, title:String):Void {
+        if (s.mc == null) return;
+        draw(s);
+        var above:Number = KazBarsPreview.roomAbove();
+        KazBarsPreview.attach({mc: s.mc, x: -TW / 2, y: -above, w: TW,
+                               h: above + TH + KazBarsPreview.roomBelow(),
                                label: title, color: col});
-    }
-
-    private function hidePreview(clip:MovieClip, stillCasting:Boolean):Void {
-        if (clip == null) return;
-        KazBarsPreview.detach(clip);
-        if (!stillCasting) { clip._visible = false; setText(clip, ""); }
     }
 
     // =========================================================================
@@ -369,46 +248,42 @@ class KazBarsCastTimer implements KazBarsModule {
 
     public function loadState(config:Object):Void {
         if (config == null) return;
-        applyPos(m_PlayerClip, config.FindEntry("ctpx"), config.FindEntry("ctpy"));
-        applyPos(m_TargetClip, config.FindEntry("cttx"), config.FindEntry("ctty"));
+        applyPos(pS.mc, config.FindEntry("ctpx"), config.FindEntry("ctpy"));
+        applyPos(tS.mc, config.FindEntry("cttx"), config.FindEntry("ctty"));
         var v:Object = config.FindEntry("ctv");
         if (v !== undefined) setActive(v == 1);
     }
 
-    // makeClip centers the text on the clip's own x (a box from -100 to +100),
+    // makeClip centers the text on the clip's own x (a box from -TW/2 to +TW/2),
     // top-anchors it on y, so the clamp floor/ceiling shift by that half-width
     // instead of reusing KazBarsPanel.clampPos's top-left-anchored assumption.
+    // The same TW x TH the text box and the preview footprint have.
     private function applyPos(clip:MovieClip, x:Object, y:Object):Void {
         if (clip == null) return;
         if (x !== undefined && y !== undefined) {
-            var halfW:Number = 100;
-            var h:Number = SIZE + 8;
-            clip._x = halfW + KazBarsPanel.clampPos(Number(x) - halfW, Stage.width - halfW * 2);
-            clip._y = KazBarsPanel.clampPos(Number(y), Stage.height - h);
+            var halfW:Number = TW / 2;
+            clip._x = halfW + KazBarsPanel.clampPos(Number(x) - halfW, TW, true);
+            clip._y = KazBarsPanel.clampPos(Number(y), TH, false);
         }
     }
 
     public function saveState(config:Object):Void {
         if (config == null) return;
-        if (m_PlayerClip != null) { config.ReplaceEntry("ctpx", m_PlayerClip._x); config.ReplaceEntry("ctpy", m_PlayerClip._y); }
-        if (m_TargetClip != null) { config.ReplaceEntry("cttx", m_TargetClip._x); config.ReplaceEntry("ctty", m_TargetClip._y); }
+        if (pS.mc != null) { config.ReplaceEntry("ctpx", pS.mc._x); config.ReplaceEntry("ctpy", pS.mc._y); }
+        if (tS.mc != null) { config.ReplaceEntry("cttx", tS.mc._x); config.ReplaceEntry("ctty", tS.mc._y); }
         config.ReplaceEntry("ctv", active ? 1 : 0);
     }
 
+    // The sides let their characters go (World tells both again on the next start); World's subscriptions stay,
+    // made once.
     public function cleanup():Void {
-        stopDriver();
-        disconnectPlayer();
-        setTarget(null);
+        pS.wire(null);
+        tS.wire(null);
+        if (kF != null) {
+            w.clock.off(kF);
+            w.clock.off(kP);
+        }
         previewMode = false;
-        if (m_PlayerClip != null) { m_PlayerClip.removeMovieClip(); m_PlayerClip = null; }
-        if (m_TargetClip != null) { m_TargetClip.removeMovieClip(); m_TargetClip = null; }
-        if (driverClip != null) { driverClip.removeMovieClip(); driverClip = null; }
-    }
-
-    private function clamp01(v:Number):Number {
-        if (isNaN(v)) return 0;
-        if (v < 0) return 0;
-        if (v > 1) return 1;
-        return v;
+        dropClips();
     }
 }

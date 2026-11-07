@@ -42,7 +42,7 @@ from .ui_helpers import (
 
 _SUCCESS = THEME_COLORS['success']
 _ACCENT = THEME_COLORS['accent']
-_DANGER = THEME_COLORS['danger']
+_DANGER_TEXT = THEME_COLORS['danger_text']
 _WARNING = THEME_COLORS['warning']
 _MUTED = THEME_COLORS['muted']
 
@@ -95,8 +95,9 @@ SECTIONS: list[_Section] = [
                 'is a good first grid.',
             ]),
             _sub('3. Choose which buffs to track', [
-                'Click Tracked Buffs... and pick from the database. Only '
-                'selected buffs appear in the grid.',
+                "Click the grid's preview and pick from the database. Only "
+                'selected buffs appear in the grid. On a static grid, click '
+                'a slot instead.',
             ]),
             _sub('4. Build and install', [
                 [('Click ', None),
@@ -116,8 +117,9 @@ SECTIONS: list[_Section] = [
             'KazBars makes two kinds of thing. The difference: whether the '
             'app must stay open.',
             _sub('Built into the game — then close the app', [
-                [('Grids, Damage Numbers, the Stopwatch, the Inspect Panel and '
-                  'the Cast Timer are compiled in by ', None),
+                [('Grids, Damage Numbers, the Stopwatch, the Inspect Panel, '
+                  'the Cast Timer, the Console and the Onslaught Tracker are '
+                  'compiled in by ', None),
                  ('Build & Install', _SUCCESS),
                  ('. They work with the app closed. Open it again only to '
                   'change something.', None)],
@@ -138,50 +140,69 @@ SECTIONS: list[_Section] = [
     {
         'cat': 'Getting Started',
         'id': 'profiles',
-        'title': 'Profiles',
+        'title': 'Your Profile',
         'body': [
-            'A profile is a complete layout — every grid, plus the extras '
-            'and live overlays that go with it. The File menu lists every '
-            'profile you have; click one to switch, or use the commands '
-            'under the list to manage them.',
-            _sub('Switching, creating and organizing', [
-                'New profile starts a blank one. New from template starts '
-                'from the curated starter layout. Duplicate profile makes a '
-                'safety copy of the one you have open.',
-                "Delete profile… moves it to the profile trash "
-                "(userdata/profiles/trash) rather than erasing it outright.",
-                'Revert to session start undoes every edit back to how this '
-                'profile looked when you opened it this session.',
-            ]),
+            'KazBars keeps one profile — every grid, plus the extras and '
+            'live overlays that go with it. It lives in '
+            'userdata/profile.yml.',
             _sub("No Save button — it autosaves", [
                 'Every edit writes to disk about a second after you stop '
                 "typing or dragging. There's nothing to lose by closing the "
-                'app or switching profiles.',
+                'app. Ctrl+S saves right now.',
             ]),
-            _sub('Which profile opens on launch', [
-                'KazBars reopens whichever profile you last had loaded.',
+            _sub('Starting over, and getting back', [
+                'File ▸ Reset profile to defaults… asks first, then replaces '
+                'your profile with the starter layout, sized for your game '
+                'resolution. The profile keeps its name.',
+                'File ▸ Revert to session start brings back the profile you '
+                'had when KazBars opened — after edits, an Import or a '
+                'Reset. It lasts until you close the app.',
             ]),
             _sub('Sharing a profile', [
                 'File ▸ Export profile… writes one self-contained '
-                '.kazbars.json file. File ▸ Import profile… reads one back.',
-                'Custom buffs the profile tracks travel inside the file, so '
-                "the importer's own database doesn't need to know them "
-                "first (if they can't be added, the profile still imports "
-                'and the toast says so). Screen positions travel too, as '
-                'fractions of your '
-                'resolution — a shared profile lands proportionally on any '
-                'screen.',
+                '<name>.kazbars.yml file. File ▸ Import profile… opens one '
+                'and replaces the profile you have open; Revert to session '
+                'start undoes it.',
+                'Import also opens a .kazbars.json export from 3.1, or a '
+                'profile file copied from a 3.1 userdata/profiles folder.',
+                'Custom buffs the profile tracks travel inside the file and '
+                "are added to your database on import, so it doesn't need "
+                "to know them first (if they can't be added, the profile "
+                'still imports and the toast says so). Screen positions '
+                'travel too, as fractions of your resolution — a shared '
+                'profile lands proportionally on any screen.',
+                'To share a few grids instead of the whole profile, use '
+                "Export grid… in a grid card's Move… menu. File ▸ Import "
+                'grid… adds a grids file to the Grids tab.',
+                _link('Class Tabs', 'class-tabs'),
+            ]),
+            _sub('Updating from 3.1', [
+                'On the first launch after the update, KazBars takes the '
+                'profile you were using as your profile and says which one '
+                'in a toast. Your other old profiles stay untouched in '
+                'userdata/profiles; File ▸ Import profile… opens any of '
+                'them.',
+            ]),
+            _sub('If the profile file is damaged', [
+                'KazBars loads the copy from your last session instead, '
+                'keeps the damaged file as profile.damaged.yml, and says so '
+                'in a toast.',
+            ]),
+            _sub('Your data folder', [
+                'File ▸ Open data folder opens userdata — the profile, your '
+                'settings and your custom buffs.',
             ]),
             _sub('What travels with a profile', [
-                'Grids, Stopwatch, Inspect panel, Cast timer and Damage '
-                'Numbers all live inside it — and so do Deeps and the '
+                'Grids, the Overlay size and font, Stopwatch, Inspect panel, '
+                'Cast timer, Console, Onslaught tracker and Damage Numbers '
+                'all live inside it — and so do Deeps and the '
                 "Ethram-Fal Live Tracker's live settings. So do any Default "
                 'Buff Bars or Damage Number Colors '
                 "overrides you've set — only the fields you've actually "
                 'changed; everything else still defers to the game, and '
                 "only that editor's own Apply writes it.",
-                'Machine-local instead: the shared panel text size and the '
-                'buff-discovery console toggle.',
+                'Machine-local instead: your game resolution and the '
+                'overhead anchor, both under Game ▸ Game resolution….',
                 _link('Deeps', 'deeps'),
                 _link('Ethram-Fal Live Tracker', 'ethram-fal'),
             ]),
@@ -192,7 +213,8 @@ SECTIONS: list[_Section] = [
         'id': 'player-target',
         'title': 'Player vs Target Grids',
         'body': [
-            'Every grid tracks one source, set when you create it.',
+            'A floating grid sits at a spot on screen and tracks one '
+            'source, set when you create it.',
             _sub('Player grid', [
                 'Tracks buffs and debuffs on your own character.',
             ], GRID_TYPE_COLORS['player']),
@@ -200,6 +222,132 @@ SECTIONS: list[_Section] = [
                 'Tracks buffs and debuffs on your current target (mob, '
                 'friendly, or enemy player).',
             ], GRID_TYPE_COLORS['target']),
+            'Friendly and Hostile grids float over characters instead.',
+            _link('Overhead Grids', 'overhead-grids'),
+        ],
+    },
+    {
+        'cat': 'Grids',
+        'id': 'overhead-grids',
+        'title': 'Overhead Grids',
+        'body': [
+            'An overhead grid has no spot on screen. It floats over the '
+            'head of each character it applies to — one set of icons per '
+            'character.',
+            _sub('Friendly and Hostile', [
+                'Friendly shows over you (tick Over me), your group and '
+                'friendly players. Hostile shows over your target and '
+                'anyone fighting you or your group.',
+                "The game doesn't list who is around you, so a character "
+                'gets its grid once something names it: your group, your '
+                'target, someone you hit or heal, or whoever casts on a '
+                'character already known.',
+            ]),
+            _sub('Box or band', [
+                'Static makes a box — up to 4 rows of 8, 16 slots in all.',
+                'Dynamic makes a band: icons centred over the head, Row cap '
+                '(3, 5 or 7) to a row, growing upward, up to Max slots '
+                '(1–16). Fill reads Centred.',
+            ]),
+            _sub('Height and Range', [
+                "Height — room left for the game's nameplate between the "
+                'head and the grid, in px.',
+                'Range — hidden past this many metres.',
+                'Over me — Friendly only: also float the grid over your own '
+                'character.',
+            ]),
+            'If the icons sit off a head, nudge the overhead anchor and '
+            'rebuild.',
+            _link('Game Resolution', 'resolution'),
+            _link('Applying and Positioning In-Game', 'positioning'),
+        ],
+    },
+    {
+        'cat': 'Grids',
+        'id': 'class-tabs',
+        'title': 'Class Tabs',
+        'body': [
+            'A row of tabs under the Grids toolbar sorts your grids by '
+            'class: All, then the twelve classes in four groups — Guard '
+            'Conq DT, PoM ToS BS, Barb Sin Ranger, Demo Necro HoX. Each tab '
+            'shows how many grids it holds.',
+            _sub('What a tab means', [
+                'A tab lists its own grids only. A new grid joins the tab '
+                'you add it on.',
+                'In game you get the All grids plus the grids of the class '
+                "you're playing. The set follows your character's class.",
+            ]),
+            _sub('Move… and Copy…', [
+                "A grid card's Move… menu has Move to and Copy to, each "
+                'listing All classes and the twelve classes. Copy leaves the '
+                'original and makes a second grid named after it and the '
+                'class.',
+            ]),
+            _sub('Sharing grids', [
+                'The Move… menu ends with Export grid…, which saves that '
+                'grid to a <grid name>.kazbars-grids.yml file.',
+                'File ▸ Import grid…, right under Import profile…, adds the '
+                'grids from a grids file to the class tab the Grids tab is '
+                'showing, and switches to the Grids tab so you see them. '
+                'Pick a grids file in Import profile… and it points you '
+                'here instead.',
+                'A grid whose name is taken gets _2 added to it on import, '
+                'and the toast says so. Custom buffs travel inside the file '
+                'and are added to your database.',
+            ]),
+            'KazBars reopens on the tab you left.',
+        ],
+    },
+    {
+        'cat': 'Grids',
+        'id': 'grid-card',
+        'title': 'The Grid Card',
+        'body': [
+            'Each grid is a card in the Grids tab: the grid drawn to scale '
+            "and a line naming the buffs it holds. The ⚙ cog, just right of "
+            "the preview, opens the grid's settings.",
+            _sub('The preview', [
+                'Icons are drawn at two-thirds of their in-game size. A grid '
+                'too big for the card steps down to a smaller scale, and the '
+                'title line says so.',
+                'A disabled grid draws grey. The preset cards on an empty '
+                'Grids tab are drawn the same way.',
+                "It is also where you choose the grid's buffs. On a dynamic "
+                'grid the whole preview lights as you hover, and one click '
+                'picks for all of it; on a static grid, click a slot.',
+                _link('Tracked Buffs', 'tracked-buffs'),
+            ]),
+            _sub('The buffs line', [
+                'Under the preview: the buffs the grid holds, ending in '
+                '"+ 3 more" when they do not all fit. Hover it for the full '
+                'list.',
+            ]),
+            _sub('The title line', [
+                'After the name and type, a muted note gives the mode — '
+                'dynamic or static — and, once the preview is drawn '
+                'smaller, its scale: "shown at 1:2". The Applied by me '
+                'toggle comes right after it.',
+                'Move…, Enabled and × sit at the right. To reorder cards, '
+                'drag the ☰ handle, or Tab to it and press Alt+↑ / Alt+↓.',
+                'Applied by me — the grid shows only effects you cast, with '
+                'your own timer, even when other players cast the same '
+                'effect on the same character. It greys with the card when '
+                'the grid is disabled, and still works.',
+            ]),
+            _sub('Grid Settings', [
+                'The cog opens a window centred on KazBars. Its sections: '
+                'Grid and Icons, then Overhead on an overhead grid and '
+                'Sorting on a dynamic one.',
+                'Every change shows on the preview at once — Size too, '
+                'while you drag. Apply (or Enter) saves; Cancel (or Esc) '
+                'puts it back. Enter on the Cancel button cancels.',
+                "A name that is empty or another grid's blocks Apply, with "
+                'a hint under the Name field.',
+                'Shrink a static grid and the slots past the new size are '
+                'unassigned, with a warning toast. Grow it back and they '
+                'return.',
+                _link('Grid Display Options', 'display-options'),
+            ]),
         ],
     },
     {
@@ -232,12 +380,30 @@ SECTIONS: list[_Section] = [
         'body': [
             "How you pick buffs depends on the grid's mode.",
             _sub('Dynamic mode', [
-                'A list of buff names the grid watches for. Only listed buffs '
-                'appear; an empty list shows nothing.',
+                'A list of buff names the grid watches for. Click the '
+                "grid's preview (or Tab to it and press Enter) to pick from "
+                'the database. Only listed buffs appear; an empty list shows '
+                'nothing.',
             ]),
             _sub('Static mode', [
-                'Assign buffs to each slot by position. Unassigned slots stay '
-                'empty; if several share a slot, the most recent wins.',
+                "Click a slot's cell in the preview to choose that slot's "
+                'buffs. The picker is titled with the slot, like "Slot 3 '
+                'Buffs". Empty slots stay empty; if several buffs share a '
+                'slot, the most recent wins.',
+                "The picker walks the grid's slots, so you can fill a grid "
+                'without closing it. Numbered chips under the header show '
+                "where you are: the current slot filled in the grid's "
+                'colour, assigned slots outlined. Hover one to see what it '
+                'holds. Click a chip, press ◀ ▶ beside Cancel, or use '
+                'Ctrl+PageUp / Ctrl+PageDown anywhere in the window to move.',
+                'Moving saves the slot you leave. Done saves the current '
+                "one. Cancel drops only the current slot's unsaved change — "
+                'slots you moved past stay saved. Once every slot holds a '
+                'buff, the status line adds "All N slots are assigned."',
+                'Right-click a slot to clear it. A toast says "click to '
+                'undo" for 8 seconds.',
+                'From the keyboard: Tab to the preview, arrows move between '
+                'slots, Enter opens the picker, Delete clears the slot.',
             ]),
             _sub("A tracked buff your database doesn't have", [
                 "An imported profile (or a buff a database update dropped) "
@@ -248,6 +414,12 @@ SECTIONS: list[_Section] = [
                 'Build & Install counts these in its summary: "N unresolved '
                 'buffs excluded — a database update can bring them back."',
             ]),
+            _sub('A grid with nothing to track', [
+                'A dynamic grid with no Tracked Buffs, or a static grid with '
+                "nothing in its slots, isn't built. It stays in your profile "
+                'and ships once you give it something. Its card says so '
+                'under the preview.',
+            ]),
         ],
     },
     {
@@ -255,13 +427,58 @@ SECTIONS: list[_Section] = [
         'id': 'display-options',
         'title': 'Grid Display Options',
         'body': [
-            'These settings are per-grid.',
-            'Timers — remaining duration below each icon.',
-            'Flash — icons pulse near expiry. Set the threshold in seconds.',
-            'Icon size and gaps — the size of each icon and the spacing '
-            'between them.',
-            'Where a grid sits on screen is decided in-game, not here.',
+            'These settings are per-grid, in Grid Settings — the ⚙ cog on '
+            'its card.',
+            'Rows and Cols — the shape. A grid holds up to 64 slots on its '
+            'own, an overhead grid 16; there is no total across grids.',
+            'Size — a slider, 50–200 %, of the Overlay size. It sets icon, '
+            'timer and stack-count size together; the hint beside it shows '
+            'the icon in px.',
+            'Gap — the space between icons. Negative overlaps them.',
+            'Timers — Digits shows the seconds left under each icon, Bar '
+            "draws a line inside the icon's bottom edge that shrinks as "
+            'time runs out, Off shows none. Y offset nudges digits only, so '
+            'it greys out for Bar and Off.',
+            'Flash — icons pulse near expiry. Under sets the threshold in '
+            'seconds; it greys out while Flash is off.',
+            "Applied by me is not here — it is the toggle on the card's "
+            'title line.',
+            'Where a floating grid sits on screen is decided in-game, not '
+            'here.',
+            _link('Overlay Size and Font', 'overlay-size'),
             _link('Applying and Positioning In-Game', 'positioning'),
+        ],
+    },
+    {
+        'cat': 'Grids',
+        'id': 'overlay-size',
+        'title': 'Overlay Size and Font',
+        'body': [
+            'Two dropdowns on the Grids toolbar set the size and the font '
+            'of everything KazBars draws in game. Both are saved in the '
+            'profile; rebuild to apply.',
+            _sub('Overlay', [
+                'The base size, 10 to 24 — 12 suits 1080p, 16 suits 1440p, '
+                '24 suits 4K. First launch picks the one for your '
+                'resolution.',
+                'Change it and every grid and panel resizes together, each '
+                'in proportion.',
+            ]),
+            _sub('Size sliders', [
+                'Each grid, and the Stopwatch, Inspect panel, Cast timer, '
+                'Console and Onslaught tracker, has its own Size: a percent '
+                'of the Overlay size, 50–200 %. The hint beside it says '
+                'what that comes to — icon px for a grid, points of text '
+                'for a panel.',
+            ]),
+            _sub('Font', [
+                "Arial, Verdana (the game's own font), GG, or one of nine "
+                'open fonts: Roboto, Inter, Noto Sans, Source Sans 3, PT '
+                'Sans, Fira Sans, Barlow Semi Condensed, Exo 2, Alegreya '
+                'Sans.',
+                'Damage Numbers has its own Font.',
+            ]),
+            _link('Game Resolution', 'resolution'),
         ],
     },
     {
@@ -297,7 +514,7 @@ SECTIONS: list[_Section] = [
             _sub('Debuff', [
                 'Negative effects, typically the non-removable bar or '
                 'anything you track on a target. Red border.',
-            ], _DANGER),
+            ], _DANGER_TEXT),
             _sub('Misc', [
                 'Anything separated from Buff/Debuff. Golden border.',
                 'The bundled database uses Misc for CC durations and heals-over-time.',
@@ -314,24 +531,22 @@ SECTIONS: list[_Section] = [
         'id': 'finding-buff-ids',
         'title': 'Finding Buff IDs',
         'body': [
-            'The buff-discovery console logs every in-game effect with its '
-            'name and buff ID, live. It switches on in Extras ▸ Inspect '
-            'panel….',
+            "The Console's Buffs tab logs every in-game effect with its "
+            'name and buff ID, live. It switches on in Extras ▸ Console….',
             _sub('Turn it on', [
                 [('Tick ', None),
-                 ('Include the buff-discovery console in builds', _SUCCESS),
-                 (', then ', None),
+                 ('Include the console in builds', _SUCCESS),
+                 (', keep Buffs ticked, then ', None),
                  ('Build & Install', _SUCCESS),
-                 ('. Preview mode (Shift+Ctrl+Alt) shows the console.', None)],
+                 ('. If the console is not on screen after /reloadui, tick '
+                  'its box in the KazBars Preview panel (Shift+Ctrl+Alt).',
+                  None)],
                 'Everything landing on you or your target is logged. Copy the '
                 'ID into the Database tab.',
             ]),
-            'Drag it by its title bar; − collapses it to a small bar, click '
-            'to reopen. The game remembers spot, fold, and open state.',
-            'Its text uses the size all four in-game panels share, set in '
-            'the same dialog.',
             "Off by default, so finished builds don't carry it. Turn it off "
             'and rebuild to remove it.',
+            _link('Console', 'console'),
         ],
     },
     {
@@ -369,12 +584,13 @@ SECTIONS: list[_Section] = [
               'bundled — nothing else to install.', None)],
             [("The first build also registers KazBars with the game — two "
               'marked blocks in its config files, backed up beside them. ', None),
-             ('Close the game and the patcher before your first build.', _DANGER),
+             ('Close the game and the patcher before your first build.', _DANGER_TEXT),
              (' After that, rebuild anytime and /reloadui.', None)],
-            'A quiet status line under the extras cards reads "In game: '
+            'A quiet status line above the extras cards reads "In game: '
             '<profile>" and turns orange when the game no longer matches '
-            '— a different profile installed, an edit since the last build, '
-            'or a changed game resolution. It never blocks you; it just '
+            '— a profile imported or reset, an edit since the last build, '
+            'or a changed game resolution or overhead anchor. It never '
+            'blocks you; it just '
             'says a rebuild is due.',
             'From here, two things matter: how you launch, and game patches.',
             _link('Launching the Game', 'launching'),
@@ -407,23 +623,26 @@ SECTIONS: list[_Section] = [
             'in-game, in preview mode.',
             _sub('Preview mode', [
                 'Press Shift+Ctrl+Alt in-game to toggle. Each grid shows as a '
-                'colored rectangle with live X/Y. Drag things where you want '
+                'colored rectangle with its name. Drag things where you want '
                 '— the game remembers, across relogs and restarts.',
+                'Overhead grids follow their characters, so there is nothing '
+                'to drag: preview shows an empty sample of each over your '
+                'target.',
             ]),
             _sub('The KazBars Preview panel', [
                 'Preview mode also shows a KazBars Preview panel: one '
-                'checkbox per grid and extra, grouped under Player Grids, '
-                'Target Grids and Tools. Click a header to toggle its whole '
-                'group. Each box is a persistent master switch — unchecked '
-                'stays off until you re-check it.',
+                'checkbox per floating grid and extra, grouped under Player '
+                'Grids, Target Grids and Tools. Click a header to toggle its '
+                'whole group. Each box is a persistent master switch — '
+                'unchecked stays off until you re-check it.',
                 'Its footer repeats the exit keybind, the /reloadui '
-                'reminder and the app version. Its text uses the size all '
-                'four in-game panels share (Extras ▸ Inspect panel…). With '
-                'many grids it shrinks itself to stay on screen.',
+                'reminder and the app version. Its text follows the Overlay '
+                'size. With many grids it shrinks itself to stay on screen.',
             ]),
             _sub('X/Y in the app', [
-                'The Grids-tab X/Y only seed a first-ever session. Once you '
-                'drag in-game, the dragged spot wins.',
+                "The X/Y under Position in a floating grid's Grid Settings "
+                'only seed a first-ever session. Once you drag in-game, the '
+                'dragged spot wins.',
             ]),
         ],
     },
@@ -434,8 +653,19 @@ SECTIONS: list[_Section] = [
         'body': [
             'Game ▸ Game resolution... sets the screen size builds target. '
             'It must match the resolution you play at.',
-            'Change it and loaded grids re-anchor — 1920×1080 scales to '
-            '2560×1440 by itself. Rebuild to apply.',
+            'Change it and nothing in your profile moves: positions are '
+            'fractions of the screen and sizes a percent of the Overlay '
+            'size. On a bigger screen, pick a bigger Overlay size on the '
+            'Grids tab. Rebuild to apply.',
+            _sub('Overhead anchor', [
+                'The same dialog has Right and Up fields: where overhead '
+                "grids sit against a character's head. Positive moves them "
+                'right and up, negative left and down.',
+                "It depends on your game's field of view, so it is kept on "
+                'this PC, not in the profile. A change needs a rebuild.',
+            ]),
+            _link('Overlay Size and Font', 'overlay-size'),
+            _link('Overhead Grids', 'overhead-grids'),
         ],
     },
     {
@@ -516,27 +746,26 @@ SECTIONS: list[_Section] = [
                 'Nothing to build — /reloadui in-game shows the change.',
             ]),
             _sub('Build & Install to apply', [
-                [('Damage Numbers, Stopwatch, Inspect Panel and Cast Timer '
-                  'are off by default — off means zero code in the build. '
-                  'Tick the box, ', None),
+                [('Cast Timer, Console, Damage Numbers, Inspect Panel, '
+                  'Onslaught Tracker and Stopwatch are off by default — off '
+                  'means zero code in the build. Tick the box, ', None),
                  ('Apply', _SUCCESS),
                  (', then ', None),
                  ('Build & Install', _SUCCESS),
                  ('. Cancel, Escape or the X discard.', None)],
-                'The toggle cards above the grid list flip the same switches. '
-                'Configuring stays in the dialogs.',
+                [('The six cards at the bottom of the Grids tab, just '
+                  'above ', None),
+                 ('Build & Install', _SUCCESS),
+                 (', are two controls: the switch flips whether the '
+                  'feature ships, and clicking anywhere else on the card '
+                  'opens its dialog.', None)],
             ]),
-            _sub('One text size, four panels', [
-                'Stopwatch, inspect panel, buff console and control panel '
-                'share one text size (8–48), baked at build time. Each '
-                'panel scales as one piece, collapsed bars included.',
-                'Set it in Extras ▸ Inspect panel…, under Text size. It '
-                'lives there because the console and control panel have no '
-                'dialog of their own.',
-                [('To size the stopwatch or inspect panel differently, '
-                  'untick ', None),
-                 ('Use the shared size for this panel', _SUCCESS),
-                 (' in its own dialog.', None)],
+            _sub('One size, set once', [
+                'The Overlay size on the Grids tab is the base for every '
+                'panel. Each dialog has a Size slider — a percent of it, '
+                '50–200 % — and the panel scales as one piece, collapsed '
+                'bars included.',
+                _link('Overlay Size and Font', 'overlay-size'),
             ]),
         ],
     },
@@ -605,6 +834,11 @@ SECTIONS: list[_Section] = [
                 _link('How Extras Ship', 'extras-shipping'),
             ]),
             _sub('What you can tune', [
+                "Font — Hyborian, the game's own, is the default and leaves "
+                'the stock file as it is. Nine heavy display faces are built '
+                'into the mod on your next Build & Install. A face that runs '
+                'small is drawn larger to read as big as Hyborian; the '
+                'dialog shows by how much.',
                 'Keep ranged numbers big — holds ranged hit size past ~15 '
                 'metres. Melee is never touched.',
                 'Shadow, pop-in, and fade speed — with Default and Performance '
@@ -629,11 +863,11 @@ SECTIONS: list[_Section] = [
             _sub('Using it in-game', [
                 'A draggable panel shows h:mm:ss. − collapses it to the title '
                 'bar, which keeps showing the time; click to reopen.',
-                'Drag the title bar; live coordinates show. The game '
-                "remembers position and fold — the dialog's X/Y only seed "
-                'the first session.',
-                'Text size is the one all four in-game panels share — the '
-                'dialog can override it for the stopwatch alone.',
+                'Drag the title bar. The game remembers position and fold — '
+                "the dialog's X/Y only seed the first session — and keeps "
+                'the spot when the screen resizes.',
+                'Size is a slider in the dialog: a percent of the Overlay '
+                'size.',
             ]),
             [('Tick ', None),
              ('Include the stopwatch in builds', _SUCCESS),
@@ -652,37 +886,50 @@ SECTIONS: list[_Section] = [
             _sub('What it shows', [
                 'The name strip reads Name Class (Level/PvP level). A mob '
                 'just reads Name (83).',
-                'Health, armor, protections, crit and critigation, heal '
-                'rating, spell damage, combat and weapon damage, tenacity, '
-                "ferocity — in the game sheet's own Rating (Effect%) "
-                'language, at any target level. A dash: the target lacks it.',
-                [('Player targets add a PvP block. Untick ', None),
-                 ('Show the PvP section', _SUCCESS),
-                 (' to drop it from the build.', None)],
+                "The rows are yours to pick (below), in the game sheet's "
+                'own Rating (Effect%) language, at any target level. A dash: '
+                'the target lacks it.',
+                'Player targets also get a PvP tab, from a button in the '
+                'name strip: PvP combat stats, protections, bonus spell '
+                'damage and their K/D record.',
+            ]),
+            _sub('Stat rows', [
+                '112 rows in seven groups: Summary, Vitals, Attributes, '
+                'Offensive, Defensive, PvP Stats and PvP Combat.',
+                'Default shows the twelve Summary rows — health, armor, '
+                'protection, crit, critigation, hate, tenacity, penetration, '
+                'heal rating, combat rating, bonus spell damage, ferocity. '
+                'Custom list shows the rows you pick.',
+                'Add and Remove move rows between Available and Active; '
+                'Add All and Clear fill or empty Active. Move up and Move '
+                'down order them within their section. '
+                'Any change pins the list as a Custom list.',
+                'Search matches a name, a group or a stat ID; Group filters '
+                'Available. Pick one row and the line under the lists says '
+                'what it reads. It also warns when your rows would run '
+                'taller than the game screen at this size.',
             ]),
             _sub('The Perks row', [
                 "Six boxes mirror the game's perk bar — blue General, red "
                 'Archetype, dark Class. Double-slot Class perks paint two '
                 'identical icons.',
-                [('The row reads perk buffs: active perks show only while '
-                  "running; a groupmate's perk can appear too. Untick ", None),
-                 ('Track slotted perks', _SUCCESS),
-                 (' to drop the row.', None)],
+                'The row reads perk buffs on player targets: active perks '
+                "show only while running; a groupmate's perk can appear "
+                'too. Hover one to see its name.',
             ]),
-            _sub('Positioning and text size', [
+            _sub('Positioning and size', [
                 'Drag by the name strip; − collapses to just the strip. The '
-                'game remembers position and fold.',
+                "game remembers position and fold — the dialog's X/Y only "
+                'seed a first-ever session. Start collapsed loads it folded.',
                 'No target? Preview mode (Shift+Ctrl+Alt) shows a '
                 'placeholder.',
-                'This dialog sets the text size all four in-game panels '
-                'share — or the inspect panel alone.',
+                'Size is a slider in this dialog: a percent of the Overlay '
+                'size. The whole panel scales with it.',
             ]),
             [('Tick ', None),
              ('Include the inspect panel in builds', _SUCCESS),
-             (' to ship it. The same dialog holds the buff-discovery console.',
-              None)],
+             (' to ship it.', None)],
             _link('How Extras Ship', 'extras-shipping'),
-            _link('Finding Buff IDs', 'finding-buff-ids'),
         ],
     },
     {
@@ -695,8 +942,9 @@ SECTIONS: list[_Section] = [
             _sub('What you can set', [
                 'Player position and Target position — where each timer sits '
                 'on screen.',
-                'Text — Bold, Font size (8–48), Color; shared by both timers. '
-                'The sample shows the result.',
+                'Text — Bold, Size, Color; shared by both timers. Size is a '
+                'percent of the Overlay size, and the face is the Overlay '
+                'font. The sample shows the result.',
                 'Show — Elapsed counts up, Total is the estimated cast '
                 'length, Both shows 1.2 / 2.5.',
             ]),
@@ -713,6 +961,81 @@ SECTIONS: list[_Section] = [
              ('Include the cast timer in builds', _SUCCESS),
              (' to ship it. One toggle runs both the Player and Target sides.',
               None)],
+            _link('How Extras Ship', 'extras-shipping'),
+        ],
+    },
+    {
+        'cat': 'Extras',
+        'id': 'console',
+        'title': 'Console',
+        'body': [
+            'Extras ▸ Console… adds an in-game panel of tabs that logs what '
+            "the game doesn't show you.",
+            _sub('Tabs', [
+                'Buffs — every buff and debuff on you and your target, with '
+                'its buff ID. This is how you find IDs for the Database tab.',
+                "Casts — your and your target's casts as they end: "
+                'finished, interrupted or lost, and how long they took.',
+                'Tick the tabs you want and use ▲ ▼ to order the strip. A '
+                "tab you leave out isn't built; with none ticked, neither is "
+                'the console.',
+            ]),
+            _sub('Using it in-game', [
+                'Drag it by its title bar; − collapses it to a small bar, '
+                'click to reopen. The game remembers spot, fold, open state '
+                'and the tab you were on.',
+                'Its box in the KazBars Preview panel (Shift+Ctrl+Alt) '
+                'switches it off and on.',
+                'Size is a slider in the dialog: a percent of the Overlay '
+                'size.',
+            ]),
+            [('Tick ', None),
+             ('Include the console in builds', _SUCCESS),
+             (' to ship it.', None)],
+            _link('How Extras Ship', 'extras-shipping'),
+            _link('Finding Buff IDs', 'finding-buff-ids'),
+        ],
+    },
+    {
+        'cat': 'Extras',
+        'id': 'onslaught',
+        'title': 'Onslaught Tracker',
+        'body': [
+            'Extras ▸ Onslaught tracker… adds an in-game board for the '
+            'Onslaught instances, Skull Gate and Kuthchemes. It does '
+            'nothing anywhere else.',
+            _sub('Five displays', [
+                'Board — Mob list: the bosses, skulls and minis in view, '
+                'with their health. Wave timer: the wave and the time to the '
+                'next spawn. Hylda HP: Valkyrie Hylda, the ally you defend '
+                'in Skull Gate, with alerts at 50 % and 25 %.',
+                'Alerts — Spawn alerts: a banner when a watched boss, skull '
+                "or mini spawns. AoE warnings: a banner when Thugra Khotan's "
+                'AoE helpers spawn in Kuthchemes.',
+                'Tick the ones you want. Alert time (3–15 s) is how long a '
+                'banner stays.',
+            ]),
+            _sub('Watched mobs', [
+                'It always watches 27 mobs from its catalog, and the dialog '
+                'lists them by name, one line per group. Include '
+                'Kuthchemes camps adds the camp beasts to the board — '
+                'listed, never alerted — and a line for them in that list.',
+                'Your own names — up to 20, watched as minis. A name has to '
+                "match the game's exactly, capitals included; the dialog "
+                'says why it refuses one as you type. × deletes a name; '
+                "Cancel drops any change you haven't applied.",
+                'These matter when Mob list or Spawn alerts is on.',
+            ]),
+            _sub('Using it in-game', [
+                'Place the board and the alerts in preview mode '
+                '(Shift+Ctrl+Alt): drag each where you want it, the game '
+                'remembers.',
+                'Size is a slider in the dialog: a percent of the Overlay '
+                'size. The alerts draw larger than the board.',
+            ]),
+            [('Tick ', None),
+             ('Include the onslaught tracker in builds', _SUCCESS),
+             (' to ship it.', None)],
             _link('How Extras Ship', 'extras-shipping'),
         ],
     },
@@ -754,7 +1077,7 @@ SECTIONS: list[_Section] = [
                 'unsaved-changes prompts still apply — cancel, and the '
                 'downloaded update waits. Next launch: "KazBars updated to '
                 'vX — click for what\'s new".',
-                'Nothing you own moves. Profiles, settings, custom buffs and '
+                'Nothing you own moves. Your profile, settings, custom buffs and '
                 'buff-database updates all stay — no first-run setup again, '
                 'no old folder to delete, no SmartScreen prompt on the '
                 'relaunch.',
@@ -781,11 +1104,13 @@ SECTIONS: list[_Section] = [
         'title': 'Backup and Restore',
         'body': [
             'Game ▸ Backup & restore game settings... writes one portable '
-            '.zip: your full Age of Conan config plus KazBars profiles and '
-            'settings. Your recovery path after a reformat.',
+            '.zip: your full Age of Conan config plus your KazBars profile '
+            'and settings. Your recovery path after a reformat.',
             _sub('Restoring', [
                 'Restore snapshots your current settings first, so a bad '
                 'restore is reversible. Close the game before either.',
+                'A backup made by 3.1 brings back its profiles, and KazBars '
+                'adopts the one that was active.',
             ]),
         ],
     },
@@ -798,7 +1123,8 @@ SECTIONS: list[_Section] = [
             'put in the game folder. Every changed game file is restored '
             'byte-for-byte; Damage Numbers reverts to stock.',
             'Two things stay on purpose: your damage-number colors, and '
-            'everything on this PC — profiles, database entries, settings.',
+            'everything on this PC — your profile, database entries, '
+            'settings.',
             _link('Damage Number Colors', 'damage-number-colors'),
         ],
     },
@@ -1090,8 +1416,10 @@ class InstructionsPanel(ttk.Frame):
                     tokens.append((text_part[i:j], color, False))
                 i = j
 
+        # BOTH sizes must be explicit — the Tk default is 378x265, and fill='x'
+        # stretches the rendered canvas without shrinking what it asks for.
         canvas = tk.Canvas(parent, bg=self._frame_bg, highlightthickness=0, borderwidth=0,
-                           height=line_h, takefocus=0)
+                           width=1, height=line_h, takefocus=0)
         canvas.pack(fill='x', padx=padx, pady=(0, PAD_XS))
 
         def relayout(width):

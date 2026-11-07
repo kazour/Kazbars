@@ -2,7 +2,7 @@
 Smoke test: validate buff references in the default profile and the bundled
 database fallback.
 
-1. Every buff reference in the bundled `Default.json` (whitelist IDs and slot
+1. Every buff reference in the bundled `Default.yml` (whitelist IDs and slot
    assignments) must resolve to an entry in `Database.json`.
 2. `Database.json.default` (the bundled recovery copy) must match
    `Database.json` byte-for-byte.
@@ -16,7 +16,9 @@ Run: `pytest tests/test_data_integrity.py` (from repo root).
 import json
 from collections import defaultdict
 
+from kazbars import yaml_io
 from kazbars.paths import KAZBARS_ASSETS
+from kazbars.profile_share import parse_profile_file
 
 
 def _load_db() -> dict:
@@ -24,9 +26,11 @@ def _load_db() -> dict:
 
 
 def _load_default_profile() -> dict:
-    """The grids section of the document-format (schema 2) stock profile."""
-    doc = json.loads((KAZBARS_ASSETS / "Default.json").read_text(encoding="utf-8"))
-    assert doc["schema"] == 2 and doc["id"]
+    """The grids section of the document-format (schema 3) stock profile."""
+    text = (KAZBARS_ASSETS / "Default.yml").read_text(encoding="utf-8")
+    assert text.startswith("format: kazbars-profile\nschema: 3\n")
+    doc, buffs = parse_profile_file(yaml_io.loads(text))
+    assert doc["schema"] == 3 and doc["id"] and buffs == []
     return doc["modules"]["grids"]
 
 

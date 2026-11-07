@@ -105,3 +105,33 @@ class TestUninstallEngineGuard:
         monkeypatch.setattr(build_executor, "uninstall_from_client", _must_not_run)
 
         game_folder.uninstall_game(app)  # would raise via the stubs above if it got past the gate
+
+
+class TestFormatGamePath:
+    """The status bar's max_parts=6 covers every path in first_launch's
+    COMMON_INSTALL_PATHS in full (the Steam-under-Program-Files one is the
+    deepest, at 6 segments) — measured against the app's real bottom bar,
+    the widest of them still fits the 950px minimum window width. The
+    build-summary screen keeps the tighter default (3) for its own budget."""
+
+    LONGEST_COMMON_INSTALL = (
+        r"C:\Program Files (x86)\Steam\steamapps\common\Age of Conan - Unchained")
+
+    def test_default_budget_still_abbreviates_a_deep_path(self):
+        assert (game_folder.format_game_path(self.LONGEST_COMMON_INSTALL)
+                == r"C:\...\Age of Conan - Unchained")
+
+    def test_status_bar_budget_shows_every_common_install_path_in_full(self):
+        from kazbars.first_launch import COMMON_INSTALL_PATHS
+        for path in COMMON_INSTALL_PATHS:
+            assert game_folder.format_game_path(path, max_parts=6) == path
+
+    def test_status_bar_budget_still_abbreviates_past_its_own_depth(self):
+        deeper = r"C:\Program Files (x86)\Steam\steamapps\common\Age of Conan - Unchained\bin"
+        assert (game_folder.format_game_path(deeper, max_parts=6)
+                == r"C:\...\bin")
+
+    def test_a_drive_less_path_keeps_its_separators(self):
+        assert game_folder.format_game_path(r"Games\Funcom\AoC\Age of Conan") == r"Games\...\Age of Conan"
+        assert (game_folder.format_game_path(r"\\nas\share\Games\Funcom\Age of Conan")
+                == r"\\nas\share\...\Age of Conan")

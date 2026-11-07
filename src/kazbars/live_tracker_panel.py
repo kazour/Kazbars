@@ -38,7 +38,11 @@ from .ui_helpers import (
     THEME_COLORS,
 )
 from .ui_widgets import add_tooltip, app_toast
-from .window_position import bind_window_position_save, restore_window_position
+from .window_position import (
+    bind_window_position_save,
+    fit_window_height,
+    restore_window_position,
+)
 
 # Game-loop tick (ms) — drives both the schedule cadence and the reschedule.
 GAME_TICK_MS = 50
@@ -126,10 +130,13 @@ class LiveTrackerPanel(tk.Toplevel):
         # Tighten the panel to the natural height of its packed content (mirrors
         # DeepsPanel). resizable=False ignores the saved height, so this is where
         # geometry is locked in; saved-position runs keep their x/y, height only.
-        self.update_idletasks()
-        self.geometry(f"{_PANEL_DEFAULT_WIDTH}x{self.winfo_reqheight()}")
+        fit_window_height(self, _PANEL_DEFAULT_WIDTH)
 
         self.protocol("WM_DELETE_WINDOW", self._on_withdraw)
+        self.bind('<Escape>', lambda e: self._on_withdraw())
+        # No single OK to bind Enter to — Start/Stop is the headline action,
+        # so it gets the initial focus instead.
+        self.start_btn.focus_set()
 
     # =========================================================================
     # UI CONSTRUCTION
@@ -285,6 +292,9 @@ class LiveTrackerPanel(tk.Toplevel):
             text = "Waiting for combat log. Type /logcombat on in game."
             color = THEME_COLORS['warning']
         self.status_label.config(text=text, foreground=color)
+        # "Game folder not found: <long path>" wraps to two lines; the panel has
+        # to follow or it clips its own last row (mirrors DeepsPanel).
+        fit_window_height(self, _PANEL_DEFAULT_WIDTH)
 
     def _on_start_stop_click(self):
         if self._monitoring:

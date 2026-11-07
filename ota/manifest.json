@@ -1,16 +1,16 @@
 {
   "schema": 1,
-  "content_version": 33,
-  "min_app_version": "3.0.0",
-  "notes": "Default profile moves to the document format (schema 2); requires KazBars 3.0.0",
+  "content_version": 36,
+  "min_app_version": "3.2.0",
+  "notes": "Default profile is a YAML file (Default.yml); buff database unchanged",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
-      "sha256": "03ef3de617c1e20f2313708b2646ba1d4bfda64b777fd1b85a639944913b6b3f"
+      "sha256": "04283948c1d6a427413356f3922447cf0ac979e391642583edbeae2a16828d22"
     },
-    "Default.json": {
-      "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.json",
-      "sha256": "5913a7894b49d4d1a2d546ca769eafc5dd0941902559a4c4391eb2d80b268019"
+    "Default.yml": {
+      "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.yml",
+      "sha256": "24842af41df514d10e2630468477285e52e92d160c5147873957267424213e95"
     }
   }
 }

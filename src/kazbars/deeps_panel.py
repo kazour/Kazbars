@@ -62,7 +62,11 @@ from .ui_helpers import (
     THEME_COLORS,
 )
 from .ui_widgets import add_tooltip
-from .window_position import bind_window_position_save, restore_window_position
+from .window_position import (
+    bind_window_position_save,
+    fit_window_height,
+    restore_window_position,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -223,10 +227,14 @@ class DeepsPanel(tk.Toplevel):
         # `resizable=False` means the saved height is ignored anyway, so this
         # is the only place geometry is locked in for non-saved-position runs;
         # for saved-position runs, only the height changes (x/y preserved).
-        self.update_idletasks()
-        self.geometry(f"{_PANEL_DEFAULT_WIDTH}x{self.winfo_reqheight()}")
+        fit_window_height(self, _PANEL_DEFAULT_WIDTH)
 
         self.protocol("WM_DELETE_WINDOW", self._on_withdraw)
+        self.bind('<Escape>', lambda e: self._on_withdraw())
+        # No single OK to bind Enter to — Start/Stop is the headline action,
+        # so it gets the initial focus instead.
+        if self._start_btn is not None:
+            self._start_btn.focus_set()
 
     # ------------------------------------------------------------------ #
     # UI construction                                                    #
@@ -420,7 +428,7 @@ class DeepsPanel(tk.Toplevel):
         return dict(self.settings)
 
     def load_profile_data(self, config: dict) -> None:
-        """Apply an incoming profile's `deeps` section — profile switch
+        """Apply an incoming profile's `deeps` section — profile load or import
         restyles the open panel and its overlay live."""
         if not config:
             return
@@ -436,7 +444,7 @@ class DeepsPanel(tk.Toplevel):
         self._push_thresholds()
 
     def _sync_widgets_from_settings(self) -> None:
-        """Resync every control to `self.settings` (profile switch)."""
+        """Resync every control to `self.settings` (profile load or import)."""
         self._survival_var.set(str(self.settings["survival_preset"]))
         self._pet_var.set(bool(self.settings["include_pet_damage"]))
         self._layout_var.set(str(self.settings["layout"]))
@@ -894,6 +902,9 @@ class DeepsPanel(tk.Toplevel):
             return
         self._last_status = (text, color)
         self._status_label.configure(text=text, foreground=color)
+        # A long log filename wraps this line to two; without the re-fit the
+        # panel keeps its build-time height and eats the pet caveat below.
+        fit_window_height(self, _PANEL_DEFAULT_WIDTH)
 
     def _update_alarm_state(self, snapshot: MeterSnapshot) -> None:
         """Hysteresis state machine on the DPS rate.

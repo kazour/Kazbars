@@ -40,7 +40,7 @@ def test_manifest_exists_and_wellformed():
     m = _manifest()
     assert isinstance(m["content_version"], int)
     assert isinstance(m["min_app_version"], str)
-    assert set(m["files"]) == {"Database.json", "Default.json"}
+    assert set(m["files"]) == {"Database.json", "Default.yml"}
     for info in m["files"].values():
         assert info["url"].startswith("https://raw.githubusercontent.com/")
         assert "/main/" in info["url"], "payload URLs ride the main ref, not a commit SHA"

@@ -16,16 +16,17 @@ from pathlib import Path
 
 from ttkbootstrap.dialogs import Messagebox
 
-from . import game_folder
+from . import game_folder, onslaught
 from .app_popups import show_close_game_required_dialog
 from .build_loading import BuildLoadingScreen
 from .cast_timer import is_enabled as cast_is_enabled
 from .cast_timer import validate_config as validate_cast_config
-from .grid_model import get_game_resolution_or_default
-from .grids_generator import MAX_TOTAL_SLOTS, unresolved_refs
+from .console import ships as console_ships
+from .grid_model import get_game_resolution_or_default, max_slots, slot_count
+from .grids_generator import grid_ships, unresolved_refs
 from .profile_document import build_signature
 from .ui_helpers import THEME_COLORS
-from .ui_widgets import app_toast, confirm, flash_status_bar
+from .ui_widgets import app_toast, flash_status_bar
 
 logger = logging.getLogger(__name__)
 
@@ -60,14 +61,15 @@ def build(app):
     if app._building:
         return
 
-    valid = (
-        bool(app.game_path)
-        and Path(app.game_path).is_dir()
-        and (Path(app.game_path) / "Data" / "Gui" / "Default").exists()
-    )
+    valid = bool(app.game_path) and game_folder.is_game_folder(app.game_path)
 
     grids = app.grids_panel.get_profile_data()
-    total_slots = app.grids_panel.get_total_slots()
+    # A hand-edited grid past its limit blocks the build only if it would be baked.
+    oversized = next((g for g in grids
+                      if grid_ships(g) and slot_count(g) > max_slots(g['type'])), None)
+    oversized_msg = '' if oversized is None else (
+        f"Grid '{oversized['id']}' has {slot_count(oversized)} slots; "
+        f"a grid holds at most {max_slots(oversized['type'])}.\n\nReduce its rows or columns.")
 
     di_settings = dict(app.profile_store.get_section('damage_numbers'))
     di_enabled = bool(di_settings.get('enabled'))
@@ -79,17 +81,21 @@ def build(app):
     # Extras stand on their own: nothing downstream needs a grid, so an
     # extras-only build is legitimate. Mirrors the generator's include gates —
     # cast through is_enabled on the validated config, stopwatch/inspect off
-    # their own flag. The three configs are profile sections; snapshot-copy
-    # them off the live store dicts here so the worker thread never reads a
-    # dict the main thread could mutate.
+    # their own flag, the console and the onslaught tracker off their ships().
+    # Each config is a profile section; snapshot-copy them off the live store
+    # dicts here so the worker thread never reads a dict the main thread
+    # could mutate.
     cast_config = validate_cast_config(dict(app.profile_store.get_section('cast_timer')))
     stopwatch_config = dict(app.profile_store.get_section('stopwatch'))
     inspect_config = dict(app.profile_store.get_section('inspect'))
+    console_config = dict(app.profile_store.get_section('console'))
+    onslaught_config = dict(app.profile_store.get_section('onslaught'))
     any_extra = (
-        bool(app.settings.get('build_console', False))
-        or cast_is_enabled(cast_config)
+        cast_is_enabled(cast_config)
         or bool(stopwatch_config.get('enabled'))
         or bool(inspect_config.get('enabled'))
+        or console_ships(console_config)
+        or onslaught.ships(onslaught_config)
         or di_enabled
     )
 
@@ -99,9 +105,7 @@ def build(app):
          "Set your Age of Conan folder from the bottom bar."),
         (not grids and not any_extra,
          "Nothing to build.\n\nAdd a grid or enable an extra first."),
-        (total_slots > MAX_TOTAL_SLOTS,
-         f"Total slots ({total_slots}) exceeds maximum ({MAX_TOTAL_SLOTS}).\n\n"
-         "Remove some grids or reduce grid sizes."),
+        (oversized is not None, oversized_msg),
         (di_enabled and not di_assets_ok,
          "Damage Numbers is enabled but its files are missing.\n\n"
          "Re-download KazBars to restore them."),
@@ -113,41 +117,12 @@ def build(app):
             Messagebox.show_error(msg, title="Build Error")
             return
 
-    empty = []
-    for g in grids:
-        if not g.get('enabled', True):
-            continue
-        if g.get('slotMode') == 'static':
-            sa = g.get('slotAssignments', {})
-            if not any(v for v in sa.values()):
-                empty.append(g['id'])
-        else:
-            if not g.get('whitelist'):
-                empty.append(g['id'])
-
-    if empty:
-        names = ', '.join(f"'{n}'" for n in empty)
-        if not confirm(
-            f"These grids have no tracked buffs and would appear empty in-game:\n\n{names}\n\n"
-            "Disable them and build anyway?",
-            title="Empty Grids", action="Disable & build"
-        ):
-            return
-        for g in grids:
-            if g['id'] in empty:
-                g['enabled'] = False
-        # Rebuild the cards from the mutated dicts BEFORE pushing to the store:
-        # _on_grids_edited flushes widget values over the dicts, so pushing
-        # first would let the stale enabled-toggles clobber the disable.
-        app.grids_panel.refresh_panels(expand_index=-1)
-        app._on_grids_edited()
-
     if not _declarations_gate(app):
         return
 
-    # Mirror the grid cards into the store (a field mid-typing hasn't fired
-    # on_change yet), then flush, so built == saved and the build signature
-    # hashes what actually gets baked; the summary line names the profile.
+    # Mirror the grid cards into the store, then flush, so built == saved and
+    # the build signature hashes what actually gets baked; the summary line
+    # names the profile.
     profile_name = None
     if app.profile_store is not None:
         app._on_grids_edited()
@@ -170,11 +145,13 @@ def build(app):
         'database': app.database,
         'assets_path': app.assets_path,
         'app_version': app.app_version,
-        'include_console': bool(app.settings.get('build_console', False)),
         'cast_config': cast_config,
         'stopwatch_config': stopwatch_config,
         'inspect_config': inspect_config,
-        'panel_font_size': app.settings.get('panel_font_size'),
+        'console_config': console_config,
+        'onslaught_config': onslaught_config,
+        'overlay': dict(app.profile_store.get_section('overlay')),
+        'anchor': (app.settings.get('anchor_side'), app.settings.get('anchor_up')),
         'game_resolution': get_game_resolution_or_default(),
         'game_path': app.game_path,
         'di_enabled': di_enabled,
@@ -223,10 +200,13 @@ def _build_worker(app, loading, ctx):
         started = time.monotonic()
         staging_dir, compile_result = compile_to_staging(
             ctx['grids'], ctx['database'], ctx['assets_path'], ctx['app_version'],
-            include_console=ctx['include_console'], cast_config=ctx['cast_config'],
+            cast_config=ctx['cast_config'],
             stopwatch_config=ctx['stopwatch_config'],
             inspect_config=ctx['inspect_config'],
-            panel_font_size=ctx['panel_font_size'],
+            console_config=ctx['console_config'],
+            onslaught_config=ctx['onslaught_config'],
+            overlay=ctx['overlay'],
+            anchor=ctx['anchor'],
             game_resolution=ctx['game_resolution'],
         )
         if not compile_result[0]:
@@ -290,6 +270,7 @@ def _finish_success(app, loading, staging_dir, ctx, compile_result, ok, err,
                 'profile_name': ctx['build_profile_name'],
                 'hash': ctx['build_signature'],
                 'target_resolution': list(ctx['game_resolution']),
+                'anchor': list(ctx['anchor']),
             })
             if not app.settings.get('has_built_before'):
                 app.settings.set('has_built_before', True)

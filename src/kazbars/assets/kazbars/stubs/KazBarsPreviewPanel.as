@@ -17,8 +17,8 @@
 // is actually doing right now, and a box IS that item's master switch: unchecked
 // survives the exit and the relog. A header is its group's master: one click
 // checks the group, another unchecks it. The panel itself stays stateless — the
-// owner persists the grid flags (g<i>_v) and each stub persists its own (swv/
-// inv/ctv/cnv). Its own drag position rides in the module config archive as
+// owner persists the grid flags (g<i>_v) and each stub persists its own (inv/
+// ctv/cnv/onv). Its own drag position rides in the module config archive as
 // ppx/ppy, beside the other panels' keys.
 class KazBarsPreviewPanel extends KazBarsPanel {
     // The one call that flows back to the core (the contract note atop
@@ -42,7 +42,6 @@ class KazBarsPreviewPanel extends KazBarsPanel {
     private var ROWS_Y:Number;
     private var COL_W:Number;     // 18.33
     private var HDR_GAP:Number;   // 0.4  breathing room above a mid-column header
-    private var FOOT_FS:Number;   // 0.7  footer text size (floor 9 like the rest)
     private var MAX_PER_COL:Number;   // an item count, not a size — never scaled
 
     // layoutItems() -> show(): positioned {hdr, label, grp, row, col, y} items,
@@ -68,13 +67,17 @@ class KazBarsPreviewPanel extends KazBarsPanel {
     // Setup
     // =========================================================================
 
-    // Mirrors KazBarsStopwatch/KazBarsInspect, minus their bail-on-null: those
-    // two are always configured before they build, this one is not.
+    // Mirrors KazBarsInspect, minus its bail-on-null: that one is always
+    // configured before it builds, this one is not.
     public function configure(cfg:Object):Void {
         if (cfg == null) cfg = {};
         ver = (cfg.version == null) ? "" : String(cfg.version);
         applySize(Number(cfg.fontSize));
         FS_REQ = FS;   // the clamped request — show()'s fit loop restarts from it
+        // The drag overlays' labels follow the same shared size (the request,
+        // not whatever the fit loop shrinks this panel to).
+        KazBarsPreview.setFontSize(FS_REQ);
+        if (cfg.face != null) KazBarsPreview.setFace(String(cfg.face));
     }
 
     // Split out of configure() because show() re-runs it a notch smaller when the
@@ -88,7 +91,6 @@ class KazBarsPreviewPanel extends KazBarsPanel {
         ROWS_Y = BTN_Y + BTN_H + Math.round(FS * 0.85);
         COL_W = Math.round(FS * 18.33);
         HDR_GAP = Math.round(FS * 0.4);
-        FOOT_FS = Math.max(9, Math.round(FS * 0.7));
         measure(1, 0, 0);
     }
 
@@ -204,7 +206,8 @@ class KazBarsPreviewPanel extends KazBarsPanel {
         // user with a panel they cannot reach.
         applySize(FS_REQ);
         fitPass();
-        while (FS > 8 && (curW > Stage.width || curH > Stage.height)) {
+        var s:Object = KazBarsPanel.stage();
+        while (FS > 8 && (curW > s.w || curH > s.h)) {
             applySize(FS - 1);
             fitPass();
         }
@@ -214,18 +217,14 @@ class KazBarsPreviewPanel extends KazBarsPanel {
         chrome = panelClip.createEmptyMovieClip("chrome", panelClip.getNextHighestDepth());
         drawChrome(curW, curH);
 
-        titleTF = makeTF(panelClip, "title", PAD, Math.floor((TITLE_H - (LINE + 4)) / 2),
-                         curW - PAD * 2, LINE + 4, NAME_FS, true, 0xF7A22B, "left");
+        titleTF = makeTF(panelClip, "title", PAD, Math.floor((TITLE_H - NAME_H) / 2),
+                         curW - PAD * 2, NAME_H, NAME_FS, true, 0xF7A22B, "left");
         titleTF.text = "KazBars Preview";
 
-        // Full title width — there is no collapse glyph to stop short of.
-        makeCoordReadout(Math.floor((TITLE_H - LINE) / 2), curW - PAD * 2, LINE);
-
-        var btnAll:MovieClip = makeButton(panelClip, "btnAll", "All", PAD, BTN_Y,
-                                          Math.max(9, Math.round(FS * 0.9)));
+        var btnAll:MovieClip = makeButton(panelClip, "btnAll", "All", PAD, BTN_Y);
         btnAll.onRelease = function() { self.setAll(true); };
-        var btnNone:MovieClip = makeButton(panelClip, "btnNone", "None", PAD + BTN_W + 8,
-                                           BTN_Y, Math.max(9, Math.round(FS * 0.9)));
+        var btnNone:MovieClip = makeButton(panelClip, "btnNone", "None", PAD + BTN_W + BTN_GAP,
+                                           BTN_Y);
         btnNone.onRelease = function() { self.setAll(false); };
 
         var i:Number = 0;
@@ -262,9 +261,8 @@ class KazBarsPreviewPanel extends KazBarsPanel {
 
         // Placed last: the clamp has to measure the plate actually on screen.
         // First open sits clear of the console's own default y.
-        panelClip._x = isNaN(posX) ? (Stage.width - curW) / 2
-                                   : KazBarsPanel.clampPos(posX, Stage.width - curW);
-        panelClip._y = isNaN(posY) ? 100 : KazBarsPanel.clampPos(posY, Stage.height - curH);
+        panelClip._x = isNaN(posX) ? s.x + (s.w - curW) / 2 : KazBarsPanel.clampPos(posX, curW, true);
+        panelClip._y = isNaN(posY) ? s.y + 100 : KazBarsPanel.clampPos(posY, curH, false);
     }
 
     // =========================================================================
@@ -341,9 +339,8 @@ class KazBarsPreviewPanel extends KazBarsPanel {
         rectPath(hit, -2, -3, COL_W - 8, LINE + 4);
         hit.endFill();
         hit.useHandCursor = true;
-        var tf:TextField = makeTF(c, "lbl", 0, 0, COL_W - 8, LINE,
-                                  Math.max(9, Math.round(FS * 0.75)), true,
-                                  0xC8C0B0, "left");
+        var tf:TextField = makeTF(c, "lbl", 0, Math.floor((BOX - SMALL_H) / 2), COL_W - 8,
+                                  SMALL_H, SMALL_FS, true, 0xC8C0B0, "left");
         tf.text = label.toUpperCase();
         hit.onRollOver = function() { this._parent.lbl.textColor = 0xF7A22B; };
         hit.onRollOut = function() { this._parent.lbl.textColor = 0xC8C0B0; };
@@ -357,14 +354,13 @@ class KazBarsPreviewPanel extends KazBarsPanel {
     private function makeRowCheckbox(name:String, x:Number, y:Number, label:String,
                                      checked:Boolean, labelW:Number, hitW:Number):MovieClip {
         var c:MovieClip = makeCheckbox(panelClip, name, x, y, checked, hitW);
-        var lbl:TextField = makeTF(c, "lbl", BOX + 6, -3, labelW, LINE,
-                                   Math.max(9, Math.round(FS * 0.8)), false,
-                                   0xC8C0B0, "left");
+        var lbl:TextField = makeTF(c, "lbl", BOX + 6, Math.floor((BOX - LINE) / 2), labelW,
+                                   LINE, FS, false, 0xC8C0B0, "left");
         lbl.text = label;
         return c;
     }
 
-    // Dim orientation lines in the coord-readout grey: the exit keybind, the
+    // Dim orientation lines in the family's dim grey: the exit keybind, the
     // /reloadui recipe, the version credit. Word-wrapped to the plate, so
     // buildFooter both draws them and is how fitPass measures them — the same
     // fields both times, never a diverging estimate.
@@ -382,8 +378,8 @@ class KazBarsPreviewPanel extends KazBarsPanel {
         var yy:Number = y;
         var i:Number = 0;
         while (i < lines.length) {
-            var tf:TextField = makeTF(panelClip, "foot" + i, PAD, yy, w, LINE,
-                                      FOOT_FS, false, 0x999999, "left");
+            var tf:TextField = makeTF(panelClip, "foot" + i, PAD, yy, w, SMALL_H,
+                                      SMALL_FS, false, 0x999999, "left");
             tf.wordWrap = true;
             tf.autoSize = "left";   // width holds, height grows to the wrap
             tf.text = lines[i];
@@ -429,7 +425,7 @@ class KazBarsPreviewPanel extends KazBarsPanel {
     public function destroy():Void {
         capturePos();
         if (panelClip != null) { panelClip.removeMovieClip(); panelClip = null; }
-        chrome = null; dragMC = null; titleTF = null; coordTF = null;
+        chrome = null; dragMC = null; titleTF = null;
         items = null;
         begin();
     }

@@ -21,9 +21,11 @@ def test_defaults_has_every_global_key_plus_enabled():
     for key in dis.GLOBAL_SETTINGS:
         assert key in d
     assert d['enabled'] is False
-    # +1 non-baked key outside GLOBAL_SETTINGS: the master 'enabled' gate. (Per-source
-    # colors are NOT settings — the colors panel edits TextColors.xml directly.)
-    assert len(d) == len(dis.GLOBAL_SETTINGS) + 1
+    assert d['font'] == 'Hyborian'
+    # +2 keys outside GLOBAL_SETTINGS: the master 'enabled' gate and the damage
+    # text's `font`. (Per-source colors are NOT settings — the colors panel edits
+    # TextColors.xml directly.)
+    assert len(d) == len(dis.GLOBAL_SETTINGS) + 2
     assert 'source_colors' not in d
 
 

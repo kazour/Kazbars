@@ -1,61 +1,176 @@
 """
 KazBars — Profile I/O.
 
-The app-facing satellite over `profile_library` (disk) and `profile_store`
-(runtime document + autosave). Functions take the KazBarsApp instance as
-first arg. There is no Save/Open/dirty machinery: the store autosaves, the
-library owns files, and the only pointers are the in-document id and the
-`active_profile` pref.
+The app holds one profile document, `userdata/profile.yml`, behind
+`profile_store` (runtime document + autosave). Functions take the KazBarsApp
+instance as first arg. There is no Save/Open/dirty machinery and no profile
+list: the store autosaves to the one file, Import / Reset replace the
+document in place (so Revert to session start undoes them), and Export writes
+a self-contained copy.
+
+`startup_profile` resolves the document at launch: `profile.yml`, else its
+session snapshot `profile.yml.bak` (the damaged file kept as
+`profile.damaged.yml`), else the active profile of a 3.1 library
+(`userdata/profiles/`, read once, never written), else the template seed. A
+`profile.yml` the OS won't hand over, or one from a newer KazBars, is never
+set aside: the app says so and exits with the file untouched.
 
 `apply_document` is the dispatch step (grids panel, live overlays, extras
-cards, pointer, title, File menu). It runs before `app.deiconify()` at
-startup so panels are populated before the window shows. Unresolved buff
-refs raise no dialog — they surface as greyed rows in the buff selector and
-as the build summary's skipped-count line.
+cards). It runs before `app.deiconify()` at startup so panels are
+populated before the window shows. Unresolved buff refs raise no dialog —
+they surface as greyed rows in the buff selector and as the build summary's
+skipped-count line.
 """
 
 import copy
-import json
 import logging
 import os
+import time
 from pathlib import Path
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
+from typing import NoReturn
 
-from ttkbootstrap.dialogs import Messagebox, MessageDialog, Querybox
+from ttkbootstrap.dialogs import Messagebox
 
-from . import content_update, profile_share
+from . import content_update, grid_templates, profile_share, yaml_io
 from .buff_db_layers import DeltaStore
 from .grid_model import get_game_resolution_or_default
-from .profile_document import DocumentError, mint_id, new_document, validate_document
-from .profile_library import SEED_NAME, file_mtime, slugify
+from .overlay import size_for_height
+from .profile_document import NewerSchemaError, mint_id, new_document, validate_document
+from .profile_share import GRIDS_EXT, PROFILE_EXT, slugify
 from .profile_store import ProfileStore
-from .settings_manager import safe_save_json
-from .ui_widgets import app_toast
-from .userdata import database_user_path
+from .settings_core import read_json
+from .settings_manager import safe_write_text
+from .ui_widgets import app_toast, confirm
+from .userdata import (
+    database_user_path,
+    prefs_path,
+    profile_bak_path,
+    profile_damaged_path,
+    profile_path,
+    profiles_dir,
+    userdata_root,
+)
 
 logger = logging.getLogger(__name__)
+
+SEED_NAME = 'My Setup'
+STARTUP_READ_ATTEMPTS = 3
+STARTUP_RETRY_S = 0.25
+
+
+def file_mtime(path: Path) -> float:
+    """`path`'s mtime, or 0.0 if it can no longer be stat'd — a file can
+    vanish between being listed/read and being compared."""
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return 0.0
 
 
 def template_paths(app):
     """The template chain, best first: OTA content (only while it's active —
     active_content_dir() yields to stock when an app upgrade has moved the
-    baseline past it), then the shipped stock Default.json."""
+    baseline past it), then the shipped stock Default.yml."""
     active_content = content_update.active_content_dir()
-    paths = [active_content / 'Default.json'] if active_content else []
-    paths.append(app.assets_path / 'kazbars' / 'Default.json')
+    paths = [active_content / 'Default.yml'] if active_content else []
+    paths.append(app.assets_path / 'kazbars' / 'Default.yml')
     return tuple(paths)
 
 
-def make_store(app, doc):
-    """A ProfileStore wired to this app: library writer, Tk scheduler, session
-    snapshot hook."""
+# ============================================================================
+# FILES
+# ============================================================================
+class FileUnavailableError(ValueError):
+    """The OS wouldn't hand the file over (locked, no permission, gone): its
+    contents may be intact. Same message as a file that doesn't parse."""
+
+
+def _read_raw(path, noun):
+    """A data file's value (`yaml_io.read_file`), or ``ValueError`` naming
+    the kind of file it couldn't be read as — ``FileUnavailableError`` when the OS
+    refused the read itself."""
+    msg = f"That file couldn't be read as a KazBars {noun}."
+    try:
+        return yaml_io.read_file(path)
+    except OSError as e:
+        raise FileUnavailableError(msg) from e
+    except ValueError as e:
+        raise ValueError(msg) from e
+
+
+def read_profile_file(registry, path, prepare=None):
+    """A profile file through the gate → ``(doc, embedded_buffs)``. `.json`
+    reads as JSON (a 3.1 export or library document), anything else as YAML.
+    `prepare(profile_raw)` runs before the gate. Raises ``ValueError`` with a
+    user-presentable message."""
+    profile_raw, embedded = profile_share.parse_profile_file(_read_raw(path, 'profile'))
+    if prepare is not None:
+        profile_raw = prepare(profile_raw)
+    return validate_document(registry, profile_raw), embedded
+
+
+def _profile_file(app, doc, buffs=()):
+    """The file for `doc` as `profile.yml` and an export carry it: through
+    the gate, under its `format` line, `buffs` last."""
+    return profile_share.build_profile_file(validate_document(app.registry, doc), buffs)
+
+
+def write_profile(app, doc):
+    """Validate and write `doc` to `profile.yml`. Returns the path, or None on
+    failure (the store's writer contract: None is a failed autosave, retried
+    and surfaced on exit) — a disk error, or a value YAML can't hold."""
+    path = profile_path()
+    try:
+        safe_write_text(path, yaml_io.dumps(_profile_file(app, doc)))
+        return path
+    except (OSError, yaml_io.YamlError) as e:
+        logger.warning('Could not write the profile: %s', e)
+        return None
+
+
+def write_bak(app, doc):
+    """The session-start snapshot behind File ▸ Revert and the damaged-file
+    fallback. Best effort, never raises."""
+    try:
+        safe_write_text(profile_bak_path(), yaml_io.dumps(_profile_file(app, doc)))
+    except (OSError, yaml_io.YamlError) as e:
+        logger.debug('Session snapshot skipped: %s', e)
+
+
+def make_store(app, doc, dirty=False):
+    """A ProfileStore wired to this app: `profile.yml` writer, Tk scheduler,
+    session snapshot. `dirty`: `doc` is not on disk yet."""
     return ProfileStore(
         doc,
-        writer=app.library.write,
+        writer=lambda d: write_profile(app, d),
         schedule=lambda ms, fn: app.after(ms, fn),
         cancel=app.after_cancel,
-        write_bak=app.library.write_session_bak,
+        write_bak=lambda d: write_bak(app, d),
+        dirty=dirty,
     )
+
+
+def save_yaml_file(value, *, title, ext, label, stem, noun):
+    """An Export… save dialog suggesting `<stem><ext>`, then `value` as YAML,
+    written atomically. The path, or None: cancelled, or a failed write (an
+    error box names the `noun` file)."""
+    path = filedialog.asksaveasfilename(
+        title=title, defaultextension=ext, initialfile=f"{slugify(stem)}{ext}",
+        filetypes=[(label, f"*{ext}"), ("YAML files", "*.yml *.yaml")])
+    if not path:
+        return None
+    try:
+        safe_write_text(Path(path), yaml_io.dumps(value))
+    except (OSError, yaml_io.YamlError) as e:  # a disk error, or a value YAML can't hold
+        Messagebox.show_error(f"Could not write the {noun} file.\n\n({e})", title="Export Failed")
+        return None
+    return Path(path)
+
+
+def custom_buffs_suffix(n):
+    """` (+N custom buffs)` on an Exported toast; nothing for none."""
+    return f" (+{n} custom buff{'s' if n != 1 else ''})" if n else ""
 
 
 def release_store(app) -> bool:
@@ -73,41 +188,187 @@ def release_store(app) -> bool:
     return False
 
 
-def _newest_doc(app):
-    """Newest library entry. `ensure_nonempty` is best-effort — when the disk
-    refused every seed write the library is still empty, so fall back to an
-    in-memory blank: the app opens, the store's write-retry keeps trying, and
-    the exit rescue dialog surfaces the failure."""
-    entries = app.library.list_profiles()
-    if entries:
-        return max(entries, key=lambda e: file_mtime(e[0]))[1]
-    logger.warning("Profile library empty and unseedable — using an in-memory profile")
-    return new_document(app.registry, SEED_NAME, get_game_resolution_or_default())
-
-
-def startup_profile(app):
-    """Resolve and open the startup profile: seed the library if empty, then
-    `active_profile` pref → newest file → in-memory blank (unwritable disk)."""
-    app.library.ensure_nonempty(get_game_resolution_or_default())
-    doc = None
-    active = app.settings.get('active_profile')
-    if active:
-        held = app.library.load(active)
-        if held:
-            doc = held[1]
+# ============================================================================
+# STARTUP
+# ============================================================================
+def startup_profile(app, active_hint=None):
+    """Open the profile: `profile.yml` → its `.bak` (a damaged file) → the
+    active profile of a 3.1 library → the template seed (blank if no template
+    reads). `active_hint` names the library profile to adopt first (a restored
+    3.1 backup's own pointer). Toasts wait for the window."""
+    path = profile_path()
+    exists = path.exists()
+    try:
+        doc = _read_startup_profile(app, path) if exists else None
+    except FileUnavailableError:
+        _fail_startup(
+            app, "KazBars couldn't open your profile file (userdata\\profile.yml). Another "
+            "program may be holding it — an antivirus scan or a sync tool.\n\n"
+            "Your profile hasn't been changed. Close that program, then start KazBars again.")
+    except NewerSchemaError as e:
+        _fail_startup(
+            app, f"{e}\n\nYour profile (userdata\\profile.yml) was saved by a newer version "
+            "of KazBars. It hasn't been changed.")
+    on_disk = doc is not None
+    toast = None
+    if exists and not on_disk:
+        _set_aside(path)
+        bak = profile_bak_path()
+        doc = _try_read(app, bak, warn=True) if bak.exists() else None
+        toast = (("Your profile file was damaged — restored the copy from your last session",
+                  'warning', None) if doc is not None else
+                 ("Your profile file was damaged and no copy could be read — starting from "
+                  "the defaults", 'warning', None))
+    elif not on_disk:
+        doc = _adopt_library(app, active_hint)
+        if doc is not None:
+            toast = (f"Adopted “{doc['name']}” as your profile — your other profiles stay in "
+                     "userdata/profiles; File ▸ Import profile… opens one", 'info', 8)
     if doc is None:
-        doc = _newest_doc(app)
-    app.profile_store = make_store(app, doc)
+        doc = _from_template(app, SEED_NAME)
+        if doc is None:
+            logger.warning("No profile template reads — starting from a blank profile")
+            doc = new_document(app.registry, SEED_NAME, get_game_resolution_or_default())
+    # A document not yet on disk is written now; a failed write stays dirty,
+    # retries, and the exit path offers the rescue.
+    app.profile_store = make_store(app, doc, dirty=not on_disk)
+    app.profile_store.flush()
     apply_document(app)
+    if toast:
+        msg, style, duration = toast
+        app.after(0, lambda: app_toast(app, msg, style, duration))
 
 
+def _read_startup_profile(app, path):
+    """`profile.yml` through the gate, or None when it is damaged. A read the
+    OS refuses is retried briefly (a scan or sync lock passes); one still
+    refused raises ``FileUnavailableError``, a newer schema ``NewerSchemaError`` —
+    neither file is damaged, so neither may be set aside."""
+    for attempt in range(1, STARTUP_READ_ATTEMPTS + 1):
+        try:
+            return read_profile_file(app.registry, path)[0]
+        except FileUnavailableError:
+            if attempt == STARTUP_READ_ATTEMPTS:
+                raise
+            time.sleep(STARTUP_RETRY_S)
+        except ValueError as e:
+            if isinstance(e, NewerSchemaError):
+                raise
+            logger.warning('Profile file %s unreadable: %s', path.name, e)
+            return None
+
+
+def _fail_startup(app, msg) -> NoReturn:
+    """The exit path for a `profile.yml` that must not be replaced: any
+    other document would autosave over it. Says why, then exits. The native
+    box, not ttkbootstrap's: at launch the window is still withdrawn, and a
+    dialog transient to it never maps (an invisible modal grab)."""
+    logger.error('Startup stopped: %s', msg)
+    messagebox.showerror("KazBars can't open your profile", msg, parent=app)
+    raise SystemExit(1)
+
+
+def _try_read(app, path, warn=False, prepare=None):
+    """`path` through the gate, or None when it doesn't read — a warning for
+    the profile itself (`warn`), a debug line for a template or a 3.1
+    library file passed over."""
+    try:
+        return read_profile_file(app.registry, path, prepare)[0]
+    except ValueError as e:
+        logger.log(logging.WARNING if warn else logging.DEBUG,
+                   'Profile file %s unreadable: %s', path.name, e)
+        return None
+
+
+def _set_aside(path):
+    """Move the damaged `profile.yml` to `profile.damaged.yml`, never over an
+    earlier one."""
+    aside, n = profile_damaged_path(), 2
+    while aside.exists():
+        aside = aside.with_name(f'profile.damaged-{n}.yml')
+        n += 1
+    try:
+        os.replace(path, aside)
+    except OSError as e:
+        logger.warning('Could not set the damaged profile aside: %s', e)
+
+
+def _adopt_library(app, active_hint=None):
+    """The profile a 3.1 library was on: `active_hint` (a restored 3.1
+    backup's own pointer), else the `active_profile` id prefs.json still
+    holds, else its newest file. None without one. Reads only; `profiles/`
+    stays as it is."""
+    prefs = read_json(prefs_path()) or {}
+    active = prefs.get('active_profile')
+    panel_font = prefs.get('panel_font_size')
+    if not (isinstance(panel_font, int) and not isinstance(panel_font, bool)
+            and 8 <= panel_font <= 48):
+        panel_font = 12
+    entries = []
+    for path in sorted(profiles_dir().glob('*.json')):
+        doc = _try_read(app, path, prepare=lambda raw: _lift_panel_font(raw, panel_font))
+        if doc is not None:
+            entries.append((path, doc))
+    if not entries:
+        return None
+    # The hint, then the prefs id, then the newest: a restored backup's own
+    # pointer beats whatever this PC's prefs still name, and an id that names
+    # none of the files falls through. Sorted by path: the first file with an
+    # id wins.
+    for wanted in (active_hint, active):
+        for _path, doc in entries:
+            if doc['id'] == wanted:
+                return doc
+    return max(entries, key=lambda e: file_mtime(e[0]))[1]
+
+
+def _lift_panel_font(profile_raw, panel_font):
+    """A 3.1 (schema 2) library document's stopwatch/inspect `fontSize: null`
+    meant "the machine-local `panel_font_size` pref": fill it in so the
+    schema 2 → 3 migration scales from that size, not from 100 %. Mutates and
+    returns `profile_raw` (a fresh dict from the file)."""
+    if not isinstance(profile_raw, dict) or profile_raw.get('schema') != 2:
+        return profile_raw
+    modules = profile_raw.get('modules')
+    for key in ('stopwatch', 'inspect'):
+        section = modules.get(key) if isinstance(modules, dict) else None
+        if isinstance(section, dict) and section.get('fontSize') is None:
+            section['fontSize'] = panel_font
+    return profile_raw
+
+
+def template_doc(app):
+    """The first template on the chain that reads, through the gate; None
+    without one (first launch's Use Defaults asks)."""
+    for path in template_paths(app):
+        if path.is_file() and (doc := _try_read(app, path)) is not None:
+            return doc
+    return None
+
+
+def _from_template(app, name):
+    """The template, instantiated: fresh id, `name`, the overlay size for the
+    game resolution's height (grid positions are fractions and land
+    proportionally). None when no template reads."""
+    doc = template_doc(app)
+    if doc is None:
+        return None
+    doc['id'] = mint_id()
+    doc['name'] = name
+    doc['modules'].setdefault('overlay', {})['size'] = size_for_height(
+        get_game_resolution_or_default()[1])
+    return doc
+
+
+# ============================================================================
+# DISPATCH
+# ============================================================================
 def apply_document(app):
     """Dispatch the store's document into the running app.
 
     Side effects: grids panel, live BossTimer + Deeps overlays (if open),
-    extras shortcut cards, `active_profile` pref, window title, File menu
-    profile rows. Positions are fractions — no resolution rescale exists;
-    `authored_at` is display-only provenance.
+    extras shortcut cards. Positions are fractions — no
+    resolution rescale exists; `authored_at` is display-only provenance.
     """
     store = app.profile_store
     grids = copy.deepcopy(store.get_section('grids').get('grids', []))
@@ -116,6 +377,7 @@ def apply_document(app):
         # No dialog: inert refs are visible as greyed rows in the buff
         # selector, and the build summary reports the skipped count.
         logger.info("Unresolved buff refs (kept, skipped at build): %s", missing_by_grid)
+    app.grids_panel.load_overlay()
 
     if bt := app._boss_timer_if_alive():
         bt.load_profile_data(store.get_section('boss_timer'))
@@ -126,103 +388,10 @@ def apply_document(app):
     # resync the main-screen shortcut cards to the incoming sections.
     app.grids_panel.refresh_extras_shortcuts()
 
-    app.settings.set('active_profile', store.document['id'])
-    app.settings.save()
-    app._update_title()
-    app._refresh_file_menu()
 
-
-def switch_profile(app, profile_id):
-    """Flush the outgoing profile (autosave — never a prompt) and open the
-    target. A vanished target refreshes the menu instead of erroring."""
-    if profile_id == app.profile_store.document['id']:
-        return
-    if not release_store(app):
-        return
-    held = app.library.load(profile_id)
-    if held is None:
-        app_toast(app, "That profile is gone — list refreshed.", 'warning')
-        app._refresh_file_menu()
-        return
-    app.profile_store = make_store(app, held[1])
-    apply_document(app)
-
-
-def new_blank_profile(app):
-    if not release_store(app):
-        return
-    doc = app.library.create_blank(
-        app.library.unique_name('New Profile'), get_game_resolution_or_default())
-    if doc is None:
-        Messagebox.show_error("Could not create the profile file.", title="New Profile")
-        return
-    app.profile_store = make_store(app, doc)
-    apply_document(app)
-
-
-def new_from_template(app):
-    if not release_store(app):
-        return
-    doc = app.library.create_from_template(
-        app.library.unique_name('Default'), get_game_resolution_or_default())
-    if doc is None:
-        Messagebox.show_warning("No profile template is available.", title="New Profile")
-        return
-    app.profile_store = make_store(app, doc)
-    apply_document(app)
-
-
-def duplicate_current(app):
-    """A safety copy of the current profile; stays on the current one."""
-    if not release_store(app):
-        return
-    doc = app.library.duplicate(app.profile_store.document['id'])
-    if doc is None:
-        Messagebox.show_error("Could not duplicate the profile.", title="Duplicate Profile")
-        return
-    app_toast(app, f"Duplicated as “{doc['name']}”", 'success')
-    app._refresh_file_menu()
-
-
-def rename_current(app):
-    store = app.profile_store
-    new_name = Querybox.get_string(
-        prompt="New profile name:", title="Rename Profile",
-        initialvalue=store.document['name'], parent=app)
-    if not new_name or not new_name.strip():
-        return
-    if app.library.rename(store.document['id'], new_name) is None:
-        Messagebox.show_error("Could not rename the profile.", title="Rename Profile")
-        return
-    # The library already persisted the rename; sync the in-memory envelope
-    # without arming a redundant autosave.
-    store.document['name'] = new_name.strip()
-    app._update_title()
-    app._refresh_file_menu()
-
-
-def delete_current(app):
-    store = app.profile_store
-    name = store.document['name']
-    dialog = MessageDialog(
-        f"Delete “{name}”?\n\nIt moves to the profile trash "
-        "(userdata/profiles/trash).",
-        title="Delete Profile", parent=app,
-        buttons=['Cancel:secondary', 'Delete:danger'])
-    dialog.show()
-    if dialog.result != 'Delete':
-        return
-    # Flush before the file moves: an orphaned debounce timer firing after the
-    # delete would re-write the trashed document under a fresh slug.
-    if not release_store(app):
-        return
-    app.library.delete(store.document['id'])
-    app.library.ensure_nonempty(get_game_resolution_or_default())
-    doc = _newest_doc(app)
-    app.profile_store = make_store(app, doc)
-    apply_document(app)
-
-
+# ============================================================================
+# FILE MENU
+# ============================================================================
 def revert_session(app):
     """File ▸ Revert to session start — restore the session-open snapshot and
     re-dispatch it (the revert autosaves like any edit)."""
@@ -231,95 +400,125 @@ def revert_session(app):
     app_toast(app, "Reverted to session start", 'info')
 
 
-def open_profiles_folder(app):
-    os.startfile(str(app.library.profiles_dir))
+def open_data_folder(app):
+    os.startfile(str(userdata_root()))
 
 
 def export_profile(app):
-    """File ▸ Export profile… — one self-contained `.kazbars.json` envelope:
-    the flushed document plus every referenced custom buff."""
+    """File ▸ Export profile… — one self-contained `.kazbars.yml`: the flushed
+    document plus every referenced custom buff."""
     store = app.profile_store
     release_store(app)  # best-effort; export reads the in-memory doc either way
     doc = store.document
-    path = filedialog.asksaveasfilename(
-        title="Export Profile",
-        defaultextension=".kazbars.json",
-        initialfile=f"{slugify(doc['name'])}.kazbars.json",
-        filetypes=[("KazBars profile", "*.kazbars.json"), ("JSON files", "*.json")],
-    )
-    if not path:
-        return
-    envelope = profile_share.build_export(
+    buffs = profile_share.collect_embedded_buffs(
         app.registry, doc, app.database.by_id, app.database.by_name,
         app.database.provenance)
-    try:
-        safe_save_json(Path(path), envelope)
-    except OSError as e:
-        Messagebox.show_error(f"Could not write the export file.\n\n({e})",
-                              title="Export Failed")
+    if save_yaml_file(_profile_file(app, doc, buffs), title="Export Profile", ext=PROFILE_EXT,
+                      label="KazBars profile", stem=doc['name'], noun="export") is None:
         return
-    n = len(envelope['buffs'])
-    suffix = f" (+{n} custom buff{'s' if n != 1 else ''})" if n else ""
-    app_toast(app, f"Exported “{doc['name']}”{suffix}", 'success')
+    app_toast(app, f"Exported “{doc['name']}”{custom_buffs_suffix(len(buffs))}", 'success')
 
 
 def import_profile(app):
-    """File ▸ Import profile… — read an export envelope (or a bare document
-    file), run it through the gate, mint a fresh id, merge embedded custom
-    buffs, and switch to it."""
+    """File ▸ Import profile… — read a profile file (YAML, a 3.1 `.kazbars.json`
+    export or a bare library document), run it through the gate, confirm,
+    mint a fresh id, merge its custom buffs, and put it in place of the open
+    profile (Revert to session start brings that back)."""
     path = filedialog.askopenfilename(
         title="Import Profile",
-        initialdir=str(app.library.profiles_dir),
-        filetypes=[("KazBars profile", "*.json *.kazbars.json"), ("All files", "*.*")],
+        initialdir=str(userdata_root()),
+        filetypes=[("KazBars profile", "*.kazbars.yml *.yml *.yaml *.kazbars.json *.json"),
+                   ("All files", "*.*")],
     )
     if not path:
         return
     try:
-        raw = json.loads(Path(path).read_text(encoding='utf-8'))
-        profile_raw, embedded = profile_share.parse_export(raw)
-        doc = validate_document(app.registry, profile_raw)
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-        Messagebox.show_error("That file couldn't be read as a KazBars profile.",
-                              title="Import Failed")
-        return
-    except (ValueError, DocumentError) as e:
-        # DocumentError is a ValueError; both carry user-presentable messages
-        # (incl. the old-format "older KazBars" rejection).
+        doc, embedded = read_profile_file(app.registry, path)
+    except ValueError as e:  # user-presentable, incl. the gate's "older KazBars"
         Messagebox.show_error(str(e), title="Import Failed")
         return
-
-    if not release_store(app):
+    if not confirm(
+        f"Replace your profile with “{doc['name']}”?\n\nEvery grid and extra is replaced "
+        "by the imported ones. Revert to session start brings back your profile as it "
+        "was when you opened KazBars.",
+        title="Import Profile", action="Import", parent=app, danger=True,
+    ):
         return
     doc['id'] = mint_id()
-    doc['name'] = app.library.unique_name(doc['name'])
-    if app.library.write(doc) is None:
-        Messagebox.show_error("Could not save the imported profile.",
-                              title="Import Failed")
-        return
-
-    added = skipped = 0
-    buffs_failed = False
-    if embedded:
-        existing_names = {b.get('name') for b in app.database.buffs if b.get('name')}
-        try:
-            added, skipped = profile_share.merge_imported_buffs(
-                DeltaStore(database_user_path()), embedded,
-                existing_ids=set(app.database.by_id), existing_names=existing_names)
-        except OSError as e:
-            logger.warning("Could not merge imported buffs: %s", e)
-            buffs_failed = True
-        else:
-            if added:
-                app.database.reload()
-                app.db_panel.refresh_from_database()
-
-    app.profile_store = make_store(app, doc)
+    app.profile_store.replace_document(doc)
+    merged = merge_embedded_buffs(app, embedded)
     apply_document(app)
-    parts = [f"Imported “{doc['name']}”"]
+    app_toast(app, " — ".join([f"Imported “{doc['name']}”", *merged]), 'success')
+
+
+def import_grids(app):
+    """File ▸ Import grid… — a grids file's grids onto the class tab the Grids
+    view shows (`GridsPanel.append_grids`), its custom buffs merged first so
+    the grids' refs resolve. True once grids landed; False on cancel or a
+    refused file."""
+    path = filedialog.askopenfilename(
+        title="Import Grid",
+        filetypes=[("KazBars grids", f"*{GRIDS_EXT}"), ("YAML files", "*.yml *.yaml"),
+                   ("All files", "*.*")],
+    )
+    if not path:
+        return False
+    try:
+        grids, buffs = grid_templates.parse(_read_raw(path, 'grids file'))
+    except ValueError as e:
+        Messagebox.show_error(str(e), title="Import Failed")
+        return False
+    merged = merge_embedded_buffs(app, buffs)
+    panel = app.grids_panel
+    appended, renames = panel.append_grids(grids)
+    n = len(appended)
+    parts = [f"Imported {n} grid{'s' if n != 1 else ''} into {panel.tab_name()}"]
+    parts += [f"renamed ‘{old}’ to ‘{new}’ (name taken)" for old, new in renames]
+    app_toast(app, " — ".join([*parts, *merged]), 'success')
+    return True
+
+
+def merge_embedded_buffs(app, embedded):
+    """Merge a file's custom buffs into `database_user.json` (skip on an id
+    collision, rename on a name one), reloading the DB when any landed.
+    Returns the toast phrases for what happened; a write failure is logged,
+    never raised — the profile or grids still import."""
+    if not embedded:
+        return []
+    existing_names = {b.get('name') for b in app.database.buffs if b.get('name')}
+    try:
+        added, skipped = profile_share.merge_imported_buffs(
+            DeltaStore(database_user_path()), embedded,
+            existing_ids=set(app.database.by_id), existing_names=existing_names)
+    except OSError as e:
+        logger.warning("Could not merge imported buffs: %s", e)
+        return ["custom buffs not added"]
+    if added:
+        app.database.reload()
+        app.db_panel.refresh_from_database()
+    parts = []
     if added:
         parts.append(f"{added} custom buff{'s' if added != 1 else ''} added")
     if skipped:
         parts.append(f"{skipped} already existed")
-    if buffs_failed:
-        parts.append("custom buffs not added")
-    app_toast(app, " — ".join(parts), 'success')
+    return parts
+
+
+def reset_to_defaults(app):
+    """File ▸ Reset profile to defaults… — the stock (or OTA) template in place
+    of the open profile, sized for the game resolution, after a confirm. The
+    profile keeps its name."""
+    if not confirm(
+        "Reset your profile to the defaults?\n\nEvery grid and extra goes back to the "
+        "starter layout. Revert to session start brings back your profile as it was "
+        "when you opened KazBars.",
+        title="Reset Profile", action="Reset", parent=app, danger=True,
+    ):
+        return
+    doc = _from_template(app, app.profile_store.document['name'])
+    if doc is None:
+        Messagebox.show_warning("No profile template is available.", title="Reset Profile")
+        return
+    app.profile_store.replace_document(doc)
+    apply_document(app)
+    app_toast(app, "Reset to defaults", 'info')

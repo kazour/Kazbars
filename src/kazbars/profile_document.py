@@ -34,11 +34,11 @@ from typing import Any
 
 from .settings_core import Migration, Schema, get_defaults, validate_all, validate_patch
 
-DOC_SCHEMA_VERSION = 2
+DOC_SCHEMA_VERSION = 3
 
 # Apply lanes — how a section's settings reach the game. BUILD is baked into
 # the SWF by Build & Install; PATCH writes game XML only on an explicit Apply
-# (never on profile switch); LIVE retunes desktop overlays immediately.
+# (never on a profile import or reset); LIVE retunes desktop overlays immediately.
 LANE_BUILD = 'build'
 LANE_PATCH = 'patch'
 LANE_LIVE = 'live'
@@ -55,6 +55,11 @@ _ID_RE = re.compile(r'^[0-9a-f]{8}$')
 class DocumentError(ValueError):
     """A document failed the boundary check. The message is user-presentable:
     the library skips files that raise it; import surfaces it verbatim."""
+
+
+class NewerSchemaError(DocumentError):
+    """The document's schema is above this app's — intact, just not ours to
+    open (startup exits rather than set it aside)."""
 
 
 # =========================================================================== #
@@ -195,11 +200,83 @@ def _px_to_fractions(data: dict) -> dict:
     return data
 
 
+def _overlay_scale(data: dict) -> dict:
+    """Schema 2 → 3: per-module pixel and point sizes become a percent `scale`
+    of one profile-wide base size (`modules.overlay.size`). The base size is
+    seeded from `authored_at`'s height on the tiers the old seed sizes used
+    (≤1080 → 12, ≤1440 → 16, else 24), so the shipped seeds land on the same
+    icons (48 / 56 / 64 px at scales 100 / 90 / 65) and a tuned size keeps to
+    within one 5 % step. `showTimers` becomes `timerStyle`; the inspect
+    panel's `showPvp`/`showPerks` go (PvP is a tab in game, perks always
+    show). Frozen like `_px_to_fractions`: inline arithmetic, no live imports,
+    deep copy first."""
+    data = copy.deepcopy(data)
+    modules = data.get('modules')
+    if not isinstance(modules, dict):
+        return data
+    choices = (10, 11, 12, 13, 14, 16, 18, 20, 24)
+    overlay = modules.get('overlay')
+    size = overlay.get('size') if isinstance(overlay, dict) else None
+    if not (isinstance(size, int) and not isinstance(size, bool) and size in choices):
+        authored = data.get('authored_at')
+        if (
+            isinstance(authored, list) and len(authored) == 2
+            and all(isinstance(v, int) and not isinstance(v, bool) and v > 0 for v in authored)
+        ):
+            height = authored[1]
+        else:
+            height = _DEFAULT_AUTHORED_AT[1]
+        size = 12 if height <= 1080 else 16 if height <= 1440 else 24
+    # Every scale below is relative to `size`, so the section must carry it.
+    if isinstance(overlay, dict):
+        overlay['size'] = size
+    else:
+        modules['overlay'] = {'size': size, 'font': 'Arial'}
+
+    def scale(value: Any, num: int, den: int) -> int:
+        """snap5(clamp(round(value x num / den))), half-up; junk → 100."""
+        try:
+            v = int(value)
+        except (TypeError, ValueError, OverflowError):
+            return 100
+        n = max(0, v) * num
+        p = max(50, min((2 * n + den) // (2 * den), 200))
+        return max(50, min((p + 2) // 5 * 5, 200))
+
+    grids = modules.get('grids')
+    entries = grids.get('grids') if isinstance(grids, dict) else None
+    for g in entries if isinstance(entries, list) else []:
+        if not isinstance(g, dict):
+            continue
+        icon = g.pop('iconSize', None)
+        g['scale'] = 100 if icon is None else scale(icon, 100, 4 * size)
+        g.pop('timerFontSize', None)
+        g.pop('stackFontSize', None)
+        shown = g.pop('showTimers', True)
+        if 'timerStyle' not in g:
+            g['timerStyle'] = 'off' if shown is False else 'digits'
+    for key in ('stopwatch', 'inspect'):
+        section = modules.get(key)
+        if isinstance(section, dict):
+            fs = section.pop('fontSize', None)
+            section['scale'] = 100 if fs is None else scale(fs, 100, size)
+    inspect = modules.get('inspect')
+    if isinstance(inspect, dict):
+        inspect.pop('showPvp', None)
+        inspect.pop('showPerks', None)
+    cast = modules.get('cast_timer')
+    if isinstance(cast, dict):
+        fs = cast.pop('fontSize', None)
+        cast['scale'] = 100 if fs is None else scale(fs, 400, 5 * size)
+    return data
+
+
 # Document-level rungs, keyed off the envelope `schema` int. Rungs run inside
 # validate_document, before section validation, so load and import migrate
 # identically and never leave a stale document behind.
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(2, _px_to_fractions),
+    Migration(3, _overlay_scale),
 )
 
 
@@ -243,7 +320,7 @@ def validate_document(registry: SectionRegistry, raw: Any) -> dict:
     if not isinstance(schema, int) or isinstance(schema, bool) or schema < 1:
         raise DocumentError('Not a KazBars profile.')
     if schema > DOC_SCHEMA_VERSION:
-        raise DocumentError('This profile needs a newer KazBars — update the app first.')
+        raise NewerSchemaError('This profile needs a newer KazBars — update the app first.')
 
     data = _migrate(raw)
 

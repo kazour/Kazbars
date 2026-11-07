@@ -28,6 +28,13 @@ new file in `docs/README.md`. Look an ID up across all of them with
 
 ---
 
+## 2026-11-06
+- **Added:** `Sacred Fire` — `3241838`, Priest of Mitra debuff.
+- **Added:** `Purifying Light` — `198167`, Priest of Mitra debuff.
+- **Added:** `Recently Struck by Grim Corruption` — `3910716`, Assassin debuff.
+- **Added:** `Veil of the Unliving (Zaal)` (#Raid T3.5 debuff) alias spell ID `4752520` alongside `5064067` (entry IDs now `5064067`, `4752520`); primary ID unchanged, no whitelist affected.
+- **Fixed:** `Corrupted Claws Wrack 1-4 (Yah Chieng)` (#Raid T4 debuff) stack order reversed — IDs now `4704447`, `4704446`, `4704445`, `4704444`, so stack 1 maps to `4704447`. Primary ID `4704444` → `4704447`; updated the matching `Default.json` whitelist + resynced the bundled `.default`.
+
 ## 2026-08-29
 **Wrack and Torment lines — the later re-issue of the generic families.** Follows the 2026-07-25
 Ruin pass. The three `#General` wrack debuffs only carried their original spell IDs and never matched
@@ -382,5 +389,5 @@ unchanged, so no grid or profile whitelist is affected (`Default.json` untouched
 ---
 
 *Entries are reconstructed from `git log` on `Database.json` (this repo) and the predecessor
-`KzBuilder-public` repo; spell IDs reflect the current database, which holds **430 buffs**.
+`KzBuilder-public` repo; spell IDs reflect the current database, which holds **433 buffs**.
 Going forward, log changes here as they happen.*

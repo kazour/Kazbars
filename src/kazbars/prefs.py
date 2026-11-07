@@ -19,7 +19,8 @@ import logging
 from typing import Any
 
 from . import CONTENT_BASELINE_VERSION
-from .settings_core import Field, Migration, Schema, Store, nullable_int
+from .classes import id_of as class_id_of
+from .settings_core import Field, Schema, Store
 from .userdata import PREFS_FILENAME
 
 logger = logging.getLogger(__name__)
@@ -68,10 +69,12 @@ def _validate_section_open(value: Any) -> dict:
 
 
 def _validate_last_build(value: Any) -> dict:
-    """Keep ``{profile_id, hash, target_resolution[, profile_name]}`` — what the
-    last successful Build & Install baked. `{}` (never built through this pref)
-    hides the status row. `profile_name` is display-only (the built profile may
-    have been renamed or deleted since); identity is the id + hash."""
+    """Keep ``{profile_id, hash, target_resolution[, profile_name, anchor]}`` —
+    what the last successful Build & Install baked (`anchor` the overhead
+    anchor, this PC's and so in no profile hash). `{}` (never built through
+    this pref) hides the status row. `profile_name` is display-only (the built
+    profile may have been replaced by an Import or Reset since); identity is the
+    id + hash."""
     if not isinstance(value, dict):
         return {}
     pid = value.get("profile_id")
@@ -82,13 +85,25 @@ def _validate_last_build(value: Any) -> dict:
     name = value.get("profile_name")
     if isinstance(name, str) and name:
         out["profile_name"] = name
-    res = value.get("target_resolution")
-    if (
-        isinstance(res, list) and len(res) == 2
-        and all(isinstance(v, int) and not isinstance(v, bool) and v > 0 for v in res)
-    ):
-        out["target_resolution"] = res
+    if _int_pair(value.get("target_resolution"), positive=True):
+        out["target_resolution"] = value["target_resolution"]
+    if _int_pair(value.get("anchor")):
+        out["anchor"] = value["anchor"]
     return out
+
+
+def _int_pair(value: Any, positive: bool = False) -> bool:
+    """Whether `value` is a list of two ints (never bools), all > 0 with `positive`."""
+    return (
+        isinstance(value, list) and len(value) == 2
+        and all(isinstance(v, int) and not isinstance(v, bool) and (v > 0 or not positive)
+                for v in value)
+    )
+
+
+def _validate_grids_tab(value: Any) -> int:
+    """The Grids tab's class tab: a class id, else 0 (All)."""
+    return class_id_of(value) or 0
 
 
 def _validate_last_patch(value: Any) -> dict:
@@ -96,8 +111,8 @@ def _validate_last_patch(value: Any) -> dict:
     entries; drop anything malformed. Machine-local mirror of what a PATCH-lane
     section (``damage_colors``/``buff_bars``) last actually wrote into *this
     game folder's* XML — the active profile's own section is the loadout-level
-    intent, which can drift from this once a profile switch skips re-Applying
-    (PATCH lane never fires on switch). Written by the XML editors' Apply;
+    intent, which can drift from this once a profile import or reset skips re-Applying
+    (the PATCH lane never fires on an import or reset). Written by the XML editors' Apply;
     consumption (a divergence badge) is a later phase."""
     if not isinstance(value, dict):
         return {}
@@ -111,81 +126,31 @@ def _validate_last_patch(value: Any) -> dict:
     return out
 
 
-# The four in-game panels — stopwatch, inspect, buff console, preview control
-# panel — are one visual family and share one text size. Stopwatch and Inspect
-# may override it from their own dialogs; the console and control panel have no
-# dialog to host an override, which is exactly the gap the shared value closes.
-_PANEL_FONT_DEFAULT = 12
-_PANEL_FONT_MIN = 8
-_PANEL_FONT_MAX = 48
-
-_coerce_panel_font = nullable_int(min=_PANEL_FONT_MIN, max=_PANEL_FONT_MAX)
-
-
-def validate_panel_font_size(value: Any) -> int:
-    """Clamp a shared panel text size to the 8–48 range; None/garbage → 12.
-
-    `app.settings` already coerces the stored key through the same `Field`; this
-    is for the consumers that take the value as an argument (the code generator
-    bakes it into the SWF) and cannot assume it came from a validated Store.
-    """
-    size = _coerce_panel_font(value)
-    return _PANEL_FONT_DEFAULT if size is None else int(size)
-
-
-def _stored_font_size(section: Any) -> Any:
-    """The `fontSize` a stored `stopwatch`/`inspect` sub-dict carried, or None."""
-    return section.get("fontSize") if isinstance(section, dict) else None
-
-
-def _upgrade_panel_font(data: dict) -> dict:
-    """v1 → v2: lift the two per-panel font sizes onto the shared one.
-
-    Anchored on Inspect rather than on `max()`: the shared control lives in the
-    Inspect dialog, and the console and control panel are documented as the
-    inspect panel's visual family, so a user who only ever enlarged the stopwatch
-    keeps those two where they were instead of having them track the least
-    related panel. Inspect defined the shared value, so it follows it from here;
-    a stopwatch that disagreed keeps its number as a deliberate override.
-
-    Runs on the raw dict before `validate_all`. The stopwatch/inspect configs
-    later moved into the profile document, so the sub-dicts this rung rewrites
-    are dropped as undeclared keys — its surviving effect is the lifted
-    `panel_font_size`. Frozen history; the body stays as written.
-    """
-    sizes = {name: _stored_font_size(data.get(name)) for name in ("inspect", "stopwatch")}
-    shared = _PANEL_FONT_DEFAULT if sizes["inspect"] is None else sizes["inspect"]
-    data["panel_font_size"] = shared
-    for name, size in sizes.items():
-        section = data.get(name)
-        if isinstance(section, dict) and (name == "inspect" or size == shared):
-            data[name] = {**section, "fontSize": None}
-    return data
-
+ANCHOR_SIDE_DEFAULT = 389
+ANCHOR_UP_DEFAULT = -13
+ANCHOR_MIN = -2000
+ANCHOR_MAX = 2000
 
 PREFS_SCHEMA = Schema(
     PREFS_FILENAME,
     2,
     {
-        # Machine-local: game install, resolution, profile pointers, build state.
-        # Scalars are passthrough — their consumers already guard the value
-        # (e.g. grid_model.get_game_resolution_or_default validates the list).
+        # Machine-local: game install, resolution, build state. Scalars are
+        # passthrough — their consumers already guard the value (e.g.
+        # grid_model.get_game_resolution_or_default validates the list). No
+        # profile pointer: there is one profile (userdata/profile.yml); a 3.1
+        # `active_profile` is read raw once by profile_io's adopt step and
+        # erased by strict validate_all on the next save.
         "game_path": Field(None),
         "game_resolution": Field(None),
-        # The one profile pointer: the active profile's in-document id. The old
-        # last_profile/default_profile path pair is gone — strict validate_all
-        # erases stale keys on the next save, no migration rung needed.
-        "active_profile": Field(None),
         "has_built_before": Field(False, kind="bool"),
         "desktop_shortcut_offered": Field(False, kind="bool"),
-        "build_console": Field(False, kind="bool"),
-        # Shared text size for the four in-game panels (see _upgrade_panel_font).
-        # Stopwatch/inspect fall back to it whenever their own fontSize is None.
-        # Machine-local on purpose: it tracks the monitor, not the loadout —
-        # the three extras configs themselves live in the profile document.
-        "panel_font_size": Field(
-            _PANEL_FONT_DEFAULT, kind="int", min=_PANEL_FONT_MIN, max=_PANEL_FONT_MAX
-        ),
+        # Where an overhead grid sits against a character's reported point:
+        # px at a 1440 px stage times metres of camera distance, sideways and
+        # up (baked into d.PF.side / d.PF.up, read by KazBarsRelations). The
+        # game's field of view decides it, so it is this PC's, never a profile's.
+        "anchor_side": Field(ANCHOR_SIDE_DEFAULT, kind="int", min=ANCHOR_MIN, max=ANCHOR_MAX),
+        "anchor_up": Field(ANCHOR_UP_DEFAULT, kind="int", min=ANCHOR_MIN, max=ANCHOR_MAX),
         # OTA reference content (Phase 4). content_version is the authoritative
         # comparison key (vs the server manifest); it defaults to the shipped
         # baseline so a fresh install knows it's current and fires no first-run OTA.
@@ -194,6 +159,8 @@ PREFS_SCHEMA = Schema(
         # Per-window geometry — ONE structured dict (see _validate_window_positions).
         "window_positions": Field({}, validate=_validate_window_positions),
         # UI state.
+        # The Grids tab's class tab (0: All), so the tab reopens where it was left.
+        "grids_tab": Field(0, validate=_validate_grids_tab),
         "buff_selector_category": Field("All"),
         "buff_selector_type": Field("All"),
         "buff_display_section_open": Field({}, validate=_validate_section_open),
@@ -204,7 +171,6 @@ PREFS_SCHEMA = Schema(
         # _validate_last_build) — drives the grids panel's status row.
         "last_build": Field({}, validate=_validate_last_build),
     },
-    migrations=(Migration(2, _upgrade_panel_font),),
 )
 
 

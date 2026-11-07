@@ -1,24 +1,93 @@
-"""Tests for `profile_io` — the pure pieces of the app-facing profile satellite.
+"""Tests for `profile_io` — the one profile file and its File-menu flows.
 
-Since the revamp, profile_io orchestrates `profile_library` + `profile_store`
-(each with its own suite); what's testable headless here is the template
-chain order — OTA content first, then the shipped stock file — and the
-missing-buff message shape. The Tk-driven
-flows (apply_document, switch, rename/delete dialogs) are covered by the
+Headless: a fake `app` (SimpleNamespace) carries what the flows touch, the
+userdata root points at tmp_path, and the Tk-only pieces (dialogs, the grids
+panel dispatch) are monkeypatched. Covers the startup ladder (profile.yml →
+its .bak → a 3.1 library's active or newest profile → the template seed →
+blank), export / import / reset, the template chain order, and the
+flush-before-replace guard. The window-level flows are covered by the
 panel-construction smoke and manual QA.
 
 Run: `pytest tests/test_profile_io.py` (from repo root).
 """
 
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
-from kazbars import content_update, profile_io, profile_share, userdata
-from kazbars.profile_document import SectionRegistry, new_document, validate_document
-from kazbars.profile_library import ProfileLibrary
+import pytest
+
+from kazbars import (
+    content_update,
+    grid_model,
+    inspect,
+    profile_io,
+    profile_share,
+    stopwatch,
+    userdata,
+    yaml_io,
+)
+from kazbars.overlay import size_for_height
+from kazbars.profile_document import SectionRegistry, new_document
 from kazbars.profile_store import ProfileStore
 
+ASSETS = Path(__file__).resolve().parent.parent / "src" / "kazbars" / "assets"
+
+
+@pytest.fixture
+def root(monkeypatch, tmp_path):
+    monkeypatch.setattr(userdata, "app_path", lambda: tmp_path)
+    userdata.ensure_layout()
+    monkeypatch.setattr(profile_io, "get_game_resolution_or_default", lambda: (2560, 1440))
+    return userdata.userdata_root()
+
+
+@pytest.fixture
+def app(root, monkeypatch):
+    registry = SectionRegistry()
+    registry.register(grid_model.PROFILE_SECTION)
+    toasts = []
+    monkeypatch.setattr(profile_io, "apply_document", lambda a: None)
+    monkeypatch.setattr(profile_io, "app_toast",
+                        lambda a, msg, style, *rest, **k: toasts.append((msg, style)))
+    return SimpleNamespace(
+        registry=registry, assets_path=ASSETS, profile_store=None, toasts=toasts,
+        after=lambda ms, fn: fn(), after_cancel=lambda token: None,
+        _on_grids_edited=lambda: None,
+        database=SimpleNamespace(buffs=[], by_id={}, by_name={}, provenance={}),
+    )
+
+
+def _doc(app, name="Mine", **grids):
+    doc = new_document(app.registry, name, (1920, 1080))
+    doc["modules"]["grids"]["grids"] = [grid_model.create_default_grid(grid_id=g) for g in grids]
+    return doc
+
+
+def _write_yml(path, doc):
+    path.write_text(yaml_io.dumps(profile_share.build_profile_file(doc)), encoding="utf-8")
+
+
+def _library(root, *docs):
+    lib = root / "profiles"
+    lib.mkdir(exist_ok=True)
+    paths = []
+    for i, doc in enumerate(docs):
+        p = lib / f"{doc['name']}.json"
+        p.write_text(json.dumps(doc), encoding="utf-8")
+        os.utime(p, (1000 + i, 1000 + i))
+        paths.append(p)
+    return paths
+
+
+def _tree(path):
+    return {p.relative_to(path): p.read_bytes() for p in sorted(path.rglob("*")) if p.is_file()}
+
+
+# --------------------------------------------------------------------------- #
+# Template chain
+# --------------------------------------------------------------------------- #
 
 def test_template_chain_order(monkeypatch, tmp_path):
     monkeypatch.setattr(userdata, "app_path", lambda: tmp_path)
@@ -27,8 +96,8 @@ def test_template_chain_order(monkeypatch, tmp_path):
     # No OTA content/ at all yet — active_content_dir() falls back to the
     # shipped baseline, which meets itself, so the entry is still included.
     assert chain == (
-        tmp_path / "userdata" / "content" / "Default.json",
-        Path("A:/assets/kazbars/Default.json"),
+        tmp_path / "userdata" / "content" / "Default.yml",
+        Path("A:/assets/kazbars/Default.yml"),
     )
 
 
@@ -43,228 +112,349 @@ def test_template_chain_drops_a_stale_content_entry(monkeypatch, tmp_path):
     (content / "manifest.json").write_text(
         json.dumps({"content_version": stale}), encoding="utf-8")
     app = SimpleNamespace(assets_path=Path("A:/assets"))
-
-    chain = profile_io.template_paths(app)
-
-    assert chain == (
-        Path("A:/assets/kazbars/Default.json"),
-    )
+    assert profile_io.template_paths(app) == (Path("A:/assets/kazbars/Default.yml"),)
 
 
-def test_newest_doc_empty_library_falls_back_to_in_memory_blank(monkeypatch):
-    # `ensure_nonempty` is best-effort: when the disk refused every seed write
-    # the library stays empty, and startup/delete must not die on max([]).
-    monkeypatch.setattr(profile_io, "get_game_resolution_or_default", lambda: (1920, 1080))
-    registry = SectionRegistry()
-    app = SimpleNamespace(library=SimpleNamespace(list_profiles=lambda: []),
-                          registry=registry)
-    doc = profile_io._newest_doc(app)
-    assert doc["name"] == "My Setup"
-    assert validate_document(registry, doc) == doc
+# --------------------------------------------------------------------------- #
+# Startup ladder
+# --------------------------------------------------------------------------- #
+
+def test_startup_reads_profile_yml(app, root):
+    _write_yml(root / "profile.yml", _doc(app, "Mine", A=1))
+    profile_io.startup_profile(app)
+    assert app.profile_store.document["name"] == "Mine"
+    assert app.toasts == []
 
 
-def test_newest_doc_tolerates_a_vanished_path(monkeypatch, tmp_path):
-    # file_mtime() returns 0.0 instead of raising when a listed file has
-    # since vanished — _newest_doc must still resolve to the entry that's
-    # actually still there.
-    monkeypatch.setattr(profile_io, "get_game_resolution_or_default", lambda: (1920, 1080))
-    real = tmp_path / "real.json"
-    real.write_text("{}", encoding="utf-8")
-    gone = tmp_path / "gone.json"   # never created — simulates a vanished-mid-race file
-    doc_real = {"id": "real-id"}
-    doc_gone = {"id": "gone-id"}
-    app = SimpleNamespace(library=SimpleNamespace(
-        list_profiles=lambda: [(gone, doc_gone), (real, doc_real)]))
-
-    result = profile_io._newest_doc(app)
-
-    assert result == doc_real
+def test_a_damaged_profile_loads_the_bak_and_is_kept_aside(app, root):
+    (root / "profile.yml").write_text("grids: [unclosed", encoding="utf-8")
+    _write_yml(root / "profile.yml.bak", _doc(app, "Yesterday"))
+    profile_io.startup_profile(app)
+    assert app.profile_store.document["name"] == "Yesterday"
+    assert (root / "profile.damaged.yml").read_text(encoding="utf-8") == "grids: [unclosed"
+    assert "name: Yesterday" in (root / "profile.yml").read_text(encoding="utf-8")
+    assert "restored the copy" in app.toasts[0][0] and app.toasts[0][1] == "warning"
 
 
-def test_delete_current_flushes_before_trash(monkeypatch, tmp_path):
-    """A pending debounced autosave must die with the delete — an orphaned
-    timer firing afterwards would re-write the trashed document under a
-    fresh slug, resurrecting the profile the user just deleted."""
-    registry = SectionRegistry()
-    lib = ProfileLibrary(tmp_path, registry)
-    doc = lib.create_blank("Doomed", (1920, 1080))
-    assert doc is not None
-    doomed_id = doc["id"]
-
-    pending = []  # scheduled debounce callbacks; None = cancelled
-    store = ProfileStore(
-        doc, writer=lib.write,
-        schedule=lambda ms, fn: pending.append(fn) or len(pending),
-        cancel=lambda token: pending.__setitem__(token - 1, None),
-    )
-    store.set_section("stopwatch", {"enabled": True})  # arms the debounce
-
-    class _ConfirmDelete:
-        def __init__(self, *a, **k):
-            self.result = "Delete"
-
-        def show(self):
-            pass
-
-    monkeypatch.setattr(profile_io, "MessageDialog", _ConfirmDelete)
-    monkeypatch.setattr(profile_io, "apply_document", lambda app: None)
-    monkeypatch.setattr(profile_io, "get_game_resolution_or_default", lambda: (1920, 1080))
-    app = SimpleNamespace(
-        library=lib, profile_store=store, registry=registry,
-        after=lambda ms, fn: 0, after_cancel=lambda token: None,
-        _on_grids_edited=lambda: None,
-    )
-
-    profile_io.delete_current(app)
-
-    # Fire whatever the outgoing store still had scheduled — the orphaned-timer
-    # scenario. The deleted profile must stay deleted.
-    for fn in pending:
-        if fn is not None:
-            fn()
-    assert lib.load(doomed_id) is None
-    names = [d["name"] for _, d in lib.list_profiles()]
-    assert names == ["My Setup"]  # the reseed, and nothing resurrected
+def test_a_damaged_profile_without_a_bak_seeds_from_the_template(app, root):
+    (root / "profile.yml").write_text("format: kazbars-profile\nschema: 2\nid: nope\n",
+                                      encoding="utf-8")
+    profile_io.startup_profile(app)
+    assert app.profile_store.document["name"] == "My Setup"
+    assert (root / "profile.damaged.yml").exists()
+    assert "no copy could be read" in app.toasts[0][0]
 
 
-def _failing_store(doc):
-    """A ProfileStore whose writer always reports failure — every flush()
-    call returns False and leaves the store dirty (armed for RETRY_MS)."""
-    return ProfileStore(
-        doc, writer=lambda d: None,
-        schedule=lambda ms, fn: None, cancel=lambda token: None,
-    )
+def _flaky_reads(monkeypatch, failures):
+    """`yaml_io.read_file` refusing the first `failures` reads with a
+    PermissionError (None: every read), then reading for real."""
+    real, calls = yaml_io.read_file, []
+
+    def read(path):
+        calls.append(path)
+        if failures is None or len(calls) <= failures:
+            raise PermissionError(13, "locked", str(path))
+        return real(path)
+
+    monkeypatch.setattr(profile_io.yaml_io, "read_file", read)
+    monkeypatch.setattr(profile_io.time, "sleep", lambda s: None)
+    return calls
 
 
-def test_switch_profile_keeps_the_old_store_when_flush_fails(monkeypatch, tmp_path):
-    registry = SectionRegistry()
-    lib = ProfileLibrary(tmp_path, registry)
-    doc_a = lib.create_blank("A", (1920, 1080))
-    doc_b = lib.create_blank("B", (1920, 1080))
-    assert doc_a is not None and doc_b is not None
+def _capture_exit_dialog(monkeypatch):
+    errors = []
+    monkeypatch.setattr(profile_io.messagebox, "showerror",
+                        lambda title, msg, **k: errors.append(msg))
+    return errors
 
-    store = _failing_store(doc_a)
-    store.set_section("stopwatch", {"enabled": True})  # dirty, so flush() must try to write
 
-    toasts = []
-    monkeypatch.setattr(
-        profile_io, "app_toast", lambda app, msg, style, *a, **k: toasts.append((msg, style)))
-    app = SimpleNamespace(
-        library=lib, profile_store=store, registry=registry,
-        after=lambda ms, fn: 0, after_cancel=lambda token: None,
-        _on_grids_edited=lambda: None,
-    )
+def test_a_locked_profile_is_retried_not_set_aside(app, root, monkeypatch):
+    _write_yml(root / "profile.yml", _doc(app, "Mine"))
+    calls = _flaky_reads(monkeypatch, failures=2)
+    profile_io.startup_profile(app)
+    assert len(calls) == 3
+    assert app.profile_store.document["name"] == "Mine"
+    assert not list(root.glob("profile.damaged*.yml")) and app.toasts == []
 
-    profile_io.switch_profile(app, doc_b["id"])
 
-    # Old store kept (not replaced) — if switch_profile had gone on to call
-    # make_store/apply_document, the missing app attributes those need would
-    # have raised, which this test's bare SimpleNamespace implicitly guards.
+def test_an_unreadable_profile_exits_without_touching_it(app, root, monkeypatch):
+    _write_yml(root / "profile.yml", _doc(app, "Mine"))
+    _write_yml(root / "profile.yml.bak", _doc(app, "Yesterday"))
+    before = _tree(root)
+    _flaky_reads(monkeypatch, failures=None)
+    errors = _capture_exit_dialog(monkeypatch)
+    with pytest.raises(SystemExit):
+        profile_io.startup_profile(app)
+    assert "hasn't been changed" in errors[0]
+    assert _tree(root) == before, "profile.yml and its .bak untouched, nothing set aside"
+    assert app.profile_store is None
+
+
+def test_a_newer_profile_exits_with_the_gate_message(app, root, monkeypatch):
+    path = root / "profile.yml"
+    path.write_text("format: kazbars-profile\nschema: 4\nid: 0123abcd\n", encoding="utf-8")
+    before = _tree(root)
+    errors = _capture_exit_dialog(monkeypatch)
+    with pytest.raises(SystemExit):
+        profile_io.startup_profile(app)
+    assert "needs a newer KazBars" in errors[0]
+    assert _tree(root) == before
+
+
+def test_startup_adopts_the_library_profile_prefs_point_at(app, root):
+    a, b = _doc(app, "Raid"), _doc(app, "Solo")
+    _library(root, a, b)  # Solo is newest
+    (root / "prefs.json").write_text(json.dumps({"active_profile": a["id"]}), encoding="utf-8")
+    before = _tree(root / "profiles")
+    profile_io.startup_profile(app)
+    assert app.profile_store.document["id"] == a["id"]
+    assert (root / "profile.yml").read_text(encoding="utf-8").startswith("format: kazbars-profile\n")
+    assert _tree(root / "profiles") == before, "the library is read, never written"
+    assert "Adopted “Raid”" in app.toasts[0][0]
+
+
+def test_startup_adopts_the_newest_library_profile_without_a_pointer(app, root):
+    _library(root, _doc(app, "Old"), _doc(app, "New"))
+    (root / "profiles" / "junk.json").write_text("{nope", encoding="utf-8")
+    profile_io.startup_profile(app)
+    assert app.profile_store.document["name"] == "New"
+
+
+def test_startup_seeds_from_the_template_sized_for_the_resolution(app, root):
+    profile_io.startup_profile(app)
+    doc = app.profile_store.document
+    assert doc["name"] == "My Setup" and doc["id"] != "00000000"
+    assert doc["modules"]["overlay"]["size"] == size_for_height(1440)
+    assert doc["modules"]["grids"]["grids"], "the stock grids"
+    assert (root / "profile.yml").exists() and app.toasts == []
+    assert not app.profile_store.dirty
+
+
+def test_a_failed_first_write_keeps_the_profile_dirty(app, root, monkeypatch):
+    monkeypatch.setattr(profile_io, "write_profile", lambda a, d: None)
+    app.after = lambda ms, fn: None
+    profile_io.startup_profile(app)
+    assert app.profile_store.dirty, "the store retries and the exit path offers the rescue"
+
+
+def test_startup_falls_back_to_blank_without_a_template(app, root, tmp_path):
+    app.assets_path = tmp_path / "no-assets"
+    profile_io.startup_profile(app)
+    assert app.profile_store.document["name"] == "My Setup"
+    assert app.profile_store.document["modules"]["grids"]["grids"] == []
+    assert profile_io.template_doc(app) is None
+
+
+def test_the_store_writes_profile_yml_and_its_bak(app, root):
+    _write_yml(root / "profile.yml", _doc(app, "Mine"))
+    scheduled = []
+    app.after = lambda ms, fn: scheduled.append(fn) or len(scheduled)
+    profile_io.startup_profile(app)
+    app.profile_store.set_section("stopwatch", {"enabled": True})
+    assert app.profile_store.flush()
+    assert "stopwatch:" in (root / "profile.yml").read_text(encoding="utf-8")
+    assert "stopwatch:" not in (root / "profile.yml.bak").read_text(encoding="utf-8")
+
+
+# --------------------------------------------------------------------------- #
+# Export / import / reset
+# --------------------------------------------------------------------------- #
+
+def _open_store(app, doc):
+    app.profile_store = ProfileStore(doc, writer=lambda d: True,
+                                     schedule=lambda ms, fn: None, cancel=lambda t: None)
+    return app.profile_store
+
+
+def test_export_writes_the_profile_file_with_buffs_only_when_any(app, root, monkeypatch, tmp_path):
+    doc = _doc(app, "Raid: best", A=1)
+    doc["modules"]["grids"]["grids"][0]["whitelist"] = [9]
+    _open_store(app, doc)
+    out = tmp_path / "out.kazbars.yml"
+    seen = {}
+    monkeypatch.setattr(profile_io.filedialog, "asksaveasfilename",
+                        lambda **k: seen.update(k) or str(out))
+    profile_io.export_profile(app)
+    assert seen["initialfile"] == "Raid best.kazbars.yml"
+    text = out.read_text(encoding="utf-8")
+    assert text.startswith("format: kazbars-profile\nschema: ") and "buffs:" not in text
+
+    user = {"name": "Mine", "ids": [9], "category": "#X", "type": "buff"}
+    app.database = SimpleNamespace(buffs=[user], by_id={9: user}, by_name={"Mine": user},
+                                   provenance={9: "user"})
+    profile_io.export_profile(app)
+    assert yaml_io.loads(out.read_text(encoding="utf-8"))["buffs"] == [user]
+    assert "(+1 custom buff)" in app.toasts[-1][0]
+
+
+@pytest.mark.parametrize("kind", ["yml", "envelope", "bare"])
+def test_import_replaces_the_document_in_the_same_store(app, root, monkeypatch, tmp_path, kind):
+    incoming = _doc(app, "Shared", B=1)
+    path = tmp_path / {"yml": "x.kazbars.yml", "envelope": "x.kazbars.json", "bare": "x.json"}[kind]
+    if kind == "yml":
+        _write_yml(path, incoming)
+    elif kind == "envelope":
+        path.write_text(json.dumps({"format": "kazbars-profile-export", "export_schema": 1,
+                                    "profile": incoming, "buffs": []}), encoding="utf-8")
+    else:
+        path.write_text(json.dumps(incoming), encoding="utf-8")
+    home = _doc(app, "Home", A=1)
+    store = _open_store(app, home)
+    monkeypatch.setattr(profile_io.filedialog, "askopenfilename", lambda **k: str(path))
+    monkeypatch.setattr(profile_io, "confirm", lambda *a, **k: True)
+    profile_io.import_profile(app)
     assert app.profile_store is store
-    assert toasts and toasts[0][1] == "danger"
-    assert "Profile not saved" in toasts[0][0]
+    assert store.document["name"] == "Shared" and store.document["id"] != incoming["id"]
+    store.revert_to_session_start()
+    assert store.document["name"] == "Home", "Revert brings the previous profile back"
 
 
-def test_switch_profile_mirrors_grid_edits_before_flushing(monkeypatch, tmp_path):
-    registry = SectionRegistry()
-    lib = ProfileLibrary(tmp_path, registry)
-    doc_a = lib.create_blank("A", (1920, 1080))
-    doc_b = lib.create_blank("B", (1920, 1080))
-    assert doc_a is not None and doc_b is not None
-
-    order = []
-
-    def _writer(doc):
-        order.append("flush")
-        return lib.write(doc)
-
-    store = ProfileStore(
-        doc_a, writer=_writer,
-        schedule=lambda ms, fn: None, cancel=lambda token: None,
-    )
-    store.set_section("stopwatch", {"enabled": True})  # dirty, so flush() actually writes
-
-    monkeypatch.setattr(profile_io, "apply_document", lambda app: None)
-    app = SimpleNamespace(
-        library=lib, profile_store=store, registry=registry,
-        after=lambda ms, fn: 0, after_cancel=lambda token: None,
-        _on_grids_edited=lambda: order.append("mirror"),
-    )
-
-    profile_io.switch_profile(app, doc_b["id"])
-
-    assert order == ["mirror", "flush"]
+def test_import_cancelled_changes_nothing(app, root, monkeypatch, tmp_path):
+    path = tmp_path / "x.kazbars.yml"
+    _write_yml(path, _doc(app, "Shared", B=1))
+    store = _open_store(app, _doc(app, "Home", A=1))
+    asked = []
+    monkeypatch.setattr(profile_io.filedialog, "askopenfilename", lambda **k: str(path))
+    monkeypatch.setattr(profile_io, "confirm",
+                        lambda msg, **k: asked.append((msg, k)) or False)
+    profile_io.import_profile(app)
+    assert "“Shared”" in asked[0][0] and "Revert to session start" in asked[0][0]
+    assert asked[0][1]["danger"] is True
+    assert store.document["name"] == "Home" and not store.dirty
+    assert app.toasts == []
 
 
-def test_delete_current_keeps_the_profile_when_flush_fails(monkeypatch, tmp_path):
-    registry = SectionRegistry()
-    lib = ProfileLibrary(tmp_path, registry)
-    doc = lib.create_blank("Doomed", (1920, 1080))
-    assert doc is not None
-    doomed_id = doc["id"]
-
-    store = _failing_store(doc)
-    store.set_section("stopwatch", {"enabled": True})  # dirty, so flush() must try to write
-
-    class _ConfirmDelete:
-        def __init__(self, *a, **k):
-            self.result = "Delete"
-
-        def show(self):
-            pass
-
-    monkeypatch.setattr(profile_io, "MessageDialog", _ConfirmDelete)
-    monkeypatch.setattr(profile_io, "app_toast", lambda *a, **k: None)
-    app = SimpleNamespace(
-        library=lib, profile_store=store, registry=registry,
-        after=lambda ms, fn: 0, after_cancel=lambda token: None,
-        _on_grids_edited=lambda: None,
-    )
-
-    profile_io.delete_current(app)
-
-    assert lib.load(doomed_id) is not None   # never trashed — flush failed first
-    assert app.profile_store is store        # not replaced
+def test_import_shows_the_reason_and_keeps_the_profile(app, root, monkeypatch, tmp_path):
+    grids_file = tmp_path / "g.kazbars-grids.yml"
+    grids_file.write_text("format: kazbars-grids\nschema: 1\ngrids: []\n", encoding="utf-8")
+    store = _open_store(app, _doc(app, "Home"))
+    errors = []
+    monkeypatch.setattr(profile_io.Messagebox, "show_error", lambda msg, **k: errors.append(msg))
+    for path in (grids_file, tmp_path / "missing.yml"):
+        monkeypatch.setattr(profile_io.filedialog, "askopenfilename", lambda p=path, **k: str(p))
+        profile_io.import_profile(app)
+    assert "Use File ▸ Import grid… instead." in errors[0]
+    assert errors[1] == "That file couldn't be read as a KazBars profile."
+    assert store.document["name"] == "Home"
 
 
-def test_import_profile_continues_when_buff_merge_fails(monkeypatch, tmp_path):
-    registry = SectionRegistry()
-    lib = ProfileLibrary(tmp_path, registry)
-    home_doc = lib.create_blank("Home", (1920, 1080))
-    assert home_doc is not None
-
-    src_doc = new_document(registry, "Imported", (1920, 1080))
-    export_path = tmp_path / "export.kazbars.json"
-    export_path.write_text(json.dumps({
-        "format": "kazbars-profile-export",
-        "export_schema": 1,
-        "profile": src_doc,
+def test_import_continues_when_the_buff_merge_fails(app, root, monkeypatch, tmp_path):
+    path = tmp_path / "x.kazbars.json"
+    path.write_text(json.dumps({
+        "format": "kazbars-profile-export", "export_schema": 1, "profile": _doc(app, "Imported"),
         "buffs": [{"name": "Custom", "ids": [999999], "category": "#X", "type": "buff"}],
     }), encoding="utf-8")
-
-    store = ProfileStore(
-        home_doc, writer=lib.write,
-        schedule=lambda ms, fn: None, cancel=lambda token: None,
-    )
+    _open_store(app, _doc(app, "Home"))
 
     def _boom(*a, **k):
         raise OSError("disk full")
 
-    toasts = []
-    monkeypatch.setattr(profile_io.filedialog, "askopenfilename", lambda **k: str(export_path))
+    monkeypatch.setattr(profile_io.filedialog, "askopenfilename", lambda **k: str(path))
+    monkeypatch.setattr(profile_io, "confirm", lambda *a, **k: True)
     monkeypatch.setattr(profile_share, "merge_imported_buffs", _boom)
-    monkeypatch.setattr(profile_io, "apply_document", lambda app: None)
-    monkeypatch.setattr(
-        profile_io, "app_toast", lambda app, msg, style, *a, **k: toasts.append((msg, style)))
-    app = SimpleNamespace(
-        library=lib, profile_store=store, registry=registry,
-        after=lambda ms, fn: 0, after_cancel=lambda token: None,
-        _on_grids_edited=lambda: None,
-        database=SimpleNamespace(buffs=[], by_id={}),
-    )
-
     profile_io.import_profile(app)
-
-    assert app.profile_store is not store             # switched to the imported doc
     assert app.profile_store.document["name"] == "Imported"
-    assert toasts and "custom buffs not added" in toasts[0][0]
+    assert "custom buffs not added" in app.toasts[0][0]
+
+
+def test_reset_cancelled_changes_nothing(app, root, monkeypatch):
+    store = _open_store(app, _doc(app, "Home", A=1))
+    monkeypatch.setattr(profile_io, "confirm", lambda *a, **k: False)
+    profile_io.reset_to_defaults(app)
+    assert store.document["name"] == "Home" and not store.dirty
+
+
+def test_reset_puts_the_template_in_place_and_revert_undoes_it(app, root, monkeypatch):
+    store = _open_store(app, _doc(app, "Home", A=1))
+    monkeypatch.setattr(profile_io, "confirm", lambda *a, **k: True)
+    profile_io.reset_to_defaults(app)
+    assert store.document["name"] == "Home", "the profile keeps its name"
+    assert store.document["modules"]["grids"]["grids"], "the starter grids"
+    assert store.document["modules"]["overlay"]["size"] == size_for_height(1440)
+    assert app.toasts[-1] == ("Reset to defaults", "info")
+    store.revert_to_session_start()
+    assert store.document["name"] == "Home"
+
+
+# --------------------------------------------------------------------------- #
+# Flush guard
+# --------------------------------------------------------------------------- #
+
+def test_release_store_mirrors_then_flushes_and_reports_a_failure(app):
+    order = []
+    doc = _doc(app)
+    app.profile_store = ProfileStore(doc, writer=lambda d: order.append("flush") and None,
+                                     schedule=lambda ms, fn: None, cancel=lambda t: None)
+    app._on_grids_edited = lambda: order.append("mirror")
+    app.profile_store.set_section("stopwatch", {"enabled": True})
+    assert profile_io.release_store(app) is False
+    assert order == ["mirror", "flush"]
+    assert app.toasts[0][1] == "danger" and "Profile not saved" in app.toasts[0][0]
+
+
+def test_a_second_damaged_file_never_overwrites_the_first(app, root):
+    (root / "profile.damaged.yml").write_text("first", encoding="utf-8")
+    (root / "profile.yml").write_text("second: [", encoding="utf-8")
+    profile_io.startup_profile(app)
+    assert (root / "profile.damaged.yml").read_text(encoding="utf-8") == "first"
+    assert (root / "profile.damaged-2.yml").read_text(encoding="utf-8") == "second: ["
+
+
+def test_startup_adopts_the_hinted_library_profile(app, root):
+    a, b = _doc(app, "Raid"), _doc(app, "Solo")
+    _library(root, a, b)
+    profile_io.startup_profile(app, active_hint=a["id"])
+    assert app.profile_store.document["id"] == a["id"]
+
+
+def test_a_stale_prefs_id_never_hides_the_hint(app, root):
+    a, b = _doc(app, "Raid"), _doc(app, "Solo")  # Solo is newest
+    _library(root, a, b)
+    (root / "prefs.json").write_text(json.dumps({"active_profile": "deadbeef"}), encoding="utf-8")
+    profile_io.startup_profile(app, active_hint=a["id"])
+    assert app.profile_store.document["id"] == a["id"]
+
+
+def test_a_junk_prefs_id_falls_back_to_the_hint(app, root):
+    a, b = _doc(app, "Raid"), _doc(app, "Solo")
+    _library(root, a, b)
+    (root / "prefs.json").write_text(json.dumps({"active_profile": {"not": "an id"}}), encoding="utf-8")
+    profile_io.startup_profile(app, active_hint=a["id"])
+    assert app.profile_store.document["id"] == a["id"]
+
+
+def test_the_hint_wins_over_the_prefs_id(app, root):
+    a, b = _doc(app, "Raid"), _doc(app, "Solo")
+    _library(root, a, b)
+    (root / "prefs.json").write_text(json.dumps({"active_profile": b["id"]}), encoding="utf-8")
+    profile_io.startup_profile(app, active_hint=a["id"])
+    assert app.profile_store.document["id"] == a["id"]
+
+
+@pytest.mark.parametrize("prefs, font, scale", [
+    ({"panel_font_size": 18}, None, 115),  # 18/16 → 112.5 → snap 115
+    ({}, None, 75),                        # the 3.1 default 12 → 12/16
+    ({"panel_font_size": 18}, 14, 90),     # an explicit size ignores the pref
+])
+def test_adoption_lifts_the_3_1_panel_font_pref(app, root, prefs, font, scale):
+    app.registry.register(stopwatch.PROFILE_SECTION)
+    app.registry.register(inspect.PROFILE_SECTION)
+    lib = root / "profiles"
+    lib.mkdir(exist_ok=True)
+    (lib / "Raid.json").write_text(json.dumps({
+        "schema": 2, "id": "0123abcd", "name": "Raid", "authored_at": [2560, 1440],
+        "modules": {"stopwatch": {"enabled": True, "fontSize": font},
+                    "inspect": {"enabled": True, "fontSize": font}},
+    }), encoding="utf-8")
+    (root / "prefs.json").write_text(json.dumps(prefs), encoding="utf-8")
+    profile_io.startup_profile(app)
+    modules = app.profile_store.document["modules"]
+    assert modules["overlay"]["size"] == 16
+    assert modules["stopwatch"]["scale"] == scale
+    assert modules["inspect"]["scale"] == scale
+
+
+def test_a_value_yaml_cannot_hold_is_a_failed_write_not_a_crash(app, root):
+    doc = _doc(app)
+    doc["modules"]["mystery"] = {1: "int key"}
+    assert profile_io.write_profile(app, doc) is None

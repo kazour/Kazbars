@@ -114,8 +114,8 @@ class TimerOverlay:
         self._on_settings_changed = on_settings_changed
 
         # Geometry + appearance + lock live in the shared OverlayConfig. Size is
-        # auto-derived from the font (`_measure`); the persisted width/height
-        # keys are accepted on load but ignored (kept for back-compat).
+        # auto-derived from the font (`_measure`); `get_settings` records the
+        # measured width/height, but nothing reads them back.
         self._config = overlay_config_from_timer(settings)
 
         # Current display state — same dict shape the panel/boss_timer push.

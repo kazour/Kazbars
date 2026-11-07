@@ -1,9 +1,8 @@
-// KazBarsInspectData.as - The inspect panel's baked tables, split from the
-// logic the way KazBarsData carries the grid config: one static init() the
-// KazBarsInspect constructor pulls from. Every value here is measured game
-// data — ids, ranks, names, the watch list — documented in
-// docs/inspect-panel.md; read that before changing any number. Referenced
-// only by KazBarsInspect, so it compiles in only on inspect-enabled builds.
+// KazBarsInspectData.as - The inspect panel's fixed tables, split from the logic: one static init() the
+// KazBarsInspect constructor pulls from. Every value here is measured game data (ids, ranks, names), documented in
+// the comments beside each table; read those before changing any number. The rows a panel shows are baked
+// (d.INS.groups, rows, watch), never kept here. Referenced by KazBarsInspect and KazBarsInspectRows, so it compiles
+// in only on a build with the Inspect Panel.
 class KazBarsInspectData {
 
     public static function init():Object {
@@ -13,11 +12,6 @@ class KazBarsInspectData {
         // school family (157 prot, 162 CR); the other four cluster at 876-879.
         d.spellIds = [158, 876, 877, 878, 879];
 
-        // "Immeasurable Empowerment", the +100-all-attributes AA passive —
-        // the ubiquitous member of the attribute-buff layer the sheet's CDI
-        // excludes, and the one the panel can see and undo.
-        d.aaBuffId = 4279994;
-
         // Slotted-perk buff id -> display rank: 113 perks, 114 ids, mostly in
         // contiguous per-archetype and per-class blocks over 4279889-4282396.
         // The pool shape is fixed and every block fills its quota exactly --
@@ -26,8 +20,8 @@ class KazBarsInspectData {
         // 4281429 is the Dark Templar's seventh). Rank is id order, so the
         // row reads General -> archetype -> class and stays stable.
         // Two entries break the block pattern and are NOT typos:
-        //   4279994 is also aaBuffId -- the bugged +100-all-attrs passive
-        //     IS a slotted General perk, so it is in both.
+        //   4279994 is "Immeasurable Empowerment", the +100-all-attributes
+        //     AA passive -- a slotted General perk despite the block gap.
         //   4483617 (Point Blank Shot) is the Ranger's seventh, added by a
         //     later patch far outside the band. 4282385 shares its rank as
         //     an alias, so whichever id the game applies renders one icon.
@@ -130,23 +124,6 @@ class KazBarsInspectData {
                         c29: "Bear Shaman", c31: "Dark Templar",
                         c34: "Assassin", c39: "Ranger", c41: "Necromancer",
                         c43: "Herald of Xotli", c44: "Demonologist"};
-
-        d.watchIds = [
-            1, 27, 525, 54, 67, 70, 507,
-            448, 450, 451, 334, 157, 926, 927, 928, 929, 911,
-            902, 167, 905, 906, 907, 908,
-            312, 711, 713, 804, 808, 810, 814, 1403,
-            875, 866, 867, 868, 869, 870, 871, 872, 873,
-            162, 1007, 1008, 1009, 1010, 1095, 1096,
-            861, 158, 876, 877, 878, 879, 1041,
-            1000016, 1000017, 1000018,
-            454, 458, 225, 226, 656, 658
-        ];
-
-        // Collapsed, the only thing on screen is a static label, so the pass
-        // reads what the teardown gate needs to notice a dead subject and
-        // nothing else at all: 2 reads, not 65.
-        d.gateIds = [1, 54];
 
         return d;
     }

@@ -114,7 +114,7 @@ def _coerce_field(f: Field, value: Any) -> Any:
         if f.kind == 'int':
             try:
                 coerced = int(value)
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):  # inf: YAML `.inf`
                 return f.default
             return coerced if coerced in f.choices else f.default
         return value if value in f.choices else f.default
@@ -129,31 +129,6 @@ def _coerce_field(f: Field, value: Any) -> Any:
             num = min(f.max, num)
         return round(num) if f.kind == 'int' else float(num)
     return value
-
-
-def nullable_int(*, min: Any = None, max: Any = None) -> Callable[[Any], Any]:
-    """Validator for an int field where `None` means *unset* — the setting defers
-    to a shared value held elsewhere instead of carrying its own.
-
-    `kind='int'` cannot express this: it coerces every unparsable value to the
-    default, so there is no way to store "no opinion" distinctly from a number.
-    Here `None`, `''` and anything unparsable store as `None`; everything else
-    stores as an int clamped to `[min, max]`.
-    """
-    def validate(value: Any) -> int | None:
-        if value is None or value == '':
-            return None
-        try:
-            num = float(value)
-        except (TypeError, ValueError):
-            return None
-        if min is not None and num < min:
-            num = min
-        if max is not None and num > max:
-            num = max
-        return round(num)
-
-    return validate
 
 
 def coerce(schema: Schema, key: str, value: Any) -> Any:
@@ -221,7 +196,7 @@ def _migrate(schema: Schema, raw: dict) -> dict:
 # FILE I/O                                                                    #
 # =========================================================================== #
 
-def _read_json(path: Path) -> dict | None:
+def read_json(path: Path) -> dict | None:
     """Read a JSON object, or None on missing/corrupt/non-dict (logged at
     debug; never raises)."""
     try:
@@ -237,7 +212,7 @@ def _read_json(path: Path) -> dict | None:
 def load(schema: Schema, folder: str | Path) -> dict[str, Any]:
     """Read `<folder>/<schema.filename>`, run the migration ladder, then validate
     + fill. A missing or corrupt file yields defaults — load never raises."""
-    raw = _read_json(Path(folder) / schema.filename)
+    raw = read_json(Path(folder) / schema.filename)
     if raw is None:
         return get_defaults(schema)
     return validate_all(schema, _migrate(schema, raw))
@@ -255,16 +230,6 @@ def save(schema: Schema, folder: str | Path, data: dict) -> bool:
     except OSError as e:
         logger.warning('Could not save %s: %s', schema.filename, e)
         return False
-
-
-def save_patch(schema: Schema, folder: str | Path, patch: dict) -> bool:
-    """Overwrite only `patch`'s keys in the on-disk settings (defaults when the
-    file is missing) and write the merged result atomically. For callers that
-    own one slice of a shared file — a blind `save` of a stale full copy would
-    clobber keys a sibling panel wrote since it loaded."""
-    current = load(schema, folder)
-    current.update(patch)
-    return save(schema, folder, current)
 
 
 # =========================================================================== #

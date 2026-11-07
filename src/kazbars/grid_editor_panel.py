@@ -1,47 +1,46 @@
-"""KazBars — Grid editor card (per-row CollapsibleSection).
+"""KazBars — Grid editor card (one row of the grids list).
 
 `GridEditorPanel` is one card in the grids list. The container `GridsPanel`
 (in `grids_panel.py`) creates/destroys these as the grid list changes.
 
-Module-level option maps (`_FILL_*`, `_LAYOUT_*`, `_SORT_*`) are private to
-this module — the container does not read them.
+A card is a row, never expanded: the title line (name, type, mode, Applied
+by me; Move… (move, copy or export the grid), Enabled, ×), the grid drawn to
+scale (`GridPreview`) with the settings cog at its top right, and the names
+line under it. The preview is where buffs are
+chosen: a dynamic grid's opens the Tracked Buffs picker, a static grid's cell
+opens it on that slot (walking the grid's slots from there), and a
+right-click (or Delete) clears a slot with an undo toast. The cog opens Grid
+Settings (`grid_settings_dialog`), whose draft the preview follows live;
+Apply lands it through `apply_settings` (the shape through `settle_box`, a
+static grid's slot assignments trimmed or restored).
 """
 
+import time
 import tkinter as tk
 from tkinter import ttk
 
-from .grid_dialogs import BuffSelectorDialog, SlotAssignmentDialog
-from .grid_model import (
-    CLAMP_SPECS,
-    MAX_COLS,
-    MAX_ROWS,
-    MAX_TOTAL_SLOTS,
-    get_game_resolution_or_default,
-    project_px,
-    unproject_px,
-)
-from .ui_collapsible import CollapsibleSection
-from .ui_forms import (
-    draw_grid_cells,
-    labeled_combobox,
-    labeled_spinbox,
-    position_entry,
-)
+from . import grid_preview
+from .classes import CLASSES
+from .grid_dialogs import BuffSelectorDialog
+from .grid_model import is_band, ref_list
+from .grid_preview_canvas import GridPreview
+from .grid_settings_dialog import open_grid_settings
+from .overlay import DEFAULT_SIZE
+from .overlay_size import SCALE_DEFAULT, grid_metrics
 from .ui_helpers import (
-    BTN_MEDIUM,
+    CARD_STRIPE_PX,
     FONT_BODY_LG,
+    FONT_SECTION,
     FONT_SMALL,
-    FONT_SMALL_BOLD,
     FONT_SYMBOL,
-    GRID_PREVIEW_PX,
     GRID_TYPE_COLORS,
     PAD_BUTTON_GAP,
     PAD_LF,
     PAD_MICRO,
-    PAD_MID,
     PAD_ROW,
     PAD_TAB,
     PAD_XS,
+    PREVIEW_RATIO,
     THEME_COLORS,
     TK_COLORS,
 )
@@ -53,419 +52,336 @@ from .ui_widgets import (
     bind_label_press_effect,
 )
 
+# How long a cleared slot stays undoable — the undo toast's own life.
+_CLEAR_UNDO_S = 8
+# The names line's width before the card is first laid out.
+_NAMES_FALLBACK_W = 600
+
+
+# Applied by me's round toggle, and its dimmed twin for a disabled grid (the
+# label greys with the title; the switch keeps working).
+_TOGGLE_STYLE = 'success.Round.Toggle'
+_DIM_TOGGLE_STYLE = 'Dim.' + _TOGGLE_STYLE
+
+
+def _dim_toggle_style():
+    ttk.Style().configure(_DIM_TOGGLE_STYLE, foreground=TK_COLORS['dim_text'])
+    return _DIM_TOGGLE_STYLE
+
+
+class _SlotWalker:
+    """What the slot picker walks: a static grid's slots, read and written
+    through its card (`BuffSelectorDialog`'s `walker`)."""
+
+    def __init__(self, card, start):
+        self.card = card
+        self.start = start
+        self.count = grid_preview.slot_total(card.grid_config)
+        self.accent = card._accent_color
+        self.committed = False
+
+    def ids(self, slot):
+        return grid_preview.slot_ids(self.card.grid_config, slot)
+
+    def assigned(self, slot):
+        return bool(self.ids(slot))
+
+    def tip(self, slot, refs=None):
+        """What `slot` holds: as stored, or `refs` (the picker's live selection)."""
+        cfg = self.card.grid_config if refs is None else {'slotAssignments': {str(slot): refs}}
+        return grid_preview.slot_tip(cfg, self.card._name_of, slot, actions=False)
+
+    def commit(self, slot, refs):
+        """Write `slot` back: the picker calls this only for a slot it edited."""
+        self.card._write_slot(slot, refs)
+        self.committed = True
+
 
 class GridEditorPanel(ttk.Frame):
-    """A collapsible grid editor card."""
+    """One grid's row: title line, to-scale preview, names line."""
 
-    def __init__(self, parent, database, grid_config, on_delete=None, initially_open=False,
-                 get_total_slots=None, on_resize=None, on_whitelist_changed=None,
-                 name_in_use=None, on_edit=None):
+    def __init__(self, parent, database, grid_config, on_delete=None,
+                 get_base_size=None, on_whitelist_changed=None,
+                 name_in_use=None, on_edit=None, on_move=None, find_card=None,
+                 on_export=None):
         super().__init__(parent)
         self.database = database
         self.grid_config = grid_config
         self.on_delete = on_delete
-        self._get_total_slots = get_total_slots
-        self._on_resize = on_resize
+        # The profile's overlay size, read live: the preview follows the Grids
+        # toolbar's Overlay dropdown.
+        self._get_base_size = get_base_size or (lambda: DEFAULT_SIZE)
         self._on_whitelist_changed = on_whitelist_changed
         self._name_in_use = name_in_use
         self._on_edit = on_edit
+        # on_move(card, class_id, copy): Move to… / Copy to… another class tab.
+        self._on_move = on_move
+        # on_export(card): the Move… menu's Export grid… — the grid to a grids file.
+        self._on_export = on_export
+        # find_card(config): the card showing that config now, None once it left
+        # the list — a rebuild within the undo toast's life replaces this card.
+        self._find_card = find_card
+        # Cleared slots still undoable: slot -> (refs, when cleared).
+        self._cleared = {}
+        self._names = []
+        self._names_cfg = grid_config  # what the names were read from (a draft while one is open)
+        self._names_cut = (None, None)  # (names, width) the line was cut for
+        self.settings_dialog = None
 
         grid_type = grid_config.get('type', 'player')
         self._accent_color = GRID_TYPE_COLORS.get(grid_type, GRID_TYPE_COLORS['player'])
-        self._resting_border_color = self._accent_color
+        # The type and slot mode are fixed at creation, so the card is built for them.
+        self._band = is_band(grid_config)
 
-        self._card = tk.Frame(self,
-                               highlightbackground=self._accent_color,
-                               highlightcolor=self._accent_color,
-                               highlightthickness=1)
+        border = TK_COLORS['border']
+        self._card = tk.Frame(self, highlightbackground=border, highlightcolor=border,
+                              highlightthickness=1)
         card = self._card
         card.pack(fill='x')
 
+        # Player/target identity lives on one 3px edge, not a full bright
+        # outline — a column of cards reads as a list, not a stack of boxes.
+        # Canvas, not Frame: an empty tk.Frame can repaint in the theme bg.
+        # BOTH sizes must be explicit — the defaults are 378x265, and fill='y'
+        # stretches the canvas without shrinking what it asks the card for.
+        self._stripe = tk.Canvas(card, width=CARD_STRIPE_PX, height=1,
+                                 highlightthickness=0, bg=self._accent_color)
+        self._stripe.pack(side='left', fill='y')
+
         self.drag_handle = ttk.Label(card, text=" ☰ ", font=FONT_BODY_LG,
-                                      foreground=THEME_COLORS['muted'], cursor='fleur')
+                                      foreground=THEME_COLORS['muted'], cursor='fleur',
+                                      takefocus=True)
         self.drag_handle.pack(side='left', fill='y', padx=(PAD_MICRO, 0))
-        bind_label_hover_colors(self.drag_handle, THEME_COLORS['muted'], THEME_COLORS['heading'])
-        add_tooltip(self.drag_handle, "Drag to reorder")
+        self._handle_hovered = False
+        self._handle_focused = False
+        self.drag_handle.bind('<Enter>', lambda e: self._paint_drag_handle(hover=True))
+        self.drag_handle.bind('<Leave>', lambda e: self._paint_drag_handle(hover=False))
+        self.drag_handle.bind('<FocusIn>', lambda e: self._paint_drag_handle(focus=True))
+        self.drag_handle.bind('<FocusOut>', lambda e: self._paint_drag_handle(focus=False))
+        add_tooltip(self.drag_handle, "Drag to reorder — or Tab here, then Alt+↑/↓")
 
-        self.section = CollapsibleSection(
-            card, title=grid_config.get('id', 'Grid'),
-            badge_text=grid_type,
-            badge_color=self._accent_color,
-            initially_open=initially_open,
-        )
-        self.section.pack(side='left', fill='x', expand=True,
-                          padx=PAD_ROW, pady=(PAD_BUTTON_GAP, PAD_ROW))
+        self._row = ttk.Frame(card)
+        self._row.pack(side='left', fill='x', expand=True,
+                       padx=PAD_ROW, pady=(PAD_BUTTON_GAP, PAD_ROW))
+        self._build_title_line()
+        self._build_body()
 
-        self._build_header_widgets()
-
-        content_wrapper = ttk.Frame(self.section.content)
-        content_wrapper.pack(fill='x')
-        settings_col = ttk.Frame(content_wrapper)
-        settings_col.pack(side='left', fill='x', expand=True)
-
-        self._preview_canvas = tk.Canvas(
-            content_wrapper, width=GRID_PREVIEW_PX, height=GRID_PREVIEW_PX,
-            bg=TK_COLORS['bg'], highlightthickness=0)
-        self._preview_canvas.pack(side='right', padx=(PAD_XS, 0), pady=PAD_XS)
-
-        self._build_top_row(settings_col)
-        self._build_icon_row(settings_col)
-        self._build_info_and_dynamic(settings_col)
-
-        self.load_from_config()
         self._apply_enabled_styling(self.enabled_var.get())
+        self.refresh_view()
 
-        bind_card_events(card, lambda: self._resting_border_color)
+        bind_card_events(card, border)
 
-    def _build_header_widgets(self):
-        """Pack right-side header controls: × delete, Enabled toggle, X/Y, mode button."""
-        cfg = self.grid_config
-        header = self.section.header_frame
-        max_x, max_y = get_game_resolution_or_default()
+    def _paint_drag_handle(self, *, hover=None, focus=None):
+        """Hover and keyboard focus both light the ☰ handle, and either one alone
+        keeps it lit — moving the mouse off a focused handle must not erase the
+        only cue that Alt+↑/↓ is armed."""
+        if hover is not None:
+            self._handle_hovered = hover
+        if focus is not None:
+            self._handle_focused = focus
+        lit = self._handle_hovered or self._handle_focused
+        self.drag_handle.configure(
+            foreground=THEME_COLORS['heading'] if lit else THEME_COLORS['muted'])
 
-        self.enabled_var = tk.BooleanVar(value=True)
-        delete_label = ttk.Label(header, text="×",
-                                 font=FONT_SYMBOL, foreground=THEME_COLORS['muted'],
-                                 cursor='hand2', takefocus=True,
-                                 padding=(PAD_XS, PAD_MICRO))
-        delete_label.pack(side='right', padx=(PAD_XS, 0))
+    # ------------------------------------------------------------------
+    # Title line
+    # ------------------------------------------------------------------
+    def _build_title_line(self):
+        """Name, type badge, mode and Applied by me on the left; on the right,
+        left to right: Move…, Enabled and ×."""
+        header = ttk.Frame(self._row)
+        header.pack(fill='x')
+        self._title_label = ttk.Label(header, font=FONT_SECTION, foreground=THEME_COLORS['heading'])
+        self._title_label.pack(side='left')
+        self._badge_label = ttk.Label(header, text=self.grid_config.get('type', 'player'),
+                                      font=FONT_SMALL, foreground=self._accent_color)
+        self._badge_label.pack(side='left', padx=(PAD_LF, 0))
+        self.summary_label = ttk.Label(header, font=FONT_SMALL, foreground=THEME_COLORS['muted'])
+        self.summary_label.pack(side='left', padx=(PAD_TAB, 0))
+        self.self_cast_var = tk.BooleanVar(value=self.grid_config.get('selfCastOnly') is True)
+        self._self_cast_cb = ttk.Checkbutton(header, text="Applied by me",
+                                             variable=self.self_cast_var,
+                                             command=self._on_self_cast_toggled,
+                                             bootstyle="success-round-toggle")  # type: ignore[call-arg]
+        add_tooltip(self._self_cast_cb, "Show only effects you cast, with your own timer, even when "
+                                        "other players cast the same effect on the same character.")
+
+        self.enabled_var = tk.BooleanVar(value=self.grid_config.get('enabled', True))
+        delete_label = self._glyph_label(header, "×", FONT_SYMBOL, "Delete this grid",
+                                         self.delete_grid, THEME_COLORS['danger_text'])
+        bind_label_press_effect(delete_label, THEME_COLORS['danger_text'])
+        enabled_cb = ttk.Checkbutton(header, text="Enabled",
+                                     variable=self.enabled_var,
+                                     command=self._on_enabled_toggled,
+                                     bootstyle="success-round-toggle")  # type: ignore[call-arg]
+        enabled_cb.pack(side='right', padx=(0, PAD_XS))
+        in_view = [enabled_cb, delete_label]
+        if self._on_move is not None:
+            move_label = self._glyph_label(header, "Move…", FONT_SMALL,
+                                           "Move this grid to another class tab, copy it there, "
+                                           "or export it to a file",
+                                           lambda: self._show_move_menu(move_label),
+                                           THEME_COLORS['heading'])
+            in_view.insert(0, move_label)
+        # Packed after the right cluster, so a narrow header squeezes the
+        # toggle before Move… or ×; side='left' still lands it after the mode.
+        self._self_cast_cb.pack(side='left', padx=(PAD_LF, 0))
+        # The right cluster is packed right to left; raise everything left to
+        # right so Tab walks it as seen.
+        for w in [self._self_cast_cb, *in_view]:
+            w.lift()
+
+    def _glyph_label(self, parent, text, font, tip, command, hover_color, padding=(PAD_XS, PAD_MICRO),
+                     side='right'):
+        """A clickable muted label (hand cursor, Tab stop, Enter/space like a
+        click), packed to `side` of `parent`."""
+        lbl = ttk.Label(parent, text=text, font=font, foreground=THEME_COLORS['muted'],
+                        cursor='hand2', takefocus=True, padding=padding)
+        lbl.pack(side=side, padx=(PAD_XS, 0))
         for seq in ('<Button-1>', '<Return>', '<space>'):
-            delete_label.bind(seq, lambda e: self.delete_grid())
-        bind_label_hover_colors(delete_label, THEME_COLORS['muted'], THEME_COLORS['danger'])
-        bind_label_press_effect(delete_label, THEME_COLORS['danger'])
-        add_tooltip(delete_label, "Delete this grid")
-        ttk.Checkbutton(header, text="Enabled",
-                        variable=self.enabled_var,
-                        command=self._on_enabled_toggled,
-                        bootstyle="success-round-toggle").pack(side='right', padx=(0, PAD_XS))  # type: ignore[call-arg]
+            lbl.bind(seq, lambda e: command())
+        bind_label_hover_colors(lbl, THEME_COLORS['muted'], hover_color)
+        add_tooltip(lbl, tip)
+        return lbl
 
-        pos_frame = ttk.Frame(header)
-        pos_frame.pack(side='right', padx=(0, PAD_LF))
-        self.x_var = tk.StringVar(value=str(cfg.get('x', 0)))
-        position_entry(pos_frame, "X:", self.x_var, lo=0, hi=max_x,
-                       tooltip="Horizontal position on screen (pixels from left edge)",
-                       on_change=self._notify_edit,
-                       label_color=THEME_COLORS['muted'], padx=(PAD_MICRO, PAD_MID))
-        self.y_var = tk.StringVar(value=str(cfg.get('y', 0)))
-        position_entry(pos_frame, "Y:", self.y_var, lo=0, hi=max_y,
-                       tooltip="Vertical position on screen (pixels from top edge)",
-                       on_change=self._notify_edit,
-                       label_color=THEME_COLORS['muted'], padx=(PAD_MICRO, 0))
+    def _show_move_menu(self, anchor):
+        """Move to / Copy to, each listing All classes and the twelve classes;
+        Move greys the grid's own. Then Export grid… (a grids file of this one
+        grid). Built once per card, re-greyed per click."""
+        targets = ((0, "All classes"), *((c.id, c.name) for c in CLASSES))
+        menu = getattr(self, '_move_menu', None)
+        if menu is None:
+            menu = self._move_menu = tk.Menu(self, tearoff=0)
+            for title, copy_it in (("Move to", False), ("Copy to", True)):
+                sub = tk.Menu(menu, tearoff=0)
+                for cid, name in targets:
+                    sub.add_command(label=name,
+                                    command=lambda c=cid, cp=copy_it: self._on_move(self, c, cp))
+                menu.add_cascade(label=title, menu=sub)
+                if not copy_it:
+                    self._move_sub = sub
+            if self._on_export is not None:
+                menu.add_separator()
+                menu.add_command(label="Export grid…", command=lambda: self._on_export(self))
+        own = self.grid_config.get('class', 0)
+        for i, (cid, _name) in enumerate(targets):
+            self._move_sub.entryconfigure(i, state='disabled' if cid == own else 'normal')
+        menu.tk_popup(anchor.winfo_rootx(), anchor.winfo_rooty() + anchor.winfo_height())
 
-        ttk.Button(header, text="Tracked Buffs...",
-                   command=self._on_mode_btn_click, width=BTN_MEDIUM,
-                   bootstyle='info-outline').pack(side='right', padx=(0, PAD_LF))  # type: ignore[call-arg]
+    # ------------------------------------------------------------------
+    # Preview and names line
+    # ------------------------------------------------------------------
+    def _build_body(self):
+        """The to-scale preview with the settings cog at its top right, and
+        the names line under them."""
+        body = ttk.Frame(self._row)
+        body.pack(fill='x', padx=(PAD_XS, 0))
+        self._body = body
+        row = ttk.Frame(body)
+        row.pack(fill='x')
+        self.preview = GridPreview(row, accent=self._accent_color, on_pick=self._on_pick,
+                                   on_clear=self.clear_slot, tip_for=self._preview_tip)
+        self.preview.pack(side='left', anchor='n', pady=(PAD_XS, PAD_MICRO))
+        # Its top on the preview's: Tab reaches it right after the preview.
+        self.cog_label = self._glyph_label(row, "⚙", FONT_BODY_LG, "This grid's settings",
+                                           self.open_settings, THEME_COLORS['heading'],
+                                           padding=(PAD_MICRO, 0), side='left')
+        self.cog_label.pack_configure(anchor='n', pady=(PAD_XS, 0))
+        self.names_var = tk.StringVar()
+        self._names_label = ttk.Label(body, textvariable=self.names_var, font=FONT_SMALL,
+                                      foreground=THEME_COLORS['muted'])
+        self._names_label.pack(anchor='w', fill='x')
+        add_tooltip(self._names_label, self._names_tip)
+        body.bind('<Configure>', lambda e: self._draw_names(), add='+')
 
-    def _build_top_row(self, parent):
-        """Pack the Name + Rows + Cols controls."""
-        cfg = self.grid_config
-        top_row = ttk.Frame(parent)
-        top_row.pack(fill='x', pady=(0, PAD_ROW))
+    def base_size(self):
+        return self._get_base_size()
 
-        ttk.Label(top_row, text="Name:", font=FONT_SMALL_BOLD,
-                  foreground=THEME_COLORS['body']).pack(side='left')
-        self.id_var = tk.StringVar()
-        self.id_var.trace_add('write', lambda *_: self.section.set_title(self.id_var.get() or 'Grid'))
-        self._name_entry = ttk.Entry(top_row, textvariable=self.id_var, width=14)
-        self._name_entry.pack(side='left', padx=(PAD_XS, PAD_MID))
-        self._name_entry.bind('<FocusIn>',
-                              lambda e: self._name_entry.configure(bootstyle='default'))  # type: ignore[call-overload]
-        self._name_entry.bind('<FocusOut>', lambda e: self._validate_name())
-        add_tooltip(self._name_entry, "Display name for this grid (shown in preview mode)")
+    def _icon(self, cfg):
+        return grid_metrics(self._get_base_size(), cfg.get('scale', SCALE_DEFAULT)).icon
 
-        self._rows_var = tk.StringVar(value=str(cfg.get('rows', 1)))
-        labeled_spinbox(
-            top_row, "Rows:", self._rows_var, from_=1, to=MAX_ROWS, width=4,
-            tooltip="Grid rows (height). Total slots across all grids cannot exceed 64.",
-            on_change=lambda: self._on_dimension_changed('rows'),
-            label_color=THEME_COLORS['muted'], padx=(PAD_MICRO, PAD_MID),
-        )
-        self._cols_var = tk.StringVar(value=str(cfg.get('cols', 5)))
-        labeled_spinbox(
-            top_row, "Cols:", self._cols_var, from_=1, to=MAX_COLS, width=4,
-            tooltip="Grid columns (width). Total slots across all grids cannot exceed 64.",
-            on_change=lambda: self._on_dimension_changed('cols'),
-            label_color=THEME_COLORS['muted'], padx=(PAD_MICRO, 0),
-        )
+    def refresh_view(self, cfg=None):
+        """Redraw the preview, then the lines that read it (the summary says
+        the ratio the preview settled on). `cfg` is a Grid Settings draft
+        while one is open; the stored config otherwise."""
+        cfg = self.grid_config if cfg is None else cfg
+        self.preview.set_config(cfg, self._icon(cfg), bool(self.enabled_var.get()))
+        self._refresh_labels(cfg)
 
-    def _build_icon_row(self, parent):
-        """Pack icon size, gap, stack font, and the Timers / Flash toggle groups."""
-        icon_row = ttk.Frame(parent)
-        icon_row.pack(fill='x', pady=(0, PAD_ROW))
-        self.icon_var = tk.IntVar()
-        labeled_spinbox(icon_row, "Icon:", self.icon_var, from_=8, to=128, width=3,
-            tooltip="Size of each buff icon in pixels (8-128)",
-            on_change=self._notify_edit,
-            padx=(PAD_BUTTON_GAP, PAD_TAB))
-        self.gap_var = tk.IntVar()
-        labeled_spinbox(icon_row, "Gap:", self.gap_var, from_=-5, to=10, width=3,
-            tooltip="Space between icons (-5 = overlapping, 0 = touching, 10 = spaced out)",
-            on_change=self._notify_edit,
-            padx=(PAD_BUTTON_GAP, PAD_MID))
+    def _refresh_labels(self, cfg=None):
+        """The title, summary and names line (a slot write repaints only its
+        cell, then these)."""
+        cfg = self.grid_config if cfg is None else cfg
+        self._title_label.configure(text=cfg.get('id', 'Grid'))
+        # The mode only: the preview shows the shape, the names line the buffs.
+        shown_at = grid_preview.ratio_text(PREVIEW_RATIO[0], self.preview.ratio, PREVIEW_RATIO[1])
+        self.summary_label.configure(text=cfg.get('slotMode', 'dynamic') + shown_at)
+        self._names = [self._name_of(ref) for ref in grid_preview.held_ids(cfg)]
+        self._names_cfg = cfg
+        self._draw_names()
 
-        ttk.Separator(icon_row, orient='vertical').pack(side='left', fill='y', padx=PAD_XS)
-        self.stack_font_var = tk.IntVar()
-        labeled_spinbox(icon_row, "Stack Font:", self.stack_font_var, from_=8, to=24, width=2,
-            tooltip="Font size for stack counter at top-right of icons (8-24)",
-            on_change=self._notify_edit,
-            padx=(PAD_BUTTON_GAP, PAD_MID))
+    def _measure(self, text):
+        """`text`'s width in px in the names line's font."""
+        return self.tk.call('font', 'measure', FONT_SMALL, text)
 
-        timer_group = ttk.Frame(icon_row)
-        timer_group.pack(side='left')
-        ttk.Separator(timer_group, orient='vertical').pack(side='left', fill='y', padx=PAD_XS)
-        self.timers_var = tk.BooleanVar()
-        timers_cb = ttk.Checkbutton(timer_group, text="Timers",
-                                     variable=self.timers_var,
-                                     bootstyle="success-round-toggle",  # type: ignore[call-arg]
-                                     command=self._on_timers_clicked)
-        timers_cb.pack(side='left', padx=(0, PAD_MID))
-        add_tooltip(timers_cb, "Display remaining duration below each buff icon")
+    def _draw_names(self):
+        """The names line, cut to the card's width: the buffs the grid holds,
+        or what to click while it holds nothing. Cut once per (names, width)."""
+        nudge = grid_preview.empty_nudge(self._names_cfg)
+        if nudge is not None:
+            self._names_cut = (None, None)
+            self.names_var.set(nudge)
+            return
+        width = self._body.winfo_width()
+        width = width if width > 1 else _NAMES_FALLBACK_W
+        key = (tuple(self._names), width)
+        if key == self._names_cut:
+            return
+        self._names_cut = key
+        self.names_var.set(grid_preview.names_line(self._names, self._measure, width))
 
-        self._timer_options_frame = ttk.Frame(timer_group)
-        self._timer_options_frame.pack(side='left')
-        self.timer_font_var = tk.IntVar()
-        labeled_spinbox(self._timer_options_frame, "Font:", self.timer_font_var,
-            from_=8, to=24, width=2,
-            tooltip="Font size for timer text below icons (8-24)",
-            on_change=self._notify_edit,
-            padx=(PAD_BUTTON_GAP, PAD_TAB))
-        self.timer_y_offset_var = tk.IntVar()
-        labeled_spinbox(self._timer_options_frame, "Y Offset:", self.timer_y_offset_var,
-            from_=-10, to=10, width=3,
-            tooltip="Shift timer text up/down relative to the icon (-10 to 10)",
-            on_change=self._notify_edit,
-            padx=(PAD_BUTTON_GAP, PAD_MID))
-
-        flash_group = ttk.Frame(icon_row)
-        flash_group.pack(side='left')
-        ttk.Separator(flash_group, orient='vertical').pack(side='left', fill='y', padx=PAD_XS)
-        self.flashing_var = tk.BooleanVar()
-        flash_cb = ttk.Checkbutton(flash_group, text="Flash",
-                                    variable=self.flashing_var,
-                                    bootstyle="success-round-toggle",  # type: ignore[call-arg]
-                                    command=self._on_flash_clicked)
-        flash_cb.pack(side='left', padx=(0, PAD_MID))
-        add_tooltip(flash_cb, "Icons flash when buff timer is about to expire")
-
-        self._flash_threshold_frame = ttk.Frame(flash_group)
-        self._flash_threshold_frame.pack(side='left')
-        self.flash_threshold_var = tk.IntVar()
-        labeled_spinbox(self._flash_threshold_frame, "Under:", self.flash_threshold_var,
-            from_=0, to=11, width=2,
-            tooltip="Icons flash when timer drops below this many seconds (0-11)",
-            on_change=self._notify_edit,
-            padx=(PAD_BUTTON_GAP, 0))
-        ttk.Label(self._flash_threshold_frame, text="s",
-                  foreground=THEME_COLORS['muted'],
-                  font=FONT_SMALL).pack(side='left')
-
-    def _build_info_and_dynamic(self, parent):
-        """Pack whitelist/slot summary row and the Fill/Sort/Group dynamic options."""
-        info_row = ttk.Frame(parent)
-        info_row.pack(fill='x', pady=(0, PAD_ROW))
-
-        self.info_text = tk.StringVar(value="No buffs tracked. Click 'Tracked Buffs...' to add some.")
-        ttk.Label(info_row, textvariable=self.info_text,
-                  foreground=THEME_COLORS['muted'], font=FONT_SMALL).pack(side='left', padx=(0, PAD_LF))
-        self.whitelist_preview_var = tk.StringVar(value="")
-        self.whitelist_preview_label = ttk.Label(
-            parent, textvariable=self.whitelist_preview_var,
-            foreground=THEME_COLORS['muted'], font=FONT_SMALL)
-
-        self.dynamic_frame = ttk.Frame(parent)
-        dyn_row = ttk.Frame(self.dynamic_frame)
-        dyn_row.pack(fill='x', pady=(0, PAD_ROW))
-
-        self.fill_var = tk.StringVar()
-        self.fill_combo = labeled_combobox(dyn_row, "Fill:", self.fill_var, [], width=22,
-            tooltip=lambda: _FILL_DESCRIPTIONS.get(self.fill_var.get(), "Direction buffs fill into the grid"),
-            on_change=self._notify_edit,
-            padx=(PAD_BUTTON_GAP, PAD_TAB))
-
-        self.sort_var = tk.StringVar()
-        labeled_combobox(dyn_row, "Sort:", self.sort_var,
-            [label for _, label, _ in _SORT_OPTIONS], width=16,
-            tooltip=lambda: _SORT_DESCRIPTIONS.get(self.sort_var.get(), "How buffs are ordered"),
-            on_change=self._notify_edit,
-            padx=(PAD_BUTTON_GAP, PAD_TAB))
-
-        self.layout_var = tk.StringVar()
-        labeled_combobox(dyn_row, "Order:", self.layout_var,
-            [label for _, label in _LAYOUT_OPTIONS], width=11,
-            tooltip="In Buffs First and Debuffs First, misc effects always lead. In Mixed, all buffs sort together by time.",
-            on_change=self._notify_edit,
-            padx=(PAD_BUTTON_GAP, 0))
-
-    def load_from_config(self):
-        """Populate all editor widgets from the current grid configuration dict."""
-        cfg = self.grid_config
-        self.id_var.set(cfg.get('id', 'Grid'))
-        self.enabled_var.set(cfg.get('enabled', True))
-        rows = cfg.get('rows', 1)
-        cols = cfg.get('cols', 5)
-        self._rows_var.set(str(rows))
-        self._cols_var.set(str(cols))
-        # Positions are stored as fractions; the fields display projected px at
-        # the current game resolution. Display-only — never written back here
-        # (a clamp writeback would silently corrupt the stored value).
-        game_w, game_h = get_game_resolution_or_default()
-        self.x_var.set(str(project_px(cfg.get('fx', 100 / 1920), game_w)))
-        self.y_var.set(str(project_px(cfg.get('fy', 400 / 1080), game_h)))
-        self.icon_var.set(cfg.get('iconSize', 56))
-        self.gap_var.set(max(-5, min(cfg.get('gap', -1), 10)))
-        self.timers_var.set(cfg.get('showTimers', True))
-        self.stack_font_var.set(cfg.get('stackFontSize', 14))
-        self.timer_font_var.set(cfg.get('timerFontSize', 18))
-        self.flash_threshold_var.set(cfg.get('timerFlashThreshold', 6))
-        self.timer_y_offset_var.set(cfg.get('timerYOffset', 0))
-        self.flashing_var.set(cfg.get('enableFlashing', True))
-        self._on_timers_toggled()
-        self._on_flash_toggled()
-        self.fill_var.set(_FILL_LABEL_BY_CODE.get(cfg.get('fillDirection', 'LR'),
-                                                   _FILL_LABEL_BY_CODE['LR']))
-        self.sort_var.set(_SORT_LABEL_BY_CODE.get(cfg.get('sortOrder', 'longest'),
-                                                   _SORT_LABEL_BY_CODE['longest']))
-        self.layout_var.set(_LAYOUT_LABEL_BY_CODE.get(cfg.get('layout', 'buffFirst'),
-                                                       _LAYOUT_LABEL_BY_CODE['buffFirst']))
-
-        self._update_fill_options(rows, cols)
-
-        if cfg.get('slotMode') == 'static':
-            self.dynamic_frame.pack_forget()
-        else:
-            self.dynamic_frame.pack(fill='x')
-
-        self.update_labels()
-        self._update_preview()
-
-    def _update_preview(self):
-        """Redraw the small grid shape preview in the card."""
-        rows = self.grid_config.get('rows', 1)
-        cols = self.grid_config.get('cols', 5)
-        draw_grid_cells(self._preview_canvas, rows, cols,
-                        self._accent_color, GRID_PREVIEW_PX, GRID_PREVIEW_PX)
-
-    def _validate_name(self, interactive=True):
-        """Red on empty or duplicate, commit on valid. Never rewrites the field —
-        deleting and blurring would otherwise snap the old name back. Duplicates
-        are rejected because grid names key the generated AS2 whitelist tables:
-        two grids sharing a name would silently share one whitelist in-game.
-        `interactive=False` (the save_to_config flush) skips the toast so a
-        duplicate left sitting in the field doesn't re-warn on every save.
-        TclError-safe: the <FocusOut> binding can fire on a card mid-teardown
-        during refresh_panels."""
-        try:
-            name = self.id_var.get().strip()
-            if not name:
-                self._name_entry.configure(bootstyle='danger')  # type: ignore[call-overload]
-                return
-            if self._name_in_use is not None and self._name_in_use(name, self.grid_config):
-                self._name_entry.configure(bootstyle='danger')  # type: ignore[call-overload]
-                if interactive:
-                    app_toast(self, f"Grid name '{name}' is already used by another grid",
-                              'warning', key='grid-name-dup')
-                return
-            self._name_entry.configure(bootstyle='default')  # type: ignore[call-overload]
-            changed = self.grid_config.get('id') != name
-            self.grid_config['id'] = name
-            # interactive only: the save_to_config flush calls this with
-            # interactive=False, and notifying from there would recurse
-            # (notify → store mirror → save_to_config → here).
-            if interactive and changed:
-                self._notify_edit()
-        except tk.TclError:
-            pass
-
-    def save_to_config(self):
-        """Write current widget values back into the grid configuration dict."""
-        self._validate_name(interactive=False)
-        self.grid_config['enabled'] = self.enabled_var.get()
-        var_map = {
-            'rows': self._rows_var, 'cols': self._cols_var,
-            'iconSize': self.icon_var, 'gap': self.gap_var,
-            'stackFontSize': self.stack_font_var,
-            'timerFontSize': self.timer_font_var,
-            'timerFlashThreshold': self.flash_threshold_var,
-            'timerYOffset': self.timer_y_offset_var,
-        }
-        for key, var in var_map.items():
-            _, lo, hi = CLAMP_SPECS[key]
-            try:
-                v = int(var.get())
-            except (ValueError, tk.TclError):
-                # Validator allows transient '' / '-' mid-edit; fall back to current value.
-                v = self.grid_config.get(key, lo)
-            self.grid_config[key] = max(lo, min(v, hi))
-        # Position fields carry projected px; unproject back to fractions at
-        # the current game resolution (typed overshoot clamps to the screen).
-        game_w, game_h = get_game_resolution_or_default()
-        for key, var, extent in (('fx', self.x_var, game_w), ('fy', self.y_var, game_h)):
-            try:
-                px = max(0, min(int(var.get()), extent))
-            except (ValueError, tk.TclError):
-                px = project_px(self.grid_config.get(key, 0.0), extent)
-            self.grid_config[key] = unproject_px(px, extent)
-        self.grid_config['showTimers'] = self.timers_var.get()
-        self.grid_config['enableFlashing'] = self.flashing_var.get()
-        self.grid_config['fillDirection'] = _FILL_CODE_BY_LABEL.get(
-            self.fill_var.get(), self.grid_config.get('fillDirection', 'LR'))
-        self.grid_config['sortOrder'] = _SORT_CODE_BY_LABEL.get(
-            self.sort_var.get(), self.grid_config.get('sortOrder', 'longest'))
-        self.grid_config['layout'] = _LAYOUT_CODE_BY_LABEL.get(
-            self.layout_var.get(), self.grid_config.get('layout', 'buffFirst'))
+    def _name_of(self, ref):
+        """A buff ref as its database name, `(missing #id)` when gone."""
+        if isinstance(ref, str):
+            return ref
+        return (self.database.by_id.get(ref) or {}).get('name', f"(missing #{ref})")
 
     def _format_buff_preview(self, ids, max_show=4):
-        """Comma-separated preview of buff names for up to *max_show* IDs."""
-        names = [
-            (self.database.by_id.get(bid) or {}).get('name', f"(missing #{bid})")
-            for bid in ids[:max_show]
-        ]
-        extra = f" + {len(ids) - max_show} more" if len(ids) > max_show else ""
-        return ", ".join(names) + extra
+        """Up to *max_show* names, then ` + N more`."""
+        return grid_preview.join_names([self._name_of(bid) for bid in ids], max_show)
 
-    def update_labels(self):
-        """Refresh whitelist, slot assignment, and header summary labels."""
+    def _names_tip(self):
+        if not self._names:
+            return grid_preview.empty_nudge(self.grid_config) or ""
+        n = len(self._names)
+        return f"{n} buff{'s' if n != 1 else ''}: " + ", ".join(self._names)
+
+    def _preview_tip(self, slot):
         cfg = self.grid_config
-        wl = cfg.get('whitelist', [])
-        rows = cfg.get('rows', 1)
-        cols = cfg.get('cols', 5)
-
-        sa = cfg.get('slotAssignments', {})
-        assigned_ids = []
-        for v in sa.values():
-            if isinstance(v, list):
-                assigned_ids.extend(b for b in v if b)
-            elif v:
-                assigned_ids.append(v)
-        configured = sum(1 for v in sa.values() if v)
-
         if cfg.get('slotMode') == 'static':
-            self.info_text.set(f"{configured} of {rows * cols} slots assigned")
-        else:
-            self.info_text.set(
-                f"Tracking {len(wl)} buffs" if wl
-                else "No buffs tracked. Click 'Tracked Buffs...' to add some."
-            )
+            if slot < 0:
+                return "Click a slot to choose its buffs"
+            return grid_preview.slot_tip(cfg, self._name_of, slot)
+        if self._band:
+            return f"Click to choose the buffs this grid tracks — it shows up to {cfg.get('maxSlots', 10)}"
+        return "Click to choose the buffs this grid tracks"
 
-        preview_ids = assigned_ids if cfg.get('slotMode') == 'static' else wl
-        if preview_ids:
-            self.whitelist_preview_var.set(self._format_buff_preview(preview_ids))
-            self.whitelist_preview_label.pack(fill='x', pady=(0, PAD_BUTTON_GAP))
-        else:
-            self.whitelist_preview_var.set("")
-            self.whitelist_preview_label.pack_forget()
-
-        self.section.set_title(cfg.get('id', 'Grid'))
-        self.section.set_summary(f"  {rows}×{cols} · {cfg.get('slotMode', 'dynamic')}")
-
-    def _on_mode_btn_click(self):
-        if self.grid_config.get('slotMode') == 'static':
-            self.edit_slots()
-        else:
+    # ------------------------------------------------------------------
+    # Buffs: the picker from the preview, clearing a slot
+    # ------------------------------------------------------------------
+    def _on_pick(self, slot):
+        if slot is None:
             self.edit_whitelist()
+        else:
+            self.edit_slot(slot)
+
+    def _buffs_changed(self):
+        self._refresh_labels()
+        if self._on_whitelist_changed:
+            self._on_whitelist_changed()
 
     def edit_whitelist(self):
-        self.save_to_config()
+        """The Tracked Buffs picker on the whitelist (a dynamic grid's preview)."""
         dialog = BuffSelectorDialog(
             self.winfo_toplevel(), self.database, "Edit Tracked Buffs",
             initial_ids=self.grid_config.get('whitelist', []),
@@ -474,118 +390,118 @@ class GridEditorPanel(ttk.Frame):
         self.wait_window(dialog)
         if dialog.result is not None:
             self.grid_config['whitelist'] = dialog.result
-            self.update_labels()
+            self.refresh_view()  # every cell of a dynamic grid shows it holds something
             if self._on_whitelist_changed:
                 self._on_whitelist_changed()
 
-    def edit_slots(self):
-        self.save_to_config()
-        dialog = SlotAssignmentDialog(self.winfo_toplevel(), self.database, self.grid_config)
+    def edit_slot(self, slot):
+        """The same picker on one static slot (a click on its cell), walking
+        the grid's slots from there: every slot it leaves, and the one Done
+        closes on, is written back as it goes."""
+        walker = _SlotWalker(self, slot)
+        dialog = BuffSelectorDialog(
+            self.winfo_toplevel(), self.database, f"Slot {slot} Buffs",
+            layout=self.grid_config.get('layout', 'mixed'), walker=walker,
+        )
         self.wait_window(dialog)
-        if dialog.result is not None:
-            self.grid_config['slotAssignments'] = dialog.result
-            self.update_labels()
-            if self._on_whitelist_changed:
-                self._on_whitelist_changed()
+        if walker.committed:
+            self._buffs_changed()
 
-    def delete_grid(self):
-        # No confirm — grids_panel shows an undo toast instead.
-        if self.on_delete:
-            self.on_delete(self)
-
-    def _notify_edit(self):
-        # Non-structural field edit → the container mirrors grids into the
-        # profile store (structural changes notify via _on_resize instead).
-        if self._on_edit:
-            self._on_edit()
-
-    def _on_enabled_toggled(self):
-        self._apply_enabled_styling(self.enabled_var.get())
-        self._notify_edit()
-
-    def _apply_enabled_styling(self, enabled):
-        """Drain the grid's identity colors when it's excluded from the build.
-
-        Title, badge, and accent strips drop to greys; the card frame border
-        falls back from the player/target accent to the neutral border. The
-        Enabled toggle is the affordance — this is the visual consequence.
-        """
-        self._resting_border_color = self._accent_color if enabled else TK_COLORS['border']
-        self._card.configure(highlightbackground=self._resting_border_color,
-                             highlightcolor=self._resting_border_color)
-        self.section.set_dimmed(not enabled)
-
-    def _on_timers_clicked(self):
-        """Checkbutton handler — load_from_config calls _on_timers_toggled
-        directly so a profile load never arms the autosaver."""
-        self._on_timers_toggled()
-        self._notify_edit()
-
-    def _on_timers_toggled(self):
-        if self.timers_var.get():
-            self._timer_options_frame.pack(side='left')
+    def _write_slot(self, slot, refs):
+        """Set (or, with no refs, drop) static slot `slot` and repaint its cell."""
+        sa = dict(self.grid_config.get('slotAssignments') or {})
+        if refs:
+            sa[str(slot)] = list(refs)
         else:
-            self._timer_options_frame.pack_forget()
+            sa.pop(str(slot), None)
+        self.grid_config['slotAssignments'] = sa
+        self.preview.repaint_slot(slot)
 
-    def _on_flash_clicked(self):
-        self._on_flash_toggled()
-        self._notify_edit()
-
-    def _on_flash_toggled(self):
-        if self.flashing_var.get():
-            self._flash_threshold_frame.pack(side='left')
-        else:
-            self._flash_threshold_frame.pack_forget()
-
-    def _on_dimension_changed(self, dim):
-        var = self._rows_var if dim == 'rows' else self._cols_var
-        limit = MAX_ROWS if dim == 'rows' else MAX_COLS
-        try:
-            new_val = max(1, min(int(var.get()), limit))
-        except (ValueError, tk.TclError):
-            var.set(str(self.grid_config.get(dim, 1)))
+    def clear_slot(self, slot):
+        """Empty a static slot at once (right-click or Delete on its cell); the
+        toast's click puts back every slot cleared while it showed."""
+        refs = grid_preview.slot_ids(self.grid_config, slot)
+        if not refs:
             return
-        old_val = self.grid_config.get(dim, 1)
-        other_dim = self.grid_config.get('cols' if dim == 'rows' else 'rows', 1)
-        if self._get_total_slots:
-            old_total = old_val * other_dim
-            other_slots = self._get_total_slots() - old_total
-            if other_slots + new_val * other_dim > MAX_TOTAL_SLOTS:
-                new_val = max(1, (MAX_TOTAL_SLOTS - other_slots) // other_dim)
-                var.set(str(new_val))
-        new_rows = new_val if dim == 'rows' else other_dim
-        new_cols = other_dim if dim == 'rows' else new_val
-        self._apply_dimension_change(new_rows, new_cols, old_val * other_dim)
+        now = time.monotonic()
+        self._cleared = {s: v for s, v in self._cleared.items() if now - v[1] < _CLEAR_UNDO_S}
+        self._cleared[slot] = (refs, now)
+        self._write_slot(slot, [])
+        self._buffs_changed()
+        app_toast(self, f"Cleared slot {slot} — click to undo", 'info', _CLEAR_UNDO_S,
+                  key=f'grid-slot-clear-{id(self)}', on_click=self._undo_clear)
 
-    def _apply_dimension_change(self, new_rows, new_cols, old_total):
-        new_total = new_rows * new_cols
-        self.grid_config['rows'] = new_rows
-        self.grid_config['cols'] = new_cols
-        if self.grid_config.get('slotMode') == 'static':
-            if new_total < old_total:
-                self._trim_slot_assignments(new_total)
-            elif new_total > old_total:
-                self._restore_orphaned_assignments(new_total)
-        if new_rows == 1 and new_cols == 1 and self.grid_config.get('slotMode') == 'dynamic':
-            new_cols = 2
-            self.grid_config['cols'] = new_cols
-            self._cols_var.set('2')
-            app_toast(self, "Dynamic grids need at least 2 slots, switched to 1×2", 'info',
-                      key='grid_resize')
-        self._update_fill_options(new_rows, new_cols)
-        self.update_labels()
-        self._update_preview()
-        if self._on_resize:
-            self._on_resize()
+    def _undo_clear(self):
+        """Refill the slots still empty since their clear; a slot filled again
+        meanwhile keeps what it holds now, and one the grid shrank past stays
+        cleared. Lands on whichever card shows this grid now (a rebuild since
+        the clear replaced this one); a grid gone from the list is left be."""
+        cleared, self._cleared = self._cleared, {}
+        if self._find_card is not None:
+            card = self._find_card(self.grid_config)
+        else:
+            card = self if self.winfo_exists() else None
+        if card is None:
+            return
+        cfg = card.grid_config
+        restored = False
+        for slot, (refs, _when) in cleared.items():
+            if slot < grid_preview.slot_total(cfg) and not grid_preview.slot_ids(cfg, slot):
+                card._write_slot(slot, refs)
+                restored = True
+        if restored:
+            card._buffs_changed()
+
+    # ------------------------------------------------------------------
+    # Grid Settings (the cog)
+    # ------------------------------------------------------------------
+    def open_settings(self):
+        return open_grid_settings(self)
+
+    def name_problem(self, name):
+        """Why `name` can't be this grid's name, or None. Names key the
+        generated AS2 whitelist tables: two grids sharing one would silently
+        share a whitelist in game."""
+        if not name:
+            return "A grid needs a name"
+        if self._name_in_use is not None and self._name_in_use(name, self.grid_config):
+            return f"'{name}' is already another grid's name"
+        return None
+
+    def preview_draft(self, draft):
+        """Draw a Grid Settings draft over the stored config."""
+        self.refresh_view(dict(self.grid_config, **draft))
+
+    def cancel_draft(self):
+        """The dialog closed without Apply: back to the stored config."""
+        self.refresh_view()
+
+    def apply_settings(self, draft):
+        """Land a Grid Settings draft (the settings it owns, the shape already
+        through `settle_box`) on the config; a static grid's change of slot
+        count trims its assignments (restored on a regrow)."""
+        cfg = self.grid_config
+        old_total = grid_preview.slot_total(cfg)
+        cfg.update(draft)
+        new_total = grid_preview.slot_total(cfg)
+        slots_moved = cfg.get('slotMode') == 'static' and new_total != old_total
+        if slots_moved and new_total < old_total:
+            self._trim_slot_assignments(new_total)
+        elif slots_moved:
+            self._restore_orphaned_assignments(new_total)
+        self.refresh_view()
+        if slots_moved and self._on_whitelist_changed:
+            self._on_whitelist_changed()  # the step guide re-reads the slots
+        else:
+            self._notify_edit()
 
     def _trim_slot_assignments(self, new_total):
         """Drop assignments past new_total; stash dropped IDs on the grid for later restore."""
-        sa = self.grid_config.get('slotAssignments', {})
+        sa = self.grid_config.get('slotAssignments') or {}
         dropped_ids = []
         for k, v in sa.items():
-            if int(k) >= new_total and v:
-                ids = v if isinstance(v, list) else [v]
-                dropped_ids.extend(b for b in ids if b)
+            if int(k) >= new_total:
+                dropped_ids.extend(ref_list(v))
         self.grid_config['slotAssignments'] = {
             k: v for k, v in sa.items() if int(k) < new_total
         }
@@ -593,9 +509,6 @@ class GridEditorPanel(ttk.Frame):
             return
         existing = self.grid_config.get('_orphanedAssignments', [])
         self.grid_config['_orphanedAssignments'] = list(dict.fromkeys(existing + dropped_ids))
-        # Non-blocking toast: a modal here would let the spinbox arrow's auto-repeat
-        # keep firing during the popup, recursively trimming further. Coalesce-key
-        # collapses an arrow-hold burst into a single in-place-updating toast.
         noun = "buff" if len(dropped_ids) == 1 else "buffs"
         app_toast(
             self,
@@ -610,15 +523,13 @@ class GridEditorPanel(ttk.Frame):
         orphans = list(self.grid_config.get('_orphanedAssignments', []))
         if not orphans:
             return
-        sa = dict(self.grid_config.get('slotAssignments', {}))
+        sa = dict(self.grid_config.get('slotAssignments') or {})
         restored = []
         for k in range(new_total):
             if not orphans:
                 break
             slot_key = str(k)
-            current = sa.get(slot_key)
-            is_empty = not current or (isinstance(current, list) and not any(current))
-            if is_empty:
+            if not ref_list(sa.get(slot_key)):
                 sa[slot_key] = [orphans.pop(0)]
                 restored.append(sa[slot_key][0])
         if not restored:
@@ -633,51 +544,48 @@ class GridEditorPanel(ttk.Frame):
             key='grid_resize'
         )
 
-    def _update_fill_options(self, rows, cols):
-        if rows == 1:
-            valid_codes = ['LR', 'RL']
-            default = 'LR'
-        elif cols == 1:
-            valid_codes = ['TB', 'BT']
-            default = 'BT'
+    # ------------------------------------------------------------------
+    # Row state
+    # ------------------------------------------------------------------
+    def delete_grid(self):
+        # No confirm — grids_panel shows an undo toast instead.
+        if self.on_delete:
+            self.on_delete(self)
+
+    def _notify_edit(self):
+        # Any settled edit → the container mirrors grids into the profile store.
+        if self._on_edit:
+            self._on_edit()
+
+    def _on_self_cast_toggled(self):
+        """Applied by me: written only when on, so a grid that never set it
+        saves unchanged."""
+        if self.self_cast_var.get():
+            self.grid_config['selfCastOnly'] = True
         else:
-            valid_codes = ['TL-BR', 'TR-BL', 'BL-TR', 'BR-TL']
-            default = 'BL-TR'
-        valid_labels = [_FILL_LABEL_BY_CODE[c] for c in valid_codes]
-        self.fill_combo['values'] = valid_labels
-        if self.fill_var.get() not in valid_labels:
-            self.fill_var.set(_FILL_LABEL_BY_CODE[default])
-            self.grid_config['fillDirection'] = default
+            self.grid_config.pop('selfCastOnly', None)
+        self._notify_edit()
 
+    def _on_enabled_toggled(self):
+        """Enabled is the card's one live control; it writes the config as it
+        is toggled (every other setting is written by Grid Settings' Apply)."""
+        self.grid_config['enabled'] = bool(self.enabled_var.get())
+        self._apply_enabled_styling(self.enabled_var.get())
+        self.refresh_view()
+        self._notify_edit()
 
-_FILL_OPTIONS = [
-    # (persisted code, user-facing label, tooltip description)
-    ('LR',    'Left → Right',           'New buffs appear on the right'),
-    ('RL',    'Right → Left',           'New buffs appear on the left'),
-    ('TB',    'Top → Bottom',           'New buffs appear at the bottom'),
-    ('BT',    'Bottom → Top',           'New buffs appear at the top'),
-    ('TL-BR', 'Top-left → Bottom-right', 'Fills from the top-left corner'),
-    ('TR-BL', 'Top-right → Bottom-left', 'Fills from the top-right corner'),
-    ('BL-TR', 'Bottom-left → Top-right', 'Fills from the bottom-left corner'),
-    ('BR-TL', 'Bottom-right → Top-left', 'Fills from the bottom-right corner'),
-]
-_FILL_LABEL_BY_CODE = {code: label for code, label, _ in _FILL_OPTIONS}
-_FILL_CODE_BY_LABEL = {label: code for code, label, _ in _FILL_OPTIONS}
-_FILL_DESCRIPTIONS = {label: desc for _, label, desc in _FILL_OPTIONS}
+    def _apply_enabled_styling(self, enabled):
+        """Drain the grid's identity colors when it's excluded from the build.
 
-_LAYOUT_OPTIONS = [
-    ('buffFirst',   'Buffs first'),
-    ('debuffFirst', 'Debuffs first'),
-    ('mixed',       'Mixed'),
-]
-_LAYOUT_LABEL_BY_CODE = {code: label for code, label in _LAYOUT_OPTIONS}
-_LAYOUT_CODE_BY_LABEL = {label: code for code, label in _LAYOUT_OPTIONS}
-
-_SORT_OPTIONS = [
-    ('shortest',    'Shortest first', 'Buffs about to expire appear first'),
-    ('longest',     'Longest first',  'Buffs with the most time remaining appear first'),
-    ('application', 'Order applied',  'Buffs appear in the order they were applied'),
-]
-_SORT_LABEL_BY_CODE = {code: label for code, label, _ in _SORT_OPTIONS}
-_SORT_CODE_BY_LABEL = {label: code for code, label, _ in _SORT_OPTIONS}
-_SORT_DESCRIPTIONS = {label: desc for _, label, desc in _SORT_OPTIONS}
+        Title, badge and the left stripe drop to greys (the card outline is
+        already neutral and stays put for hover); the preview drains with them
+        (`refresh_view`). The Enabled toggle is the affordance — this is the
+        visual consequence.
+        """
+        self._stripe.configure(
+            bg=self._accent_color if enabled else TK_COLORS['border'])
+        self._title_label.configure(
+            foreground=THEME_COLORS['heading'] if enabled else TK_COLORS['dim_text'])
+        self._badge_label.configure(
+            foreground=self._accent_color if enabled else TK_COLORS['dim_text'])
+        self._self_cast_cb.configure(style=_TOGGLE_STYLE if enabled else _dim_toggle_style())

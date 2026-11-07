@@ -24,7 +24,7 @@ the Damage Number Colors panel (``damageinfo_colors_panel.py``) writes into
 ``TextColors.xml``. Colors/directions themselves are never baked or
 build-gated — this is a separate section from ``damage_numbers`` because it
 lives on a different lane (PATCH: written to game XML only on explicit Apply,
-never on profile switch) and is sparse (absent source = "no opinion, follow
+never on a profile import or reset) and is sparse (absent source = "no opinion, follow
 whatever the file already says" — most sources are never touched by a given
 profile).
 """
@@ -37,6 +37,7 @@ from . import settings_core
 from .profile_document import LANE_BUILD, LANE_PATCH
 from .profile_document import SectionSpec as ProfileSectionSpec
 from .settings_core import Field, Schema
+from .swf_font import DN_DEFAULT_FONT, DN_FONTS
 
 logger = logging.getLogger(__name__)
 
@@ -417,7 +418,7 @@ _DAMAGE_COLORS_SCHEMA = Schema('', 1, {
 # The Damage Number Colors panel's slice of the profile document — sparse:
 # `{}` default, absent source = "no opinion" (the panel shows whatever
 # TextColors.xml already says). PATCH lane: written to game XML only on
-# explicit Apply, never on profile switch. Registered by app.py.
+# explicit Apply, never on a profile import or reset. Registered by app.py.
 DAMAGE_COLORS_SECTION = ProfileSectionSpec(
     'damage_colors', _DAMAGE_COLORS_SCHEMA, LANE_PATCH, sparse=True)
 
@@ -452,6 +453,10 @@ def _build_schema_fields() -> dict[str, Field]:
         kind = 'float' if is_float_key(key) else 'int'
         fields[key] = Field(meta['default'], min=meta['min'], max=meta['max'], kind=kind)
     fields['enabled'] = Field(False, kind='bool')
+    # The damage text's face (`swf_font.DN_FONTS`): Hyborian, the game's own,
+    # leaves DamageInfo.swf's font alone; any other is embedded at build time.
+    # A name no longer offered reads as Hyborian.
+    fields['font'] = Field(DN_DEFAULT_FONT, choices=DN_FONTS)
     return fields
 
 

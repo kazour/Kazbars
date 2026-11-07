@@ -22,7 +22,7 @@ auto-resume per the locked decision).
 
 Lives in the profile document as the `deeps` section (LIVE lane — Deeps has no
 build-time output, so every field retunes the open overlay immediately on
-profile switch); registered by app.py, mirroring `live_tracker_settings`.
+profile load or import); registered by app.py, mirroring `live_tracker_settings`.
 """
 
 import logging

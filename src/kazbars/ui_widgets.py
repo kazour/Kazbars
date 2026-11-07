@@ -120,6 +120,20 @@ def app_toast(widget, message, style="info", duration=None, key=None, on_click=N
         w = getattr(w, "master", None)
 
 
+def pointer_inside(widget, event):
+    """Whether the pointer `event` reports is over `widget` or a child of it
+    (its .master chain): a <Leave> onto a child is no leave."""
+    try:
+        under = widget.winfo_containing(event.x_root, event.y_root)
+    except (tk.TclError, RuntimeError):
+        return False
+    while under is not None:
+        if under is widget:
+            return True
+        under = getattr(under, "master", None)
+    return False
+
+
 def bind_card_events(card_border, color, hover_color=None):
     """Bind hover highlight on a card frame.
 
@@ -132,28 +146,15 @@ def bind_card_events(card_border, color, hover_color=None):
     caller can flip the resting state (e.g. enabled -> disabled) without
     rebinding.
     """
-    _hover = hover_color or "#ffffff"
+    _hover = hover_color or THEME_COLORS["heading"]
     _resting = color if callable(color) else (lambda c=color: c)
-
-    def _is_descendant(widget):
-        """Walk .master chain to check if widget is inside card_border."""
-        w = widget
-        while w is not None:
-            if w is card_border:
-                return True
-            w = getattr(w, "master", None)
-        return False
 
     def on_enter(e):
         card_border.config(highlightbackground=_hover, highlightcolor=_hover)
 
     def on_leave(e):
-        try:
-            w = card_border.winfo_containing(e.x_root, e.y_root)
-            if w is not None and _is_descendant(w):
-                return
-        except (tk.TclError, RuntimeError):
-            pass
+        if pointer_inside(card_border, e):
+            return
         normal = _resting()
         card_border.config(highlightbackground=normal, highlightcolor=normal)
 
@@ -173,6 +174,14 @@ def add_tooltip(widget, text):
         tip.text = text
         return
     widget._kz_tooltip = _InAppToolTip(widget, text)
+
+
+def refresh_tooltip(widget):
+    """Hide a widget's tooltip and show it again after the usual delay — for
+    a canvas whose tip names the item under the pointer as it moves."""
+    tip = getattr(widget, '_kz_tooltip', None)
+    if tip is not None:
+        tip._schedule()
 
 
 class _InAppToolTip:
@@ -209,6 +218,9 @@ class _InAppToolTip:
         self._hide()
         if not self.widget.winfo_exists():
             return
+        text = self.text() if callable(self.text) else self.text
+        if not text:  # a callable with nothing to say here (between a canvas's items)
+            return
         root = self.widget.winfo_toplevel()
         tip = tk.Frame(
             root,
@@ -218,7 +230,7 @@ class _InAppToolTip:
         )
         lbl = tk.Label(
             tip,
-            text=self.text() if callable(self.text) else self.text,
+            text=text,
             bg=TK_COLORS["input_bg"],
             fg=THEME_COLORS["body"],
             font=FONT_SMALL,

@@ -18,15 +18,16 @@ config archive, for every user (`game_persistence`).
 
 import logging
 
+from .overlay_size import SCALE_DEFAULT, scale_from
 from .profile_document import LANE_BUILD
 from .profile_document import SectionSpec as ProfileSectionSpec
-from .settings_core import Field, Schema, get_defaults, validate_all
+from .settings_core import Field, Schema, validate_all
 
 logger = logging.getLogger(__name__)
 
-# Font is fixed to Arial: it's the only face embedded in base.swf, and AoC's
-# Flash runtime can't fall back to OS device fonts, so any other choice would
-# render blank. Bold is exposed instead (Arial Bold is embedded too).
+# The face is the profile's overlay font (`overlay`), like every other text
+# KazBars.swf draws; bold is the timer's own choice. `scale` is a percent of the
+# overlay size: the build bakes the text size from the two (`overlay_size.cast_fs`).
 
 # display: what the timer text shows.
 #   "elapsed" — count up,        e.g. "1.2"
@@ -60,18 +61,10 @@ _SCHEMA = Schema('', 1, {
     "targetFx": Field(910 / 1920, kind='float', min=0.0, max=1.0),
     "targetFy": Field(560 / 1080, kind='float', min=0.0, max=1.0),
     "bold": Field(True, kind='bool'),
-    "fontSize": Field(12, kind='int', min=8, max=48),
+    "scale": Field(SCALE_DEFAULT, validate=scale_from),
     "display": Field("elapsed", choices=DISPLAY_MODES),
     "color": Field("FFFFFF", validate=validate_color),
 })
-
-CAST_TIMER_DEFAULTS = get_defaults(_SCHEMA)
-
-
-def get_default_config():
-    """Return a fresh copy of the default cast-timer config."""
-    return get_defaults(_SCHEMA)
-
 
 def validate_config(config):
     """Validate/clamp a cast-timer config on load. Returns a sanitized dict

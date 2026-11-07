@@ -1,8 +1,8 @@
 """
 KazBars — form fields and settings-panel builders.
 
-Labeled input widgets (spinbox, combobox, position entry), the grid-cell
-preview, the rounded color swatch, and the shared settings-panel builders
+Labeled input widgets (spinbox, combobox, position entry), the Size slider,
+the rounded color swatch, and the shared settings-panel builders
 (card, status block, slider row, Start/Stop toggle button) used by the Deeps
 and Live Tracker config panels.
 """
@@ -10,10 +10,9 @@ and Live Tracker config panels.
 import tkinter as tk
 from tkinter import ttk
 
+from .grid_model import project_px, unproject_px
+from .overlay_size import SCALE_MAX, SCALE_MIN, SCALE_STEP, snap_scale
 from .ui_helpers import (
-    CELL_GAP,
-    CELL_PX,
-    CELL_PX_LARGE,
     FONT_BODY,
     FONT_FORM_LABEL,
     FONT_SMALL,
@@ -24,7 +23,20 @@ from .ui_helpers import (
     THEME_COLORS,
     TK_COLORS,
 )
+from .ui_tk_style import style_tk_listbox
 from .ui_widgets import add_tooltip, blend_alpha
+
+
+def _field_label(parent, text, font, color=None):
+    """A field's descriptor label packed to the left, or None for `text`
+    None (the caller lays out its own label — a form grid)."""
+    if text is None:
+        return None
+    lbl = ttk.Label(parent, text=text, font=font)
+    if color:
+        lbl.configure(foreground=color)
+    lbl.pack(side="left")
+    return lbl
 
 
 def labeled_spinbox(
@@ -42,20 +54,21 @@ def labeled_spinbox(
     padx=0,
     label_sink=None,
 ):
-    """Labeled spinbox with key-validation and focus-out clamp.
+    """Labeled spinbox with key-validation and a clamp on focus-out or Enter
+    (a field left empty gets its last committed value back).
 
     `var` is a caller-owned StringVar or IntVar; the helper reads its type
     to drive the clamp. `on_change`, if given, fires on spinbox arrows AND
-    after focus-out clamp. Returns the Spinbox so callers can bind extras.
+    after the clamp. Enter clamps before any toplevel `<Return>` binding runs
+    (widget bindings fire first), so a dialog that applies on Enter applies
+    the typed value already settled. Returns the Spinbox so callers can bind
+    extras.
 
     `label_sink`, when given a list, receives the descriptor label so a caller
     can grey it in step with the control (as `create_slider_row`).
     """
-    lbl = ttk.Label(parent, text=label, font=label_font)
-    if label_color:
-        lbl.configure(foreground=label_color)
-    lbl.pack(side="left")
-    if label_sink is not None:
+    lbl = _field_label(parent, label, label_font, label_color)
+    if label_sink is not None and lbl is not None:
         label_sink.append(lbl)
 
     def _validate(value):
@@ -67,6 +80,30 @@ def labeled_spinbox(
         except ValueError:
             return False
 
+    is_str_var = isinstance(var, tk.StringVar)
+
+    def _read():
+        try:
+            return int(var.get()) if is_str_var else var.get()
+        except (ValueError, tk.TclError):
+            return None
+
+    # The field's last committed value (as built, focused, stepped, entered
+    # or clamped — read after `on_change`, which may rewrite it): a field
+    # left empty or half-typed ("-") gets it back.
+    last = _read()
+
+    def _commit():
+        nonlocal last
+        v = _read()
+        if v is not None:
+            last = v
+
+    def _stepped():
+        if on_change is not None:
+            on_change()
+        _commit()
+
     vcmd = (parent.register(_validate), "%P")
     spin = ttk.Spinbox(
         parent,
@@ -76,23 +113,23 @@ def labeled_spinbox(
         width=width,
         validate="key",
         validatecommand=vcmd,
-        command=on_change or "",
+        command=_stepped,
     )
     spin.pack(side="left", padx=padx)
 
-    is_str_var = isinstance(var, tk.StringVar)
-
     def _clamp(_evt=None):
-        try:
-            v = int(var.get()) if is_str_var else var.get()
-        except (ValueError, tk.TclError):
-            v = from_
+        v = _read()
+        if v is None:
+            v = from_ if last is None else last
         clamped = max(from_, min(to, v))
         var.set(str(clamped) if is_str_var else clamped)
         if on_change is not None:
             on_change()
+        _commit()
 
+    spin.bind("<FocusIn>", lambda _e: _commit(), add="+")
     spin.bind("<FocusOut>", _clamp)
+    spin.bind("<Return>", _clamp)
     if tooltip:
         add_tooltip(spin, tooltip)
     return spin
@@ -104,7 +141,7 @@ def labeled_combobox(
 ):
     """Labeled readonly combobox. `on_change`, if given, fires on user
     selection (never on a programmatic `var.set`). Returns the Combobox widget."""
-    ttk.Label(parent, text=label, font=label_font).pack(side="left")
+    _field_label(parent, label, label_font)
     combo = ttk.Combobox(parent, textvariable=var, values=values, width=width, state="readonly")
     combo.pack(side="left", padx=padx)
     if on_change is not None:
@@ -112,6 +149,43 @@ def labeled_combobox(
     if tooltip:
         add_tooltip(combo, tooltip)
     return combo
+
+
+def position_fields(parent, fx, fy, game_w, game_h, *, label_sink=None):
+    """X / Y spinboxes for a position stored as fractions of the game
+    resolution, shown as px at `game_w` x `game_h` (the grid editor
+    convention). Returns `(x_spin, y_spin, read)`: `read()` is `(fx, fy)` as
+    the fields stand — a typed overshoot lands on the edge (`unproject_px`
+    clamps), an emptied field keeps its loaded fraction."""
+    x_var = tk.IntVar(value=project_px(fx, game_w))
+    y_var = tk.IntVar(value=project_px(fy, game_h))
+    x_spin = labeled_spinbox(parent, "X ", x_var, from_=0, to=game_w, width=6,
+                             padx=(0, PAD_SMALL * 2), label_sink=label_sink)
+    y_spin = labeled_spinbox(parent, "Y ", y_var, from_=0, to=game_h, width=6,
+                             label_sink=label_sink)
+
+    def _frac(var, loaded, extent):
+        try:
+            return unproject_px(int(var.get()), extent)
+        except (ValueError, tk.TclError):
+            return loaded
+
+    return x_spin, y_spin, lambda: (_frac(x_var, fx, game_w), _frac(y_var, fy, game_h))
+
+
+def picker_list(parent, label, width, height, *, exportselection=True):
+    """One list of a two-list picker: a titled frame holding a themed
+    multi-select Listbox and its scrollbar. Returns `(frame, listbox)`; the
+    caller packs the frame and binds the list."""
+    frame = ttk.LabelFrame(parent, text=label, padding=PAD_SMALL)
+    scroll = ttk.Scrollbar(frame)
+    scroll.pack(side='right', fill='y')
+    lb = tk.Listbox(frame, yscrollcommand=scroll.set, selectmode='extended',
+                    width=width, height=height, exportselection=exportselection)
+    style_tk_listbox(lb)
+    lb.pack(side='left', fill='both', expand=True)
+    scroll.config(command=lb.yview)
+    return frame, lb
 
 
 def position_entry(
@@ -132,13 +206,10 @@ def position_entry(
 
     Spinbox stepping doesn't fit thousands of pixels, so this is a plain Entry
     that key-validates to int (allowing transient '' / '-') and clamps to
-    [lo, hi] on focus-out. `on_change`, if given, fires after the clamp. Returns
+    [lo, hi] on focus-out (a field left empty gets its last good value back). `on_change`, if given, fires after the clamp. Returns
     the Entry so callers can grey it when disabled.
     """
-    lbl = ttk.Label(parent, text=label, font=label_font)
-    if label_color:
-        lbl.configure(foreground=label_color)
-    lbl.pack(side="left")
+    _field_label(parent, label, label_font, label_color)
 
     def _validate(value):
         if value in ("", "-"):
@@ -156,44 +227,31 @@ def position_entry(
     )
     entry.pack(side="left", padx=padx)
 
+    last = None  # the field's last good value: a field left empty gets it back
+
+    def _remember(_evt=None):
+        nonlocal last
+        try:
+            last = int(var.get())
+        except (ValueError, tk.TclError):
+            pass
+
     def _clamp(_evt=None):
         try:
             v = int(var.get())
         except (ValueError, tk.TclError):
-            v = lo
+            v = lo if last is None else last
         var.set(str(max(lo, min(hi, v))))
+        _remember()
         if on_change is not None:
             on_change()
 
+    _remember()
+    entry.bind("<FocusIn>", _remember, add="+")
     entry.bind("<FocusOut>", _clamp)
     if tooltip:
         add_tooltip(entry, tooltip)
     return entry
-
-
-def draw_grid_cells(canvas, rows, cols, type_color, area_w, area_h, tag="cells"):
-    """Draw a miniature grid of colored rectangles on *canvas*."""
-    canvas.delete(tag)
-    cell_border = TK_COLORS["separator"]
-    display_rows = min(rows, 5)
-    display_cols = min(cols, 5)
-    cell = CELL_PX_LARGE if rows == 1 and cols == 1 else CELL_PX
-    gap = CELL_GAP
-    while display_rows * cell + (display_rows - 1) * gap > area_h - 8 and cell > 3:
-        cell -= 1
-    while display_cols * cell + (display_cols - 1) * gap > area_w - 16 and cell > 3:
-        cell -= 1
-    total_w = display_cols * cell + (display_cols - 1) * gap
-    total_h = display_rows * cell + (display_rows - 1) * gap
-    sx = (area_w - total_w) // 2
-    sy = (area_h - total_h) // 2
-    for r in range(display_rows):
-        for c in range(display_cols):
-            x = sx + c * (cell + gap)
-            y = sy + r * (cell + gap)
-            canvas.create_rectangle(
-                x, y, x + cell, y + cell, fill=type_color, outline=cell_border, tags=tag
-            )
 
 
 def create_rounded_rect(canvas, x1, y1, x2, y2, radius, **kwargs):
@@ -428,6 +486,87 @@ def create_slider_row(parent, label_text, from_, to, initial, suffix, on_drag, o
     if label_sink is not None:
         label_sink.extend((desc_label, value_label))
     return scale, value_label
+
+
+def size_slider(parent, initial, hint, on_commit=None, *, label="Size:", length=120,
+                tooltip=None, label_sink=None, on_move=None):
+    """Inline `label · slider · "N %" · hint` for a module's `scale`: a percent
+    of the profile's overlay size, 50-200 in steps of 5 (`snap_scale`).
+
+    `hint(p)` names what p means on screen ("48 px icons", "12 pt") and is
+    redrawn as the slider moves. `on_commit()` fires on button/key release
+    when the value moved, so a drag is one write; `on_move(p)`, when given,
+    fires on every 5 % step of a drag or key, for a live preview. Returns `(scale,
+    var)`: `var` is the IntVar holding the snapped value. `label_sink`, when
+    given a list, receives the three labels so a caller can grey them with the
+    scale."""
+    var = tk.IntVar(value=snap_scale(int(initial)))
+    lbl = _field_label(parent, label, FONT_FORM_LABEL)
+    value_label = ttk.Label(parent, font=FONT_SMALL, foreground=THEME_COLORS["muted"],
+                            width=5, anchor="e")
+    hint_label = ttk.Label(parent, font=FONT_SMALL, foreground=THEME_COLORS["muted"])
+
+    def _show():
+        p = var.get()
+        value_label.configure(text=f"{p} %")
+        hint_label.configure(text=hint(p))
+
+    def _drag(raw):
+        p = snap_scale(round(float(raw)))
+        if p != var.get():
+            var.set(p)
+            _show()
+            if on_move is not None:
+                on_move(p)
+
+    scale = ttk.Scale(parent, from_=SCALE_MIN, to=SCALE_MAX, value=var.get(),
+                      orient="horizontal", length=length, command=_drag)
+    scale.pack(side="left", padx=(PAD_XS, 0))
+    value_label.pack(side="left")
+    hint_label.pack(side="left", padx=(PAD_XS, 0))
+
+    committed = [var.get()]
+
+    def _commit(_e=None):
+        scale.set(var.get())
+        if on_commit is not None and var.get() != committed[0]:
+            committed[0] = var.get()
+            on_commit()
+
+    def _key_to(p):
+        # ttk.Scale's own keys step by 1, which the 5 % snap rounds straight
+        # back; step a whole notch instead (the release commits it). A
+        # disabled scale's class bindings would refuse; these run first.
+        if scale.instate(["disabled"]) or snap_scale(p) == var.get():
+            return "break"
+        var.set(snap_scale(p))
+        scale.set(var.get())
+        _show()
+        if on_move is not None:
+            on_move(var.get())
+        return "break"
+
+    for seq, step in (("<Left>", -SCALE_STEP), ("<Up>", -SCALE_STEP),
+                      ("<Right>", SCALE_STEP), ("<Down>", SCALE_STEP)):
+        scale.bind(seq, lambda _e, d=step: _key_to(var.get() + d))
+    scale.bind("<Home>", lambda _e: _key_to(SCALE_MIN))
+
+    def _press(e):
+        # A trough click is the same 1-step increment: a notch toward the click.
+        if not scale.identify(e.x, e.y).endswith(("track", "trough")):
+            return None  # the slider: ttk's own drag
+        return _key_to(var.get() + (SCALE_STEP if scale.get(e.x, e.y) > var.get() else -SCALE_STEP))
+
+    scale.bind("<Button-1>", _press)
+    scale.bind("<End>", lambda _e: _key_to(SCALE_MAX))
+    scale.bind("<ButtonRelease-1>", _commit)
+    scale.bind("<KeyRelease>", _commit)
+    if tooltip:
+        add_tooltip(scale, tooltip)
+    if label_sink is not None:
+        label_sink.extend(w for w in (lbl, value_label, hint_label) if w is not None)
+    _show()
+    return scale, var
 
 
 def toggle_button_state(

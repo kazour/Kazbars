@@ -85,8 +85,9 @@ def _atomic_install(src, dst):
         raise
 
 
-def compile_to_staging(grids, database, assets_path, app_version, include_console=False, cast_config=None, stopwatch_config=None,
-                       inspect_config=None, panel_font_size=None, game_resolution=None):
+def compile_to_staging(grids, database, assets_path, app_version, cast_config=None, stopwatch_config=None,
+                       inspect_config=None, console_config=None, onslaught_config=None,
+                       overlay=None, anchor=None, game_resolution=None):
     """Compile KazBars.swf to a temp staging dir.
 
     Returns (staging_dir, result) where result is (success_bool, message).
@@ -104,11 +105,13 @@ def compile_to_staging(grids, database, assets_path, app_version, include_consol
         str(output_swf),
         app_version,
         assets_path=assets_path,
-        include_console=include_console,
         cast_config=cast_config,
         stopwatch_config=stopwatch_config,
         inspect_config=inspect_config,
-        panel_font_size=panel_font_size,
+        console_config=console_config,
+        onslaught_config=onslaught_config,
+        overlay=overlay,
+        anchor=anchor,
         game_resolution=game_resolution,
     )
     return staging_dir, result

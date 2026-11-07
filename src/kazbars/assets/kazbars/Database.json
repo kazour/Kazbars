@@ -134,7 +134,8 @@
     {
       "name": "Veil of the Unliving (Zaal)",
       "ids": [
-        5064067
+        5064067,
+        4752520
       ],
       "category": "#Raid T3.5",
       "type": "debuff"
@@ -3174,6 +3175,14 @@
       "type": "debuff"
     },
     {
+      "name": "Recently Struck by Grim Corruption",
+      "ids": [
+        3910716
+      ],
+      "category": "Assassin",
+      "type": "debuff"
+    },
+    {
       "name": "Consume (HathorKa)",
       "ids": [
         4206340
@@ -3382,6 +3391,22 @@
         5014793
       ],
       "category": "#Raid T5",
+      "type": "debuff"
+    },
+    {
+      "name": "Sacred Fire",
+      "ids": [
+        3241838
+      ],
+      "category": "Priest of Mitra",
+      "type": "debuff"
+    },
+    {
+      "name": "Purifying Light",
+      "ids": [
+        198167
+      ],
+      "category": "Priest of Mitra",
       "type": "debuff"
     },
     {
@@ -3623,10 +3648,10 @@
     {
       "name": "Corrupted Claws Wrack 1-4 (Yah Chieng)",
       "ids": [
-        4704444,
-        4704445,
+        4704447,
         4704446,
-        4704447
+        4704445,
+        4704444
       ],
       "category": "#Raid T4",
       "type": "debuff",

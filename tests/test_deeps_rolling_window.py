@@ -25,7 +25,6 @@ def at(ms: int) -> float:
 def test_empty_returns_zero() -> None:
     w = RollingWindow(capacity_seconds=20.0)
     assert w.sum_since(at(0), 3.0) == 0
-    assert w.count_since(at(0), 3.0) == 0
     assert w.first_event() is None
 
 
@@ -33,7 +32,6 @@ def test_single_event_within_window() -> None:
     w = RollingWindow(capacity_seconds=20.0)
     w.record(at(0), 100)
     assert w.sum_since(at(1000), 3.0) == 100
-    assert w.count_since(at(1000), 3.0) == 1
 
 
 def test_event_outside_window_excluded() -> None:
@@ -49,7 +47,6 @@ def test_multiple_events_summed() -> None:
     w.record(at(1000), 20)
     w.record(at(2000), 30)
     assert w.sum_since(at(2500), 3.0) == 60
-    assert w.count_since(at(2500), 3.0) == 3
 
 
 def test_pruning_drops_old_events() -> None:

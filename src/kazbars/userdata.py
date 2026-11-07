@@ -15,9 +15,12 @@ Layout::
     userdata/
       prefs.json                     ← machine-local prefs (schema in prefs.py)
       prefs3_snapshot.xml            ← Prefs_3.xml copy, insurance for Repair
-      profiles/*.json                ← profile documents (identity = in-doc id)
-        *.json.bak                   ← per-profile session-start snapshots
-        trash/                       ← deleted profiles, pruned to the 10 newest
+      profile.yml                    ← the profile document (autosaved)
+      profile.yml.bak                ← its session-start snapshot (Revert, and
+                                       the fallback when profile.yml is damaged)
+      profile.damaged.yml            ← only after that fallback: the file set aside
+      profiles/*.json                ← a 3.1 library, read once by the adopt step,
+                                       never written
       database_user.json             ← user buff deltas (seeded empty; Phase 3)
       content/                       ← OTA reference content (Phase 4)
         .bak/                        ← OTA rollback snapshots (Phase 4)
@@ -54,8 +57,16 @@ def profiles_dir() -> Path:
     return userdata_root() / "profiles"
 
 
-def profiles_trash_dir() -> Path:
-    return profiles_dir() / "trash"
+def profile_path() -> Path:
+    return userdata_root() / "profile.yml"
+
+
+def profile_bak_path() -> Path:
+    return userdata_root() / "profile.yml.bak"
+
+
+def profile_damaged_path() -> Path:
+    return userdata_root() / "profile.damaged.yml"
 
 
 def database_user_path() -> Path:
@@ -97,8 +108,6 @@ def ensure_layout() -> None:
     try:
         for d in (
             userdata_root(),
-            profiles_dir(),
-            profiles_trash_dir(),
             content_dir(),
             content_backup_dir(),
         ):

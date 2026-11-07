@@ -19,6 +19,7 @@ from kazbars import (
     buff_xml,
     build_action,
     cast_timer,
+    console,
     content_update,
     damageinfo_settings,
     deeps_settings,
@@ -26,6 +27,8 @@ from kazbars import (
     grid_model,
     inspect,
     live_tracker_settings,
+    onslaught,
+    overlay,
     profile_io,
     stopwatch,
     update_orchestrator,
@@ -36,6 +39,7 @@ from kazbars.buff_database import BuffDatabase
 from kazbars.buff_db_layers import DeltaStore
 from kazbars.custom_menu_bar import CustomMenuBar
 from kazbars.database_editor import DatabaseEditorTab
+from kazbars.extras_dialog import raise_if_open
 from kazbars.first_launch import run_first_launch
 from kazbars.focus_watcher import ForegroundWatcher
 from kazbars.game_resolution import change_game_resolution
@@ -45,7 +49,6 @@ from kazbars.live_tracker_panel import LiveTrackerPanel
 from kazbars.paths import APP_ICON, ASSETS, KAZBARS_ASSETS, app_path
 from kazbars.prefs import PREFS_SCHEMA
 from kazbars.profile_document import SectionRegistry
-from kazbars.profile_library import ProfileLibrary
 from kazbars.settings_core import Store
 from kazbars.settings_manager import init_settings
 from kazbars.ui_components import (
@@ -73,7 +76,6 @@ from kazbars.ui_widgets import (
 from kazbars.userdata import (
     database_user_path,
     ensure_layout,
-    profiles_dir,
     userdata_root,
 )
 from kazbars.window_position import bind_window_position_save, restore_window_position
@@ -93,7 +95,9 @@ class KazBarsApp(ttkb.Window):
         super().__init__(themename="darkly", iconphoto=None)
         self.withdraw()
 
-        self.title(f"{APP_NAME} — Untitled")
+        # Just the app: there is one profile, and its name (kept in the
+        # document, used by exports and toasts) has nowhere to be changed.
+        self.title(APP_NAME)
         self.iconname(APP_NAME)
         try:
             # default= : every Toplevel (dialogs included) inherits it.
@@ -109,7 +113,6 @@ class KazBarsApp(ttkb.Window):
         self.assets_path = ASSETS
 
         ensure_layout()
-        self.profiles_path = profiles_dir()
 
         # Machine-local prefs (prefs.json) via the strict settings_core engine.
         self.settings = Store(PREFS_SCHEMA, userdata_root())
@@ -133,6 +136,7 @@ class KazBarsApp(ttkb.Window):
         # only app.py collects them.
         self.registry = SectionRegistry()
         self.registry.register(grid_model.PROFILE_SECTION)
+        self.registry.register(overlay.PROFILE_SECTION)
         self.registry.register(live_tracker_settings.PROFILE_SECTION)
         self.registry.register(deeps_settings.PROFILE_SECTION)
         # The three baked extras: this registration order is the document's
@@ -143,12 +147,12 @@ class KazBarsApp(ttkb.Window):
         self.registry.register(inspect.PROFILE_SECTION)
         self.registry.register(cast_timer.PROFILE_SECTION)
         self.registry.register(damageinfo_settings.PROFILE_SECTION)
+        self.registry.register(console.PROFILE_SECTION)
+        self.registry.register(onslaught.PROFILE_SECTION)
         # The XML editors' sparse PATCH-lane overrides — never dispatched on
-        # profile switch (profile_io.apply_document only touches BUILD/LIVE).
+        # profile load or import (profile_io.apply_document only touches BUILD/LIVE).
         self.registry.register(damageinfo_settings.DAMAGE_COLORS_SECTION)
         self.registry.register(buff_xml.PROFILE_SECTION)
-        self.library = ProfileLibrary(
-            self.profiles_path, self.registry, profile_io.template_paths(self))
 
         # State
         self.app_version = APP_VERSION
@@ -164,6 +168,8 @@ class KazBarsApp(ttkb.Window):
         self.stopwatch_dialog = None
         self.inspect_dialog = None
         self.cast_timer_dialog = None
+        self.console_dialog = None
+        self.onslaught_dialog = None
 
         # One shared focus gate for every overlay: hides them whenever neither
         # KazBars nor AoC owns the foreground window. Overlays register on
@@ -191,7 +197,7 @@ class KazBarsApp(ttkb.Window):
         # Protocol
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
-        # Open the startup profile (active_profile pref → newest → seed).
+        # Open the profile (profile.yml → its .bak → a 3.1 library → seed).
         # Must precede deiconify() — see profile_io.apply_document.
         profile_io.startup_profile(self)
 
@@ -254,7 +260,10 @@ class KazBarsApp(ttkb.Window):
 
             tab_color = self.nav_colors[view_name]
             dim_color = blend_alpha(tab_color, TK_COLORS['bg'], 30)
-            underline = tk.Canvas(btn_frame, height=1, highlightthickness=0,
+            # BOTH sizes must be explicit — the Tk default is 378x265, and
+            # fill='x' stretches the rendered canvas without shrinking what
+            # it asks btn_frame for (same class as the grid card's stripe).
+            underline = tk.Canvas(btn_frame, width=1, height=1, highlightthickness=0,
                                   bg=dim_color)
             underline.pack(fill='x')
 
@@ -309,6 +318,14 @@ class KazBarsApp(ttkb.Window):
 
         # Instructions view
         self.instructions_panel = InstructionsPanel(self.content_frame)
+
+        # The extras tiles and the "In game" row above them own the bottom strip
+        # of the Grids tab, which is where toasts stack — lift them clear of
+        # both, so a Build & Install toast can't cover the build-status line the
+        # same action just refreshed. Unmapped on the other two tabs, so the
+        # guard costs nothing there.
+        self.toast.set_bottom_guard(self.grids_panel.extras_row,
+                                    self.grids_panel.build_status_lbl)
 
         # Show default view — set initial underlines directly (canvas not mapped yet)
         self.grids_panel.pack(fill='both', expand=True)
@@ -389,11 +406,7 @@ class KazBarsApp(ttkb.Window):
 
         self._auto_update_var = tk.BooleanVar(value=bool(self.settings.get('auto_update_content', True)))
 
-        # The File menu is rebuilt in place by _refresh_file_menu — the menu bar
-        # re-reads the list on every dropdown open, so the profile rows stay
-        # current without menu-widget surgery.
-        self._file_menu_def = self._menubar.add_cascade(label="File", menu_def=[])
-        self._refresh_file_menu()
+        self._build_file_menu()
         self._menubar.add_cascade(label="Game", menu_def=[
             {'type': 'command', 'label': 'Change game folder…',
              'command': self._change_game_folder},
@@ -422,10 +435,14 @@ class KazBarsApp(ttkb.Window):
             {'type': 'separator'},
             {'type': 'command', 'label': 'Cast timer…',
              'command': self._open_cast_timer_settings},
+            {'type': 'command', 'label': 'Console…',
+             'command': self._open_console_settings},
             {'type': 'command', 'label': 'Damage number mod…',
              'command': self._open_damage_numbers},
             {'type': 'command', 'label': 'Inspect panel…',
              'command': self._open_inspect_settings},
+            {'type': 'command', 'label': 'Onslaught tracker…',
+             'command': self._open_onslaught_settings},
             {'type': 'command', 'label': 'Stopwatch…',
              'command': self._open_stopwatch_settings},
         ])
@@ -442,54 +459,41 @@ class KazBarsApp(ttkb.Window):
 
         # Keyboard shortcuts. Ctrl+S is muscle memory — under autosave it just
         # flushes the pending write and confirms.
-        self.bind_all('<Control-n>', self._hotkey(self._new_profile))
         self.bind_all('<Control-s>', self._hotkey(self._save_now))
         self.bind_all('<Control-b>', self._hotkey(self._build))
 
-    def _refresh_file_menu(self):
-        """Rebuild the File menu_def in place: one row per library profile
-        (● marks the active one), then the lifecycle commands."""
-        d = self._file_menu_def
-        d.clear()
-        active = self.profile_store.document['id'] if self.profile_store else None
-        d.append({'type': 'header', 'label': 'Profiles'})
-        for _path, doc in self.library.list_profiles():
-            marker = '●  ' if doc['id'] == active else '    '
-            d.append({'type': 'command', 'label': f"{marker}{doc['name']}",
-                      'command': lambda pid=doc['id']: profile_io.switch_profile(self, pid)})
-        d.extend([
-            {'type': 'separator'},
-            {'type': 'command', 'label': 'New profile', 'accelerator': 'Ctrl+N',
-             'command': self._new_profile},
-            {'type': 'command', 'label': 'New from template',
-             'command': self._new_from_template},
-            {'type': 'command', 'label': 'Duplicate profile',
-             'command': self._duplicate_profile},
-            {'type': 'separator'},
-            {'type': 'command', 'label': 'Rename profile…',
-             'command': self._rename_profile},
-            {'type': 'command', 'label': 'Delete profile…',
-             'command': self._delete_profile},
-            {'type': 'command', 'label': 'Revert to session start',
-             'command': self._revert_profile},
-            {'type': 'separator'},
+    def _build_file_menu(self):
+        """The File menu: the one profile's export, import, reset and revert,
+        a grids file's import, the data folder, Exit."""
+        self._menubar.add_cascade(label="File", menu_def=[
             {'type': 'command', 'label': 'Export profile…',
              'command': self._export_profile},
             {'type': 'command', 'label': 'Import profile…',
              'command': self._import_profile},
-            {'type': 'command', 'label': 'Open profiles folder',
-             'command': self._open_profiles_folder},
+            {'type': 'command', 'label': 'Import grid…',
+             'command': self._import_grid},
+            {'type': 'separator'},
+            {'type': 'command', 'label': 'Reset profile to defaults…',
+             'command': self._reset_profile},
+            {'type': 'command', 'label': 'Revert to session start',
+             'command': self._revert_profile},
+            {'type': 'separator'},
+            {'type': 'command', 'label': 'Open data folder',
+             'command': self._open_data_folder},
             {'type': 'separator'},
             {'type': 'command', 'label': 'Exit',
              'command': self._on_close},
         ])
 
     def _hotkey(self, fn):
-        """Wrap a bind_all shortcut handler: shortcuts bypass the build modal's
-        grab (menu items are already blocked by it), so swallow them while a
-        build is running."""
+        """Wrap a bind_all shortcut handler: shortcuts bypass a modal's grab
+        (menu items are already blocked by it), so swallow them while a build
+        runs or any dialog holds the grab — Ctrl+B under Grid Settings would
+        build while the dialog still holds the card's draft."""
         def handler(_event):
-            if not self._building:
+            # The grab as Tcl names it: grab_current() can't name a combobox
+            # popdown's grab (KeyError) — any holder at all is enough here.
+            if not self._building and not self.tk.call('grab', 'current'):
                 fn()
         return handler
 
@@ -513,9 +517,12 @@ class KazBarsApp(ttkb.Window):
         }
         views[view_name].pack(fill='both', expand=True)
 
+        # A toast raised before the switch is still on screen and still placed
+        # against the old tab's bottom guards — re-place it against this one's.
+        self.toast.relayout()
+
         # Refresh database list when switching to it (grid usage may have changed)
         if view_name == 'database':
-            self.grids_panel.save_settings()
             self.db_panel.refresh_list()
 
         # Animate nav underlines
@@ -623,6 +630,16 @@ class KazBarsApp(ttkb.Window):
         from .cast_timer_panel import open_cast_timer_dialog
         open_cast_timer_dialog(self)
 
+    def _open_onslaught_settings(self):
+        """Open the Onslaught Tracker settings dialog (Extras ▸ Onslaught tracker…)."""
+        from .onslaught_panel import open_onslaught_dialog
+        open_onslaught_dialog(self)
+
+    def _open_console_settings(self):
+        """Open the in-game Console settings dialog (Extras ▸ Console…)."""
+        from .console_panel import open_console_dialog
+        open_console_dialog(self)
+
     def _open_backup_dialog(self):
         """Open the Backup & Restore settings dialog."""
         from .settings_backup import open_backup_dialog
@@ -682,7 +699,11 @@ class KazBarsApp(ttkb.Window):
     # ========================================================================
     def _check_unsaved_db_changes(self):
         """Exit guard for the buff-DB editor's own dirty state (the profile
-        autosaves and has no dirty state). True = safe to proceed."""
+        autosaves and has no dirty state). True = safe to proceed.
+
+        The editor writes every change as it happens, so `modified` is only ever
+        True here after a write that failed — this is the retry, not the routine
+        save prompt it used to be."""
         if not self.db_panel.modified:
             return True
         dialog = MessageDialog(
@@ -691,8 +712,7 @@ class KazBarsApp(ttkb.Window):
             buttons=['Cancel:secondary', "Don't save:secondary", 'Save:primary'])
         dialog.show()
         if dialog.result == "Save":
-            self.db_panel.save()
-            return not self.db_panel.modified
+            return self.db_panel.save()
         return dialog.result == "Don't save"
 
     def _on_grids_edited(self):
@@ -713,46 +733,33 @@ class KazBarsApp(ttkb.Window):
         if self.profile_store:
             self.profile_store.set_section('deeps', data)
 
-    def _update_title(self):
-        """Window title = app + active profile name (no dirty marker — the
-        profile autosaves)."""
-        name = self.profile_store.document['name'] if self.profile_store else "…"
-        self.title(f"{APP_NAME} — {name}")
-
     def _save_now(self):
-        """Ctrl+S: mirror the grid cards into the store (a field mid-typing
-        hasn't fired on_change yet — only arrows/focus-out do), flush, confirm."""
+        """Ctrl+S: mirror the grid cards into the store, flush, confirm."""
         if self.profile_store:
             self._on_grids_edited()
             if self.profile_store.flush():
                 self.toast.show("Profile saved", style='success', duration=2)
 
-    def _new_profile(self):
-        return profile_io.new_blank_profile(self)
-
-    def _new_from_template(self):
-        return profile_io.new_from_template(self)
-
-    def _duplicate_profile(self):
-        return profile_io.duplicate_current(self)
-
-    def _rename_profile(self):
-        return profile_io.rename_current(self)
-
-    def _delete_profile(self):
-        return profile_io.delete_current(self)
-
     def _revert_profile(self):
         return profile_io.revert_session(self)
 
-    def _open_profiles_folder(self):
-        return profile_io.open_profiles_folder(self)
+    def _reset_profile(self):
+        return profile_io.reset_to_defaults(self)
+
+    def _open_data_folder(self):
+        return profile_io.open_data_folder(self)
 
     def _export_profile(self):
         return profile_io.export_profile(self)
 
     def _import_profile(self):
         return profile_io.import_profile(self)
+
+    def _import_grid(self):
+        """File ▸ Import grid…: the grids land on the current class tab, and the
+        Grids view comes up so they are seen."""
+        if profile_io.import_grids(self):
+            self._switch_view('grids')
 
     # ========================================================================
     # BUILD PIPELINE
@@ -762,16 +769,8 @@ class KazBarsApp(ttkb.Window):
 
     def _show_about(self):
         """Show the About dialog (single-instance — focus existing if alive)."""
-        existing = getattr(self, '_about_popup', None)
-        if existing is not None:
-            try:
-                if existing.winfo_exists():
-                    existing.deiconify()
-                    existing.lift()
-                    existing.focus_set()
-                    return
-            except tk.TclError:
-                pass
+        if raise_if_open(getattr(self, '_about_popup', None)):
+            return
         self._about_popup = show_about_popup(self, APP_NAME, APP_VERSION)
 
     # ========================================================================
