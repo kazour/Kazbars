@@ -40,10 +40,10 @@ logger = logging.getLogger(__name__)
 def template_paths(app):
     """The template chain, best first: OTA content (only while it's active —
     active_content_dir() yields to stock when an app upgrade has moved the
-    baseline past it), then the shipped stock Default.json."""
+    baseline past it), then the shipped stock Default.yml."""
     active_content = content_update.active_content_dir()
-    paths = [active_content / 'Default.json'] if active_content else []
-    paths.append(app.assets_path / 'kazbars' / 'Default.json')
+    paths = [active_content / 'Default.yml'] if active_content else []
+    paths.append(app.assets_path / 'kazbars' / 'Default.yml')
     return tuple(paths)
 
 

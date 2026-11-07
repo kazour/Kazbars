@@ -46,7 +46,7 @@ def _manifest(version=2, min_app="2.0.0", files=None, payloads=None):
 
 
 def _payloads(db=b'{"version":2,"buffs":[]}', default=b"{}"):
-    return {"Database.json": db, "Default.json": default}
+    return {"Database.json": db, "Default.yml": default}
 
 
 # --------------------------------------------------------------------------- #
@@ -139,7 +139,7 @@ def test_apply_first_update_then_rollback_clears(tmp_path):
     result = C.apply_content(content, _manifest(version=5), _payloads())
     assert result["content_version"] == 5
     assert (content / "Database.json").exists()
-    assert (content / "Default.json").exists()
+    assert (content / "Default.yml").exists()
     assert json.loads((content / "manifest.json").read_text())["content_version"] == 5
     # prev/ recorded the (absent) prior state, so revert clears content/ entirely.
     assert C.rollback(content) is True
@@ -167,7 +167,7 @@ def test_half_applied_prior_not_snapshotted(tmp_path):
     content = tmp_path / "content"
     p5 = _payloads(db=b"DB5", default=b"DEF5")
     C.apply_content(content, _manifest(version=5, payloads=p5), p5)
-    # Simulate a half-applied v6: Database.json already swapped, Default.json +
+    # Simulate a half-applied v6: Database.json already swapped, Default.yml +
     # marker still read v5 (the second replace / marker write never happened).
     (content / "Database.json").write_bytes(b"DB6")
     assert not C._is_consistent(content)               # {DB6, DEF5, marker v5}
@@ -178,7 +178,7 @@ def test_half_applied_prior_not_snapshotted(tmp_path):
     # Revert clears to the floor — the half state was never a rollback target.
     assert C.rollback(content) is True
     assert not (content / "Database.json").exists()
-    assert not (content / "Default.json").exists()
+    assert not (content / "Default.yml").exists()
     assert C._applied_version(content) == C.CONTENT_BASELINE_VERSION
 
 
@@ -316,7 +316,7 @@ def test_worker_applies_remerges_and_persists(tmp_path, monkeypatch):
     version = C.CONTENT_BASELINE_VERSION
     manifest = _manifest(version=version, files={
         "Database.json": {"url": "http://x/db", "sha256": hashlib.sha256(new_db).hexdigest()},
-        "Default.json": {"url": "http://x/def", "sha256": hashlib.sha256(default_payload).hexdigest()},
+        "Default.yml": {"url": "http://x/def", "sha256": hashlib.sha256(default_payload).hexdigest()},
     })
     by_url = {C.MANIFEST_URL: json.dumps(manifest).encode(),
               "http://x/db": new_db, "http://x/def": default_payload}
@@ -355,7 +355,7 @@ def test_apply_picks_up_immediately_even_after_a_stale_boot(tmp_path, monkeypatc
     default_payload = b"{}"
     manifest = _manifest(version=C.CONTENT_BASELINE_VERSION, files={
         "Database.json": {"url": "http://x/db", "sha256": hashlib.sha256(new_db).hexdigest()},
-        "Default.json": {"url": "http://x/def", "sha256": hashlib.sha256(default_payload).hexdigest()},
+        "Default.yml": {"url": "http://x/def", "sha256": hashlib.sha256(default_payload).hexdigest()},
     })
     by_url = {C.MANIFEST_URL: json.dumps(manifest).encode(),
               "http://x/db": new_db, "http://x/def": default_payload}

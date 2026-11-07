@@ -23,6 +23,7 @@ import json
 import logging
 from pathlib import Path
 
+from . import yaml_io
 from .overlay import size_for_height
 from .profile_document import (
     DocumentError,
@@ -31,7 +32,7 @@ from .profile_document import (
     new_document,
     validate_document,
 )
-from .profile_share import slugify
+from .profile_share import parse_profile_file, slugify
 from .settings_manager import safe_save_json
 
 logger = logging.getLogger(__name__)
@@ -71,8 +72,11 @@ class ProfileLibrary:
     def _read_doc(self, path: Path) -> dict | None:
         """One file through the gate, or None (corrupt/old/foreign → skip)."""
         try:
-            raw = json.loads(path.read_text(encoding='utf-8'))
-        except (json.JSONDecodeError, UnicodeDecodeError, OSError) as e:
+            text = path.read_text(encoding='utf-8')
+            # A library entry is a bare JSON document; the template a YAML file.
+            raw = (json.loads(text) if path.suffix == '.json'
+                   else parse_profile_file(yaml_io.loads(text))[0])
+        except (ValueError, UnicodeDecodeError, OSError) as e:  # JSON/YAML errors are ValueErrors
             logger.debug('Skipping unreadable profile %s: %s', path.name, e)
             return None
         try:

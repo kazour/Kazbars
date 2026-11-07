@@ -35,7 +35,7 @@ REPO = Path(__file__).resolve().parent.parent
 STOCK = REPO / "src" / "kazbars" / "assets" / "kazbars"
 INIT = REPO / "src" / "kazbars" / "__init__.py"
 MANIFEST = REPO / "ota" / "manifest.json"
-FILES = ("Database.json", "Default.json")
+FILES = ("Database.json", "Default.yml")
 # Pinned to the main ref, not a commit SHA: a single content commit can't name
 # its own future SHA, and the client trusts the sha256 below regardless.
 RAW_URL = "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/{name}"

@@ -75,7 +75,7 @@
 | `src/kazbars/prefs.py` | 224 |
 | `src/kazbars/profile_document.py` | 345 |
 | `src/kazbars/profile_io.py` | 328 |
-| `src/kazbars/profile_library.py` | 289 |
+| `src/kazbars/profile_library.py` | 293 |
 | `src/kazbars/profile_share.py` | 174 |
 | `src/kazbars/profile_store.py` | 130 |
 | `src/kazbars/self_update.py` | 487 |
@@ -118,7 +118,7 @@
 | `tests/test_damageinfo_colors_panel.py` | 293 |
 | `tests/test_damageinfo_generator.py` | 208 |
 | `tests/test_damageinfo_settings.py` | 338 |
-| `tests/test_data_integrity.py` | 121 |
+| `tests/test_data_integrity.py` | 125 |
 | `tests/test_deeps_meter.py` | 469 |
 | `tests/test_deeps_overlay.py` | 374 |
 | `tests/test_deeps_parsers.py` | 544 |

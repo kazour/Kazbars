@@ -27,8 +27,8 @@ def test_template_chain_order(monkeypatch, tmp_path):
     # No OTA content/ at all yet — active_content_dir() falls back to the
     # shipped baseline, which meets itself, so the entry is still included.
     assert chain == (
-        tmp_path / "userdata" / "content" / "Default.json",
-        Path("A:/assets/kazbars/Default.json"),
+        tmp_path / "userdata" / "content" / "Default.yml",
+        Path("A:/assets/kazbars/Default.yml"),
     )
 
 
@@ -47,7 +47,7 @@ def test_template_chain_drops_a_stale_content_entry(monkeypatch, tmp_path):
     chain = profile_io.template_paths(app)
 
     assert chain == (
-        Path("A:/assets/kazbars/Default.json"),
+        Path("A:/assets/kazbars/Default.yml"),
     )
 
 

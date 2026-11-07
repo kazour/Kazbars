@@ -3,7 +3,7 @@
 On launch the app polls a published manifest; if it advertises a newer
 ``content_version`` than the client holds (``prefs.json.content_version``), the
 running app is new enough (``min_app_version``), and the auto-update toggle is
-on, this downloads the pinned ``Database.json`` + ``Default.json`` payloads,
+on, this downloads the pinned ``Database.json`` + ``Default.yml`` payloads,
 verifies sha256, **atomically** swaps them into ``userdata/content/`` with a
 ``.bak/`` rollback, re-merges the live DB, and shows **one** toast. Anything that
 fails swaps nothing. It never applies while the DB editor has unsaved edits or a
@@ -53,7 +53,7 @@ RELEASES_URL = "https://github.com/kazour/Kazbars/releases/latest"
 DOWNLOAD_TIMEOUT = 8
 MANIFEST_NAME = "manifest.json"
 # The reference files OTA manages in content/ (snapshot + rollback cover these).
-CONTENT_FILES = ("Database.json", "Default.json")
+CONTENT_FILES = ("Database.json", "Default.yml")
 
 
 # =========================================================================== #
