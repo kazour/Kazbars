@@ -50,7 +50,7 @@
 | `src/kazbars/foreground.py` | 111 |
 | `src/kazbars/game_folder.py` | 430 |
 | `src/kazbars/game_persistence.py` | 608 |
-| `src/kazbars/game_resolution.py` | 160 |
+| `src/kazbars/game_resolution.py` | 163 |
 | `src/kazbars/grid_dialogs.py` | 794 |
 | `src/kazbars/grid_editor_panel.py` | 620 |
 | `src/kazbars/grid_model.py` | 444 |
@@ -86,8 +86,8 @@
 | `src/kazbars/swf_font.py` | 302 |
 | `src/kazbars/timer_overlay.py` | 372 |
 | `src/kazbars/ui_collapsible.py` | 232 |
-| `src/kazbars/ui_components.py` | 677 |
-| `src/kazbars/ui_forms.py` | 548 |
+| `src/kazbars/ui_components.py` | 683 |
+| `src/kazbars/ui_forms.py` | 565 |
 | `src/kazbars/ui_headers.py` | 197 |
 | `src/kazbars/ui_helpers.py` | 203 |
 | `src/kazbars/ui_tk_style.py` | 67 |
@@ -146,7 +146,7 @@
 | `tests/test_overlay_rung.py` | 145 |
 | `tests/test_overlay_size.py` | 226 |
 | `tests/test_panel_ratios.py` | 162 |
-| `tests/test_panels_construct.py` | 1775 |
+| `tests/test_panels_construct.py` | 1778 |
 | `tests/test_prefs.py` | 76 |
 | `tests/test_prefs_migration.py` | 68 |
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |
@@ -164,7 +164,7 @@
 | `tests/test_subprocess_flags.py` | 88 |
 | `tests/test_swf_font.py` | 320 |
 | `tests/test_timer_sizing.py` | 41 |
-| `tests/test_toast_model.py` | 277 |
+| `tests/test_toast_model.py` | 286 |
 | `tests/test_toggle_button_state.py` | 41 |
 | `tests/test_update_check.py` | 83 |
 | `tests/test_update_orchestrator.py` | 226 |

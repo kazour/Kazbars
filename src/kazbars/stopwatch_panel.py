@@ -127,7 +127,7 @@ def open_stopwatch_dialog(app):
     base = app.profile_store.get_section('overlay')['size']
     size_row = ttk.Frame(size_card)
     size_row.pack(anchor='w')
-    size_scale, size_var, _ = size_slider(
+    size_scale, size_var = size_slider(
         size_row, cfg['scale'], lambda p: f"{panel_fs(base, p)} pt text",
         tooltip="A percent of the overlay size (Overlay, top of the Grids tab). "
                 "The whole panel scales with it, collapsed bar included.",

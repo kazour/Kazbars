@@ -295,8 +295,14 @@ class ToastManager:
         """Keep the toast stack clear of whatever is pinned to the parent's
         bottom edge — on the Grids tab, the extras tiles and the "In game" row
         stacked above them. Read live in `_bottom_inset`, never cached: the same
-        strip is empty on the other tabs, where those widgets are unmapped."""
+        strip is empty on the other tabs, where those widgets are unmapped.
+        A guard that resizes (the "In game" row appearing, the tiles rewrapping)
+        re-places the toasts on screen."""
         self._bottom_guards = widgets
+        for guard in widgets:
+            if guard is not None:
+                guard.bind('<Configure>',
+                           lambda _e: self._model.visible and self._layout(), add='+')
 
     def relayout(self):
         """Re-place live toasts after something outside the stack moved — a tab

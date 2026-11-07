@@ -50,12 +50,11 @@ def change_game_resolution(app):
         options.insert(0, current)
 
     dialog = tk.Toplevel(app)
+    dialog.withdraw()
     dialog.title("Game Resolution")
     dialog.resizable(False, False)
     dialog.transient(app)
     dialog.grab_set()
-
-    center_on_parent(dialog, app, 380, 330)
 
     create_dialog_header(dialog, "Game Resolution",
                          MODULE_COLORS['grids'], width=380)
@@ -131,13 +130,17 @@ def change_game_resolution(app):
 
     ttk.Button(btns, text="Apply", bootstyle="success",
                command=_apply, width=BTN_SMALL).pack(side='right')
-    ttk.Button(btns, text="Cancel", bootstyle="secondary",
-               command=dialog.destroy, width=BTN_SMALL
-               ).pack(side='right', padx=(0, PAD_XS))
+    cancel_btn = ttk.Button(btns, text="Cancel", bootstyle="secondary",
+                            command=dialog.destroy, width=BTN_SMALL)
+    cancel_btn.pack(side='right', padx=(0, PAD_XS))
+
+    center_on_parent(dialog, app, 380, max(330, dialog.winfo_reqheight()))
+    dialog.deiconify()
 
     dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
     dialog.bind('<Escape>', lambda e: dialog.destroy())
-    dialog.bind('<Return>', lambda e: _apply())
+    # Enter applies, except on the focused Cancel button.
+    dialog.bind('<Return>', lambda e: dialog.destroy() if e.widget is cancel_btn else _apply())
     res_combo.focus_set()
 
 

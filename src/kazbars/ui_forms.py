@@ -161,7 +161,7 @@ def position_entry(
 
     Spinbox stepping doesn't fit thousands of pixels, so this is a plain Entry
     that key-validates to int (allowing transient '' / '-') and clamps to
-    [lo, hi] on focus-out. `on_change`, if given, fires after the clamp. Returns
+    [lo, hi] on focus-out (a field left empty gets its last good value back). `on_change`, if given, fires after the clamp. Returns
     the Entry so callers can grey it when disabled.
     """
     lbl = None
@@ -187,15 +187,27 @@ def position_entry(
     )
     entry.pack(side="left", padx=padx)
 
+    last = None  # the field's last good value: a field left empty gets it back
+
+    def _remember(_evt=None):
+        nonlocal last
+        try:
+            last = int(var.get())
+        except (ValueError, tk.TclError):
+            pass
+
     def _clamp(_evt=None):
         try:
             v = int(var.get())
         except (ValueError, tk.TclError):
-            v = lo
+            v = lo if last is None else last
         var.set(str(max(lo, min(hi, v))))
+        _remember()
         if on_change is not None:
             on_change()
 
+    _remember()
+    entry.bind("<FocusIn>", _remember, add="+")
     entry.bind("<FocusOut>", _clamp)
     if tooltip:
         add_tooltip(entry, tooltip)
@@ -445,11 +457,10 @@ def size_slider(parent, initial, hint, on_commit=None, *, label="Size:", length=
     `hint(p)` names what p means on screen ("48 px icons", "12 pt") and is
     redrawn as the slider moves. `on_commit()` fires on button/key release
     when the value moved, so a drag is one write; `on_move(p)`, when given,
-    fires on every 5 % step of a drag or key, for a live preview. Returns `(scale, var,
-    refresh)`: `var` is the IntVar holding the snapped value; after setting it
-    (a profile load) or when the overlay size changes under it, call
-    `refresh()` to move the thumb and redraw. `label_sink`, when given a list,
-    receives the three labels so a caller can grey them with the scale."""
+    fires on every 5 % step of a drag or key, for a live preview. Returns `(scale,
+    var)`: `var` is the IntVar holding the snapped value. `label_sink`, when
+    given a list, receives the three labels so a caller can grey them with the
+    scale."""
     var = tk.IntVar(value=snap_scale(int(initial)))
     lbl = None
     if label is not None:  # None: the caller lays out its own label (a form grid)
@@ -482,11 +493,6 @@ def size_slider(parent, initial, hint, on_commit=None, *, label="Size:", length=
 
     committed = [var.get()]
 
-    def refresh():
-        committed[0] = var.get()
-        scale.set(committed[0])
-        _show()
-
     def _commit(_e=None):
         scale.set(var.get())
         if on_commit is not None and var.get() != committed[0]:
@@ -495,7 +501,10 @@ def size_slider(parent, initial, hint, on_commit=None, *, label="Size:", length=
 
     def _key_to(p):
         # ttk.Scale's own keys step by 1, which the 5 % snap rounds straight
-        # back; step a whole notch instead (the release commits it).
+        # back; step a whole notch instead (the release commits it). A
+        # disabled scale's class bindings would refuse; these run first.
+        if scale.instate(["disabled"]):
+            return "break"
         var.set(snap_scale(p))
         scale.set(var.get())
         _show()
@@ -507,6 +516,14 @@ def size_slider(parent, initial, hint, on_commit=None, *, label="Size:", length=
                       ("<Right>", SCALE_STEP), ("<Down>", SCALE_STEP)):
         scale.bind(seq, lambda _e, d=step: _key_to(var.get() + d))
     scale.bind("<Home>", lambda _e: _key_to(SCALE_MIN))
+
+    def _press(e):
+        # A trough click is the same 1-step increment: a notch toward the click.
+        if not scale.identify(e.x, e.y).endswith(("track", "trough")):
+            return None  # the slider: ttk's own drag
+        return _key_to(var.get() + (SCALE_STEP if scale.get(e.x, e.y) > var.get() else -SCALE_STEP))
+
+    scale.bind("<Button-1>", _press)
     scale.bind("<End>", lambda _e: _key_to(SCALE_MAX))
     scale.bind("<ButtonRelease-1>", _commit)
     scale.bind("<KeyRelease>", _commit)
@@ -515,7 +532,7 @@ def size_slider(parent, initial, hint, on_commit=None, *, label="Size:", length=
     if label_sink is not None:
         label_sink.extend(w for w in (lbl, value_label, hint_label) if w is not None)
     _show()
-    return scale, var, refresh
+    return scale, var
 
 
 def toggle_button_state(

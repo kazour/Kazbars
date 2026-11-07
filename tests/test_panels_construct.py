@@ -358,6 +358,9 @@ def test_size_slider_keys_step_a_notch(app):
             assert fire(f'<{key}>') == 'break', key
             fire('<KeyRelease>')
             assert (dlg.scale_var.get(), round(float(scale.get()))) == (want, want), key
+        scale.state(['disabled'])
+        assert fire('<Right>') == 'break'
+        assert dlg.scale_var.get() == 50, "a greyed slider's keys change nothing"
     finally:
         dlg.cancel()
 

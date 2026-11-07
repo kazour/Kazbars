@@ -226,6 +226,10 @@ def test_every_severity_has_a_color_and_danger_is_red():
 class _Guard:
     def __init__(self, mapped, height=50):
         self._mapped, self._height = mapped, height
+        self.bound = []
+
+    def bind(self, seq, fn, add=None):
+        self.bound.append(seq)
 
     def winfo_ismapped(self):
         return self._mapped
@@ -240,8 +244,10 @@ def test_bottom_inset_is_zero_without_a_guard():
 
 def test_bottom_inset_tracks_a_mapped_guard():
     mgr = ToastManager(object())
-    mgr.set_bottom_guard(_Guard(mapped=1, height=50))
+    guard = _Guard(mapped=1, height=50)
+    mgr.set_bottom_guard(guard)
     assert mgr._bottom_inset() == 50 + 4          # + PAD_XS
+    assert guard.bound == ['<Configure>'], "a guard that resizes re-places the toasts"
 
 
 def test_bottom_inset_ignores_an_unmapped_guard():
@@ -269,6 +275,9 @@ def test_bottom_inset_survives_a_torn_down_guard():
     import tkinter as tk
 
     class _Dead:
+        def bind(self, seq, fn, add=None):
+            pass
+
         def winfo_ismapped(self):
             raise tk.TclError('bad window path name')
 

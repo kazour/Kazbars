@@ -320,7 +320,7 @@ def open_inspect_dialog(app):
     search_var.trace_add('write', lambda *_: _refresh_lists())
     group_combo.bind('<<ComboboxSelected>>', lambda e: _refresh_lists())
 
-    size_scale, size_var, _ = size_slider(
+    size_scale, size_var = size_slider(
         size_row, cfg['scale'], lambda p: f"{panel_fs(base, p)} pt text",
         on_commit=_refresh_status,
         tooltip="A percent of the overlay size (Overlay, top of the Grids tab). "

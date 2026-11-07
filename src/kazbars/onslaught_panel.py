@@ -119,7 +119,7 @@ def open_onslaught_dialog(app):
     size_row = ttk.Frame(display)
     size_row.pack(anchor='w', pady=(0, PAD_XS))
     size_sink: list = []
-    size_scale, size_var, _ = size_slider(
+    size_scale, size_var = size_slider(
         size_row, cfg['scale'], lambda p: f"{panel_fs(base, p)} pt text",
         tooltip="The board's text, a percent of the overlay size (Overlay, top of the "
                 "Grids tab); the alerts draw 1.6 times as large.",

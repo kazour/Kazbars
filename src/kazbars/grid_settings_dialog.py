@@ -288,7 +288,7 @@ class GridSettingsDialog(tk.Toplevel):
         cfg = self._cfg
         card = self._card(parent, "Icons")
         cell, _ = self._field(card, "Size:")
-        _, self.scale_var, _ = size_slider(
+        _, self.scale_var = size_slider(
             cell, cfg.get('scale', CLAMP_SPECS['scale'][0]),
             lambda p: f"{grid_metrics(self.card.base_size(), p).icon} px icons",
             label=None, on_commit=self._changed, on_move=lambda p: self._changed(),
