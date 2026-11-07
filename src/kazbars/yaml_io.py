@@ -38,8 +38,9 @@ class YamlError(ValueError):
 def loads(text):
     """The value `text` holds (JSON text reads too), in JSON's shapes: a
     mapping key is always text and a value YAML types beyond JSON (a date,
-    a set, binary) reads as text or a list, so whatever loads, `dumps` can
-    write back. Raises `YamlError`."""
+    a set, binary) reads as text or a list, and a lone surrogate reads as
+    U+FFFD as `dumps` writes it, so whatever loads, `dumps` writes back the
+    same. Raises `YamlError`."""
     try:
         return _json_shaped(yaml.load(text, Loader=getattr(yaml, 'CSafeLoader', yaml.SafeLoader)))
     except yaml.YAMLError as e:
@@ -52,7 +53,7 @@ def read_file(path):
     (`UnicodeDecodeError`, a JSON or YAML error)."""
     path = Path(path)
     text = path.read_text(encoding='utf-8')
-    return json.loads(text) if path.suffix.lower() == '.json' else loads(text)
+    return _json_shaped(json.loads(text)) if path.suffix.lower() == '.json' else loads(text)
 
 
 def _json_shaped(value):
@@ -60,7 +61,9 @@ def _json_shaped(value):
         return {_key_text(k): _json_shaped(v) for k, v in value.items()}
     if isinstance(value, (list, tuple, set)):
         return [_json_shaped(v) for v in value]
-    if value is None or isinstance(value, (bool, int, float, str)):
+    if isinstance(value, str):
+        return _SURROGATES.sub('\ufffd', value)
+    if value is None or isinstance(value, (bool, int, float)):
         return value
     if isinstance(value, bytes):
         return value.decode('utf-8', 'replace')
@@ -70,7 +73,7 @@ def _json_shaped(value):
 def _key_text(key):
     """A mapping key as JSON writes one: `1` → "1", `true` → "true"."""
     if isinstance(key, str):
-        return key
+        return _json_shaped(key)
     if key is None or isinstance(key, bool):
         return json.dumps(key)
     return str(_json_shaped(key))

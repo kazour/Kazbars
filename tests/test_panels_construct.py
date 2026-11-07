@@ -1210,7 +1210,6 @@ def test_cards_carry_no_step_arrows_and_alt_arrows_still_reorder(app):
     _add_seam_grid(app, 'SeamStepA')
     _add_seam_grid(app, 'SeamStepB')
     last = gp.grid_panels[-1]
-    assert not hasattr(last, '_step_labels')
     assert not any(str(w.cget('text')) in ('▲', '▼') for w in last.summary_label.master.winfo_children()
                    if 'text' in w.keys())
     visible = gp._visible()

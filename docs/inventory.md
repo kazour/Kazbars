@@ -96,7 +96,7 @@
 | `src/kazbars/update_orchestrator.py` | 148 |
 | `src/kazbars/userdata.py` | 119 |
 | `src/kazbars/window_position.py` | 162 |
-| `src/kazbars/yaml_io.py` | 193 |
+| `src/kazbars/yaml_io.py` | 196 |
 | `tests/test_app_contract.py` | 104 |
 | `tests/test_app_icon.py` | 43 |
 | `tests/test_as2_class_names.py` | 77 |
@@ -146,7 +146,7 @@
 | `tests/test_overlay_rung.py` | 145 |
 | `tests/test_overlay_size.py` | 226 |
 | `tests/test_panel_ratios.py` | 162 |
-| `tests/test_panels_construct.py` | 1776 |
+| `tests/test_panels_construct.py` | 1775 |
 | `tests/test_prefs.py` | 76 |
 | `tests/test_prefs_migration.py` | 68 |
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |
@@ -169,4 +169,4 @@
 | `tests/test_update_check.py` | 83 |
 | `tests/test_update_orchestrator.py` | 226 |
 | `tests/test_userdata.py` | 73 |
-| `tests/test_yaml_io.py` | 149 |
+| `tests/test_yaml_io.py` | 156 |

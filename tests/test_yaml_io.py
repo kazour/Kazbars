@@ -147,3 +147,10 @@ def test_non_characters_are_escaped_and_read_back(loader):
 def test_a_lone_surrogate_is_written_as_the_replacement_character(loader):
     lone = 'a' + chr(0xd800) + 'b'
     assert loads(dumps({'k': lone, lone: [lone]})) == {'k': 'a\ufffdb', 'a\ufffdb': ['a\ufffdb']}
+
+
+def test_a_lone_surrogate_in_a_json_file_reads_as_the_replacement_character(tmp_path):
+    # What loads is what `dumps` writes, so memory matches disk after a save.
+    path = tmp_path / 'old.json'
+    path.write_text('{"k\\ud83d": ["a\\ud83db"]}', encoding='utf-8')
+    assert yaml_io.read_file(path) == {'k\ufffd': ['a\ufffdb']}
