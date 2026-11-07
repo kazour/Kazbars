@@ -4,7 +4,8 @@
 (in `grids_panel.py`) creates/destroys these as the grid list changes.
 
 A card is a row, never expanded: the title line (name, type, mode, Applied
-by me; the settings cog, Move…, Enabled, ▲ ▼, ×), the grid drawn to scale
+by me; the settings cog, Move… (move, copy or export the grid), Enabled,
+▲ ▼, ×), the grid drawn to scale
 (`GridPreview`) and the names line under it. The preview is where buffs are
 chosen: a dynamic grid's opens the Tracked Buffs picker, a static grid's cell
 opens it on that slot (walking the grid's slots from there), and a
@@ -112,7 +113,8 @@ class GridEditorPanel(ttk.Frame):
 
     def __init__(self, parent, database, grid_config, on_delete=None,
                  get_base_size=None, on_whitelist_changed=None,
-                 name_in_use=None, on_edit=None, on_move=None, on_step=None, find_card=None):
+                 name_in_use=None, on_edit=None, on_move=None, on_step=None, find_card=None,
+                 on_export=None):
         super().__init__(parent)
         self.database = database
         self.grid_config = grid_config
@@ -125,6 +127,8 @@ class GridEditorPanel(ttk.Frame):
         self._on_edit = on_edit
         # on_move(card, class_id, copy): Move to… / Copy to… another class tab.
         self._on_move = on_move
+        # on_export(card): the Move… menu's Export grid… — the grid to a grids file.
+        self._on_export = on_export
         # on_step(card, delta): ▲ / ▼, one place up or down the listed cards.
         self._on_step = on_step
         # find_card(config): the card showing that config now, None once it left
@@ -235,7 +239,8 @@ class GridEditorPanel(ttk.Frame):
         in_view = [enabled_cb, self._step_labels[-1], self._step_labels[1], delete_label]
         if self._on_move is not None:
             move_label = self._glyph_label(header, "Move…", FONT_SMALL,
-                                           "Move this grid to another class tab, or copy it there",
+                                           "Move this grid to another class tab, copy it there, "
+                                           "or export it to a file",
                                            None, THEME_COLORS['heading'])
             move_label.bind('<Button-1>', lambda e: self._show_move_menu(move_label))
             for seq in ('<Return>', '<space>'):
@@ -304,7 +309,8 @@ class GridEditorPanel(ttk.Frame):
 
     def _show_move_menu(self, anchor):
         """Move to / Copy to, each listing All classes and the twelve classes;
-        Move greys the grid's own. Built once per card, re-greyed per click."""
+        Move greys the grid's own. Then Export grid… (a grids file of this one
+        grid). Built once per card, re-greyed per click."""
         targets = ((0, "All classes"), *((c.id, c.name) for c in CLASSES))
         menu = getattr(self, '_move_menu', None)
         if menu is None:
@@ -317,6 +323,9 @@ class GridEditorPanel(ttk.Frame):
                 menu.add_cascade(label=title, menu=sub)
                 if not copy_it:
                     self._move_sub = sub
+            if self._on_export is not None:
+                menu.add_separator()
+                menu.add_command(label="Export grid…", command=lambda: self._on_export(self))
         own = self.grid_config.get('class', 0)
         for i, (cid, _name) in enumerate(targets):
             self._move_sub.entryconfigure(i, state='disabled' if cid == own else 'normal')

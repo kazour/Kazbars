@@ -1,18 +1,24 @@
 """
 KazBars — Grid Editor Panel
 Grid configuration UI: the class tabs and the list of grid cards (add, delete,
-reorder by drag, Alt+arrows or a card's ▲ ▼), the empty state's presets.
+reorder by drag, Alt+arrows or a card's ▲ ▼), the empty state's presets, and
+grids files (a card's Export grid…, the tab strip's Export tab… / Import
+grids…).
 """
 
 import copy
+import json
 import logging
 import tkinter as tk
-from tkinter import ttk
+from pathlib import Path
+from tkinter import filedialog, ttk
+
+from ttkbootstrap.dialogs import Messagebox
 
 logger = logging.getLogger(__name__)
 
 
-from . import grid_preview
+from . import grid_preview, grid_templates, profile_io, yaml_io
 from .classes import CLASSES, by_id
 from .extras_shortcuts import ExtrasShortcutsRow
 from .grid_dialogs import AddGridWizard
@@ -33,7 +39,8 @@ from .overlay import DEFAULT_SIZE, FONT_CHOICES, SIZE_CHOICES, font_label
 from .overlay_size import grid_metrics
 from .prefs import ANCHOR_SIDE_DEFAULT, ANCHOR_UP_DEFAULT
 from .profile_document import build_signature
-from .settings_manager import get_setting, set_setting
+from .profile_share import slugify
+from .settings_manager import get_setting, safe_write_text, set_setting
 from .ui_components import (
     DragReorderManager,
     create_scrollable_frame,
@@ -197,6 +204,15 @@ class GridsPanel(ttk.Frame):
                 rb.pack(side='left', padx=(PAD_TAB if gi and k == 0 else 0, 0))
                 add_tooltip(rb, tip)
                 self._tab_buttons[cid] = (rb, short)
+        # The tab's file pair: a grids file in, the tab's grids out.
+        import_btn = ttk.Button(row, text="Import grids…", command=self.import_grids,
+                                bootstyle='info-outline')  # type: ignore[call-arg]
+        import_btn.pack(side='right')
+        add_tooltip(import_btn, "Add grids from a grids file to this tab")
+        self._export_tab_btn = ttk.Button(row, text="Export tab…", command=self.export_tab,
+                                          bootstyle='info-outline')  # type: ignore[call-arg]
+        self._export_tab_btn.pack(side='right', padx=(0, PAD_XS))
+        add_tooltip(self._export_tab_btn, "Save every grid on this tab to a grids file")
 
     def _tab_class(self):
         """The current tab's class id, or None for All."""
@@ -238,6 +254,82 @@ class GridsPanel(ttk.Frame):
             self._mark_modified()
             self._repack_panels()
             app_toast(self, f"Moved '{grid['id']}' to {short}", 'info', key='grids_class')
+
+    # ------------------------------------------------------------------
+    # Grids files: Export grid… (a card's Move… menu), Export tab…, Import grids…
+    # ------------------------------------------------------------------
+    def export_grid(self, panel):
+        """One grid to a grids file."""
+        self.save_settings()
+        grid = self.grids[self.grid_panels.index(panel)]
+        self._export_grids([grid], f"{slugify(grid['id'])}.kazbars-grids.yml",
+                           f"Exported ‘{grid['id']}’")
+
+    def export_tab(self):
+        """Every grid the current tab lists to one grids file."""
+        self.save_settings()
+        grids = [self.grids[i] for i in self._visible()]
+        if not grids:
+            return
+        tab = by_id(self._tab_var.get())
+        n = len(grids)
+        self._export_grids(grids, f"{tab.short if tab else 'All'} grids.kazbars-grids.yml",
+                           f"Exported {n} grid{'s' if n != 1 else ''}")
+
+    def _export_grids(self, grids, initialfile, done):
+        """Write `grids` (with the custom buffs they reference) to a grids file
+        the user picks; `done` opens the toast."""
+        path = filedialog.asksaveasfilename(
+            title="Export Grids", defaultextension=".kazbars-grids.yml", initialfile=initialfile,
+            filetypes=[("KazBars grids", "*.kazbars-grids.yml"), ("YAML files", "*.yml *.yaml")])
+        if not path:
+            return
+        db = self.database
+        value = grid_templates.build(grids, db.by_id, db.by_name, db.provenance)
+        try:
+            safe_write_text(path, yaml_io.dumps(value))
+        except OSError as e:
+            Messagebox.show_error(f"Could not write the grids file.\n\n({e})", title="Export Failed")
+            return
+        n = len(value.get('buffs', []))
+        suffix = f" (+{n} custom buff{'s' if n != 1 else ''})" if n else ""
+        app_toast(self, f"{done} to “{Path(path).name}”{suffix}", 'success')
+
+    def import_grids(self):
+        """A grids file's grids appended to the current tab, each on its class
+        under a free name, and its custom buffs merged into the database."""
+        path = filedialog.askopenfilename(
+            title="Import Grids",
+            filetypes=[("KazBars grids", "*.kazbars-grids.yml *.yml *.yaml"), ("All files", "*.*")])
+        if not path:
+            return
+        try:
+            text = Path(path).read_text(encoding='utf-8')
+            raw = json.loads(text) if Path(path).suffix.lower() == '.json' else yaml_io.loads(text)
+        except (OSError, ValueError):  # UnicodeDecodeError, JSON and YAML errors are ValueErrors
+            Messagebox.show_error("That file couldn't be read as a KazBars grids file.",
+                                  title="Import Failed")
+            return
+        try:
+            grids, buffs = grid_templates.parse(raw)
+        except ValueError as e:
+            Messagebox.show_error(str(e), title="Import Failed")
+            return
+        self.save_settings()
+        # The custom buffs first, so the grids' refs resolve as they land.
+        merged = profile_io.merge_embedded_buffs(self.app, buffs) if self.app else (0, 0, False)
+        missing: list = []  # unresolved refs stay, greyed, as a load keeps them
+        grids = [self._migrate_grid(g, missing) for g in grids]
+        appended, renames = grid_templates.import_into(self.grids, grids, self._tab_class())
+        self.grids.extend(appended)
+        self._mark_modified()
+        self.refresh_panels()
+        tab = by_id(self._tab_var.get())
+        n = len(appended)
+        parts = [f"Imported {n} grid{'s' if n != 1 else ''} into {tab.name if tab else 'All'}"]
+        parts += [f"renamed ‘{old}’ to ‘{new}’ (name taken)" for old, new in renames]
+        parts += profile_io.buff_merge_parts(*merged)
+        app_toast(self, " — ".join(parts), 'success')
 
     @staticmethod
     def _set_class(grid, class_id):
@@ -818,6 +910,7 @@ class GridsPanel(ttk.Frame):
                 on_move=self.move_or_copy,
                 on_step=self._step_card,
                 find_card=self._card_for,
+                on_export=self.export_grid,
             )
             self.grid_panels.append(panel)
         self._repack_panels()
@@ -889,6 +982,7 @@ class GridsPanel(ttk.Frame):
         for n, i in enumerate(visible):
             self._attach_panel(self.grid_panels[i], n)
             self.grid_panels[i].set_step_state(n > 0, n < len(visible) - 1)
+        self._export_tab_btn.configure(state='normal' if visible else 'disabled')
         if self.grids and not visible:
             tab = by_id(self._tab_var.get())
             self._tab_empty_lbl.configure(

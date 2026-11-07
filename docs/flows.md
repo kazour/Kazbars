@@ -575,7 +575,7 @@ End state: the profile document's `overlay` section (`{size, font}`) holds the c
 
 ## 33. move or copy a grid to another class tab
 
-Trigger: User clicks a class tab on the Grids tab (All, then the twelve classes grouped by archetype), or "Move…" in a grid card's header and picks Move to / Copy to ▸ a class
+Trigger: User clicks a class tab on the Grids tab (All, then the twelve classes grouped by archetype), or "Move…" in a grid card's header and picks Move to / Copy to ▸ a class (the menu's Export grid… and the strip's Export tab… / Import grids… are Flow 38)
 
 Steps:
 1. `GridsPanel._build_class_tabs()` — src/kazbars/grids_panel.py — builds the strip: All plus one toolbutton per entry of `classes.CLASSES`, grouped by archetype, each showing the count of its own grids (`_update_tab_counts`); the selected tab is the `grids_tab` pref, so the panel reopens where it was left
@@ -651,3 +651,18 @@ Steps:
 Both `apply()` and `cancel()` go through `_close()` — src/kazbars/grid_settings_dialog.py — which destroys the dialog first (releasing its grab), then returns the card if it still exists, clearing `card.settings_dialog`, and the card call (`apply_settings` / `cancel_draft`) follows. Nothing rebuilds the card list under the dialog: `KazBarsApp._hotkey()` — src/kazbars/app.py — swallows shortcuts while this (or any) dialog holds the grab
 
 End state: on Apply, `grid_config` holds the new settings and the card shows them; the profile is marked modified and autosaved (Flow 3). The dialog itself never writes the config; Cancel leaves it untouched
+
+---
+
+## 38. share grids (export a grid or a tab, import a grids file)
+
+Trigger: A grid card's "Move…" ▸ Export grid…, or the Export tab… / Import grids… buttons at the right end of the class-tab strip (Flow 33)
+
+Steps:
+1. `GridEditorPanel._show_move_menu()` — src/kazbars/grid_editor_panel.py — after the Move to / Copy to cascades, a separator and "Export grid…", which calls the card's `on_export` callback (`GridsPanel.export_grid`)
+2. `GridsPanel.export_grid()` / `GridsPanel.export_tab()` — src/kazbars/grids_panel.py — `save_settings()` flushes the cards; the one grid, or every grid `_visible()` lists (Export tab… is disabled on an empty tab — `_repack_panels()` sets it), go to `_export_grids()` with a suggested `<grid id>.kazbars-grids.yml` (through `profile_share.slugify`) or `<tab short> grids.kazbars-grids.yml` (`All grids…` on All)
+3. `GridsPanel._export_grids()` — src/kazbars/grids_panel.py — `asksaveasfilename`, then `grid_templates.build()` (src/kazbars/grid_templates.py): `format: kazbars-grids`, `schema: 1`, the grids minus their `class`, and the user-provenance buffs they reference (`profile_share.collect_for_refs` over the grids section's `harvest_refs`) — `yaml_io.dumps`, written atomically by `safe_write_text`; toast "Exported ‘<id>’ to “<file>”" or "Exported N grids to “<file>”", plus "(+N custom buffs)"; a write failure is an error box
+4. `GridsPanel.import_grids()` — src/kazbars/grids_panel.py — `askopenfilename`; `.json` reads as JSON, anything else as YAML (a read failure: "That file couldn't be read as a KazBars grids file."); `grid_templates.parse()` refuses a profile ("Use File ▸ Import profile… instead"), a newer schema or a file with no grids; `save_settings()`; the file's custom buffs merged first through `profile_io.merge_embedded_buffs()` (src/kazbars/profile_io.py — skip on an id collision, rename on a name one) so the grids' refs resolve; each grid through `_migrate_grid()` (refs normalised as a load does; unresolved ones kept, greyed)
+5. `grid_templates.import_into()` — src/kazbars/grid_templates.py — each grid `validate_grid`'d, put on the current tab's class (`_tab_class()`; the All tab leaves it on every class), under `grids_generator.free_id()` (an id whose archive key is taken becomes `<id>_2`, the taken set growing across the batch); the grids are appended, `_mark_modified()` autosaves them (Flow 3), `refresh_panels()` builds their cards; one toast: "Imported N grids into <tab name>", a "renamed ‘A’ to ‘A_2’ (name taken)" per rename, and the custom-buff phrases (`profile_io.buff_merge_parts()`)
+
+End state: a grids file holds the grids exactly as the profile does, without their class, plus the custom buffs they need; an import lands them on the tab it was made on, each under a name of its own, autosaved; nothing else in the profile changes

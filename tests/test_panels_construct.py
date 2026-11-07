@@ -1638,3 +1638,88 @@ def test_a_tooltip_with_nothing_to_say_shows_nothing(app):
         assert tip._tip_frame is None
     finally:
         label.destroy()
+
+
+# ============================================================================
+# GRIDS FILES: EXPORT GRID… / EXPORT TAB… / IMPORT GRIDS…
+# ============================================================================
+def test_export_tab_writes_the_tabs_grids_without_their_class(app, monkeypatch, tmp_path):
+    from kazbars import grids_panel, yaml_io
+    from kazbars.grid_model import create_default_grid
+    gp = app.grids_panel
+    gp.grids.append(dict(create_default_grid('player', 1, 5, 'dynamic', 'ShareDT'), **{'class': 31}))
+    gp.refresh_panels()
+    gp._tab_var.set(30)  # a tab with nothing on it
+    gp._on_tab_changed()
+    try:
+        assert gp._export_tab_btn.instate(['disabled']), "nothing to export on an empty tab"
+        gp._tab_var.set(31)
+        gp._on_tab_changed()
+        assert not gp._export_tab_btn.instate(['disabled'])
+        out = tmp_path / 'dt.kazbars-grids.yml'
+        seen = {}
+        monkeypatch.setattr(grids_panel.filedialog, 'asksaveasfilename',
+                            lambda **k: seen.update(k) or str(out))
+        gp.export_tab()
+        assert seen['initialfile'] == 'DT grids.kazbars-grids.yml'
+        value = yaml_io.loads(out.read_text(encoding='utf-8'))
+        assert value['format'] == 'kazbars-grids'
+        assert [g['id'] for g in value['grids']] == ['ShareDT']
+        assert all('class' not in g for g in value['grids'])
+    finally:
+        gp._tab_var.set(0)
+        gp._on_tab_changed()
+
+
+def test_import_grids_appends_to_the_tab_and_renames_a_taken_id(app, monkeypatch, tmp_path):
+    from kazbars import grid_templates, grids_panel, yaml_io
+    from kazbars.grid_model import create_default_grid
+    gp = app.grids_panel
+    gp.grids.append(dict(create_default_grid('player', 1, 5, 'dynamic', 'Shared Raid'), **{'class': 31}))
+    gp.refresh_panels()
+    src = tmp_path / 'in.kazbars-grids.yml'
+    src.write_text(yaml_io.dumps(grid_templates.build(
+        [create_default_grid('target', 1, 4, 'dynamic', 'Shared_Raid'),
+         create_default_grid('player', 1, 3, 'static', 'Shared Fresh')], {}, {}, {})), encoding='utf-8')
+    monkeypatch.setattr(grids_panel.filedialog, 'askopenfilename', lambda **k: str(src))
+    toasts = []
+    monkeypatch.setattr(grids_panel, 'app_toast', lambda w, msg, *a, **k: toasts.append(msg))
+    gp._tab_var.set(31)
+    gp._on_tab_changed()
+    try:
+        gp.import_grids()
+        landed = [g for g in gp.grids if g['id'] in ('Shared_Raid_2', 'Shared Fresh')]
+        assert [g['id'] for g in landed] == ['Shared_Raid_2', 'Shared Fresh']
+        assert all(g['class'] == 31 for g in landed)
+        assert len(gp.grid_panels) == len(gp.grids)
+        assert toasts[-1].startswith('Imported 2 grids into Dark Templar')
+        assert "renamed ‘Shared_Raid’ to ‘Shared_Raid_2’ (name taken)" in toasts[-1]
+        stored = app.profile_store.get_section('grids')['grids']
+        assert any(g['id'] == 'Shared_Raid_2' for g in stored), "the import autosaves"
+    finally:
+        gp._tab_var.set(0)
+        gp._on_tab_changed()
+
+
+def test_import_grids_refuses_a_profile_file(app, monkeypatch, tmp_path):
+    from kazbars import grids_panel
+    src = tmp_path / 'p.kazbars.yml'
+    src.write_text('format: kazbars-profile\nschema: 3\n', encoding='utf-8')
+    errors = []
+    monkeypatch.setattr(grids_panel.filedialog, 'askopenfilename', lambda **k: str(src))
+    monkeypatch.setattr(grids_panel.Messagebox, 'show_error', lambda msg, **k: errors.append(msg))
+    before = len(app.grids_panel.grids)
+    app.grids_panel.import_grids()
+    assert 'is a profile, not a grids file' in errors[0]
+    assert len(app.grids_panel.grids) == before
+
+
+def test_a_cards_move_menu_ends_with_export_grid(app, monkeypatch):
+    import tkinter as tk
+    monkeypatch.setattr(tk.Menu, 'tk_popup', lambda *a, **k: None)  # a real popup waits
+    card, _ = _add_seam_grid(app, 'SeamExportMenu')
+    card._show_move_menu(card.cog_label)
+    menu = card._move_menu
+    last = menu.index('end')
+    assert menu.entrycget(last, 'label') == 'Export grid…'
+    assert menu.type(last - 1) == 'separator'
