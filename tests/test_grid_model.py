@@ -246,7 +246,9 @@ def test_a_snapped_fill_draws_every_slot_where_the_unfit_code_did():
         for code in codes:
             snapped = snap_fill(rows, cols, code)
             assert snapped in valid_fills(rows, cols)[0]
-            assert [slot_pos(rows, cols, snapped, i) for i in range(rows * cols)] ==                 [slot_pos(rows, cols, code, i) for i in range(rows * cols)], (rows, cols, code)
+            def order(fill):
+                return [slot_pos(rows, cols, fill, i) for i in range(rows * cols)]
+            assert order(snapped) == order(code), (rows, cols, code)
 
 
 def test_an_overhead_box_is_capped_at_sixteen_slots():

@@ -66,7 +66,7 @@
 | `src/kazbars/live_tracker_panel.py` | 521 |
 | `src/kazbars/live_tracker_settings.py` | 175 |
 | `src/kazbars/onslaught.py` | 204 |
-| `src/kazbars/onslaught_panel.py` | 361 |
+| `src/kazbars/onslaught_panel.py` | 366 |
 | `src/kazbars/overlay.py` | 122 |
 | `src/kazbars/overlay_engine.py` | 800 |
 | `src/kazbars/overlay_size.py` | 126 |
@@ -128,7 +128,7 @@
 | `tests/test_foreground.py` | 95 |
 | `tests/test_game_folder.py` | 137 |
 | `tests/test_game_persistence.py` | 748 |
-| `tests/test_grid_model.py` | 308 |
+| `tests/test_grid_model.py` | 310 |
 | `tests/test_grid_preview.py` | 143 |
 | `tests/test_grids_generator.py` | 603 |
 | `tests/test_hud_overlay.py` | 141 |

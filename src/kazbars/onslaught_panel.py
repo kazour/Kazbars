@@ -264,25 +264,27 @@ def open_onslaught_dialog(app):
             btn.pack(side='right')
             add_tooltip(btn, f"Stop watching {name}")
 
+    def _names_changed():
+        # A name added, removed or restored: the list's rows, then the height.
+        _draw_names()
+        _refit()
+
     def _add(_e=None):
         if _refusal() is None:
             custom.append(name_var.get().strip())
             name_var.set("")
-            _draw_names()
-            _refit()
+            _names_changed()
         return 'break'
 
     def _delete(name):
         before = list(custom)
         custom.remove(name)
-        _draw_names()
-        _refit()
+        _names_changed()
 
         def _undo():
             if dialog.winfo_exists():
                 custom[:] = before
-                _draw_names()
-                _refit()
+                _names_changed()
         app_toast(dialog, f"Removed {name} — click to undo", 'info', 8,
                   key='onslaught-custom-undo', on_click=_undo)
 
@@ -298,6 +300,7 @@ def open_onslaught_dialog(app):
     resting = [(lbl, rule, str(lbl.cget('foreground'))) for lbl, rule in labels]
 
     def _sync(*_):
+        hinted = bool(hint.winfo_manager())
         on = enabled_var.get()
         for widget, rule in controls:
             widget.configure(state='normal' if on and (rule is None or rule()) else 'disabled')
@@ -310,6 +313,8 @@ def open_onslaught_dialog(app):
             hint.pack_forget()
         _on_name_typed()
         _draw_names()
+        if bool(hint.winfo_manager()) != hinted:  # a line came or went; a recolour never re-fits
+            _refit()
 
     enable_cb.configure(command=_sync)
     _sync()
