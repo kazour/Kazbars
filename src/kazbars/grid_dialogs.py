@@ -20,6 +20,7 @@ from .grid_model import (
     is_plate,
     max_shape,
     max_slots,
+    settle_box,
     snap_row_cap,
 )
 from .settings_manager import get_setting, set_setting
@@ -94,7 +95,6 @@ class AddGridWizard(tk.Toplevel):
         False: (("H-bar 1x10", 1, 10), ("V-bar 10x1", 10, 1), ("Grid 3x3", 3, 3), ("Single 1x1", 1, 1)),
         True: (("Row 1x3", 1, 3), ("Band 2x5", 2, 5), ("Grid 3x3", 3, 3), ("Single 1x1", 1, 1)),
     }
-    _TYPE_STYLES = {'player': 'Player', 'target': 'Target', 'friendly': 'Friendly', 'hostile': 'Hostile'}
     _PRESET_STYLES = {'player': 'info-outline', 'target': 'warning-outline',
                       'friendly': 'success-outline', 'hostile': 'danger-outline'}
 
@@ -111,7 +111,6 @@ class AddGridWizard(tk.Toplevel):
         # existing_ids stays for the default-name suggestion only.
         self.name_in_use = name_in_use
         self.result = None
-        self.parent = parent
 
         self._mode_forced_static = False
         self._mode_before_force = "dynamic"
@@ -167,7 +166,7 @@ class AddGridWizard(tk.Toplevel):
                 rb = ttk.Radiobutton(lf, text=text, variable=self.type_var, value=value,
                                      command=self._on_type_changed)
                 # ttkbootstrap strips custom style= at construction; apply via configure() after.
-                rb.configure(style=f'{self._TYPE_STYLES[value]}.TRadiobutton')
+                rb.configure(style=f'{value.title()}.TRadiobutton')
                 rb.pack(anchor='w', pady=(PAD_TINY if k else 0, 0))
                 ttk.Label(lf, text=desc, foreground=THEME_COLORS['muted'], font=FONT_SMALL,
                           wraplength=WIZARD_TYPE_DESC_WRAP, justify='left'
@@ -176,12 +175,12 @@ class AddGridWizard(tk.Toplevel):
         mode_lf = _section(frame, "Mode")
         self.mode_var = tk.StringVar(value="dynamic")
         self.mode_dynamic = ttk.Radiobutton(mode_lf, text="Dynamic", variable=self.mode_var,
-                                            value="dynamic", command=self._on_mode_changed)
+                                            value="dynamic", command=self._reshape)
         self.mode_dynamic.pack(anchor='w')
         self._dynamic_desc = ttk.Label(mode_lf, foreground=THEME_COLORS['muted'], font=FONT_SMALL)
         self._dynamic_desc.pack(anchor='w', padx=PAD_RADIO_INDENT)
         self.mode_static = ttk.Radiobutton(mode_lf, text="Static", variable=self.mode_var,
-                                           value="static", command=self._on_mode_changed)
+                                           value="static", command=self._reshape)
         self.mode_static.pack(anchor='w', pady=(PAD_TINY, 0))
         ttk.Label(mode_lf, text="Fixed slots for specific buffs. Empty when buff not active",
                   foreground=THEME_COLORS['muted'], font=FONT_SMALL).pack(anchor='w', padx=PAD_RADIO_INDENT)
@@ -250,9 +249,6 @@ class AddGridWizard(tk.Toplevel):
             self.id_var.set(default_grid_name(gtype, self.existing_ids))
         self._reshape()
 
-    def _on_mode_changed(self):
-        self._reshape()
-
     def _reshape(self):
         """Clamp the shape for the kind and mode now in force. update_display
         settles the mode first (a floating 1x1 forces Static, which an
@@ -280,8 +276,8 @@ class AddGridWizard(tk.Toplevel):
         """Keep the shape inside the grid's limit. A band's columns are its row
         cap, snapped to 3, 5 or 7 (a typed 4 reads 5) — but a Single 1x1 band
         stays one icon, three to a row — and its rows give way to the 16
-        slots; any other grid keeps its rows and columns inside its max shape,
-        the other one giving way to its slot limit."""
+        slots; any other grid keeps its rows and columns inside its max shape
+        (`settle_box`), the other one giving way to its slot limit."""
         gtype = self.type_var.get()
         rows = self.safe_get_int(self.rows_var, 1)
         cols = self.safe_get_int(self.cols_var, 1)
@@ -295,11 +291,8 @@ class AddGridWizard(tk.Toplevel):
             self.rows_spin.config(from_=1, to=max(1, limit // cols))
         else:
             self.cols_spin.config(values=())
-            rows, cols = min(rows, max_rows), min(cols, max_cols)
-            if changed == 'rows':
-                cols = min(cols, max(1, limit // rows))
-            else:
-                rows = min(rows, max(1, limit // cols))
+            rows, cols, _ = settle_box(rows, cols, '', gtype, False,
+                                       give='cols' if changed == 'rows' else 'rows')
             self.rows_spin.config(from_=1, to=min(max_rows, max(1, limit // cols)))
             self.cols_spin.config(from_=1, to=min(max_cols, max(1, limit // rows)))
         self.rows_var.set(str(rows))

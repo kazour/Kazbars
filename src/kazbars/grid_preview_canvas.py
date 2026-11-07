@@ -45,8 +45,7 @@ _INSET = _RING + _MARGIN
 class GridPreview(tk.Canvas):
     """The grid drawn to scale; see the module docstring."""
 
-    def __init__(self, parent, *, accent, on_pick, on_clear, tip_for,
-                 max_w=PREVIEW_MAX_W, max_h=PREVIEW_MAX_H):
+    def __init__(self, parent, *, accent, on_pick, on_clear, tip_for):
         super().__init__(parent, width=1, height=1, bd=0, takefocus=True)
         # After the constructor: ttkbootstrap restyles every tk.Canvas as it
         # is built, the ring's thickness to 0 among it.
@@ -56,10 +55,10 @@ class GridPreview(tk.Canvas):
         self._on_pick = on_pick
         self._on_clear = on_clear
         self._tip_for = tip_for
-        self._max = (max_w, max_h)
         self._cfg: dict = {}
         self._enabled = True
-        self._layout: grid_preview.Layout | None = None
+        # Nothing yet; the card's first `set_config` draws the grid.
+        self._layout = grid_preview.Layout((), 0, 0, 1, 0, PREVIEW_RATIO[1])
         self._hot = -1
         # The slot the keyboard sits on: kept while the picker has focus or
         # the pointer wanders off, so Tab back lands where it was.
@@ -85,7 +84,7 @@ class GridPreview(tk.Canvas):
     @property
     def ratio(self):
         """The `den` of `PREVIEW_RATIO[0]:den` the preview is drawn at."""
-        return self._layout.den if self._layout is not None else PREVIEW_RATIO[1]
+        return self._layout.den
 
     @property
     def layout(self):
@@ -100,22 +99,20 @@ class GridPreview(tk.Canvas):
             cfg.get('rows', 1), cfg.get('cols', 1), cfg.get('fillDirection', 'LR'),
             icon=icon, gap=cfg.get('gap', -1), band=band,
             num=PREVIEW_RATIO[0], den=PREVIEW_RATIO[1], spacing=PREVIEW_SLOT_SPACING,
-            max_w=self._max[0], max_h=self._max[1])
-        if self._layout is None or lay.rects != self._layout.rects:
-            self._layout = lay
+            max_w=PREVIEW_MAX_W, max_h=PREVIEW_MAX_H)
+        moved = lay.rects != self._layout.rects
+        self._layout = lay
+        if moved:
             self._hot = min(self._hot, len(lay.rects) - 1)
             self._kept = min(self._kept, len(lay.rects) - 1)
             self.redraw()
         else:
-            self._layout = lay
             for i in range(len(lay.rects)):
                 self.repaint_slot(i)
 
     def redraw(self):
         """Recreate every slot's items (a geometry change only)."""
         lay = self._layout
-        if lay is None:
-            return
         self.delete('all')
         # Tk adds the ring around this.
         self.configure(width=lay.width + 2 * _MARGIN, height=lay.height + 2 * _MARGIN)
@@ -137,7 +134,7 @@ class GridPreview(tk.Canvas):
     def repaint_slot(self, i):
         """Repaint slot `i`'s three items from the config as it is now."""
         lay = self._layout
-        if lay is None or not 0 <= i < len(lay.rects):
+        if not 0 <= i < len(lay.rects):
             return
         tag = f'slot_{i}'
         full = self._has_content(i)
@@ -161,8 +158,6 @@ class GridPreview(tk.Canvas):
         return self._cfg.get('slotMode') == 'static'
 
     def _slot_at(self, event):
-        if self._layout is None:
-            return -1
         return grid_preview.slot_at(self._layout, int(self.canvasx(event.x)) - _INSET,
                                     int(self.canvasy(event.y)) - _INSET)
 
@@ -177,21 +172,15 @@ class GridPreview(tk.Canvas):
             self._kept = i
         if i == self._hot:
             return
-        if not self._static():
-            # Every cell of a dynamic grid looks alike: one outline for all.
-            self._hot = i
-            full = bool(grid_preview.held_ids(self._cfg))
-            rest = (self._accent if self._enabled else TK_COLORS['border']) if full else TK_COLORS['border']
-            self.itemconfigure('rect', outline=THEME_COLORS['heading'] if i >= 0 else rest)
-            return
         prev, self._hot = self._hot, i
-        self.repaint_slot(prev)
-        self.repaint_slot(i)
+        # Every cell of a dynamic grid looks alike: all of them light as one.
+        for j in (prev, i) if self._static() else range(len(self._layout.rects)):
+            self.repaint_slot(j)
 
     def _on_motion(self, event):
         # Anywhere over a dynamic grid is the whole grid.
         i = self._slot_at(event) if self._static() else 0
-        hand = i >= 0 or not self._static()
+        hand = i >= 0
         if hand != self._hand:
             self._hand = hand
             self.configure(cursor='hand2' if hand else '')
@@ -214,7 +203,7 @@ class GridPreview(tk.Canvas):
         self._clear(i)
 
     def _on_arrow(self, dx, dy):
-        if self._layout is not None and self._static():
+        if self._static():
             self._set_hot(grid_preview.step(self._layout, self._hot, dx, dy))
         return 'break'
 

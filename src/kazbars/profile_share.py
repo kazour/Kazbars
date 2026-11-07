@@ -72,7 +72,7 @@ def parse_profile_file(raw):
     fmt = raw.get('format')
     if fmt == PROFILE_FORMAT:
         profile = {k: v for k, v in raw.items() if k not in ('format', 'buffs')}
-        return profile, _buff_list(raw.get('buffs'))
+        return profile, buff_list(raw.get('buffs'))
     if fmt == EXPORT_FORMAT:
         schema = raw.get('export_schema', 1)
         if isinstance(schema, int) and schema > EXPORT_SCHEMA:
@@ -80,7 +80,7 @@ def parse_profile_file(raw):
         inner = raw.get('profile')
         if not isinstance(inner, dict):
             raise ValueError('This export file is missing its profile data.')
-        return inner, _buff_list(raw.get('buffs'))
+        return inner, buff_list(raw.get('buffs'))
     if fmt == GRIDS_FORMAT:
         raise ValueError("That file is a grids file, not a profile. "
                          "Use File ▸ Import grid… instead.")
@@ -89,7 +89,7 @@ def parse_profile_file(raw):
     raise ValueError("That file isn't a KazBars profile.")
 
 
-def _buff_list(buffs):
+def buff_list(buffs):
     return buffs if isinstance(buffs, list) else []
 
 

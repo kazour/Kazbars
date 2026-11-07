@@ -23,7 +23,6 @@ config itself.
 """
 
 import tkinter as tk
-import tkinter.font as tkfont
 from tkinter import ttk
 
 from .grid_model import (
@@ -31,10 +30,9 @@ from .grid_model import (
     BAND_ROW_CAPS,
     BAND_SLOTS_DEFAULT,
     CLAMP_SPECS,
-    PLATE_DISTANCE_DEFAULT,
     PLATE_MAX_SLOTS,
-    PLATE_OFFSET_DEFAULT,
-    band_shape,
+    PLATE_SPECS,
+    band_fields,
     get_game_resolution_or_default,
     is_band,
     is_plate,
@@ -151,7 +149,6 @@ class GridSettingsDialog(tk.Toplevel):
         self.resizable(False, False)
         self.transient(top)
         self.grab_set()
-        self._label_font = tkfont.Font(root=self, font=FONT_FORM_LABEL)
         self._label_w = 0  # the widest label `_field` has made
 
         create_dialog_header(self, f"GRID SETTINGS — {cfg.get('id', 'Grid')}",
@@ -209,7 +206,7 @@ class GridSettingsDialog(tk.Toplevel):
         card.next_row += 1
         lbl = None
         if label is not None:
-            self._label_w = max(self._label_w, self._label_font.measure(label))
+            self._label_w = max(self._label_w, self.tk.call('font', 'measure', FONT_FORM_LABEL, label))
             lbl = ttk.Label(card, text=label, font=FONT_FORM_LABEL)
             lbl.grid(row=r, column=0, sticky='e', padx=(0, PAD_XS), pady=(0, PAD_ROW))
         cell = ttk.Frame(card)
@@ -291,7 +288,7 @@ class GridSettingsDialog(tk.Toplevel):
         _, self.scale_var = size_slider(
             cell, cfg.get('scale', CLAMP_SPECS['scale'][0]),
             lambda p: f"{grid_metrics(self.card.base_size(), p).icon} px icons",
-            label=None, on_commit=self._changed, on_move=lambda p: self._changed(),
+            label=None, on_move=lambda p: self._changed(),
             tooltip="Icon, timer and stack size, as a percent of the overlay size "
                     "(Overlay, top of the Grids tab)")
         default, lo, hi = CLAMP_SPECS['gap']
@@ -336,16 +333,18 @@ class GridSettingsDialog(tk.Toplevel):
     def _build_overhead_card(self, parent):
         cfg = self._cfg
         card = self._card(parent, "Overhead")
-        self.plate_offset_var = tk.StringVar(value=str(cfg.get('plateOffset', PLATE_OFFSET_DEFAULT)))
+        default, lo, hi = PLATE_SPECS['plateOffset']
+        self.plate_offset_var = tk.StringVar(value=str(cfg.get('plateOffset', default)))
         cell, _ = self._field(card, "Height:")
-        labeled_spinbox(cell, None, self.plate_offset_var, from_=0, to=400, width=4,
+        labeled_spinbox(cell, None, self.plate_offset_var, from_=lo, to=hi, width=4,
                         tooltip="Room left for the game's nameplate between the head and the grid, in px")
         self._unit(cell, "px")
-        self.max_distance_var = tk.StringVar(value=str(cfg.get('maxDistance', PLATE_DISTANCE_DEFAULT)))
+        default, lo, hi = PLATE_SPECS['maxDistance']
+        self.max_distance_var = tk.StringVar(value=str(cfg.get('maxDistance', default)))
         who = ("you (Over me), your group and friendly players" if self._type == 'friendly'
                else "your target and anyone fighting you or your group")
         cell, _ = self._field(card, "Range:")
-        labeled_spinbox(cell, None, self.max_distance_var, from_=5, to=100, width=4,
+        labeled_spinbox(cell, None, self.max_distance_var, from_=lo, to=hi, width=4,
                         tooltip=f"Hidden past this distance. It shows over {who}.")
         self._unit(cell, "m")
         self.show_self_var = tk.BooleanVar(value=cfg.get('showSelf', True))
@@ -453,9 +452,7 @@ class GridSettingsDialog(tk.Toplevel):
         out = {'id': self.id_var.get().strip()}
         if self._band:
             slots = _int(self.max_slots_var, cfg.get('maxSlots', BAND_SLOTS_DEFAULT), 1, PLATE_MAX_SLOTS)
-            cap = self.row_cap_var.get()
-            rows, cols = band_shape(cap, slots)
-            out.update(rowCap=cap, maxSlots=slots, rows=rows, cols=cols, fillDirection='C')
+            out.update(band_fields(self.row_cap_var.get(), slots))
         else:
             fill = (_FILL_CODE_BY_LABEL.get(self.fill_var.get(), cfg.get('fillDirection'))
                     if not self._static else cfg.get('fillDirection'))
@@ -479,10 +476,10 @@ class GridSettingsDialog(tk.Toplevel):
         out['timerStyle'] = self.timer_style_var.get()
         out['enableFlashing'] = bool(self.flashing_var.get())
         if self._plate:
-            out['plateOffset'] = _int(self.plate_offset_var,
-                                      cfg.get('plateOffset', PLATE_OFFSET_DEFAULT), 0, 400)
-            out['maxDistance'] = _int(self.max_distance_var,
-                                      cfg.get('maxDistance', PLATE_DISTANCE_DEFAULT), 5, 100)
+            for key, var in (('plateOffset', self.plate_offset_var),
+                             ('maxDistance', self.max_distance_var)):
+                default, lo, hi = PLATE_SPECS[key]
+                out[key] = _int(var, cfg.get(key, default), lo, hi)
             if self._type == 'friendly':
                 out['showSelf'] = bool(self.show_self_var.get())
         if not self._static:

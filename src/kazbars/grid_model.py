@@ -47,6 +47,12 @@ CLAMP_SPECS = {
     'timerFlashThreshold': (6, 0, 11),
     'timerYOffset': (-3, -10, 10),
 }
+# The overhead keys, the same shape: height (`plateOffset`, px of room for the
+# nameplate) and range (`maxDistance`, m).
+PLATE_SPECS = {
+    'plateOffset': (PLATE_OFFSET_DEFAULT, 0, 400),
+    'maxDistance': (PLATE_DISTANCE_DEFAULT, 5, 100),
+}
 # Fraction position specs: key → default. Positions are stored as fractions of
 # the game resolution (full floats, clamped to [0.0, 1.0]); pixels exist only
 # at display/emit via project_px/unproject_px, so a document is never rewritten
@@ -159,14 +165,32 @@ def ref_list(value):
     return [value] if value else []
 
 
-def band_shape(row_cap, slots):
-    """A band's derived (rows, cols): `rowCap` to a row, rows as needed."""
-    return math.ceil(slots / row_cap), row_cap
+def band_fields(row_cap, slots):
+    """A band's keys from its row cap and slot count: the two, its derived
+    shape (`rowCap` to a row, rows as needed) and its centred fill."""
+    return {'rowCap': row_cap, 'maxSlots': slots,
+            'rows': math.ceil(slots / row_cap), 'cols': row_cap, 'fillDirection': 'C'}
+
+
+def set_class(grid, class_id):
+    """Put the grid on class `class_id` (classes.CLASSES); None or 0 — every
+    class (All) — drops the key, so a classless grid never carries one."""
+    if class_id:
+        grid['class'] = class_id
+    else:
+        grid.pop('class', None)
 
 
 # ============================================================================
 # DEFAULT GRID CONFIGURATION
 # ============================================================================
+def _type_defaults(grid_type):
+    """The defaults that follow the type: an overhead grid's timers are a
+    bar; a target's or a hostile's debuffs come first."""
+    return {'timerStyle': 'bar' if is_plate(grid_type) else 'digits',
+            'layout': 'debuffFirst' if grid_type in ('target', 'hostile') else 'buffFirst'}
+
+
 def create_default_grid(grid_type="player", rows=1, cols=10, mode="dynamic", grid_id=None):
     """Return a grid configuration dictionary with sensible defaults. An
     overhead dynamic grid is a band: its row cap from `cols` (snapped to 3, 5
@@ -176,6 +200,7 @@ def create_default_grid(grid_type="player", rows=1, cols=10, mode="dynamic", gri
         mode = "static"
 
     fill_dir = valid_fills(rows, cols)[1]
+    by_type = _type_defaults(grid_type)
 
     grid = {
         'id': grid_id or f"{grid_type.title()}Grid 1",
@@ -188,24 +213,22 @@ def create_default_grid(grid_type="player", rows=1, cols=10, mode="dynamic", gri
         'fx': (100 if grid_type == "player" else 300) / 1920,
         'fy': 400 / 1080,
         'slotMode': mode,
-        'timerStyle': 'bar' if plate else 'digits',
+        'timerStyle': by_type['timerStyle'],
         'timerFlashThreshold': 6,
         'timerYOffset': -3,
         'enableFlashing': True,
         'fillDirection': fill_dir,
         'sortOrder': 'longest',
-        'layout': 'debuffFirst' if grid_type in ('target', 'hostile') else 'buffFirst',
+        'layout': by_type['layout'],
         'whitelist': [],
         'slotAssignments': {}
     }
     if plate:
-        grid['plateOffset'] = PLATE_OFFSET_DEFAULT
-        grid['maxDistance'] = PLATE_DISTANCE_DEFAULT
+        grid.update({key: default for key, (default, _, _) in PLATE_SPECS.items()})
         if mode == 'dynamic':
             cap = snap_row_cap(cols)
             slots = max(1, min(rows * cols, PLATE_MAX_SLOTS))
-            grid['rows'], grid['cols'] = band_shape(cap, slots)
-            grid.update(rowCap=cap, maxSlots=slots, fillDirection='C')
+            grid.update(band_fields(cap, slots))
     if grid_type == 'friendly':
         grid['showSelf'] = True
     return grid
@@ -223,25 +246,16 @@ def default_grid_name(grid_type, existing_ids):
 def validate_grid(grid):
     """Validate and clamp a grid config on load. Returns sanitized grid."""
     defaults = create_default_grid()
-
     # Type-dependent defaults, as a new grid of the type gets them.
-    defaults['timerStyle'] = 'bar' if is_plate(grid.get('type')) else 'digits'
-    defaults['layout'] = 'debuffFirst' if grid.get('type') in ('target', 'hostile') else 'buffFirst'
+    defaults.update(_type_defaults(grid.get('type')))
 
     # Ensure required keys exist
     for key, val in defaults.items():
         if key not in grid:
             grid[key] = val
 
-    # Clamp numeric ranges. Profiles are hand-editable JSON, so a junk value
-    # (null, "abc", 1e999 — json parses that to inf, and int(inf) raises
-    # OverflowError) falls back to the default instead of crashing the load.
     for key, (default, lo, hi) in CLAMP_SPECS.items():
-        try:
-            value = int(grid.get(key, default))
-        except (TypeError, ValueError, OverflowError):
-            value = default
-        grid[key] = max(lo, min(value, hi))
+        grid[key] = _clamp_int(grid, key, default, lo, hi)
 
     # Fraction positions: full-float clamp to the unit range (NaN → default;
     # inf lands on the clamp bound).
@@ -275,11 +289,7 @@ def validate_grid(grid):
         grid.pop('selfCastOnly', None)
     # `class`: the class this grid is built for in game (classes.CLASSES);
     # absent is every class (All). Written only when set.
-    cls = class_id_of(grid.get('class'))
-    if cls is None:
-        grid.pop('class', None)
-    else:
-        grid['class'] = cls
+    set_class(grid, class_id_of(grid.get('class')))
 
     # Validate grid name/id: always text (YAML reads a bare `id: 300` as a number)
     grid_id = grid.get('id')
@@ -306,6 +316,9 @@ def validate_grid(grid):
 
 
 def _clamp_int(grid, key, default, lo, hi):
+    """`grid[key]` as an int inside [lo, hi]. Profiles are hand-editable, so
+    a junk value (null, "abc", 1e999 — YAML reads that as inf, and int(inf)
+    raises OverflowError) reads as the default instead of crashing the load."""
     try:
         value = int(grid.get(key, default))
     except (TypeError, ValueError, OverflowError):
@@ -322,22 +335,21 @@ def _validate_overhead(grid):
     them; a friendly grid's `showSelf`."""
     gtype = grid['type']
     if is_plate(gtype):
-        grid['plateOffset'] = _clamp_int(grid, 'plateOffset', PLATE_OFFSET_DEFAULT, 0, 400)
-        grid['maxDistance'] = _clamp_int(grid, 'maxDistance', PLATE_DISTANCE_DEFAULT, 5, 100)
+        for key, spec in PLATE_SPECS.items():
+            grid[key] = _clamp_int(grid, key, *spec)
         if is_band(grid):
             # A band saved without its keys reads them off its shape, clamped first.
             grid['rows'] = min(grid['rows'], PLATE_MAX_ROWS)
             grid['cols'] = min(grid['cols'], PLATE_MAX_COLS)
-            cap = snap_row_cap(_clamp_int(grid, 'rowCap', grid['cols'], 1, 7))
+            cap = snap_row_cap(_clamp_int(grid, 'rowCap', grid['cols'], 1, BAND_ROW_CAPS[-1]))
             slots = _clamp_int(grid, 'maxSlots', grid['rows'] * grid['cols'], 1, PLATE_MAX_SLOTS)
-            grid['rows'], grid['cols'] = band_shape(cap, slots)
-            grid.update(rowCap=cap, maxSlots=slots, fillDirection='C')
+            grid.update(band_fields(cap, slots))
         else:
             grid['rows'], grid['cols'], _ = settle_box(grid['rows'], grid['cols'], '', gtype, False)
             grid.pop('rowCap', None)
             grid.pop('maxSlots', None)
     else:
-        for key in ('plateOffset', 'maxDistance', 'rowCap', 'maxSlots'):
+        for key in (*PLATE_SPECS, 'rowCap', 'maxSlots'):
             grid.pop(key, None)
     if gtype == 'friendly':
         if not isinstance(grid.get('showSelf'), bool):

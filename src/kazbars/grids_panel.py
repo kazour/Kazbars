@@ -20,21 +20,20 @@ from . import grid_preview, grid_templates, yaml_io
 from .classes import CLASSES, by_id
 from .extras_shortcuts import ExtrasShortcutsRow
 from .grid_dialogs import AddGridWizard
-from .grid_editor_panel import (
-    GridEditorPanel,
-)
+from .grid_editor_panel import GridEditorPanel
 from .grid_model import (
     create_default_grid,
     dedupe_grid_ids,
     default_grid_name,
     get_game_resolution_or_default,
     is_plate,
+    set_class,
     snap_row_cap,
     validate_grid,
 )
 from .grids_generator import free_id
-from .overlay import DEFAULT_SIZE, FONT_CHOICES, SIZE_CHOICES, font_label
-from .overlay_size import grid_metrics
+from .overlay import DEFAULT_FONT, DEFAULT_SIZE, FONT_CHOICES, SIZE_CHOICES, font_label
+from .overlay_size import SCALE_DEFAULT, grid_metrics
 from .prefs import ANCHOR_SIDE_DEFAULT, ANCHOR_UP_DEFAULT
 from .profile_document import build_signature
 from .profile_share import slugify
@@ -225,21 +224,19 @@ class GridsPanel(ttk.Frame):
         """Move to… (the grid's `class` set to `class_id`, 0 All) or Copy to… (a
         duplicate for that class, its id `<id> <short>` kept clear of every
         other grid's archive key). Says what it did in a toast."""
-        index = self.grid_panels.index(panel)
-        self.save_settings()
-        grid = self.grids[index]
+        grid = panel.grid_config
         short = by_id(class_id).short if class_id else "All"
         if copy_it:
             dup = copy.deepcopy(grid)
             dup['id'] = free_id([g['id'] for g in self.grids], f"{grid['id']} {short}")
-            self._set_class(dup, class_id)
+            set_class(dup, class_id)
             self.grids.append(dup)
             self._mark_modified()
             self.refresh_panels()
             app_toast(self, f"Copied '{grid['id']}' to {short} as '{dup['id']}'", 'info',
                       key='grids_class')
         else:
-            self._set_class(grid, class_id)
+            set_class(grid, class_id)
             self._mark_modified()
             self._repack_panels()
             app_toast(self, f"Moved '{grid['id']}' to {short}", 'info', key='grids_class')
@@ -250,8 +247,7 @@ class GridsPanel(ttk.Frame):
     # ------------------------------------------------------------------
     def export_grid(self, panel):
         """One grid, with the custom buffs it references, to a grids file."""
-        self.save_settings()
-        grid = self.grids[self.grid_panels.index(panel)]
+        grid = panel.grid_config
         path = filedialog.asksaveasfilename(
             title="Export Grid", defaultextension=".kazbars-grids.yml",
             initialfile=f"{slugify(grid['id'])}.kazbars-grids.yml",
@@ -274,11 +270,9 @@ class GridsPanel(ttk.Frame):
         on the tab's class, under a free name (`grid_templates.import_into`),
         its refs normalised as a load does (unresolved ones kept, greyed).
         Returns ``(appended, renames)``."""
-        self.save_settings()
         appended, renames = grid_templates.import_into(self.grids, grids, self._tab_class())
-        missing: list = []
         for grid in appended:
-            self._migrate_grid(grid, missing)
+            self._migrate_grid(grid, [])
         self.grids.extend(appended)
         self._mark_modified()
         self.refresh_panels()
@@ -295,46 +289,42 @@ class GridsPanel(ttk.Frame):
         tab = by_id(self._tab_var.get())
         return tab.name if tab else "All"
 
-    @staticmethod
-    def _set_class(grid, class_id):
-        if class_id:
-            grid['class'] = class_id
-        else:
-            grid.pop('class', None)
-
     def _join_current_tab(self, grid):
         """A new grid joins the tab it was made on."""
-        self._set_class(grid, self._tab_var.get())
+        set_class(grid, self._tab_var.get())
         return grid
 
+    def _store(self):
+        return self.app.profile_store if self.app is not None else None
+
     def _overlay(self):
-        store = self.app.profile_store if self.app is not None else None
+        store = self._store()
         return store.get_section('overlay') if store is not None else {}
 
     def base_size(self):
-        """The profile's overlay size (the grid cards' Size hints read it live)."""
+        """The profile's overlay size (the grid cards' previews read it live)."""
         return self._overlay().get('size', DEFAULT_SIZE)
 
     def load_overlay(self):
         """Show the loaded profile's overlay size and font, and redraw every
-        card's Size hint (profile load or import, first-launch seeding)."""
+        card's preview (profile load or import, first-launch seeding)."""
         overlay = self._overlay()
         self._overlay_size_var.set(self._size_labels.get(overlay.get('size', DEFAULT_SIZE), ''))
-        self._overlay_font_var.set(font_label(overlay.get('font', 'Arial')))
+        self._overlay_font_var.set(font_label(overlay.get('font', DEFAULT_FONT)))
         for panel in self.grid_panels:
-            panel.refresh_size_hint()
+            panel.refresh_view()
         self._redraw_empty_cards()
 
     def _on_overlay_changed(self):
         size = self._size_by_label.get(self._overlay_size_var.get(), DEFAULT_SIZE)
-        font = self._font_by_label.get(self._overlay_font_var.get(), 'Arial')
-        store = self.app.profile_store if self.app is not None else None
+        font = self._font_by_label.get(self._overlay_font_var.get(), DEFAULT_FONT)
+        store = self._store()
         if store is not None:
             if store.get_section('overlay') == {'size': size, 'font': font}:
                 return
             store.update_section('overlay', {'size': size, 'font': font})
         for panel in self.grid_panels:
-            panel.refresh_size_hint()
+            panel.refresh_view()
         self._redraw_empty_cards()
         # The deployed SWF was baked at the old size/font: un-tick Build.
         self._mark_modified()
@@ -523,12 +513,7 @@ class GridsPanel(ttk.Frame):
         self._empty_cards.append((card, rows, cols, card_w, card_h))
 
         def _on_click(e, r=rows, c=cols):
-            if r is None:
-                self._create_from_empty_state(r, c, None)
-                return
-            # A floating 1x1 is a static slot; an overhead one may be a band of one.
-            single = r == 1 and c == 1 and not is_plate(self._empty_type_var.get())
-            self._create_from_empty_state(r, c, 'static' if single else self._empty_mode_var.get())
+            self._create_from_empty_state(r, c, self._empty_mode_var.get())
 
         def _highlight(e, color, c=card):
             c.configure(highlightbackground=color)
@@ -572,7 +557,7 @@ class GridsPanel(ttk.Frame):
         gtype = self._empty_type_var.get()
         type_color = GRID_TYPE_COLORS[gtype]
         band = is_plate(gtype) and self._empty_mode_var.get() == 'dynamic'
-        icon = grid_metrics(self.base_size(), 100).icon
+        icon = grid_metrics(self.base_size(), SCALE_DEFAULT).icon
         for card, rows, cols, card_w, card_h in self._empty_cards:
             card.delete('cells')
             preview_h = card_h - PRESET_LABEL_AREA
@@ -694,7 +679,9 @@ class GridsPanel(ttk.Frame):
                                  before=anchor)
 
     def _create_from_empty_state(self, rows, cols, mode):
-        """Create a grid from the empty state preset shortcuts."""
+        """Create a grid from the empty state preset shortcuts (the Custom
+        card, with no shape, opens the wizard; a floating 1x1 is static
+        whatever the mode picked, as `create_default_grid` makes it)."""
         if rows is None:
             self.add_grid()
             return
@@ -709,8 +696,8 @@ class GridsPanel(ttk.Frame):
         self.refresh_panels()
 
     def get_profile_data(self):
-        """Return current grid configurations (save all panel values first)."""
-        self.save_settings()
+        """The grid configs as they are: a card writes its one live control
+        (Enabled) the moment it is toggled, so nothing needs flushing."""
         return self.grids
 
     def _migrate_whitelist(self, whitelist, missing):
@@ -788,11 +775,6 @@ class GridsPanel(ttk.Frame):
         self.refresh_panels()
         return missing_by_grid
 
-    def save_settings(self):
-        """Persist all panel UI values back to grid configs."""
-        for panel in self.grid_panels:
-            panel.save_to_config()
-
     def add_grid(self):
         """Open AddGridWizard dialog."""
         existing_ids = {g['id'] for g in self.grids}
@@ -800,10 +782,6 @@ class GridsPanel(ttk.Frame):
                                name_in_use=self._grid_name_in_use)
         self.winfo_toplevel().wait_window(wizard)
         if wizard.result:
-            # refresh_panels() rebuilds every card from self.grids, so flush the
-            # live widget state of existing cards first — otherwise their unsaved
-            # edits (Enabled, icon size, position, …) revert to the last save.
-            self.save_settings()
             self.grids.append(self._join_current_tab(wizard.result))
             self._mark_modified()
             self.refresh_panels()
@@ -812,7 +790,6 @@ class GridsPanel(ttk.Frame):
         """Delete a single grid — undoable via toast instead of a confirm."""
         for i, p in enumerate(self.grid_panels):
             if p == panel:
-                self.save_settings()  # flush sibling cards before refresh_panels rebuilds them
                 removed = self.grids.pop(i)
                 self._mark_modified()
                 self.refresh_panels()
@@ -837,7 +814,6 @@ class GridsPanel(ttk.Frame):
                       'warning', 4)
             return
         index = min(index, len(self.grids))
-        self.save_settings()  # flush live cards before the rebuild
         self.grids.insert(index, grid)
         self._mark_modified()
         self.refresh_panels()
@@ -845,9 +821,9 @@ class GridsPanel(ttk.Frame):
     def refresh_panels(self):
         """Rebuild GridEditorPanel widgets or show empty state.
 
-        Destroys and recreates every card from self.grids. A card's only live
-        control is Enabled (Grid Settings writes the config on Apply), so
-        callers that mutate self.grids flush with save_settings() first."""
+        Destroys and recreates every card from self.grids: a card holds no
+        state of its own (Enabled is written as it is toggled, everything
+        else by Grid Settings' Apply), so nothing is lost."""
         self._drag_manager.clear()
 
         if not self.grids:

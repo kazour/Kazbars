@@ -13,7 +13,7 @@
 |---|---:|
 | `src/kazbars/__init__.py` | 11 |
 | `src/kazbars/__main__.py` | 71 |
-| `src/kazbars/app.py` | 819 |
+| `src/kazbars/app.py` | 818 |
 | `src/kazbars/app_popups.py` | 491 |
 | `src/kazbars/boss_timer.py` | 399 |
 | `src/kazbars/buff_database.py` | 165 |
@@ -50,16 +50,16 @@
 | `src/kazbars/foreground.py` | 111 |
 | `src/kazbars/game_folder.py` | 430 |
 | `src/kazbars/game_persistence.py` | 608 |
-| `src/kazbars/game_resolution.py` | 163 |
-| `src/kazbars/grid_dialogs.py` | 794 |
-| `src/kazbars/grid_editor_panel.py` | 620 |
-| `src/kazbars/grid_model.py` | 444 |
-| `src/kazbars/grid_preview.py` | 240 |
-| `src/kazbars/grid_preview_canvas.py` | 229 |
-| `src/kazbars/grid_settings_dialog.py` | 532 |
-| `src/kazbars/grid_templates.py` | 83 |
+| `src/kazbars/game_resolution.py` | 161 |
+| `src/kazbars/grid_dialogs.py` | 787 |
+| `src/kazbars/grid_editor_panel.py` | 591 |
+| `src/kazbars/grid_model.py` | 456 |
+| `src/kazbars/grid_preview.py` | 238 |
+| `src/kazbars/grid_preview_canvas.py` | 218 |
+| `src/kazbars/grid_settings_dialog.py` | 529 |
+| `src/kazbars/grid_templates.py` | 85 |
 | `src/kazbars/grids_generator.py` | 791 |
-| `src/kazbars/grids_panel.py` | 972 |
+| `src/kazbars/grids_panel.py` | 948 |
 | `src/kazbars/inspect.py` | 69 |
 | `src/kazbars/inspect_catalog.py` | 585 |
 | `src/kazbars/inspect_panel.py` | 393 |

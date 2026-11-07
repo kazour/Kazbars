@@ -14,6 +14,7 @@ apart. Every cell and gap is a whole pixel, a gap never under one. A grid too
 big for its room steps to the next whole `num:den` that fits.
 """
 
+from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from math import gcd
@@ -161,7 +162,7 @@ def step(lay: Layout, idx: int, dx: int, dy: int) -> int:
 def slot_ids(cfg: dict, idx: int) -> list:
     """The buff refs static slot `idx` holds (a bare scalar reads as one)."""
     sa = cfg.get('slotAssignments') or {}
-    return ref_list(sa.get(str(idx), sa.get(idx)))
+    return ref_list(sa.get(str(idx)))
 
 
 def slot_total(cfg: dict) -> int:
@@ -181,10 +182,7 @@ def held_ids(cfg: dict) -> list:
 
 def _named(refs: Sequence, name_of: Callable[[Any], str]) -> str:
     """`Lash, Bloodlust x2`: names in first-seen order, repeats counted."""
-    counts: dict[str, int] = {}
-    for ref in refs:
-        name = name_of(ref)
-        counts[name] = counts.get(name, 0) + 1
+    counts = Counter(name_of(ref) for ref in refs)
     return ', '.join(f"{n} x{c}" if c > 1 else n for n, c in counts.items())
 
 

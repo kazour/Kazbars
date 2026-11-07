@@ -107,11 +107,9 @@ def change_game_resolution(app):
         new_w, new_h = new_res
         res_changed = (new_w, new_h) != (current_w, current_h)
         if res_changed:
-            # Positions are fractions — nothing in the document moves. Flush
-            # the widgets at the OLD resolution first (their px unprojects
-            # against it), then persist and rebuild so every pixel field
-            # re-projects at the new one.
-            app.grids_panel.save_settings()
+            # Positions are fractions — nothing in the document moves. Persist
+            # and rebuild the cards so Grid Settings, opened next, projects
+            # its pixel fields at the new resolution.
             app.settings.set('game_resolution', [new_w, new_h])
             app.settings.save()
             app.grids_panel.refresh_panels()

@@ -522,7 +522,6 @@ class KazBarsApp(ttkb.Window):
 
         # Refresh database list when switching to it (grid usage may have changed)
         if view_name == 'database':
-            self.grids_panel.save_settings()
             self.db_panel.refresh_list()
 
         # Animate nav underlines

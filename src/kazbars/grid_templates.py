@@ -16,9 +16,15 @@ reference, so they resolve on an install that has never seen them.
 
 import copy
 
-from .grid_model import PROFILE_SECTION, validate_grid
+from .grid_model import PROFILE_SECTION, set_class, validate_grid
 from .grids_generator import free_id
-from .profile_share import EXPORT_FORMAT, GRIDS_FORMAT, PROFILE_FORMAT, collect_for_refs
+from .profile_share import (
+    EXPORT_FORMAT,
+    GRIDS_FORMAT,
+    PROFILE_FORMAT,
+    buff_list,
+    collect_for_refs,
+)
 
 TEMPLATE_SCHEMA = 1
 
@@ -56,8 +62,7 @@ def parse(raw):
     grids = [g for g in grids if isinstance(g, dict)] if isinstance(grids, list) else []
     if not grids:
         raise ValueError("That file holds no grids.")
-    buffs = raw.get('buffs')
-    return grids, buffs if isinstance(buffs, list) else []
+    return grids, buff_list(raw.get('buffs'))
 
 
 def import_into(existing, grids, class_id):
@@ -70,10 +75,7 @@ def import_into(existing, grids, class_id):
     appended, renames = [], []
     for raw in grids:
         grid = validate_grid(copy.deepcopy(raw))
-        if class_id is None:
-            grid.pop('class', None)
-        else:
-            grid['class'] = class_id
+        set_class(grid, class_id)
         old = grid['id']
         grid['id'] = free_id(taken, old)
         if grid['id'] != old:

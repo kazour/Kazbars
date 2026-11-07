@@ -17,13 +17,12 @@ static grid's slot assignments trimmed or restored).
 
 import time
 import tkinter as tk
-import tkinter.font as tkfont
 from tkinter import ttk
 
 from . import grid_preview
 from .classes import CLASSES
 from .grid_dialogs import BuffSelectorDialog
-from .grid_model import is_band, is_plate, ref_list, settle_box
+from .grid_model import is_band, ref_list
 from .grid_preview_canvas import GridPreview
 from .grid_settings_dialog import open_grid_settings
 from .overlay import DEFAULT_SIZE
@@ -98,16 +97,6 @@ class _SlotWalker:
         self.committed = True
 
 
-def _names_measure(widget):
-    """`measure(text)` in the names line's font: one Font per Tk root, shared
-    by every card under it."""
-    root = widget._root()
-    font = getattr(root, '_kz_names_font', None)
-    if font is None:
-        font = root._kz_names_font = tkfont.Font(root=root, font=FONT_SMALL)
-    return font.measure
-
-
 class GridEditorPanel(ttk.Frame):
     """One grid's row: title line, to-scale preview, names line."""
 
@@ -119,8 +108,8 @@ class GridEditorPanel(ttk.Frame):
         self.database = database
         self.grid_config = grid_config
         self.on_delete = on_delete
-        # The profile's overlay size, read live: the preview and the Size hint
-        # follow the Grids toolbar's Overlay dropdown.
+        # The profile's overlay size, read live: the preview follows the Grids
+        # toolbar's Overlay dropdown.
         self._get_base_size = get_base_size or (lambda: DEFAULT_SIZE)
         self._on_whitelist_changed = on_whitelist_changed
         self._name_in_use = name_in_use
@@ -142,14 +131,11 @@ class GridEditorPanel(ttk.Frame):
         grid_type = grid_config.get('type', 'player')
         self._accent_color = GRID_TYPE_COLORS.get(grid_type, GRID_TYPE_COLORS['player'])
         # The type and slot mode are fixed at creation, so the card is built for them.
-        self._plate = is_plate(grid_type)
         self._band = is_band(grid_config)
 
-        self._resting_border_color = TK_COLORS['border']
-        self._card = tk.Frame(self,
-                               highlightbackground=self._resting_border_color,
-                               highlightcolor=self._resting_border_color,
-                               highlightthickness=1)
+        border = TK_COLORS['border']
+        self._card = tk.Frame(self, highlightbackground=border, highlightcolor=border,
+                              highlightthickness=1)
         card = self._card
         card.pack(fill='x')
 
@@ -180,11 +166,10 @@ class GridEditorPanel(ttk.Frame):
         self._build_title_line()
         self._build_body()
 
-        self.enabled_var.set(grid_config.get('enabled', True))
         self._apply_enabled_styling(self.enabled_var.get())
-        self._refresh_view()
+        self.refresh_view()
 
-        bind_card_events(card, lambda: self._resting_border_color)
+        bind_card_events(card, border)
 
     def _paint_drag_handle(self, *, hover=None, focus=None):
         """Hover and keyboard focus both light the ☰ handle, and either one alone
@@ -221,10 +206,9 @@ class GridEditorPanel(ttk.Frame):
         add_tooltip(self._self_cast_cb, "Show only effects you cast, with your own timer, even when "
                                         "other players cast the same effect on the same character.")
 
-        self.enabled_var = tk.BooleanVar(value=True)
+        self.enabled_var = tk.BooleanVar(value=self.grid_config.get('enabled', True))
         delete_label = self._glyph_label(header, "×", FONT_SYMBOL, "Delete this grid",
-                                         lambda: self.delete_grid(), THEME_COLORS['danger_text'],
-                                         padding=(PAD_XS, PAD_MICRO))
+                                         self.delete_grid, THEME_COLORS['danger_text'])
         bind_label_press_effect(delete_label, THEME_COLORS['danger_text'])
         enabled_cb = ttk.Checkbutton(header, text="Enabled",
                                      variable=self.enabled_var,
@@ -236,10 +220,8 @@ class GridEditorPanel(ttk.Frame):
             move_label = self._glyph_label(header, "Move…", FONT_SMALL,
                                            "Move this grid to another class tab, copy it there, "
                                            "or export it to a file",
-                                           None, THEME_COLORS['heading'])
-            move_label.bind('<Button-1>', lambda e: self._show_move_menu(move_label))
-            for seq in ('<Return>', '<space>'):
-                move_label.bind(seq, lambda e: self._show_move_menu(move_label))
+                                           lambda: self._show_move_menu(move_label),
+                                           THEME_COLORS['heading'])
             in_view.insert(0, move_label)
         # Packed after the right cluster, so a narrow header squeezes the
         # toggle before Move… or ×; side='left' still lands it after the mode.
@@ -256,9 +238,8 @@ class GridEditorPanel(ttk.Frame):
         lbl = ttk.Label(parent, text=text, font=font, foreground=THEME_COLORS['muted'],
                         cursor='hand2', takefocus=True, padding=padding)
         lbl.pack(side=side, padx=(PAD_XS, 0))
-        if command is not None:
-            for seq in ('<Button-1>', '<Return>', '<space>'):
-                lbl.bind(seq, lambda e: command())
+        for seq in ('<Button-1>', '<Return>', '<space>'):
+            lbl.bind(seq, lambda e: command())
         bind_label_hover_colors(lbl, THEME_COLORS['muted'], hover_color)
         add_tooltip(lbl, tip)
         return lbl
@@ -319,7 +300,7 @@ class GridEditorPanel(ttk.Frame):
     def _icon(self, cfg):
         return grid_metrics(self._get_base_size(), cfg.get('scale', SCALE_DEFAULT)).icon
 
-    def _refresh_view(self, cfg=None):
+    def refresh_view(self, cfg=None):
         """Redraw the preview, then the lines that read it (the summary says
         the ratio the preview settled on). `cfg` is a Grid Settings draft
         while one is open; the stored config otherwise."""
@@ -339,10 +320,9 @@ class GridEditorPanel(ttk.Frame):
         self._names_cfg = cfg
         self._draw_names()
 
-    def refresh_size_hint(self):
-        """The overlay size changed under this card: the preview draws the
-        icons at their baked size, so it redraws."""
-        self._refresh_view()
+    def _measure(self, text):
+        """`text`'s width in px in the names line's font."""
+        return self.tk.call('font', 'measure', FONT_SMALL, text)
 
     def _draw_names(self):
         """The names line, cut to the card's width: the buffs the grid holds,
@@ -358,7 +338,7 @@ class GridEditorPanel(ttk.Frame):
         if key == self._names_cut:
             return
         self._names_cut = key
-        self.names_var.set(grid_preview.names_line(self._names, _names_measure(self), width))
+        self.names_var.set(grid_preview.names_line(self._names, self._measure, width))
 
     def _name_of(self, ref):
         """A buff ref as its database name, `(missing #id)` when gone."""
@@ -410,7 +390,7 @@ class GridEditorPanel(ttk.Frame):
         self.wait_window(dialog)
         if dialog.result is not None:
             self.grid_config['whitelist'] = dialog.result
-            self._refresh_view()  # every cell of a dynamic grid shows it holds something
+            self.refresh_view()  # every cell of a dynamic grid shows it holds something
             if self._on_whitelist_changed:
                 self._on_whitelist_changed()
 
@@ -430,7 +410,6 @@ class GridEditorPanel(ttk.Frame):
     def _write_slot(self, slot, refs):
         """Set (or, with no refs, drop) static slot `slot` and repaint its cell."""
         sa = dict(self.grid_config.get('slotAssignments') or {})
-        sa.pop(slot, None)
         if refs:
             sa[str(slot)] = list(refs)
         else:
@@ -491,31 +470,26 @@ class GridEditorPanel(ttk.Frame):
 
     def preview_draft(self, draft):
         """Draw a Grid Settings draft over the stored config."""
-        self._refresh_view(dict(self.grid_config, **draft))
+        self.refresh_view(dict(self.grid_config, **draft))
 
     def cancel_draft(self):
         """The dialog closed without Apply: back to the stored config."""
-        self._refresh_view()
+        self.refresh_view()
 
     def apply_settings(self, draft):
-        """Land a Grid Settings draft (the settings it owns) on the config.
-        The shape goes through `settle_box` again — the draft already did, so
-        this guards only a caller that skipped it — and a static grid's change
-        of slot count trims its assignments (restored on a regrow)."""
+        """Land a Grid Settings draft (the settings it owns, the shape already
+        through `settle_box`) on the config; a static grid's change of slot
+        count trims its assignments (restored on a regrow)."""
         cfg = self.grid_config
         old_total = grid_preview.slot_total(cfg)
         cfg.update(draft)
-        slots_moved = False
-        if not self._band:
-            rows, cols, fill = settle_box(cfg['rows'], cfg['cols'], cfg.get('fillDirection'),
-                                          cfg.get('type', 'player'), cfg.get('slotMode') == 'dynamic')
-            cfg.update(rows=rows, cols=cols, fillDirection=fill)
-            slots_moved = cfg.get('slotMode') == 'static' and rows * cols != old_total
-            if slots_moved and rows * cols < old_total:
-                self._trim_slot_assignments(rows * cols)
-            elif slots_moved:
-                self._restore_orphaned_assignments(rows * cols)
-        self._refresh_view()
+        new_total = grid_preview.slot_total(cfg)
+        slots_moved = cfg.get('slotMode') == 'static' and new_total != old_total
+        if slots_moved and new_total < old_total:
+            self._trim_slot_assignments(new_total)
+        elif slots_moved:
+            self._restore_orphaned_assignments(new_total)
+        self.refresh_view()
         if slots_moved and self._on_whitelist_changed:
             self._on_whitelist_changed()  # the step guide re-reads the slots
         else:
@@ -573,11 +547,6 @@ class GridEditorPanel(ttk.Frame):
     # ------------------------------------------------------------------
     # Row state
     # ------------------------------------------------------------------
-    def save_to_config(self):
-        """Write the card's one live control (Enabled) into the config. Every
-        other setting is written by Grid Settings' Apply."""
-        self.grid_config['enabled'] = bool(self.enabled_var.get())
-
     def delete_grid(self):
         # No confirm — grids_panel shows an undo toast instead.
         if self.on_delete:
@@ -598,9 +567,11 @@ class GridEditorPanel(ttk.Frame):
         self._notify_edit()
 
     def _on_enabled_toggled(self):
-        self.save_to_config()
+        """Enabled is the card's one live control; it writes the config as it
+        is toggled (every other setting is written by Grid Settings' Apply)."""
+        self.grid_config['enabled'] = bool(self.enabled_var.get())
         self._apply_enabled_styling(self.enabled_var.get())
-        self._refresh_view()
+        self.refresh_view()
         self._notify_edit()
 
     def _apply_enabled_styling(self, enabled):
@@ -608,7 +579,7 @@ class GridEditorPanel(ttk.Frame):
 
         Title, badge and the left stripe drop to greys (the card outline is
         already neutral and stays put for hover); the preview drains with them
-        (`_refresh_view`). The Enabled toggle is the affordance — this is the
+        (`refresh_view`). The Enabled toggle is the affordance — this is the
         visual consequence.
         """
         self._stripe.configure(

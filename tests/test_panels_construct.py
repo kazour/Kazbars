@@ -1328,7 +1328,7 @@ def _wizard_grid(app, gtype, setup):
 def test_the_add_grid_wizard_makes_bands_with_a_snapped_row_cap(app):
     def custom(wiz):
         wiz.mode_var.set('dynamic')
-        wiz._on_mode_changed()
+        wiz._reshape()
         wiz.cols_var.set('4')
         wiz.rows_var.set('9')
         wiz.on_cols_changed()
@@ -1341,7 +1341,7 @@ def test_the_add_grid_wizard_makes_bands_with_a_snapped_row_cap(app):
 
     def single(wiz):
         wiz.mode_var.set('dynamic')
-        wiz._on_mode_changed()
+        wiz._reshape()
         wiz.apply_preset(1, 1)
         assert wiz.shape_var.get() == 'Band: up to 1 icon, 3 to a row'
     grid = _wizard_grid(app, 'friendly', single)
