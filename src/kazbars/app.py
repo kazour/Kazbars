@@ -48,7 +48,6 @@ from kazbars.live_tracker_panel import LiveTrackerPanel
 from kazbars.paths import APP_ICON, ASSETS, KAZBARS_ASSETS, app_path
 from kazbars.prefs import PREFS_SCHEMA
 from kazbars.profile_document import SectionRegistry
-from kazbars.profile_library import ProfileLibrary
 from kazbars.settings_core import Store
 from kazbars.settings_manager import init_settings
 from kazbars.ui_components import (
@@ -76,7 +75,6 @@ from kazbars.ui_widgets import (
 from kazbars.userdata import (
     database_user_path,
     ensure_layout,
-    profiles_dir,
     userdata_root,
 )
 from kazbars.window_position import bind_window_position_save, restore_window_position
@@ -112,7 +110,6 @@ class KazBarsApp(ttkb.Window):
         self.assets_path = ASSETS
 
         ensure_layout()
-        self.profiles_path = profiles_dir()
 
         # Machine-local prefs (prefs.json) via the strict settings_core engine.
         self.settings = Store(PREFS_SCHEMA, userdata_root())
@@ -153,8 +150,6 @@ class KazBarsApp(ttkb.Window):
         # profile switch (profile_io.apply_document only touches BUILD/LIVE).
         self.registry.register(damageinfo_settings.DAMAGE_COLORS_SECTION)
         self.registry.register(buff_xml.PROFILE_SECTION)
-        self.library = ProfileLibrary(
-            self.profiles_path, self.registry, profile_io.template_paths(self))
 
         # State
         self.app_version = APP_VERSION
@@ -199,7 +194,7 @@ class KazBarsApp(ttkb.Window):
         # Protocol
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
-        # Open the startup profile (active_profile pref → newest → seed).
+        # Open the profile (profile.yml → its .bak → a 3.1 library → seed).
         # Must precede deiconify() — see profile_io.apply_document.
         profile_io.startup_profile(self)
 
@@ -408,11 +403,7 @@ class KazBarsApp(ttkb.Window):
 
         self._auto_update_var = tk.BooleanVar(value=bool(self.settings.get('auto_update_content', True)))
 
-        # The File menu is rebuilt in place by _refresh_file_menu — the menu bar
-        # re-reads the list on every dropdown open, so the profile rows stay
-        # current without menu-widget surgery.
-        self._file_menu_def = self._menubar.add_cascade(label="File", menu_def=[])
-        self._refresh_file_menu()
+        self._build_file_menu()
         self._menubar.add_cascade(label="Game", menu_def=[
             {'type': 'command', 'label': 'Change game folder…',
              'command': self._change_game_folder},
@@ -465,43 +456,25 @@ class KazBarsApp(ttkb.Window):
 
         # Keyboard shortcuts. Ctrl+S is muscle memory — under autosave it just
         # flushes the pending write and confirms.
-        self.bind_all('<Control-n>', self._hotkey(self._new_profile))
         self.bind_all('<Control-s>', self._hotkey(self._save_now))
         self.bind_all('<Control-b>', self._hotkey(self._build))
 
-    def _refresh_file_menu(self):
-        """Rebuild the File menu_def in place: one row per library profile
-        (● marks the active one), then the lifecycle commands."""
-        d = self._file_menu_def
-        d.clear()
-        active = self.profile_store.document['id'] if self.profile_store else None
-        d.append({'type': 'header', 'label': 'Profiles'})
-        for _path, doc in self.library.list_profiles():
-            marker = '●  ' if doc['id'] == active else '    '
-            d.append({'type': 'command', 'label': f"{marker}{doc['name']}",
-                      'command': lambda pid=doc['id']: profile_io.switch_profile(self, pid)})
-        d.extend([
-            {'type': 'separator'},
-            {'type': 'command', 'label': 'New profile', 'accelerator': 'Ctrl+N',
-             'command': self._new_profile},
-            {'type': 'command', 'label': 'New from template',
-             'command': self._new_from_template},
-            {'type': 'command', 'label': 'Duplicate profile',
-             'command': self._duplicate_profile},
-            {'type': 'separator'},
-            {'type': 'command', 'label': 'Rename profile…',
-             'command': self._rename_profile},
-            {'type': 'command', 'label': 'Delete profile…',
-             'command': self._delete_profile},
-            {'type': 'command', 'label': 'Revert to session start',
-             'command': self._revert_profile},
-            {'type': 'separator'},
+    def _build_file_menu(self):
+        """The File menu: the one profile's export, import, reset and revert,
+        the data folder, Exit."""
+        self._menubar.add_cascade(label="File", menu_def=[
             {'type': 'command', 'label': 'Export profile…',
              'command': self._export_profile},
             {'type': 'command', 'label': 'Import profile…',
              'command': self._import_profile},
-            {'type': 'command', 'label': 'Open profiles folder',
-             'command': self._open_profiles_folder},
+            {'type': 'separator'},
+            {'type': 'command', 'label': 'Reset profile to defaults…',
+             'command': self._reset_profile},
+            {'type': 'command', 'label': 'Revert to session start',
+             'command': self._revert_profile},
+            {'type': 'separator'},
+            {'type': 'command', 'label': 'Open data folder',
+             'command': self._open_data_folder},
             {'type': 'separator'},
             {'type': 'command', 'label': 'Exit',
              'command': self._on_close},
@@ -510,8 +483,8 @@ class KazBarsApp(ttkb.Window):
     def _hotkey(self, fn):
         """Wrap a bind_all shortcut handler: shortcuts bypass a modal's grab
         (menu items are already blocked by it), so swallow them while a build
-        runs or any dialog holds the grab — Ctrl+N under Grid Settings would
-        rebuild the card the dialog is editing."""
+        runs or any dialog holds the grab — Ctrl+B under Grid Settings would
+        build while the dialog still holds the card's draft."""
         def handler(_event):
             # The grab as Tcl names it: grab_current() can't name a combobox
             # popdown's grab (KeyError) — any holder at all is enough here.
@@ -770,26 +743,14 @@ class KazBarsApp(ttkb.Window):
             if self.profile_store.flush():
                 self.toast.show("Profile saved", style='success', duration=2)
 
-    def _new_profile(self):
-        return profile_io.new_blank_profile(self)
-
-    def _new_from_template(self):
-        return profile_io.new_from_template(self)
-
-    def _duplicate_profile(self):
-        return profile_io.duplicate_current(self)
-
-    def _rename_profile(self):
-        return profile_io.rename_current(self)
-
-    def _delete_profile(self):
-        return profile_io.delete_current(self)
-
     def _revert_profile(self):
         return profile_io.revert_session(self)
 
-    def _open_profiles_folder(self):
-        return profile_io.open_profiles_folder(self)
+    def _reset_profile(self):
+        return profile_io.reset_to_defaults(self)
+
+    def _open_data_folder(self):
+        return profile_io.open_data_folder(self)
 
     def _export_profile(self):
         return profile_io.export_profile(self)

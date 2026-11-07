@@ -116,7 +116,6 @@ files = [
     "src/kazbars/paths.py",
     "src/kazbars/prefs.py",
     "src/kazbars/profile_document.py",
-    "src/kazbars/profile_library.py",
     "src/kazbars/profile_share.py",
     "src/kazbars/profile_store.py",
     "src/kazbars/settings_core.py",

@@ -9,7 +9,7 @@ from tkinter import filedialog, ttk
 
 from ttkbootstrap.dialogs import Messagebox
 
-from . import game_folder, update_orchestrator
+from . import game_folder, profile_io, update_orchestrator
 from .app_popups import show_welcome_popup
 from .grid_model import parse_resolution
 from .overlay import size_for_height
@@ -333,8 +333,8 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
 
 def run_first_launch(app, app_name):
     """Coordinate first-launch flow: show the dialog, then handle the chosen
-    path. Startup already seeded the library ('My Setup' from the template —
-    the never-empty invariant), so "Use Defaults" re-anchors that seed to the
+    path. Startup already seeded the profile ('My Setup' from the template),
+    so "Use Defaults" re-anchors that seed to the
     chosen resolution, and "Start Empty" empties it. Owns the callbacks the
     dialog dispatches to."""
     welcome_data = {}
@@ -352,7 +352,7 @@ def run_first_launch(app, app_name):
 
     def _seed_overlay_size(resolution_str):
         """Set the seed's overlay size for the resolution the user just
-        picked. Startup seeded the library before this dialog opened, so its
+        picked. Startup seeded the profile before this dialog opened, so its
         size came from the pre-dialog default — positions need nothing
         (fractions), the base size every in-game size derives from does. Only
         ever the pristine seed."""
@@ -396,5 +396,5 @@ def run_first_launch(app, app_name):
 
     show_first_launch_dialog(
         app, app_name, on_game_set, on_load_default, on_resolution_set,
-        app.library.has_template(), on_dialog_closed, on_start_empty,
+        profile_io.has_template(app), on_dialog_closed, on_start_empty,
     )

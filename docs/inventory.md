@@ -13,7 +13,7 @@
 |---|---:|
 | `src/kazbars/__init__.py` | 11 |
 | `src/kazbars/__main__.py` | 71 |
-| `src/kazbars/app.py` | 854 |
+| `src/kazbars/app.py` | 815 |
 | `src/kazbars/app_popups.py` | 491 |
 | `src/kazbars/boss_timer.py` | 399 |
 | `src/kazbars/buff_database.py` | 189 |
@@ -72,14 +72,13 @@
 | `src/kazbars/overlay_engine.py` | 800 |
 | `src/kazbars/overlay_size.py` | 126 |
 | `src/kazbars/paths.py` | 46 |
-| `src/kazbars/prefs.py` | 224 |
+| `src/kazbars/prefs.py` | 223 |
 | `src/kazbars/profile_document.py` | 345 |
-| `src/kazbars/profile_io.py` | 328 |
-| `src/kazbars/profile_library.py` | 293 |
+| `src/kazbars/profile_io.py` | 400 |
 | `src/kazbars/profile_share.py` | 174 |
-| `src/kazbars/profile_store.py` | 130 |
+| `src/kazbars/profile_store.py` | 136 |
 | `src/kazbars/self_update.py` | 487 |
-| `src/kazbars/settings_backup.py` | 484 |
+| `src/kazbars/settings_backup.py` | 512 |
 | `src/kazbars/settings_core.py` | 298 |
 | `src/kazbars/settings_manager.py` | 56 |
 | `src/kazbars/stopwatch.py` | 59 |
@@ -95,7 +94,7 @@
 | `src/kazbars/ui_widgets.py` | 331 |
 | `src/kazbars/update_check.py` | 64 |
 | `src/kazbars/update_orchestrator.py` | 148 |
-| `src/kazbars/userdata.py` | 110 |
+| `src/kazbars/userdata.py` | 119 |
 | `src/kazbars/window_position.py` | 162 |
 | `src/kazbars/yaml_io.py` | 150 |
 | `tests/test_app_contract.py` | 104 |
@@ -152,14 +151,13 @@
 | `tests/test_prefs_migration.py` | 68 |
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |
 | `tests/test_profile_document.py` | 249 |
-| `tests/test_profile_io.py` | 270 |
-| `tests/test_profile_library.py` | 275 |
+| `tests/test_profile_io.py` | 310 |
 | `tests/test_profile_share.py` | 234 |
-| `tests/test_profile_store.py` | 138 |
+| `tests/test_profile_store.py` | 152 |
 | `tests/test_projection.py` | 89 |
 | `tests/test_release_assets.py` | 33 |
 | `tests/test_self_update.py` | 505 |
-| `tests/test_settings_backup.py` | 226 |
+| `tests/test_settings_backup.py` | 279 |
 | `tests/test_settings_core.py` | 373 |
 | `tests/test_settings_manager.py` | 33 |
 | `tests/test_stopwatch.py` | 100 |
@@ -170,5 +168,5 @@
 | `tests/test_toggle_button_state.py` | 41 |
 | `tests/test_update_check.py` | 83 |
 | `tests/test_update_orchestrator.py` | 226 |
-| `tests/test_userdata.py` | 71 |
+| `tests/test_userdata.py` | 73 |
 | `tests/test_yaml_io.py` | 133 |

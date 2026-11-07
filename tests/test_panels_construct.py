@@ -130,7 +130,7 @@ OPENERS = [
 DEFERRED = {
     '_open_backup_dialog': 'settings_backup dialog — v2',
     '_open_game_in_explorer': 'os.startfile shell-out, not a panel',
-    '_open_profiles_folder': 'os.startfile shell-out, not a panel',
+    '_open_data_folder': 'os.startfile shell-out, not a panel',
     '_show_first_launch_dialog': 'blocking first-launch modal — v2',
     '_show_game_context_menu': 'tk.Menu popup, needs a real click event',
 }

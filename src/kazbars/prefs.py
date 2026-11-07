@@ -168,15 +168,14 @@ PREFS_SCHEMA = Schema(
     PREFS_FILENAME,
     2,
     {
-        # Machine-local: game install, resolution, profile pointers, build state.
-        # Scalars are passthrough — their consumers already guard the value
-        # (e.g. grid_model.get_game_resolution_or_default validates the list).
+        # Machine-local: game install, resolution, build state. Scalars are
+        # passthrough — their consumers already guard the value (e.g.
+        # grid_model.get_game_resolution_or_default validates the list). No
+        # profile pointer: there is one profile (userdata/profile.yml); a 3.1
+        # `active_profile` is read raw once by profile_io's adopt step and
+        # erased by strict validate_all on the next save.
         "game_path": Field(None),
         "game_resolution": Field(None),
-        # The one profile pointer: the active profile's in-document id. The old
-        # last_profile/default_profile path pair is gone — strict validate_all
-        # erases stale keys on the next save, no migration rung needed.
-        "active_profile": Field(None),
         "has_built_before": Field(False, kind="bool"),
         "desktop_shortcut_offered": Field(False, kind="bool"),
         # Where an overhead grid sits against a character's reported point:

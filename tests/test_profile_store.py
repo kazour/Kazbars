@@ -3,7 +3,7 @@
 The scheduler is injected, so the debounce is exercised deterministically: a
 fake records scheduled callbacks and fires them by hand. Pins the debounce
 collapse (N mutations → one write), flush-before-build semantics, the lazy
-once-only session .bak, revert-then-autosave, and the failed-write retry loop
+once-only session .bak, revert-then-autosave, replace-then-revert, and the failed-write retry loop
 with `last_write_failed` for the exit rescue path.
 
 Run: `pytest tests/test_profile_store.py` (from repo root).
@@ -108,6 +108,20 @@ def test_revert_restores_snapshot_and_autosaves():
     assert store.get_section("alpha") == {"count": 10}
     sched.fire()
     assert writer.calls[-1]["alpha"] == {"count": 10}  # reverted state persisted
+
+
+def test_replace_document_autosaves_and_revert_restores_the_session_start():
+    baks = []
+    store, sched, writer = _store(write_bak=baks.append)
+    incoming = dict(_doc(), name="Imported", modules={"alpha": {"count": 5}})
+    store.replace_document(incoming)
+    assert store.document is incoming and store.dirty
+    assert baks[0]["name"] == "Setup", "the session snapshot is the pre-replace document"
+    sched.fire()
+    assert writer.calls[-1] == {"name": "Imported", "alpha": {"count": 5}}
+    store.revert_to_session_start()
+    sched.fire()
+    assert writer.calls[-1] == {"name": "Setup", "alpha": {"count": 10}}
 
 
 def test_failed_write_sets_flag_and_retries_slower():

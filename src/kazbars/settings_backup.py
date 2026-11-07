@@ -3,8 +3,9 @@ KazBars — Game settings backup & restore.
 
 Backs up the Age of Conan config tree (``%LOCALAPPDATA%\\Funcom\\Conan\\Prefs``
 — keybinds, HUD layouts, chat, graphics/audio, waypoints) plus KazBars's own
-user data from ``userdata/`` — an allowlist of ``profiles/`` and
-``database_user.json`` (custom buffs), plus the machine-local ``prefs.json`` —
+user data from ``userdata/`` — an allowlist of ``profile.yml`` (and a 3.1
+``profiles/`` library while one is still there), ``database_user.json``
+(custom buffs), plus the machine-local ``prefs.json`` —
 into a single portable zip, and restores it later. It is the recovery path after
 a Windows reformat or profile corruption, neither of which AoC guards itself.
 
@@ -52,6 +53,8 @@ from .userdata import (
     database_user_path,
     funcom_prefs_path,
     prefs_path,
+    profile_path,
+    profiles_dir,
     userdata_root,
 )
 from .window_position import center_on_parent
@@ -62,6 +65,7 @@ BACKUP_FORMAT = "kazbars-settings-backup"
 BACKUP_VERSION = 1
 FUNCOM_ARC = "funcom"
 KAZBARS_ARC = "kazbars"
+PROFILE_ARC = "profile.yml"
 MANIFEST_NAME = "manifest.json"
 
 
@@ -112,16 +116,18 @@ def write_backup_zip(
     zip_path,
     *,
     funcom_dir,
-    profiles_dir,
+    profile_file=None,
+    profiles_dir=None,
     database_user=None,
     prefs_file=None,
     app_version,
 ):
     """Build a backup zip at `zip_path` from whichever sources exist: the Funcom
     prefs tree under ``funcom/``, and the KazBars ``userdata/`` allowlist under
-    ``kazbars/`` — ``profiles/`` (Deeps, Live Tracker, and Damage Numbers travel
-    inside the profile document now), ``database_user.json`` (custom buffs), and
-    the machine-local ``prefs.json``. The OTA ``content/`` cache is intentionally
+    ``kazbars/`` — ``profile.yml`` (Deeps, Live Tracker, and Damage Numbers
+    travel inside the profile document), a 3.1 ``profiles/`` library while the
+    userdata still carries one, ``database_user.json`` (custom buffs), and the
+    machine-local ``prefs.json``. The OTA ``content/`` cache is intentionally
     NOT a parameter, so it never lands in a backup. Writes ``manifest.json``
     last. Returns the `sections` dict."""
     sections = {}
@@ -130,6 +136,8 @@ def write_backup_zip(
             added, skipped = _add_tree(zf, Path(funcom_dir), FUNCOM_ARC)
             sections["funcom"] = {"files": added, "skipped": skipped, "source": str(funcom_dir)}
         kz = {}
+        if profile_file:
+            kz["profile"] = _add_file(zf, profile_file, f"{KAZBARS_ARC}/{PROFILE_ARC}")
         if profiles_dir and Path(profiles_dir).is_dir():
             # Session snapshots and trashed profiles are local recovery state,
             # not the user's data — they stay out of backups.
@@ -160,6 +168,18 @@ def write_backup_zip(
     return sections
 
 
+def _is_library_backup(zip_path):
+    """A 3.1 backup: profiles under ``kazbars/profiles/`` and no
+    ``kazbars/profile.yml``."""
+    try:
+        with zipfile.ZipFile(zip_path) as zf:
+            names = zf.namelist()
+    except (OSError, zipfile.BadZipFile):
+        return False
+    return (f"{KAZBARS_ARC}/{PROFILE_ARC}" not in names
+            and any(n.startswith(f"{KAZBARS_ARC}/profiles/") for n in names))
+
+
 def read_manifest(zip_path):
     """Return the parsed manifest if `zip_path` is a KazBars backup, else None."""
     try:
@@ -175,8 +195,8 @@ def read_manifest(zip_path):
 def restore_zip(zip_path, *, funcom_dest, userdata_dest, include_prefs=False):
     """Extract a backup's sections to their destinations (created as needed — a
     fresh machine has no Funcom folder yet). `funcom_dest` is the AoC prefs dir;
-    `userdata_dest` is the ``userdata/`` root (``profiles/`` and
-    ``database_user.json`` land directly under it). The machine-local
+    `userdata_dest` is the ``userdata/`` root (``profile.yml``, a 3.1
+    ``profiles/`` and ``database_user.json`` land directly under it). The machine-local
     ``prefs.json`` is restored only when `include_prefs` is True (default off, so
     a cross-PC restore doesn't drag a dead game path / window geometry along). A
     pre-P8 backup's ``settings/`` entries (Deeps/Live Tracker/Damage Numbers
@@ -276,8 +296,6 @@ def open_backup_dialog(app):
         aoc_line = "Age of Conan settings — not detected on this PC"
         aoc_color = THEME_COLORS["muted"]
 
-    n_profiles = sum(1 for _ in app.profiles_path.glob("*.json"))
-
     ttk.Label(
         content, text="What's included", font=FONT_SECTION, foreground=THEME_COLORS["heading"]
     ).pack(anchor="w", pady=(PAD_SMALL, PAD_XS))
@@ -295,7 +313,7 @@ def open_backup_dialog(app):
         ).pack(anchor="w", pady=(0, PAD_XS))
     ttk.Label(
         content,
-        text=f"•  KazBars data — {n_profiles} profile(s) + custom buffs",
+        text="•  KazBars data — your profile + custom buffs",
         font=FONT_BODY,
         foreground=THEME_COLORS["body"],
         wraplength=width - PAD_TAB * 4,
@@ -372,7 +390,8 @@ def backup_settings(app, dialog):
         sections = write_backup_zip(
             path,
             funcom_dir=locate_funcom_prefs(),
-            profiles_dir=app.profiles_path,
+            profile_file=profile_path(),
+            profiles_dir=profiles_dir(),
             database_user=database_user_path(),
             prefs_file=prefs_path(),
             app_version=app.app_version,
@@ -386,8 +405,8 @@ def backup_settings(app, dialog):
         return
     dialog.destroy()
     funcom_n = sections.get("funcom", {}).get("files", 0)
-    profiles_n = sections.get("kazbars", {}).get("profiles", 0)
-    app_toast(app, f"Backed up {funcom_n} AoC files + {profiles_n} profile(s)", "success", 8)
+    profile = " + your profile" if sections.get("kazbars", {}).get("profile") else ""
+    app_toast(app, f"Backed up {funcom_n} AoC files{profile}", "success", 8)
 
 
 def restore_settings(app, dialog, include_prefs=False):
@@ -437,7 +456,8 @@ def restore_settings(app, dialog, include_prefs=False):
         write_backup_zip(
             snapshot,
             funcom_dir=locate_funcom_prefs(),
-            profiles_dir=app.profiles_path,
+            profile_file=profile_path(),
+            profiles_dir=profiles_dir(),
             database_user=database_user_path(),
             prefs_file=prefs_path(),
             app_version=app.app_version,
@@ -445,6 +465,14 @@ def restore_settings(app, dialog, include_prefs=False):
     except OSError as e:
         logger.warning("Pre-restore snapshot failed: %s", e)
         snapshot = None
+
+    # A 3.1 backup holds a profile library, no profile.yml: drop ours so the
+    # startup step below adopts from the restored library.
+    if _is_library_backup(path):
+        try:
+            profile_path().unlink(missing_ok=True)
+        except OSError as e:
+            logger.warning("Could not clear the profile for the library restore: %s", e)
 
     try:
         restored = restore_zip(
@@ -469,7 +497,7 @@ def restore_settings(app, dialog, include_prefs=False):
     # the restored custom buffs.
     app.database.reload()
     # The in-memory profile store still holds the pre-restore document; reopen
-    # whatever the restored userdata/profiles/ + active_profile pref now say.
+    # the restored profile.yml (or adopt from a restored 3.1 library).
     profile_io.startup_profile(app)
     if db_panel is not None:
         db_panel.refresh_from_database()

@@ -1,6 +1,6 @@
 """KazBars — runtime profile store: the in-memory document + debounced autosave.
 
-One `ProfileStore` per open profile. Panels are views: they read sections via
+One `ProfileStore` for the open profile. Panels are views: they read sections via
 `get_section` (treat as read-only) and write through `set_section` /
 `update_section`, which arm a debounced atomic write — there is no dirty flag,
 no Save prompt, and no gather-at-save step, so section data exists independent
@@ -78,6 +78,12 @@ class ProfileStore:
 
     def set_name(self, name: str) -> None:
         self._doc['name'] = str(name).strip() or self._doc['name']
+        self._touch()
+
+    def replace_document(self, doc: dict) -> None:
+        """Put `doc` in place of the document (Import, Reset). The session
+        snapshot stays, so Revert to session start brings the old one back."""
+        self._doc = doc
         self._touch()
 
     def revert_to_session_start(self) -> None:
