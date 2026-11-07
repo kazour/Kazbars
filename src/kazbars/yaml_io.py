@@ -49,7 +49,7 @@ def loads(text):
 
 def read_file(path):
     """A data file's value by extension: `.json` as JSON, anything else as
-    YAML. Raises `OSError`, or `ValueError` for text that doesn't read
+    YAML, both in `loads`' shapes. Raises `OSError`, or `ValueError` for text that doesn't read
     (`UnicodeDecodeError`, a JSON or YAML error)."""
     path = Path(path)
     text = path.read_text(encoding='utf-8')
