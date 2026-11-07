@@ -96,6 +96,7 @@
 | `src/kazbars/update_orchestrator.py` | 148 |
 | `src/kazbars/userdata.py` | 110 |
 | `src/kazbars/window_position.py` | 162 |
+| `src/kazbars/yaml_io.py` | 150 |
 | `tests/test_app_contract.py` | 104 |
 | `tests/test_app_icon.py` | 43 |
 | `tests/test_as2_class_names.py` | 77 |
@@ -167,3 +168,4 @@
 | `tests/test_update_check.py` | 83 |
 | `tests/test_update_orchestrator.py` | 226 |
 | `tests/test_userdata.py` | 71 |
+| `tests/test_yaml_io.py` | 133 |

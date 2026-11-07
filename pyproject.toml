@@ -15,6 +15,7 @@ dependencies = [
     "pywin32>=306; sys_platform == 'win32'",
     "pywinstyles>=1.8; sys_platform == 'win32'",
     "Pillow>=10.0,<13",
+    "PyYAML>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -124,6 +125,7 @@ files = [
     "src/kazbars/swf_font.py",
     "src/kazbars/update_check.py",
     "src/kazbars/userdata.py",
+    "src/kazbars/yaml_io.py",
 ]
 ignore_missing_imports = true
 warn_unused_configs = true

@@ -116,5 +116,5 @@ embeds the GreenSock TweenLite classes (© GreenSock), untouched.
 
 The release zip is built with PyInstaller and bundles the Python runtime and these packages,
 each under its own license: Python (PSF), ttkbootstrap (MIT), Pillow (MIT-CMU),
-pywin32 (PSF), pywinstyles (CC0-1.0). PyInstaller's bootloader is GPL-2.0-or-later with the
+pywin32 (PSF), pywinstyles (CC0-1.0), PyYAML (MIT). PyInstaller's bootloader is GPL-2.0-or-later with the
 exception that permits bundling programs under any license.
