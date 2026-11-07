@@ -60,7 +60,7 @@ profile_store (in-memory doc + debounced autosave) ← profile_io, app
     prefs.json                    ← machine-local (window positions, game path, resolution, the Grids tab's `grids_tab`, the overhead anchor `anchor_side`/`anchor_up` — this PC's field of view, so never profile data, the `last_build`/`last_patch` staleness records, UI state)
     profile.yml                   ← THE profile document (YAML; `profile_io.write_profile` is the sole writer)
     profile.yml.bak               ← its session-start snapshot (Revert to session start; the damaged-file fallback)
-    profile.damaged.yml           ← only after that fallback: the file that failed the gate, set aside
+    profile.damaged.yml           ← only after that fallback: the damaged file, set aside (a locked or newer-schema one is never moved — the app exits instead)
     profiles/*.json               ← a 3.1 library, read once by the adopt step (`profile_io._adopt_library`), never written
     database_user.json            ← user buff deltas (seeded empty)
     prefs3_snapshot.xml           ← copy of the game's Prefs_3.xml, taken only while the install is healthy; Repair re-injects stripped archives from it (Flow 29)

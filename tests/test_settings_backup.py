@@ -256,10 +256,13 @@ def test_a_3_1_backup_restores_its_library_and_the_next_startup_adopts(monkeypat
     with zipfile.ZipFile(z, "w") as zf:
         zf.writestr("kazbars/profiles/Raid.json", json.dumps(raid))
         zf.writestr("kazbars/prefs.json", json.dumps({"active_profile": raid["id"]}))
-    assert settings_backup._is_library_backup(z)
+        zf.writestr("manifest.json", json.dumps({
+            "format": "kazbars-settings-backup",
+            "sections": {"kazbars": {"profiles": 1, "prefs": 1}}}))
 
     order = []
     _stub_restore_settings_deps(monkeypatch, tmp_path, order)
+    monkeypatch.setattr(settings_backup, "read_manifest", read_manifest)
     monkeypatch.setattr(settings_backup, "filedialog",
                         SimpleNamespace(askopenfilename=lambda **k: str(z)))
     monkeypatch.setattr(settings_backup, "userdata_root", userdata.userdata_root)
@@ -273,9 +276,12 @@ def test_a_3_1_backup_restores_its_library_and_the_next_startup_adopts(monkeypat
     assert adopted["id"] == raid["id"]
 
 
-def test_a_backup_with_profile_yml_is_not_a_library_backup(tmp_path) -> None:
-    z = tmp_path / "new.zip"
-    with zipfile.ZipFile(z, "w") as zf:
-        zf.writestr("kazbars/profile.yml", "format: kazbars-profile\n")
-        zf.writestr("kazbars/profiles/Old.json", "{}")
-    assert not settings_backup._is_library_backup(z)
+def test_a_backup_with_profile_yml_is_not_a_library_backup() -> None:
+    def manifest(kz):
+        return {"format": "kazbars-settings-backup", "sections": {"kazbars": kz}}
+
+    assert not settings_backup._is_library_backup(manifest({"profile": 1, "profiles": 2}))
+    # profile.yml failed to add: still this version's backup, never a 3.1 one.
+    assert not settings_backup._is_library_backup(manifest({"profile": 0, "profiles": 2}))
+    assert settings_backup._is_library_backup(manifest({"profiles": 2, "prefs": 1}))
+    assert not settings_backup._is_library_backup({"format": "kazbars-settings-backup"})

@@ -169,16 +169,13 @@ def write_backup_zip(
     return sections
 
 
-def _is_library_backup(zip_path):
-    """A 3.1 backup: profiles under ``kazbars/profiles/`` and no
-    ``kazbars/profile.yml``."""
-    try:
-        with zipfile.ZipFile(zip_path) as zf:
-            names = zf.namelist()
-    except (OSError, zipfile.BadZipFile):
-        return False
-    return (f"{KAZBARS_ARC}/{PROFILE_ARC}" not in names
-            and any(n.startswith(f"{KAZBARS_ARC}/profiles/") for n in names))
+def _is_library_backup(manifest):
+    """A 3.1 backup, by its manifest: a `profiles` count and no `profile`
+    key. This version always records `profile` (0 when the file didn't make
+    it into the zip), so a failed add never passes for a 3.1 backup."""
+    sections = manifest.get("sections")
+    kz = sections.get("kazbars") if isinstance(sections, dict) else None
+    return isinstance(kz, dict) and "profile" not in kz and "profiles" in kz
 
 
 def _zip_json(zip_path, member):
@@ -477,7 +474,7 @@ def restore_settings(app, dialog, include_prefs=False):
         logger.warning("Pre-restore snapshot failed: %s", e)
         snapshot = None
 
-    library = _is_library_backup(path)
+    library = _is_library_backup(manifest)
     try:
         restored = restore_zip(
             path,

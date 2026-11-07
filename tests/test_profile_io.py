@@ -18,7 +18,16 @@ from types import SimpleNamespace
 
 import pytest
 
-from kazbars import content_update, grid_model, profile_io, profile_share, userdata, yaml_io
+from kazbars import (
+    content_update,
+    grid_model,
+    inspect,
+    profile_io,
+    profile_share,
+    stopwatch,
+    userdata,
+    yaml_io,
+)
 from kazbars.overlay import size_for_height
 from kazbars.profile_document import SectionRegistry, new_document
 from kazbars.profile_store import ProfileStore
@@ -128,11 +137,68 @@ def test_a_damaged_profile_loads_the_bak_and_is_kept_aside(app, root):
 
 
 def test_a_damaged_profile_without_a_bak_seeds_from_the_template(app, root):
-    (root / "profile.yml").write_text("format: kazbars-profile\nschema: 99\n", encoding="utf-8")
+    (root / "profile.yml").write_text("format: kazbars-profile\nschema: 2\nid: nope\n",
+                                      encoding="utf-8")
     profile_io.startup_profile(app)
     assert app.profile_store.document["name"] == "My Setup"
     assert (root / "profile.damaged.yml").exists()
     assert "no copy could be read" in app.toasts[0][0]
+
+
+def _flaky_reads(monkeypatch, failures):
+    """`yaml_io.read_file` refusing the first `failures` reads with a
+    PermissionError (None: every read), then reading for real."""
+    real, calls = yaml_io.read_file, []
+
+    def read(path):
+        calls.append(path)
+        if failures is None or len(calls) <= failures:
+            raise PermissionError(13, "locked", str(path))
+        return real(path)
+
+    monkeypatch.setattr(profile_io.yaml_io, "read_file", read)
+    monkeypatch.setattr(profile_io.time, "sleep", lambda s: None)
+    return calls
+
+
+def _capture_exit_dialog(monkeypatch):
+    errors = []
+    monkeypatch.setattr(profile_io.messagebox, "showerror",
+                        lambda title, msg, **k: errors.append(msg))
+    return errors
+
+
+def test_a_locked_profile_is_retried_not_set_aside(app, root, monkeypatch):
+    _write_yml(root / "profile.yml", _doc(app, "Mine"))
+    calls = _flaky_reads(monkeypatch, failures=2)
+    profile_io.startup_profile(app)
+    assert len(calls) == 3
+    assert app.profile_store.document["name"] == "Mine"
+    assert not list(root.glob("profile.damaged*.yml")) and app.toasts == []
+
+
+def test_an_unreadable_profile_exits_without_touching_it(app, root, monkeypatch):
+    _write_yml(root / "profile.yml", _doc(app, "Mine"))
+    _write_yml(root / "profile.yml.bak", _doc(app, "Yesterday"))
+    before = _tree(root)
+    _flaky_reads(monkeypatch, failures=None)
+    errors = _capture_exit_dialog(monkeypatch)
+    with pytest.raises(SystemExit):
+        profile_io.startup_profile(app)
+    assert "hasn't been changed" in errors[0]
+    assert _tree(root) == before, "profile.yml and its .bak untouched, nothing set aside"
+    assert app.profile_store is None
+
+
+def test_a_newer_profile_exits_with_the_gate_message(app, root, monkeypatch):
+    path = root / "profile.yml"
+    path.write_text("format: kazbars-profile\nschema: 4\nid: 0123abcd\n", encoding="utf-8")
+    before = _tree(root)
+    errors = _capture_exit_dialog(monkeypatch)
+    with pytest.raises(SystemExit):
+        profile_io.startup_profile(app)
+    assert "needs a newer KazBars" in errors[0]
+    assert _tree(root) == before
 
 
 def test_startup_adopts_the_library_profile_prefs_point_at(app, root):
@@ -235,11 +301,27 @@ def test_import_replaces_the_document_in_the_same_store(app, root, monkeypatch, 
     home = _doc(app, "Home", A=1)
     store = _open_store(app, home)
     monkeypatch.setattr(profile_io.filedialog, "askopenfilename", lambda **k: str(path))
+    monkeypatch.setattr(profile_io, "confirm", lambda *a, **k: True)
     profile_io.import_profile(app)
     assert app.profile_store is store
     assert store.document["name"] == "Shared" and store.document["id"] != incoming["id"]
     store.revert_to_session_start()
     assert store.document["name"] == "Home", "Revert brings the previous profile back"
+
+
+def test_import_cancelled_changes_nothing(app, root, monkeypatch, tmp_path):
+    path = tmp_path / "x.kazbars.yml"
+    _write_yml(path, _doc(app, "Shared", B=1))
+    store = _open_store(app, _doc(app, "Home", A=1))
+    asked = []
+    monkeypatch.setattr(profile_io.filedialog, "askopenfilename", lambda **k: str(path))
+    monkeypatch.setattr(profile_io, "confirm",
+                        lambda msg, **k: asked.append((msg, k)) or False)
+    profile_io.import_profile(app)
+    assert "“Shared”" in asked[0][0] and "Revert to session start" in asked[0][0]
+    assert asked[0][1]["danger"] is True
+    assert store.document["name"] == "Home" and not store.dirty
+    assert app.toasts == []
 
 
 def test_import_shows_the_reason_and_keeps_the_profile(app, root, monkeypatch, tmp_path):
@@ -268,6 +350,7 @@ def test_import_continues_when_the_buff_merge_fails(app, root, monkeypatch, tmp_
         raise OSError("disk full")
 
     monkeypatch.setattr(profile_io.filedialog, "askopenfilename", lambda **k: str(path))
+    monkeypatch.setattr(profile_io, "confirm", lambda *a, **k: True)
     monkeypatch.setattr(profile_share, "merge_imported_buffs", _boom)
     profile_io.import_profile(app)
     assert app.profile_store.document["name"] == "Imported"
@@ -340,12 +423,35 @@ def test_a_junk_prefs_id_falls_back_to_the_hint(app, root):
     assert app.profile_store.document["id"] == a["id"]
 
 
-def test_the_prefs_id_wins_over_the_hint(app, root):
+def test_the_hint_wins_over_the_prefs_id(app, root):
     a, b = _doc(app, "Raid"), _doc(app, "Solo")
     _library(root, a, b)
     (root / "prefs.json").write_text(json.dumps({"active_profile": b["id"]}), encoding="utf-8")
     profile_io.startup_profile(app, active_hint=a["id"])
-    assert app.profile_store.document["id"] == b["id"]
+    assert app.profile_store.document["id"] == a["id"]
+
+
+@pytest.mark.parametrize("prefs, font, scale", [
+    ({"panel_font_size": 18}, None, 115),  # 18/16 → 112.5 → snap 115
+    ({}, None, 75),                        # the 3.1 default 12 → 12/16
+    ({"panel_font_size": 18}, 14, 90),     # an explicit size ignores the pref
+])
+def test_adoption_lifts_the_3_1_panel_font_pref(app, root, prefs, font, scale):
+    app.registry.register(stopwatch.PROFILE_SECTION)
+    app.registry.register(inspect.PROFILE_SECTION)
+    lib = root / "profiles"
+    lib.mkdir(exist_ok=True)
+    (lib / "Raid.json").write_text(json.dumps({
+        "schema": 2, "id": "0123abcd", "name": "Raid", "authored_at": [2560, 1440],
+        "modules": {"stopwatch": {"enabled": True, "fontSize": font},
+                    "inspect": {"enabled": True, "fontSize": font}},
+    }), encoding="utf-8")
+    (root / "prefs.json").write_text(json.dumps(prefs), encoding="utf-8")
+    profile_io.startup_profile(app)
+    modules = app.profile_store.document["modules"]
+    assert modules["overlay"]["size"] == 16
+    assert modules["stopwatch"]["scale"] == scale
+    assert modules["inspect"]["scale"] == scale
 
 
 def test_a_value_yaml_cannot_hold_is_a_failed_write_not_a_crash(app, root):

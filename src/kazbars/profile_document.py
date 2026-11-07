@@ -57,6 +57,11 @@ class DocumentError(ValueError):
     the library skips files that raise it; import surfaces it verbatim."""
 
 
+class NewerSchemaError(DocumentError):
+    """The document's schema is above this app's — intact, just not ours to
+    open (startup exits rather than set it aside)."""
+
+
 # =========================================================================== #
 # SECTION CONTRACT                                                            #
 # =========================================================================== #
@@ -315,7 +320,7 @@ def validate_document(registry: SectionRegistry, raw: Any) -> dict:
     if not isinstance(schema, int) or isinstance(schema, bool) or schema < 1:
         raise DocumentError('Not a KazBars profile.')
     if schema > DOC_SCHEMA_VERSION:
-        raise DocumentError('This profile needs a newer KazBars — update the app first.')
+        raise NewerSchemaError('This profile needs a newer KazBars — update the app first.')
 
     data = _migrate(raw)
 

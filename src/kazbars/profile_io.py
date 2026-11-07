@@ -11,7 +11,9 @@ a self-contained copy.
 `startup_profile` resolves the document at launch: `profile.yml`, else its
 session snapshot `profile.yml.bak` (the damaged file kept as
 `profile.damaged.yml`), else the active profile of a 3.1 library
-(`userdata/profiles/`, read once, never written), else the template seed.
+(`userdata/profiles/`, read once, never written), else the template seed. A
+`profile.yml` the OS won't hand over, or one from a newer KazBars, is never
+set aside: the app says so and exits with the file untouched.
 
 `apply_document` is the dispatch step (grids panel, live overlays, extras
 cards). It runs before `app.deiconify()` at startup so panels are
@@ -23,8 +25,10 @@ skipped-count line.
 import copy
 import logging
 import os
+import time
 from pathlib import Path
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
+from typing import NoReturn
 
 from ttkbootstrap.dialogs import Messagebox
 
@@ -32,7 +36,7 @@ from . import content_update, grid_templates, profile_share, yaml_io
 from .buff_db_layers import DeltaStore
 from .grid_model import get_game_resolution_or_default
 from .overlay import size_for_height
-from .profile_document import mint_id, new_document, validate_document
+from .profile_document import NewerSchemaError, mint_id, new_document, validate_document
 from .profile_share import GRIDS_EXT, PROFILE_EXT, slugify
 from .profile_store import ProfileStore
 from .settings_core import read_json
@@ -51,6 +55,8 @@ from .userdata import (
 logger = logging.getLogger(__name__)
 
 SEED_NAME = 'My Setup'
+STARTUP_READ_ATTEMPTS = 3
+STARTUP_RETRY_S = 0.25
 
 
 def file_mtime(path: Path) -> float:
@@ -75,20 +81,32 @@ def template_paths(app):
 # ============================================================================
 # FILES
 # ============================================================================
+class FileUnavailableError(ValueError):
+    """The OS wouldn't hand the file over (locked, no permission, gone): its
+    contents may be intact. Same message as a file that doesn't parse."""
+
+
 def _read_raw(path, noun):
     """A data file's value (`yaml_io.read_file`), or ``ValueError`` naming
-    the kind of file it couldn't be read as."""
+    the kind of file it couldn't be read as — ``FileUnavailableError`` when the OS
+    refused the read itself."""
+    msg = f"That file couldn't be read as a KazBars {noun}."
     try:
         return yaml_io.read_file(path)
-    except (OSError, ValueError) as e:
-        raise ValueError(f"That file couldn't be read as a KazBars {noun}.") from e
+    except OSError as e:
+        raise FileUnavailableError(msg) from e
+    except ValueError as e:
+        raise ValueError(msg) from e
 
 
-def read_profile_file(registry, path):
+def read_profile_file(registry, path, prepare=None):
     """A profile file through the gate → ``(doc, embedded_buffs)``. `.json`
     reads as JSON (a 3.1 export or library document), anything else as YAML.
-    Raises ``ValueError`` with a user-presentable message."""
+    `prepare(profile_raw)` runs before the gate. Raises ``ValueError`` with a
+    user-presentable message."""
     profile_raw, embedded = profile_share.parse_profile_file(_read_raw(path, 'profile'))
+    if prepare is not None:
+        profile_raw = prepare(profile_raw)
     return validate_document(registry, profile_raw), embedded
 
 
@@ -176,12 +194,21 @@ def release_store(app) -> bool:
 def startup_profile(app, active_hint=None):
     """Open the profile: `profile.yml` → its `.bak` (a damaged file) → the
     active profile of a 3.1 library → the template seed (blank if no template
-    reads). `active_hint` names the library profile to adopt when prefs.json
-    no longer does (a 3.1 backup restored without its prefs). Toasts wait for
-    the window."""
+    reads). `active_hint` names the library profile to adopt first (a restored
+    3.1 backup's own pointer). Toasts wait for the window."""
     path = profile_path()
     exists = path.exists()
-    doc = _try_read(app, path, warn=True) if exists else None
+    try:
+        doc = _read_startup_profile(app, path) if exists else None
+    except FileUnavailableError:
+        _fail_startup(
+            app, "KazBars couldn't open your profile file (userdata\\profile.yml). Another "
+            "program may be holding it — an antivirus scan or a sync tool.\n\n"
+            "Your profile hasn't been changed. Close that program, then start KazBars again.")
+    except NewerSchemaError as e:
+        _fail_startup(
+            app, f"{e}\n\nYour profile (userdata\\profile.yml) was saved by a newer version "
+            "of KazBars. It hasn't been changed.")
     on_disk = doc is not None
     toast = None
     if exists and not on_disk:
@@ -212,12 +239,41 @@ def startup_profile(app, active_hint=None):
         app.after(0, lambda: app_toast(app, msg, style, duration))
 
 
-def _try_read(app, path, warn=False):
+def _read_startup_profile(app, path):
+    """`profile.yml` through the gate, or None when it is damaged. A read the
+    OS refuses is retried briefly (a scan or sync lock passes); one still
+    refused raises ``FileUnavailableError``, a newer schema ``NewerSchemaError`` —
+    neither file is damaged, so neither may be set aside."""
+    for attempt in range(1, STARTUP_READ_ATTEMPTS + 1):
+        try:
+            return read_profile_file(app.registry, path)[0]
+        except FileUnavailableError:
+            if attempt == STARTUP_READ_ATTEMPTS:
+                raise
+            time.sleep(STARTUP_RETRY_S)
+        except ValueError as e:
+            if isinstance(e, NewerSchemaError):
+                raise
+            logger.warning('Profile file %s unreadable: %s', path.name, e)
+            return None
+
+
+def _fail_startup(app, msg) -> NoReturn:
+    """The exit path for a `profile.yml` that must not be replaced: any
+    other document would autosave over it. Says why, then exits. The native
+    box, not ttkbootstrap's: at launch the window is still withdrawn, and a
+    dialog transient to it never maps (an invisible modal grab)."""
+    logger.error('Startup stopped: %s', msg)
+    messagebox.showerror("KazBars can't open your profile", msg, parent=app)
+    raise SystemExit(1)
+
+
+def _try_read(app, path, warn=False, prepare=None):
     """`path` through the gate, or None when it doesn't read — a warning for
     the profile itself (`warn`), a debug line for a template or a 3.1
     library file passed over."""
     try:
-        return read_profile_file(app.registry, path)[0]
+        return read_profile_file(app.registry, path, prepare)[0]
     except ValueError as e:
         logger.log(logging.WARNING if warn else logging.DEBUG,
                    'Profile file %s unreadable: %s', path.name, e)
@@ -238,25 +294,47 @@ def _set_aside(path):
 
 
 def _adopt_library(app, active_hint=None):
-    """The profile a 3.1 library was on: the `active_profile` id its
-    prefs.json still holds (or `active_hint`), else its newest file. None
-    without one. Reads only; `profiles/` stays as it is."""
+    """The profile a 3.1 library was on: `active_hint` (a restored 3.1
+    backup's own pointer), else the `active_profile` id prefs.json still
+    holds, else its newest file. None without one. Reads only; `profiles/`
+    stays as it is."""
+    prefs = read_json(prefs_path()) or {}
+    active = prefs.get('active_profile')
+    panel_font = prefs.get('panel_font_size')
+    if not (isinstance(panel_font, int) and not isinstance(panel_font, bool)
+            and 8 <= panel_font <= 48):
+        panel_font = 12
     entries = []
     for path in sorted(profiles_dir().glob('*.json')):
-        doc = _try_read(app, path)
+        doc = _try_read(app, path, prepare=lambda raw: _lift_panel_font(raw, panel_font))
         if doc is not None:
             entries.append((path, doc))
     if not entries:
         return None
-    active = (read_json(prefs_path()) or {}).get('active_profile')
-    # The prefs id, then the hint, then the newest: a stale prefs id that names
-    # none of the files never hides the hint. Sorted by path: the first file
-    # with an id wins.
-    for wanted in (active, active_hint):
+    # The hint, then the prefs id, then the newest: a restored backup's own
+    # pointer beats whatever this PC's prefs still name, and an id that names
+    # none of the files falls through. Sorted by path: the first file with an
+    # id wins.
+    for wanted in (active_hint, active):
         for _path, doc in entries:
             if doc['id'] == wanted:
                 return doc
     return max(entries, key=lambda e: file_mtime(e[0]))[1]
+
+
+def _lift_panel_font(profile_raw, panel_font):
+    """A 3.1 (schema 2) library document's stopwatch/inspect `fontSize: null`
+    meant "the machine-local `panel_font_size` pref": fill it in so the
+    schema 2 → 3 migration scales from that size, not from 100 %. Mutates and
+    returns `profile_raw` (a fresh dict from the file)."""
+    if not isinstance(profile_raw, dict) or profile_raw.get('schema') != 2:
+        return profile_raw
+    modules = profile_raw.get('modules')
+    for key in ('stopwatch', 'inspect'):
+        section = modules.get(key) if isinstance(modules, dict) else None
+        if isinstance(section, dict) and section.get('fontSize') is None:
+            section['fontSize'] = panel_font
+    return profile_raw
 
 
 def template_doc(app):
@@ -343,9 +421,9 @@ def export_profile(app):
 
 def import_profile(app):
     """File ▸ Import profile… — read a profile file (YAML, a 3.1 `.kazbars.json`
-    export or a bare library document), run it through the gate, mint a fresh
-    id, merge its custom buffs, and put it in place of the open profile (Revert
-    to session start brings that back)."""
+    export or a bare library document), run it through the gate, confirm,
+    mint a fresh id, merge its custom buffs, and put it in place of the open
+    profile (Revert to session start brings that back)."""
     path = filedialog.askopenfilename(
         title="Import Profile",
         initialdir=str(userdata_root()),
@@ -358,6 +436,13 @@ def import_profile(app):
         doc, embedded = read_profile_file(app.registry, path)
     except ValueError as e:  # user-presentable, incl. the gate's "older KazBars"
         Messagebox.show_error(str(e), title="Import Failed")
+        return
+    if not confirm(
+        f"Replace your profile with “{doc['name']}”?\n\nEvery grid and extra is replaced "
+        "by the imported ones. Revert to session start brings back your profile as it "
+        "was when you opened KazBars.",
+        title="Import Profile", action="Import", parent=app, danger=True,
+    ):
         return
     doc['id'] = mint_id()
     app.profile_store.replace_document(doc)
