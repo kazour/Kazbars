@@ -56,8 +56,8 @@
 | `src/kazbars/grid_editor_panel.py` | 591 |
 | `src/kazbars/grid_model.py` | 453 |
 | `src/kazbars/grid_preview.py` | 238 |
-| `src/kazbars/grid_preview_canvas.py` | 218 |
-| `src/kazbars/grid_settings_dialog.py` | 530 |
+| `src/kazbars/grid_preview_canvas.py` | 224 |
+| `src/kazbars/grid_settings_dialog.py` | 529 |
 | `src/kazbars/grid_templates.py` | 85 |
 | `src/kazbars/grids_generator.py` | 790 |
 | `src/kazbars/grids_panel.py` | 926 |
@@ -75,7 +75,7 @@
 | `src/kazbars/paths.py` | 46 |
 | `src/kazbars/prefs.py` | 189 |
 | `src/kazbars/profile_document.py` | 345 |
-| `src/kazbars/profile_io.py` | 434 |
+| `src/kazbars/profile_io.py` | 438 |
 | `src/kazbars/profile_share.py` | 172 |
 | `src/kazbars/profile_store.py` | 133 |
 | `src/kazbars/self_update.py` | 487 |
@@ -90,7 +90,7 @@
 | `src/kazbars/ui_components.py` | 681 |
 | `src/kazbars/ui_forms.py` | 599 |
 | `src/kazbars/ui_headers.py` | 197 |
-| `src/kazbars/ui_helpers.py` | 199 |
+| `src/kazbars/ui_helpers.py` | 200 |
 | `src/kazbars/ui_tk_style.py` | 67 |
 | `src/kazbars/ui_widgets.py` | 332 |
 | `src/kazbars/update_check.py` | 64 |

@@ -50,6 +50,7 @@ from .ui_helpers import (
     BTN_DIALOG,
     FONT_FORM_LABEL,
     FONT_SMALL,
+    INPUT_WIDTH_SORTING,
     MODULE_COLORS,
     PAD_MICRO,
     PAD_MID,
@@ -65,8 +66,6 @@ from .ui_widgets import add_tooltip, app_toast
 from .window_position import center_on_parent
 
 _WIDTH = 720
-# The Fill / Sort / Order comboboxes: the longest fill label fits.
-_INPUT_WIDTH_SORTING = 24
 
 _FILL_OPTIONS = [
     # (persisted code, user-facing label, tooltip description)
@@ -363,7 +362,7 @@ class GridSettingsDialog(tk.Toplevel):
         self.fill_var = tk.StringVar()
         cell, _ = self._field(card, "Fill:")
         self.fill_combo = labeled_combobox(
-            cell, None, self.fill_var, [], width=_INPUT_WIDTH_SORTING,
+            cell, None, self.fill_var, [], width=INPUT_WIDTH_SORTING,
             tooltip=lambda: _FILL_DESCRIPTIONS.get(self.fill_var.get(), "Direction buffs fill into the grid"),
             on_change=self._changed)
         if self._band:
@@ -378,13 +377,13 @@ class GridSettingsDialog(tk.Toplevel):
                                                                    _SORT_LABEL_BY_CODE['longest']))
         cell, _ = self._field(card, "Sort:")
         labeled_combobox(cell, None, self.sort_var, [label for _, label, _ in _SORT_OPTIONS],
-                         width=_INPUT_WIDTH_SORTING,
+                         width=INPUT_WIDTH_SORTING,
                          tooltip=lambda: _SORT_DESCRIPTIONS.get(self.sort_var.get(), "How buffs are ordered"))
         self.layout_var = tk.StringVar(value=_LAYOUT_LABEL_BY_CODE.get(cfg.get('layout', 'buffFirst'),
                                                                        _LAYOUT_LABEL_BY_CODE['buffFirst']))
         cell, _ = self._field(card, "Order:")
         labeled_combobox(cell, None, self.layout_var, [label for _, label in _LAYOUT_OPTIONS],
-                         width=_INPUT_WIDTH_SORTING,
+                         width=INPUT_WIDTH_SORTING,
                          tooltip="In Buffs First and Debuffs First, misc effects always lead. "
                                  "In Mixed, all buffs sort together by time.")
         return card

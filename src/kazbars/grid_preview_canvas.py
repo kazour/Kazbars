@@ -173,9 +173,15 @@ class GridPreview(tk.Canvas):
         if i == self._hot:
             return
         prev, self._hot = self._hot, i
-        # Every cell of a dynamic grid looks alike: all of them light as one.
-        for j in (prev, i) if self._static() else range(len(self._layout.rects)):
-            self.repaint_slot(j)
+        if self._static():
+            self.repaint_slot(prev)
+            self.repaint_slot(i)
+        else:
+            # Every cell of a dynamic grid looks alike: one outline for all,
+            # the resting one as `repaint_slot` draws it.
+            full = bool(grid_preview.held_ids(self._cfg))
+            rest = (self._accent if self._enabled else TK_COLORS['border']) if full else TK_COLORS['border']
+            self.itemconfigure('rect', outline=THEME_COLORS['heading'] if i >= 0 else rest)
 
     def _on_motion(self, event):
         # Anywhere over a dynamic grid is the whole grid.

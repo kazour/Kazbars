@@ -180,13 +180,14 @@ def startup_profile(app, active_hint=None):
     no longer does (a 3.1 backup restored without its prefs). Toasts wait for
     the window."""
     path = profile_path()
-    doc = _try_read(app, path) if path.exists() else None
+    exists = path.exists()
+    doc = _try_read(app, path, warn=True) if exists else None
     on_disk = doc is not None
     toast = None
-    if path.exists() and not on_disk:
+    if exists and not on_disk:
         _set_aside(path)
         bak = profile_bak_path()
-        doc = _try_read(app, bak) if bak.exists() else None
+        doc = _try_read(app, bak, warn=True) if bak.exists() else None
         toast = (("Your profile file was damaged — restored the copy from your last session",
                   'warning', None) if doc is not None else
                  ("Your profile file was damaged and no copy could be read — starting from "
@@ -211,12 +212,15 @@ def startup_profile(app, active_hint=None):
         app.after(0, lambda: app_toast(app, msg, style, duration))
 
 
-def _try_read(app, path):
-    """`path` through the gate, or None (logged) when it doesn't read."""
+def _try_read(app, path, warn=False):
+    """`path` through the gate, or None when it doesn't read — a warning for
+    the profile itself (`warn`), a debug line for a template or a 3.1
+    library file passed over."""
     try:
         return read_profile_file(app.registry, path)[0]
     except ValueError as e:
-        logger.warning('Profile file %s unreadable: %s', path.name, e)
+        logger.log(logging.WARNING if warn else logging.DEBUG,
+                   'Profile file %s unreadable: %s', path.name, e)
         return None
 
 
