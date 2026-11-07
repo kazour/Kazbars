@@ -7,7 +7,7 @@
 // nameplate from. A character's views are one stack centred KazBarsRelations.side px left of the point (the head's
 // centre): the lowest shown one's bottom edge
 // KazBarsRelations.lift (the anchor's projected rise plus its own plateOffset px of nameplate room) above the point, each next
-// shown one STACK px above the one below, in bake order (the static grids, then the bands: core bakes them so), so the
+// shown one STACK px above the one below, in bake order (the static grids, then the bands: the generator bakes them so), so the
 // static grids sit against the nameplate and the bands grow above them; an empty or hidden one takes no place. A band's
 // W and H follow what it shows, so a view's content is picked before its place is computed. A view hides out of
 // view, dead, past maxDistance m, wholly off the stage or on an unreadable point; past every one of its grids'

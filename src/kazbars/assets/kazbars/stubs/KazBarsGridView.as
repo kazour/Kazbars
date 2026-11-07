@@ -251,7 +251,7 @@ class KazBarsGridView {
     }
 
     // =========================================================================
-    // Text: the stack counter and the timer. Nothing below floors or caps a size: core's overlay_size did.
+    // Text: the stack counter and the timer. Nothing below floors or caps a size: the generator's overlay_size did.
     // =========================================================================
 
     // The bar at p percent, in the slot art's native px: a strip a twelfth of the icon high (2 px or more) along the
@@ -296,7 +296,7 @@ class KazBarsGridView {
         tf.setNewTextFormat(fmt);
     }
 
-    // cfg.iconSize, cfg.stackFont and cfg.timerFont are on-screen values baked by core's overlay_size::grid_metrics.
+    // cfg.iconSize, cfg.stackFont and cfg.timerFont are on-screen values baked by the generator's overlay_size.grid_metrics.
     // The stack counter sits 4 px in from the icon's top and right; the timer digits are centred, their box ending at
     // the icon's bottom plus timerYOffset, then kept inside the icon and clear of the stack counter when its box fits
     // there; the shadow is one screen pixel. The bar timer (cfg.timerStyle "bar") is a sibling of the icon at depth

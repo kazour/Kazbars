@@ -140,15 +140,19 @@ def fact_code(btype, stack):
     return t | (max(0, min(level, 1023)) << 2) | (family << 12)
 
 
-def grid_ships(grid):
-    """A grid is baked only when enabled and tracking something: a dynamic grid
-    a whitelist entry, a static one a buff in a slot inside its shape. An empty
-    grid is left out as it is, never turned off."""
-    if not grid.get("enabled", True):
-        return False
+def grid_holds(grid):
+    """Whether a grid tracks something: a dynamic grid a whitelist entry, a
+    static one a buff in a slot inside its shape. The one rule behind
+    `grid_ships`, the card's nudge and the step guide."""
     if grid.get("slotMode") != "static":
         return bool(grid.get("whitelist"))
     return any(value for _, value in _slots_in_shape(grid))
+
+
+def grid_ships(grid):
+    """A grid is baked only when enabled and it holds something. An empty grid
+    is left out as it is, never turned off."""
+    return bool(grid.get("enabled", True)) and grid_holds(grid)
 
 
 def _slots_in_shape(grid):
@@ -175,11 +179,7 @@ def _archive_keys(grids):
     used: set[str] = set()
     keys = {}
     for grid in grids:
-        base = sanitize_id(grid.get("id", "Grid"))
-        key, suffix = base, 2
-        while key in used:
-            key = f"{base}_{suffix}"
-            suffix += 1
+        key = free_id(used, sanitize_id(grid.get("id", "Grid")))
         used.add(key)
         keys[id(grid)] = key
     return keys
@@ -216,6 +216,17 @@ def _stack_bound(value, fallback):
 
 def _bool(value):
     return "true" if value else "false"
+
+
+def _as2_strs(items):
+    """`items` as a comma-joined run of AS2 string literals."""
+    return ", ".join(f'"{escape_as2_string(s)}"' for s in items)
+
+
+def _row_literal(group, label, row):
+    """An inspect row as `d.INS.rows` / `d.INS.pvp.rows` carries it: `g` its
+    group's index, `l` its label, then the row's own AS2 fields."""
+    return f'{{g: {group}, l: "{escape_as2_string(label)}", {row.as2_fields()}}}'
 
 
 class CodeGenerator:
@@ -406,16 +417,12 @@ class CodeGenerator:
         indexing those groups, `l` the label, then the row's own AS2 fields),
         and every id they read plus the always-polled ones."""
         selected = inspect_catalog.shown(self.inspect_config["rows"])
-        groups: list = []
-        for r in selected:
-            if r.group not in groups:
-                groups.append(r.group)
+        groups = list(dict.fromkeys(r.group for r in selected))
         groups_line = "        d.INS.groups = [{}];".format(", ".join(
             f'{{n: "{escape_as2_string(g.label)}", p: {_bool(g.player_gated)}}}' for g in groups))
         if selected:
             entries = ",\n".join(
-                f'            {{g: {groups.index(r.group)}, l: "{escape_as2_string(r.label)}", '
-                f'{r.as2_fields()}}}' for r in selected)
+                "            " + _row_literal(groups.index(r.group), r.label, r) for r in selected)
             rows_lines = f"        d.INS.rows = [\n{entries}\n        ];"
         else:
             rows_lines = "        d.INS.rows = [];"
@@ -428,15 +435,13 @@ class CodeGenerator:
         and `ids` (what the view reads plus the always-polled ids; not
         `watch`, a method every AS2 object has)."""
         groups = ", ".join(
-            "{{n: \"{}\", c: [{}]}}".format(
-                escape_as2_string(title), ", ".join(f'"{escape_as2_string(c)}"' for c in cols))
+            f'{{n: "{escape_as2_string(title)}", c: [{_as2_strs(cols)}]}}'
             for title, cols, _ in inspect_catalog.PVP_VIEW)
         labels = [(g, label) for g, (_, _, lines) in enumerate(inspect_catalog.PVP_VIEW)
                   for label, _ in lines]
-        rows = ", ".join(
-            f'{{g: {g}, l: "{escape_as2_string(label)}", {row.as2_fields()}}}'
-            for (g, label), row in zip(labels, inspect_catalog.pvp_rows()))
-        ids = ", ".join(str(i) for i in inspect_catalog.watch_ids(inspect_catalog.pvp_rows()))
+        pvp_rows = inspect_catalog.pvp_rows()
+        rows = ", ".join(_row_literal(g, label, row) for (g, label), row in zip(labels, pvp_rows))
+        ids = ", ".join(str(i) for i in inspect_catalog.watch_ids(pvp_rows))
         return f"\n        d.INS.pvp = {{groups: [{groups}], rows: [{rows}], ids: [{ids}]}};"
 
     def _onslaught_data_block(self):
@@ -448,11 +453,8 @@ class CodeGenerator:
         helpers, the heal buffs and the per-playfield facts."""
         c = self.onslaught_config
 
-        def quoted(names):
-            return ", ".join(f'"{escape_as2_string(n)}"' for n in names)
-
         def names(kind, wanted):
-            return quoted(onslaught.names_of(c, kind)) if wanted else ""
+            return _as2_strs(onslaught.names_of(c, kind)) if wanted else ""
 
         listed = c["showList"] or c["showAlerts"]
         lines = [
@@ -469,8 +471,8 @@ class CodeGenerator:
             f"            m: [{names(onslaught.MINI, listed)}],",
             f"            c: [{names(onslaught.CAMP, c['showList'])}]",
             "        };",
-            f"        d.ONS.helpers = [{quoted(onslaught.AOE_HELPERS)}];",
-            f"        d.ONS.heal = [{quoted(onslaught.HEAL_BUFFS)}];",
+            f"        d.ONS.helpers = [{_as2_strs(onslaught.AOE_HELPERS)}];",
+            f"        d.ONS.heal = [{_as2_strs(onslaught.HEAL_BUFFS)}];",
             "        d.ONS.pf = {};",
         ]
         lines += [f'        d.ONS.pf[{i.playfield}] = {{start: "{escape_as2_string(i.start_hint)}", '
@@ -481,9 +483,8 @@ class CodeGenerator:
     def _console_data_block(self):
         """`d.CON`: the console's text size and its tabs in the strip's order."""
         c = self.console_config
-        tabs = ", ".join(f'"{t}"' for t in c["tabs"])
         return (f"\n        d.CON = {{fontSize: {panel_fs(self.base_size, c['scale'])}, "
-                f"tabs: [{tabs}]}};")
+                f"tabs: [{_as2_strs(c['tabs'])}]}};")
 
     def _data_units(self):
         """The data-class body as self-contained source units, in emit order:

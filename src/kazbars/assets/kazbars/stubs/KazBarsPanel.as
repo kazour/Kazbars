@@ -1,5 +1,5 @@
-// KazBarsPanel.as - Chrome-family base for the four runtime-drawn panels
-// (Console, Inspect, PreviewPanel, Onslaught). Holds the family's
+// KazBarsPanel.as - Chrome-family base for the five runtime-drawn panels
+// (Console, Inspect, PreviewPanel, Onslaught, Stopwatch). Holds the family's
 // shared primitives exactly as each panel drew them: warm near-black plate with
 // the 1px black-over-bronze double frame, Arial device-font TextFields, the
 // flat square button, the box/tick/hit checkbox, Stage-clamped title-strip drag,

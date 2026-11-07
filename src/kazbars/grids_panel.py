@@ -31,7 +31,7 @@ from .grid_model import (
     snap_row_cap,
     validate_grid,
 )
-from .grids_generator import free_id
+from .grids_generator import free_id, grid_holds
 from .overlay import DEFAULT_FONT, DEFAULT_SIZE, FONT_CHOICES, SIZE_CHOICES, font_label
 from .overlay_size import SCALE_DEFAULT, grid_metrics
 from .prefs import ANCHOR_SIDE_DEFAULT, ANCHOR_UP_DEFAULT
@@ -644,19 +644,7 @@ class GridsPanel(ttk.Frame):
 
         has_game_path = bool(get_setting('game_path'))
         has_grids = bool(self.grids)
-
-        needs_setup = False
-        if has_grids:
-            for g in self.grids:
-                if g.get('slotMode') == 'static':
-                    if not any(v for v in g.get('slotAssignments', {}).values()):
-                        needs_setup = True
-                        break
-                elif not g.get('whitelist'):
-                    needs_setup = True
-                    break
-
-        buffs_done = has_grids and not needs_setup
+        buffs_done = has_grids and all(grid_holds(g) for g in self.grids)
         self._update_step_guide([has_game_path, has_grids, buffs_done, self._build_done])
 
         ready = has_game_path and buffs_done

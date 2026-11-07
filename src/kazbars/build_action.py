@@ -26,7 +26,7 @@ from .grid_model import get_game_resolution_or_default, max_slots, slot_count
 from .grids_generator import grid_ships, unresolved_refs
 from .profile_document import build_signature
 from .ui_helpers import THEME_COLORS
-from .ui_widgets import app_toast, confirm, flash_status_bar
+from .ui_widgets import app_toast, flash_status_bar
 
 logger = logging.getLogger(__name__)
 
@@ -120,35 +120,6 @@ def build(app):
                 game_folder.pulse_game_hint(app)
             Messagebox.show_error(msg, title="Build Error")
             return
-
-    empty = []
-    for g in grids:
-        if not g.get('enabled', True):
-            continue
-        if g.get('slotMode') == 'static':
-            sa = g.get('slotAssignments', {})
-            if not any(v for v in sa.values()):
-                empty.append(g['id'])
-        else:
-            if not g.get('whitelist'):
-                empty.append(g['id'])
-
-    if empty:
-        names = ', '.join(f"'{n}'" for n in empty)
-        if not confirm(
-            f"These grids have no tracked buffs and would appear empty in-game:\n\n{names}\n\n"
-            "Disable them and build anyway?",
-            title="Empty Grids", action="Disable & build"
-        ):
-            return
-        for g in grids:
-            if g['id'] in empty:
-                g['enabled'] = False
-        # Rebuild the cards from the mutated dicts BEFORE pushing to the store:
-        # _on_grids_edited flushes widget values over the dicts, so pushing
-        # first would let the stale enabled-toggles clobber the disable.
-        app.grids_panel.refresh_panels()
-        app._on_grids_edited()
 
     if not _declarations_gate(app):
         return

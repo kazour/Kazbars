@@ -21,7 +21,7 @@ from math import gcd
 from typing import Any
 
 from .grid_model import ref_list
-from .grids_generator import grid_ships
+from .grids_generator import grid_holds
 
 Rect = tuple[int, int, int, int]
 
@@ -198,8 +198,8 @@ def slot_tip(cfg: dict, name_of: Callable[[Any], str], idx: int, *, actions: boo
 
 def empty_nudge(cfg: dict) -> str | None:
     """What a grid holding nothing says instead of its names. The build's own
-    rule decides (`grid_ships`, enabled or not): such a grid is left out."""
-    if grid_ships(dict(cfg, enabled=True)):
+    rule decides (`grid_holds`, enabled or not): such a grid is left out."""
+    if grid_holds(cfg):
         return None
     if cfg.get('slotMode') == 'static':
         return ("No slots assigned yet, so it is not built. Click a slot to choose "

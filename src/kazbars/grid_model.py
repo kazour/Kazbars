@@ -437,12 +437,9 @@ def _harvest_grid_refs(section):
     assignments, scalar or list) — the export layer resolves and filters."""
     refs = []
     for g in section.get('grids', []):
-        refs.extend(g.get('whitelist', []))
+        refs.extend(ref_list(g.get('whitelist')))
         for val in g.get('slotAssignments', {}).values():
-            if isinstance(val, list):
-                refs.extend(val)
-            elif val is not None:
-                refs.append(val)
+            refs.extend(ref_list(val))
     return refs
 
 

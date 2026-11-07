@@ -9,8 +9,6 @@ other face is baked into SWF font tags shipped under
 `assets/kazbars/fonts/<slug>.bin` and spliced over the Arials at build time.
 """
 
-from typing import Any
-
 from .profile_document import LANE_BUILD
 from .profile_document import SectionSpec as ProfileSectionSpec
 from .settings_core import Field, Schema, validate_all
@@ -96,25 +94,13 @@ def size_for_height(height: int) -> int:
     return 24
 
 
-def _validate_size(value: Any) -> int:
-    try:
-        size = int(value)
-    except (TypeError, ValueError, OverflowError):
-        return DEFAULT_SIZE
-    return size if any(size == s for s, _ in SIZE_CHOICES) else DEFAULT_SIZE
-
-
-def _validate_font(value: Any) -> str:
-    return value if isinstance(value, str) and value in FONT_CHOICES else DEFAULT_FONT
-
-
 _SCHEMA = Schema('', 1, {
-    'size': Field(DEFAULT_SIZE, validate=_validate_size),
-    'font': Field(DEFAULT_FONT, validate=_validate_font),
+    'size': Field(DEFAULT_SIZE, kind='int', choices=tuple(s for s, _ in SIZE_CHOICES)),
+    'font': Field(DEFAULT_FONT, choices=FONT_CHOICES),
 })
 
 
-def validate_config(config: Any) -> dict:
+def validate_config(config) -> dict:
     """The section with exactly its two keys: absent or non-dict → 12 / Arial."""
     return validate_all(_SCHEMA, config)
 

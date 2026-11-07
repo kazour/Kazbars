@@ -114,7 +114,7 @@ def _coerce_field(f: Field, value: Any) -> Any:
         if f.kind == 'int':
             try:
                 coerced = int(value)
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):  # inf: YAML `.inf`
                 return f.default
             return coerced if coerced in f.choices else f.default
         return value if value in f.choices else f.default

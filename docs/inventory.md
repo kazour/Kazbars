@@ -20,7 +20,7 @@
 | `src/kazbars/buff_db_layers.py` | 258 |
 | `src/kazbars/buff_display_editor.py` | 711 |
 | `src/kazbars/buff_xml.py` | 377 |
-| `src/kazbars/build_action.py` | 362 |
+| `src/kazbars/build_action.py` | 333 |
 | `src/kazbars/build_executor.py` | 392 |
 | `src/kazbars/build_loading.py` | 512 |
 | `src/kazbars/build_utils.py` | 62 |
@@ -53,13 +53,13 @@
 | `src/kazbars/game_resolution.py` | 161 |
 | `src/kazbars/grid_dialogs.py` | 787 |
 | `src/kazbars/grid_editor_panel.py` | 591 |
-| `src/kazbars/grid_model.py` | 456 |
+| `src/kazbars/grid_model.py` | 453 |
 | `src/kazbars/grid_preview.py` | 238 |
 | `src/kazbars/grid_preview_canvas.py` | 218 |
 | `src/kazbars/grid_settings_dialog.py` | 529 |
 | `src/kazbars/grid_templates.py` | 85 |
-| `src/kazbars/grids_generator.py` | 791 |
-| `src/kazbars/grids_panel.py` | 948 |
+| `src/kazbars/grids_generator.py` | 792 |
+| `src/kazbars/grids_panel.py` | 936 |
 | `src/kazbars/inspect.py` | 69 |
 | `src/kazbars/inspect_catalog.py` | 585 |
 | `src/kazbars/inspect_panel.py` | 393 |
@@ -68,7 +68,7 @@
 | `src/kazbars/live_tracker_settings.py` | 175 |
 | `src/kazbars/onslaught.py` | 200 |
 | `src/kazbars/onslaught_panel.py` | 360 |
-| `src/kazbars/overlay.py` | 122 |
+| `src/kazbars/overlay.py` | 108 |
 | `src/kazbars/overlay_engine.py` | 800 |
 | `src/kazbars/overlay_size.py` | 115 |
 | `src/kazbars/paths.py` | 46 |
@@ -83,7 +83,7 @@
 | `src/kazbars/settings_manager.py` | 56 |
 | `src/kazbars/stopwatch.py` | 51 |
 | `src/kazbars/stopwatch_panel.py` | 204 |
-| `src/kazbars/swf_font.py` | 295 |
+| `src/kazbars/swf_font.py` | 290 |
 | `src/kazbars/timer_overlay.py` | 372 |
 | `src/kazbars/ui_collapsible.py` | 165 |
 | `src/kazbars/ui_components.py` | 682 |

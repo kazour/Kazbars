@@ -32,19 +32,17 @@ tag at fault.
 import struct
 import zlib
 
-from as2c.swf import Movie, SwfError, Tag
+from as2c.swf import TAG_EXPORT_ASSETS as EXPORT_ASSETS
+from as2c.swf import TAG_NAMES, Movie, SwfError, Tag
 
 from .overlay import HYBORIAN
 
 ALIGN_ZONES = 73
 DEFINE_FONT3 = 75
 DEFINE_FONT_NAME = 88
-EXPORT_ASSETS = 56
 IMPORT_ASSETS = 57
 IMPORT_ASSETS2 = 71
 _FONT_TAGS = (ALIGN_ZONES, DEFINE_FONT3, DEFINE_FONT_NAME)
-_TAG_NAMES = {DEFINE_FONT3: 'DefineFont3', DEFINE_FONT_NAME: 'DefineFontName',
-              ALIGN_ZONES: 'DefineFontAlignZones'}
 
 # The two faces base.swf embeds: Arial and Arial Bold.
 FONT_IDS = (1, 2)
@@ -90,9 +88,7 @@ def _blob_error(why: str) -> SwfFontError:
     return SwfFontError(f'the font data is malformed: {why}')
 
 
-def _missing(where: str, tag: str, font: int) -> SwfFontError:
-    if where == 'blob':
-        return SwfFontError(f'the font data has no {tag} id {font}')
+def _missing(tag: str, font: int) -> SwfFontError:
     return SwfFontError(f'the base SWF has no {tag} id {font} to replace')
 
 
@@ -117,19 +113,19 @@ def records(blob: bytes) -> list[Tag]:
             raise _blob_error(f'tag code {code} at byte {pos} is not a font tag')
         end = pos + header + length
         if end > len(blob):
-            raise _blob_error(f'the {_TAG_NAMES[code]} tag at byte {pos} runs past the end')
+            raise _blob_error(f'the {TAG_NAMES[code]} tag at byte {pos} runs past the end')
         tag = Tag(code, blob[pos + header:end], header == 6)
         fid = font_id(tag)
         if fid is None:
-            raise _blob_error(f'the {_TAG_NAMES[code]} tag at byte {pos} is too short to hold a font id')
+            raise _blob_error(f'the {TAG_NAMES[code]} tag at byte {pos} is too short to hold a font id')
         if any(r.code == code and font_id(r) == fid for r in out):
-            raise _blob_error(f'two {_TAG_NAMES[code]} tags for font id {fid}')
+            raise _blob_error(f'two {TAG_NAMES[code]} tags for font id {fid}')
         out.append(tag)
         pos = end
     for fid in FONT_IDS:
         for code in (DEFINE_FONT3, DEFINE_FONT_NAME):
             if not any(r.code == code and font_id(r) == fid for r in out):
-                raise _missing('blob', _TAG_NAMES[code], fid)
+                raise SwfFontError(f'the font data has no {TAG_NAMES[code]} id {fid}')
     return out
 
 
@@ -153,25 +149,25 @@ def _movie(swf: bytes) -> Movie:
 def splice(base: bytes, blob: bytes) -> bytes:
     """`base` (a SWF file's bytes) with the faces of `blob` in place of its
     fonts, as a SWF file of the same version and compression."""
-    new = records(blob)
+    new = {(r.code, font_id(r)): r for r in records(blob)}
     movie = _movie(base)
-    replaced = {font_id(r) for r in new if r.code == DEFINE_FONT3}
-    used = [False] * len(new)
+    replaced = {fid for code, fid in new if code == DEFINE_FONT3}
+    used: set[tuple] = set()
     kept: list[Tag] = []
     for tag in movie.tags:
         fid = font_id(tag) if tag.code in _FONT_TAGS else None
         if fid is None:
             kept.append(tag)
             continue
-        i = next((i for i, r in enumerate(new) if r.code == tag.code and font_id(r) == fid), None)
-        if i is not None:
-            kept.append(new[i])
-            used[i] = True
+        key = (tag.code, fid)
+        if key in new:
+            kept.append(new[key])
+            used.add(key)
         elif not (tag.code == ALIGN_ZONES and fid in replaced):
             kept.append(tag)
-    if not all(used):
-        r = new[used.index(False)]
-        raise _missing('base', _TAG_NAMES[r.code], font_id(r) or 0)
+    for code, fid in new:
+        if (code, fid) not in used:
+            raise _missing(TAG_NAMES[code], fid or 0)
     movie.tags = kept
     return movie.to_bytes()
 
@@ -208,11 +204,12 @@ def _import_tag(url: bytes, reserved: bytes | None, entries: list[tuple[int, byt
     return Tag(IMPORT_ASSETS2 if reserved is not None else IMPORT_ASSETS, body)
 
 
-def _export_ids(tag: Tag) -> list[int] | None:
+def _export_ids(tag: Tag) -> list[int]:
+    """The character ids an ExportAssets tag exports; none when it is malformed."""
     try:
         return [cid for cid, _ in tag.exports()]
     except (SwfError, struct.error, ValueError):
-        return None
+        return []
 
 
 def import_game_font(base: bytes) -> bytes:
@@ -225,7 +222,7 @@ def import_game_font(base: bytes) -> bytes:
         if tag.code in _FONT_TAGS:
             ours = font_id(tag) in FONT_IDS
         elif tag.code == EXPORT_ASSETS:
-            ids = _export_ids(tag) or []
+            ids = _export_ids(tag)
             ours = bool(ids) and all(i in FONT_IDS for i in ids)
         else:
             ours = False
@@ -235,7 +232,7 @@ def import_game_font(base: bytes) -> bytes:
         else:
             kept.append(tag)
     if at is None:
-        raise _missing('base', 'DefineFont3', FONT_IDS[0])
+        raise _missing('DefineFont3', FONT_IDS[0])
     entries = [(FONT_IDS[0], _STANDARD_FONT), (FONT_IDS[1], _STANDARD_FONT_BOLD)]
     reserved = b'\x01\x00' if movie.version >= 8 else None
     kept.insert(at, _import_tag(_FONT_LIB, reserved, entries))
@@ -248,14 +245,14 @@ def _free_id(tags: list[Tag]) -> int:
     top = 0
     for t in tags:
         if t.code in _DEFINES and len(t.data) >= 2:
-            top = max(top, struct.unpack_from('<H', t.data, 0)[0])
+            top = max(top, font_id(t) or 0)
         elif t.code in (IMPORT_ASSETS, IMPORT_ASSETS2):
             try:
                 top = max([top, *(cid for cid, _ in _parse_import(t)[2])])
             except (ValueError, struct.error):
                 pass
         elif t.code == EXPORT_ASSETS:
-            top = max([top, *(_export_ids(t) or [])])
+            top = max([top, *_export_ids(t)])
     return top + 1
 
 
@@ -266,8 +263,8 @@ def set_damage_font(swf: bytes, font: str, blob: bytes | None) -> bytes:
     if font == HYBORIAN:
         return swf
     movie = _movie(swf)
-    found = None
-    for pos, tag in enumerate(movie.tags):
+    for pos in range(len(movie.tags)):
+        tag = movie.tags[pos]
         if tag.code not in (IMPORT_ASSETS, IMPORT_ASSETS2):
             continue
         try:
@@ -276,14 +273,12 @@ def set_damage_font(swf: bytes, font: str, blob: bytes | None) -> bytes:
             continue
         entry = next((i for i, (_, name) in enumerate(entries) if name == _CONAN_FONT), None)
         if entry is not None:
-            found = (pos, url, reserved, entries, entry)
             break
-    if found is None:
+    else:
         raise SwfFontError('the base SWF has no import of _ConanFont to replace')
     if blob is None:
         raise _blob_error(f'{font} has no font data')
     faces = records(blob)
-    pos, url, reserved, entries, entry = found
     regular = entries.pop(entry)[0]
     bold = _free_id(movie.tags)
     fonts = [Tag(r.code, struct.pack('<H', regular if font_id(r) == FONT_IDS[0] else bold) + r.data[2:])
