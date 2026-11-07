@@ -17,7 +17,7 @@ from .console import ships as console_ships
 from .console import validate_config as validate_console_config
 from .grid_model import DEFAULT_GAME_RESOLUTION, is_band, is_plate, project_px, ref_list
 from .inspect import validate_config as validate_inspect_config
-from .overlay import VERDANA, as2_face, font_slug
+from .overlay import VERDANA, as2_face, font_blob_path
 from .overlay import validate_config as validate_overlay
 from .overlay_size import cast_fs, grid_metrics, panel_fs
 from .prefs import ANCHOR_SIDE_DEFAULT, ANCHOR_UP_DEFAULT
@@ -687,10 +687,8 @@ def font_base(base_swf: Path, font: str) -> bytes:
     base = base_swf.read_bytes()
     if font == VERDANA:
         return import_game_font(base)
-    slug = font_slug(font)
-    if slug is None:
-        return base
-    return splice(base, (base_swf.parent / "fonts" / f"{slug}.bin").read_bytes())
+    blob = font_blob_path(base_swf.parent, font)
+    return base if blob is None else splice(base, blob.read_bytes())
 
 
 def build_grids(

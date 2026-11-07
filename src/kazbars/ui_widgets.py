@@ -120,24 +120,18 @@ def app_toast(widget, message, style="info", duration=None, key=None, on_click=N
         w = getattr(w, "master", None)
 
 
-def is_descendant(widget, ancestor):
-    """True when `widget` is `ancestor` or sits inside it (its .master chain)."""
-    w = widget
-    while w is not None:
-        if w is ancestor:
-            return True
-        w = getattr(w, "master", None)
-    return False
-
-
 def pointer_inside(widget, event):
     """Whether the pointer `event` reports is over `widget` or a child of it
-    (a <Leave> onto a child is no leave)."""
+    (its .master chain): a <Leave> onto a child is no leave."""
     try:
         under = widget.winfo_containing(event.x_root, event.y_root)
     except (tk.TclError, RuntimeError):
         return False
-    return under is not None and is_descendant(under, widget)
+    while under is not None:
+        if under is widget:
+            return True
+        under = getattr(under, "master", None)
+    return False
 
 
 def bind_card_events(card_border, color, hover_color=None):

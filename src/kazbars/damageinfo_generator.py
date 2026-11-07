@@ -20,7 +20,7 @@ from pathlib import Path
 
 from . import damageinfo_settings as dis
 from .build_utils import compile_as2
-from .overlay import HYBORIAN, font_slug
+from .overlay import HYBORIAN, font_blob_path
 from .swf_font import SwfFontError, dn_scale, set_damage_font
 
 logger = logging.getLogger(__name__)
@@ -141,9 +141,10 @@ def build_damageinfo(assets_path: str | Path, settings: dict,
 
         font = generator.settings['font']
         if font != HYBORIAN:
-            blob = assets_path / 'kazbars' / 'fonts' / f'{font_slug(font)}.bin'
+            blob = font_blob_path(assets_path / 'kazbars', font)
             try:
-                output_swf.write_bytes(set_damage_font(output_swf.read_bytes(), font, blob.read_bytes()))
+                output_swf.write_bytes(set_damage_font(output_swf.read_bytes(), font,
+                                                       blob.read_bytes() if blob else None))
             except (OSError, SwfFontError) as e:
                 output_swf.unlink(missing_ok=True)
                 return False, f"Couldn't set Damage Numbers in {font}:\n{e}"

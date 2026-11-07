@@ -9,6 +9,8 @@ other face is baked into SWF font tags shipped under
 `assets/kazbars/fonts/<slug>.bin` and spliced over the Arials at build time.
 """
 
+from pathlib import Path
+
 from .profile_document import LANE_BUILD
 from .profile_document import SectionSpec as ProfileSectionSpec
 from .settings_core import Field, Schema, validate_all
@@ -68,6 +70,13 @@ _SLUGS = {
 
 def font_slug(name: str) -> str | None:
     return _SLUGS.get(name)
+
+
+def font_blob_path(kazbars_dir: Path, name: str) -> Path | None:
+    """Where a baked face's font tags live under `assets/kazbars/`
+    (`fonts/<slug>.bin`); None for a face with none (Arial, the game's own)."""
+    slug = font_slug(name)
+    return None if slug is None else kazbars_dir / 'fonts' / f'{slug}.bin'
 
 
 def font_label(name: str) -> str:

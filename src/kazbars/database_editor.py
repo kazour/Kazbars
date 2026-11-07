@@ -611,17 +611,18 @@ class DatabaseEditorTab(ttk.Frame):
             return None
         return validate
 
-    def _after_db_change(self):
-        """Post-mutation refresh: mark dirty, refresh categories, redraw the list,
-        then write. Every caller is a confirmed discrete action (dialog OK,
-        confirm, import), so the write is immediate rather than debounced — and
-        `modified` stays True only when that write failed. Returns whether the
-        write landed — callers gate their success toast on it, so a failure
-        raises the error dialog alone, never a green "Added: X" behind it."""
-        self._set_modified()
+    def _after_db_change(self, toast=None, style='success'):
+        """Post-mutation refresh: refresh categories, redraw the list, then
+        write. Every caller is a confirmed discrete action (dialog OK, confirm,
+        import), so the write is immediate rather than debounced. Returns
+        whether the write landed; `toast` shows only then, so a failure raises
+        the error dialog alone, never a green "Added: X" behind it."""
         self.update_categories()
         self.refresh_list()
-        return self.save()
+        saved = self.save()
+        if saved and toast:
+            app_toast(self, toast, style)
+        return saved
 
     def refresh_from_database(self):
         """Re-pull the floor + redraw the list after `self.database` was re-merged
@@ -641,8 +642,7 @@ class DatabaseEditorTab(ttk.Frame):
 
         if dialog.result:
             self.database.add_buff(dialog.result)
-            if self._after_db_change():
-                app_toast(self, f"Added: {dialog.result['name']}", 'success')
+            self._after_db_change(f"Added: {dialog.result['name']}")
 
     def edit_buff(self):
         """Edit selected buff entry."""
@@ -659,8 +659,7 @@ class DatabaseEditorTab(ttk.Frame):
 
         if dialog.result:
             self.database.update_buff(old_ids, dialog.result)
-            if self._after_db_change():
-                app_toast(self, f"Updated: {dialog.result['name']}", 'success')
+            self._after_db_change(f"Updated: {dialog.result['name']}")
 
     def delete_buff(self):
         """Delete a buff you added, or hide a built-in one (a reversible
@@ -687,8 +686,7 @@ class DatabaseEditorTab(ttk.Frame):
 
         if confirmed:
             self.database.remove_buff(ids)
-            if self._after_db_change():
-                app_toast(self, toast, 'info')
+            self._after_db_change(toast, 'info')
 
     def import_buffs(self):
         """Import buffs from JSON file."""
@@ -807,13 +805,14 @@ class DatabaseEditorTab(ttk.Frame):
 
         Silent on success: `_after_db_change` calls it after every edit, and the
         edit's own toast already said what happened. Returns True when the file
-        was written; False leaves `modified` True for the exit-time retry."""
+        was written; False sets `modified` for the exit-time retry."""
         delta = buff_db_layers.compute_delta(self._floor_buffs, self.database.buffs)
         try:
             self._delta_store.save(delta)
             self.modified = False
             return True
         except OSError as e:
+            self.modified = True
             Messagebox.show_error(f"Failed to save your buff changes.\n\nCheck that the file isn't in use by another program.\n\n({e})", title="Error")
             return False
 
@@ -851,5 +850,3 @@ class DatabaseEditorTab(ttk.Frame):
         self.category_var.set(new_name)
         self._after_db_change()
 
-    def _set_modified(self):
-        self.modified = True

@@ -27,6 +27,18 @@ from .ui_tk_style import style_tk_listbox
 from .ui_widgets import add_tooltip, blend_alpha
 
 
+def _field_label(parent, text, font, color=None):
+    """A field's descriptor label packed to the left, or None for `text`
+    None (the caller lays out its own label — a form grid)."""
+    if text is None:
+        return None
+    lbl = ttk.Label(parent, text=text, font=font)
+    if color:
+        lbl.configure(foreground=color)
+    lbl.pack(side="left")
+    return lbl
+
+
 def labeled_spinbox(
     parent,
     label,
@@ -55,12 +67,7 @@ def labeled_spinbox(
     `label_sink`, when given a list, receives the descriptor label so a caller
     can grey it in step with the control (as `create_slider_row`).
     """
-    lbl = None
-    if label is not None:  # None: the caller lays out its own label (a form grid)
-        lbl = ttk.Label(parent, text=label, font=label_font)
-        if label_color:
-            lbl.configure(foreground=label_color)
-        lbl.pack(side="left")
+    lbl = _field_label(parent, label, label_font, label_color)
     if label_sink is not None and lbl is not None:
         label_sink.append(lbl)
 
@@ -134,8 +141,7 @@ def labeled_combobox(
 ):
     """Labeled readonly combobox. `on_change`, if given, fires on user
     selection (never on a programmatic `var.set`). Returns the Combobox widget."""
-    if label is not None:
-        ttk.Label(parent, text=label, font=label_font).pack(side="left")
+    _field_label(parent, label, label_font)
     combo = ttk.Combobox(parent, textvariable=var, values=values, width=width, state="readonly")
     combo.pack(side="left", padx=padx)
     if on_change is not None:
@@ -203,12 +209,7 @@ def position_entry(
     [lo, hi] on focus-out (a field left empty gets its last good value back). `on_change`, if given, fires after the clamp. Returns
     the Entry so callers can grey it when disabled.
     """
-    lbl = None
-    if label is not None:  # None: the caller lays out its own label (a form grid)
-        lbl = ttk.Label(parent, text=label, font=label_font)
-        if label_color:
-            lbl.configure(foreground=label_color)
-        lbl.pack(side="left")
+    _field_label(parent, label, label_font, label_color)
 
     def _validate(value):
         if value in ("", "-"):
@@ -488,8 +489,7 @@ def create_slider_row(parent, label_text, from_, to, initial, suffix, on_drag, o
 
 
 def size_slider(parent, initial, hint, on_commit=None, *, label="Size:", length=120,
-                label_font=FONT_FORM_LABEL, label_color=None, tooltip=None, padx=0,
-                label_sink=None, on_move=None):
+                tooltip=None, label_sink=None, on_move=None):
     """Inline `label · slider · "N %" · hint` for a module's `scale`: a percent
     of the profile's overlay size, 50-200 in steps of 5 (`snap_scale`).
 
@@ -501,12 +501,7 @@ def size_slider(parent, initial, hint, on_commit=None, *, label="Size:", length=
     given a list, receives the three labels so a caller can grey them with the
     scale."""
     var = tk.IntVar(value=snap_scale(int(initial)))
-    lbl = None
-    if label is not None:  # None: the caller lays out its own label (a form grid)
-        lbl = ttk.Label(parent, text=label, font=label_font)
-        if label_color:
-            lbl.configure(foreground=label_color)
-        lbl.pack(side="left")
+    lbl = _field_label(parent, label, FONT_FORM_LABEL)
     value_label = ttk.Label(parent, font=FONT_SMALL, foreground=THEME_COLORS["muted"],
                             width=5, anchor="e")
     hint_label = ttk.Label(parent, font=FONT_SMALL, foreground=THEME_COLORS["muted"])
@@ -528,7 +523,7 @@ def size_slider(parent, initial, hint, on_commit=None, *, label="Size:", length=
                       orient="horizontal", length=length, command=_drag)
     scale.pack(side="left", padx=(PAD_XS, 0))
     value_label.pack(side="left")
-    hint_label.pack(side="left", padx=(PAD_XS, padx))
+    hint_label.pack(side="left", padx=(PAD_XS, 0))
 
     committed = [var.get()]
 
@@ -542,7 +537,7 @@ def size_slider(parent, initial, hint, on_commit=None, *, label="Size:", length=
         # ttk.Scale's own keys step by 1, which the 5 % snap rounds straight
         # back; step a whole notch instead (the release commits it). A
         # disabled scale's class bindings would refuse; these run first.
-        if scale.instate(["disabled"]):
+        if scale.instate(["disabled"]) or snap_scale(p) == var.get():
             return "break"
         var.set(snap_scale(p))
         scale.set(var.get())

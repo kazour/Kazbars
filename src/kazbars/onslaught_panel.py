@@ -302,5 +302,5 @@ def open_onslaught_dialog(app):
     # each). Its <Configure> then re-wraps to the width the card really got.
     dialog.update_idletasks()
     _wrap_to(_WIDTH - 2 * PAD_TAB - PAD_SMALL - display.winfo_reqwidth() - 2 * PAD_INNER)
-    shell.finish(_apply, _HEIGHT, enter_except=name_entry, fit=True)
+    shell.finish(_apply, enter_except=name_entry, min_height=_HEIGHT)
     return dialog

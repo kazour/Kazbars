@@ -147,6 +147,7 @@ def open_cast_timer_dialog(app):
                            state="readonly", width=8)
     show_cb.pack(side='left')
     show_cb.bind("<<ComboboxSelected>>", _redraw_preview)
+    shell.gate(show_cb, live='readonly')
     add_tooltip(show_cb,
                 "Elapsed = count up (1.2). Total = estimated cast length (2.5). "
                 "Both = 1.2 / 2.5.")
@@ -168,9 +169,6 @@ def open_cast_timer_dialog(app):
     shell.dim(*sink)
 
     def _after_sync(on):
-        # The combobox's live state is readonly, not normal — normal would
-        # make it editable.
-        show_cb.configure(state='readonly' if on else 'disabled')
         swatch.set_enabled(on)
         _redraw_preview()
 

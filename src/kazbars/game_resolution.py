@@ -13,6 +13,7 @@ profile data. Functions take the KazBarsApp instance as first arg.
 import tkinter as tk
 from tkinter import ttk
 
+from .extras_dialog import show_modal
 from .grid_model import get_game_resolution_or_default, parse_resolution
 from .prefs import ANCHOR_MAX, ANCHOR_MIN
 from .ui_forms import position_entry
@@ -30,15 +31,15 @@ from .ui_helpers import (
     THEME_COLORS,
 )
 from .ui_widgets import app_toast
-from .window_position import center_on_parent
 
 COMMON_RESOLUTIONS = ["1920x1080", "2560x1440", "3840x2160"]
 
 
 def change_game_resolution(app):
     """Open the modal resolution picker. On confirm, persist the resolution
-    and the overhead anchor and rebuild the editor panels (positions are
-    fractions and sizes a percent, so the document needs nothing)."""
+    and the overhead anchor (positions are fractions and sizes a percent, so
+    the document needs nothing; Grid Settings reads the resolution when it
+    opens) and flip the in-game status row stale."""
     current_w, current_h = get_game_resolution_or_default()
     current = f"{current_w}x{current_h}"
 
@@ -103,19 +104,16 @@ def change_game_resolution(app):
             # Nothing is saved — the anchor waits for a resolution that reads.
             app_toast(app, "Type a resolution as width x height, like 2560x1440", 'warning')
             return
-        anchor_changed = _apply_anchor(app, side_var.get(), up_var.get())
+        anchor_changed = _set_anchor(app, side_var.get(), up_var.get())
         new_w, new_h = new_res
         res_changed = (new_w, new_h) != (current_w, current_h)
         if res_changed:
-            # Positions are fractions — nothing in the document moves. Persist
-            # and rebuild the cards so Grid Settings, opened next, projects
-            # its pixel fields at the new resolution.
+            # Positions are fractions — nothing in the document moves.
             app.settings.set('game_resolution', [new_w, new_h])
+        if res_changed or anchor_changed:
             app.settings.save()
-            app.grids_panel.refresh_panels()
-            app._on_grids_edited()
-            # The installed SWF was baked at the old resolution — flip the
-            # status row stale without touching the document.
+            # The installed SWF was baked at the old resolution or anchor —
+            # flip the status row stale without touching the document.
             app.grids_panel.refresh_build_status()
         if res_changed and anchor_changed:
             app_toast(app, f"Resolution set to {new_w}×{new_h} and overhead anchor saved — "
@@ -132,19 +130,14 @@ def change_game_resolution(app):
                             command=dialog.destroy, width=BTN_SMALL)
     cancel_btn.pack(side='right', padx=(0, PAD_XS))
 
-    center_on_parent(dialog, app, 380, max(330, dialog.winfo_reqheight()))
-    dialog.deiconify()
-
-    dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
-    dialog.bind('<Escape>', lambda e: dialog.destroy())
-    # Enter applies, except on the focused Cancel button.
-    dialog.bind('<Return>', lambda e: dialog.destroy() if e.widget is cancel_btn else _apply())
+    show_modal(dialog, app, 380, None, _apply, cancel_btn=cancel_btn, min_height=330)
     res_combo.focus_set()
 
 
-def _apply_anchor(app, side_text, up_text):
-    """Persist the overhead anchor fields (clamped like the pref). Returns
-    whether either moved — a change owes a rebuild, which `_apply` says."""
+def _set_anchor(app, side_text, up_text):
+    """Set the overhead anchor fields on the prefs (clamped like the pref;
+    an unreadable field is left as it was). Returns whether either moved —
+    `_apply` saves and says so."""
     changed = False
     for key, text in (('anchor_side', side_text), ('anchor_up', up_text)):
         try:
@@ -154,8 +147,4 @@ def _apply_anchor(app, side_text, up_text):
         if value != app.settings.get(key):
             app.settings.set(key, value)
             changed = True
-    if changed:
-        app.settings.save()
-        # The installed SWF was baked with the old anchor.
-        app.grids_panel.refresh_build_status()
     return changed

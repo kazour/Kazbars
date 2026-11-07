@@ -298,22 +298,21 @@ class ToastManager:
         strip is empty on the other tabs, where those widgets are unmapped.
         A guard that resizes (the "In game" row appearing, the tiles rewrapping)
         re-places the toasts on screen."""
-        self._bottom_guards = widgets
-        for guard in widgets:
-            if guard is not None:
-                guard.bind('<Configure>',
-                           lambda _e: self._model.visible and self._layout(), add='+')
+        self._bottom_guards = tuple(w for w in widgets if w is not None)
+        for guard in self._bottom_guards:
+            guard.bind('<Configure>', lambda _e: self._model.visible and self._layout(), add='+')
 
     def relayout(self):
         """Re-place live toasts after something outside the stack moved — a tab
         switch maps or unmaps the guards without touching the toasts."""
-        self._layout()
+        if self._model.visible:
+            self._layout()
 
     def _bottom_inset(self):
         inset = 0
         for guard in self._bottom_guards:
             try:
-                if guard is not None and guard.winfo_ismapped():
+                if guard.winfo_ismapped():
                     inset += guard.winfo_height() + PAD_XS
             except tk.TclError:
                 pass      # torn down mid-layout — no guard, same as unmapped

@@ -108,7 +108,6 @@ INPUT_WIDTH_NUM    = 5    # Numeric spinboxes
 INPUT_WIDTH_TYPE   = 10   # Compact type/state dropdowns
 INPUT_WIDTH_FILTER = 18   # Filter category combobox
 INPUT_WIDTH_SEARCH = 20   # Search entries
-INPUT_WIDTH_SORTING = 24  # Grid Settings' Fill / Sort / Order (the longest fill label)
 LABEL_WIDTH_FORM   = 14   # Left-column form labels (fits "Icon spacing:" + 1ch)
 
 # Scanline overlay alpha (0-255). Used for CRT decorative scanline overlays.
@@ -189,11 +188,8 @@ def style_treeview_heading():
 
     # Type-tinted Radiobutton labels (Add Grid wizard). Bold so the colored
     # label reads as semantic identity, not as just "decorated text".
-    for name, color in (('Player', GRID_TYPE_COLORS['player']),
-                        ('Target', GRID_TYPE_COLORS['target']),
-                        ('Friendly', GRID_TYPE_COLORS['friendly']),
-                        ('Hostile', GRID_TYPE_COLORS['hostile'])):
-        style_name = f'{name}.TRadiobutton'
+    for grid_type, color in GRID_TYPE_COLORS.items():
+        style_name = f'{grid_type.title()}.TRadiobutton'
         style.configure(style_name, foreground=color, font=FONT_SECTION)
         style.map(style_name,
                   foreground=[('disabled', TK_COLORS['dim_text']),

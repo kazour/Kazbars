@@ -10,9 +10,11 @@ Toplevel, header, tip bar, gate row, the footer packed first at the bottom,
 then the content frame the dialog fills with its cards — keeps the registry
 of what greys with the gate (`gate`, `dim`; `sync` applies it, then the
 dialog's own `on_sync` step) and finishes the window (`finish`: the buttons,
-the centring, the bindings). Every control and static label registered
-greys with the gate, so a disabled dialog reads fully off, not half on.
-The dialog keeps its cards and its Apply.
+then `show_modal`). Every control and static label registered greys with
+the gate, so a disabled dialog reads fully off, not half on. The dialog
+keeps its cards and its Apply. `show_modal` (centre, show, Enter / Escape /
+close, the dark title bar) and `raise_if_open` serve the other modal
+dialogs too.
 """
 
 import tkinter as tk
@@ -23,6 +25,31 @@ from .ui_helpers import BTN_DIALOG, MODULE_COLORS, PAD_SMALL, PAD_TAB, PAD_XS, T
 from .ui_tk_style import apply_dark_titlebar
 from .ui_widgets import add_tooltip
 from .window_position import center_on_parent
+
+
+def show_modal(dialog, parent, width, height, apply, *, enter_except=None, cancel_btn=None,
+               min_height=None):
+    """Show a built, withdrawn dialog: centred on `parent` at `width` x
+    `height` (or `min_height`: the height its content needs, never under
+    that), Enter applying (nothing from `enter_except`; a cancel from the
+    focused `cancel_btn`), Escape and the close box cancelling, the dark
+    title bar re-asserted on map (the global one-shot patch can miss a
+    Toplevel built this late)."""
+    center_on_parent(dialog, parent, width, height, min_height=min_height)
+    dialog.deiconify()
+
+    def _on_return(e):
+        if e.widget is cancel_btn:
+            dialog.destroy()
+        elif e.widget is not enter_except:
+            apply()
+
+    dialog.bind("<Return>", _on_return)
+    dialog.bind("<Escape>", lambda e: dialog.destroy())
+    dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
+    dialog.bind("<Map>",
+                lambda e: apply_dark_titlebar(dialog) if e.widget is dialog else None,
+                add="+")
 
 
 def raise_if_open(window):
@@ -72,16 +99,19 @@ class ExtrasShell:
         self.content = ttk.Frame(dialog, padding=(PAD_TAB, 0))
         self.content.pack(fill='both', expand=True)
 
-        # (widget, rule): live while the gate is on and the rule, if any, holds.
+        # (widget, its live state, rule): live while the gate is on and the
+        # rule, if any, holds.
         self._gated: list = []
         # (label, its resting colour, rule).
         self._dim: list = []
         # The dialog's own step after the registry, given the gate's state.
         self.on_sync = None
 
-    def gate(self, *widgets, rule=None):
-        """Controls that follow the gate (by ttk state)."""
-        self._gated.extend((w, rule) for w in widgets)
+    def gate(self, *widgets, rule=None, live='normal'):
+        """Controls that follow the gate (by ttk state; `live` is the state
+        they take when on — a combobox's is `readonly`, `normal` would make
+        it editable)."""
+        self._gated.extend((w, live, rule) for w in widgets)
 
     def dim(self, *labels, rule=None):
         """Static text that follows the gate (by foreground)."""
@@ -89,38 +119,21 @@ class ExtrasShell:
 
     def sync(self):
         on = self.enabled_var.get()
-        for widget, rule in self._gated:
-            live = on and (rule is None or rule())
-            widget.configure(state='normal' if live else 'disabled')
+        for widget, live, rule in self._gated:
+            widget.configure(state=live if on and (rule is None or rule()) else 'disabled')
         for lbl, fg, rule in self._dim:
-            live = on and (rule is None or rule())
-            lbl.configure(foreground=fg if live else TK_COLORS['dim_text'])
+            lbl.configure(foreground=fg if on and (rule is None or rule()) else TK_COLORS['dim_text'])
         if self.on_sync is not None:
             self.on_sync(on)
 
-    def finish(self, apply, height, *, enter_except=None, fit=False):
-        """Apply / Cancel in the footer, the window centred on the app at
-        `width` x `height` (`fit`: or its own height, when taller) and shown;
-        Enter applies (except from `enter_except`), Escape and the close box
-        cancel, the gate takes focus."""
-        dialog = self.dialog
+    def finish(self, apply, height=None, *, enter_except=None, min_height=None):
+        """Apply / Cancel in the footer, then the window shown (`show_modal`)
+        at `width` x `height`, or `min_height` up, with the gate focused."""
         ttk.Button(self.footer, text="Apply", bootstyle="success",
                    command=apply, width=BTN_DIALOG).pack(side='right')
         ttk.Button(self.footer, text="Cancel", bootstyle="secondary",
-                   command=dialog.destroy, width=BTN_DIALOG
+                   command=self.dialog.destroy, width=BTN_DIALOG
                    ).pack(side='right', padx=(0, PAD_SMALL))
-        if fit:
-            dialog.update_idletasks()
-            height = max(height, dialog.winfo_reqheight())
-        center_on_parent(dialog, self.app, self.width, height)
-        dialog.deiconify()
-
-        dialog.bind("<Return>", lambda e: apply() if e.widget is not enter_except else None)
-        dialog.bind("<Escape>", lambda e: dialog.destroy())
-        dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
-        # The global one-shot dark-titlebar patch can miss a Toplevel built
-        # this late, so re-assert it on the dialog's own map.
-        dialog.bind("<Map>",
-                    lambda e: apply_dark_titlebar(dialog) if e.widget is dialog else None,
-                    add="+")
-        dialog.after(0, self.enable_cb.focus_set)
+        show_modal(self.dialog, self.app, self.width, height, apply,
+                   enter_except=enter_except, min_height=min_height)
+        self.dialog.after(0, self.enable_cb.focus_set)

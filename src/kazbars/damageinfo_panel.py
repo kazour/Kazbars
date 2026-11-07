@@ -21,6 +21,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from . import damageinfo_settings as dis
+from .extras_dialog import raise_if_open, show_modal
 from .overlay import font_label
 from .swf_font import DN_FONTS, dn_scale
 from .ui_components import create_scrollable_frame
@@ -39,9 +40,7 @@ from .ui_helpers import (
     THEME_COLORS,
     TK_COLORS,
 )
-from .ui_tk_style import apply_dark_titlebar
 from .ui_widgets import add_tooltip, app_toast
-from .window_position import center_on_parent
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +100,6 @@ class DamageNumbersPanel(tk.Toplevel):
         self._shadow_blur_scale: ttk.Scale | None = None
         self._spread_spacing_var: tk.StringVar | None = None  # the coupled spread/spacing radio
         self._font_var: tk.StringVar | None = None
-        self._font_combo: ttk.Combobox | None = None  # readonly when live, so not in _all_controls
         self._font_hint: ttk.Label | None = None
 
         self._enabled_var = tk.BooleanVar(value=bool(self.settings['enabled']))
@@ -109,21 +107,9 @@ class DamageNumbersPanel(tk.Toplevel):
         self._build_ui()
         self._sync_enabled_state()
 
-        center_on_parent(self, parent, _W, _H)
-        self.deiconify()
-        self.bind("<Return>", lambda e: self._on_apply())
-        self.bind("<Escape>", lambda e: self.destroy())
-        self.protocol("WM_DELETE_WINDOW", self.destroy)
-        # The global one-shot dark-titlebar patch can miss a deep/scrollable Toplevel
-        # like this one (it fires before the caption HWND is ready, then never retries),
-        # so re-assert it on the panel's own map. Same fix as buff_display_editor.
-        self.bind("<Map>", self._reassert_dark_titlebar, add="+")
+        show_modal(self, parent, _W, _H, self._on_apply)
         if self._enable_cb is not None:
             self.after(0, self._enable_cb.focus_set)
-
-    def _reassert_dark_titlebar(self, event) -> None:
-        if event.widget is self:
-            apply_dark_titlebar(self)
 
     # ------------------------------------------------------------------ #
     # UI construction                                                    #
@@ -190,14 +176,10 @@ class DamageNumbersPanel(tk.Toplevel):
         card.pack(fill="x", pady=(0, PAD_ROW))
         row = ttk.Frame(card)
         row.pack(fill="x", pady=PAD_XS)
-        lbl = ttk.Label(row, text="Font:", font=FONT_BODY,
-                        foreground=THEME_COLORS['body'], width=_LABEL_W, anchor="w")
-        lbl.pack(side="left")
-        self._register_dim(lbl)
         tip = ("The typeface of the damage numbers. Hyborian is the game's own; the "
                "others are heavy display fonts that Build & Install embeds in "
                "DamageInfo.swf, each drawn at Hyborian's size.")
-        add_tooltip(lbl, tip)
+        self._descriptor(row, "Font:", tip)
         self._font_by_label = {font_label(f): f for f in DN_FONTS}
         self._font_var = tk.StringVar(value=font_label(self.settings['font']))
         combo = ttk.Combobox(row, textvariable=self._font_var, values=list(self._font_by_label),
@@ -205,7 +187,7 @@ class DamageNumbersPanel(tk.Toplevel):
         combo.pack(side="left", padx=PAD_XS)
         combo.bind("<<ComboboxSelected>>", lambda _e: self._on_font())
         add_tooltip(combo, tip)
-        self._font_combo = combo
+        self._all_controls.append(combo)
         self._font_hint = ttk.Label(row, font=FONT_SMALL, foreground=THEME_COLORS['muted'])
         self._font_hint.pack(side="left")
         self._register_dim(self._font_hint)
@@ -272,12 +254,7 @@ class DamageNumbersPanel(tk.Toplevel):
         options = meta['options']
         row = ttk.Frame(card)
         row.pack(fill="x", pady=PAD_XS)
-        lbl = ttk.Label(row, text=meta['description'] + ":", font=FONT_BODY,
-                        foreground=THEME_COLORS['body'], width=_LABEL_W, anchor="w")
-        lbl.pack(side="left")
-        self._register_dim(lbl)
-        if meta.get('tooltip'):
-            add_tooltip(lbl, meta['tooltip'])
+        self._descriptor(row, meta['description'] + ":", meta.get('tooltip'))
         var = tk.StringVar(value=options[int(self.settings[key])])
         self._enum_vars[key] = (var, options)
         for opt in options:
@@ -292,12 +269,8 @@ class DamageNumbersPanel(tk.Toplevel):
         """One radio that sets the zig-zag spread + spacing together (no per-axis slider)."""
         row = ttk.Frame(card)
         row.pack(fill="x", pady=PAD_XS)
-        lbl = ttk.Label(row, text="Spread-spacing:", font=FONT_BODY,
-                        foreground=THEME_COLORS['body'], width=_LABEL_W, anchor="w")
-        lbl.pack(side="left")
-        self._register_dim(lbl)
-        add_tooltip(lbl, "Zig-zag swing width and row gap together. "
-                         "Compact = tight, Extended = wide.")
+        self._descriptor(row, "Spread-spacing:", "Zig-zag swing width and row gap together. "
+                                                 "Compact = tight, Extended = wide.")
         var = tk.StringVar(value=dis.spread_spacing_option(self.settings))
         self._spread_spacing_var = var
         for name, _values in dis.SPREAD_SPACING_OPTIONS:
@@ -343,6 +316,16 @@ class DamageNumbersPanel(tk.Toplevel):
         in step with its controls — stores its current colour to restore on re-enable."""
         for lbl in labels:
             self._dim_labels.append((lbl, str(lbl.cget("foreground"))))
+
+    def _descriptor(self, row: tk.Misc, text: str, tip: str | None = None) -> ttk.Label:
+        """A row's left-column label, greying with the gate."""
+        lbl = ttk.Label(row, text=text, font=FONT_BODY, foreground=THEME_COLORS['body'],
+                        width=_LABEL_W, anchor="w")
+        lbl.pack(side="left")
+        self._register_dim(lbl)
+        if tip:
+            add_tooltip(lbl, tip)
+        return lbl
 
     # ------------------------------------------------------------------ #
     # Change handlers                                                    #
@@ -413,17 +396,16 @@ class DamageNumbersPanel(tk.Toplevel):
 
     @staticmethod
     def _set_state(widget, on: bool) -> None:
+        # A combobox's live state is readonly, not normal — normal would make it editable.
+        live = "readonly" if isinstance(widget, ttk.Combobox) else "normal"
         if widget is not None:
-            widget.configure(state="normal" if on else "disabled")
+            widget.configure(state=live if on else "disabled")
 
     def _sync_enabled_state(self) -> None:
         """Master gate: grey every control when the mod is disabled."""
         on = self._enabled_var.get()
         for widget in self._all_controls:
             self._set_state(widget, on)
-        # The combobox's live state is readonly, not normal — normal would make it editable.
-        if self._font_combo is not None:
-            self._font_combo.configure(state="readonly" if on else "disabled")
         # Carry the row descriptors + value readouts with their controls so a disabled
         # panel reads fully-off, not half-on (the readouts especially must not look live).
         for lbl, normal_fg in self._dim_labels:
@@ -470,15 +452,8 @@ class DamageNumbersPanel(tk.Toplevel):
 def open_damage_numbers_panel(app: tk.Misc) -> DamageNumbersPanel:
     """Open or focus the singleton Damage Numbers panel (mirrors open_deeps_panel)."""
     panel = getattr(app, "damage_numbers_panel", None)
-    if panel is not None:
-        try:
-            if panel.winfo_exists():
-                panel.deiconify()
-                panel.lift()
-                panel.focus_force()
-                return panel
-        except tk.TclError:
-            pass
+    if raise_if_open(panel):
+        return panel
     panel = DamageNumbersPanel(app)
     app.damage_numbers_panel = panel  # type: ignore[attr-defined]
     return panel

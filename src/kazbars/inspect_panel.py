@@ -152,6 +152,7 @@ def open_inspect_dialog(app):
                                values=["All"] + [g.label for g in catalog.Group],
                                width=INPUT_WIDTH_FILTER)
     group_combo.pack(side='left', padx=PAD_SMALL)
+    shell.gate(group_combo, live='readonly')
 
     lists = ttk.Frame(rows_card)
     lists.pack(fill='both', expand=True)
@@ -261,8 +262,6 @@ def open_inspect_dialog(app):
     shell.gate(size_scale)
 
     shell.dim(*sink)
-    # The combobox's live state is readonly, not normal — normal would make it editable.
-    shell.on_sync = lambda on: group_combo.configure(state='readonly' if on else 'disabled')
     _refresh_lists()
     shell.sync()
 

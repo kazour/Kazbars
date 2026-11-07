@@ -39,6 +39,7 @@ from kazbars.buff_database import BuffDatabase
 from kazbars.buff_db_layers import DeltaStore
 from kazbars.custom_menu_bar import CustomMenuBar
 from kazbars.database_editor import DatabaseEditorTab
+from kazbars.extras_dialog import raise_if_open
 from kazbars.first_launch import run_first_launch
 from kazbars.focus_watcher import ForegroundWatcher
 from kazbars.game_resolution import change_game_resolution
@@ -711,8 +712,7 @@ class KazBarsApp(ttkb.Window):
             buttons=['Cancel:secondary', "Don't save:secondary", 'Save:primary'])
         dialog.show()
         if dialog.result == "Save":
-            self.db_panel.save()
-            return not self.db_panel.modified
+            return self.db_panel.save()
         return dialog.result == "Don't save"
 
     def _on_grids_edited(self):
@@ -769,16 +769,8 @@ class KazBarsApp(ttkb.Window):
 
     def _show_about(self):
         """Show the About dialog (single-instance — focus existing if alive)."""
-        existing = getattr(self, '_about_popup', None)
-        if existing is not None:
-            try:
-                if existing.winfo_exists():
-                    existing.deiconify()
-                    existing.lift()
-                    existing.focus_set()
-                    return
-            except tk.TclError:
-                pass
+        if raise_if_open(getattr(self, '_about_popup', None)):
+            return
         self._about_popup = show_about_popup(self, APP_NAME, APP_VERSION)
 
     # ========================================================================
