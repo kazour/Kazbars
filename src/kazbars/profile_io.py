@@ -27,7 +27,8 @@ from . import content_update, profile_share
 from .buff_db_layers import DeltaStore
 from .grid_model import get_game_resolution_or_default
 from .profile_document import DocumentError, mint_id, new_document, validate_document
-from .profile_library import SEED_NAME, file_mtime, slugify
+from .profile_library import SEED_NAME, file_mtime
+from .profile_share import slugify
 from .profile_store import ProfileStore
 from .settings_manager import safe_save_json
 from .ui_widgets import app_toast
@@ -250,16 +251,17 @@ def export_profile(app):
     )
     if not path:
         return
-    envelope = profile_share.build_export(
+    buffs = profile_share.collect_embedded_buffs(
         app.registry, doc, app.database.by_id, app.database.by_name,
         app.database.provenance)
+    envelope = profile_share.build_profile_file(doc, buffs)
     try:
         safe_save_json(Path(path), envelope)
     except OSError as e:
         Messagebox.show_error(f"Could not write the export file.\n\n({e})",
                               title="Export Failed")
         return
-    n = len(envelope['buffs'])
+    n = len(buffs)
     suffix = f" (+{n} custom buff{'s' if n != 1 else ''})" if n else ""
     app_toast(app, f"Exported “{doc['name']}”{suffix}", 'success')
 
@@ -277,7 +279,7 @@ def import_profile(app):
         return
     try:
         raw = json.loads(Path(path).read_text(encoding='utf-8'))
-        profile_raw, embedded = profile_share.parse_export(raw)
+        profile_raw, embedded = profile_share.parse_profile_file(raw)
         doc = validate_document(app.registry, profile_raw)
     except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         Messagebox.show_error("That file couldn't be read as a KazBars profile.",

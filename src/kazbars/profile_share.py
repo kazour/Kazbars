@@ -1,92 +1,126 @@
-"""KazBars — self-contained profile export files (pure data layer, no Tk).
+"""KazBars — the profile file's shape and the buffs it carries (pure data
+layer, no Tk).
 
-A profile export is one JSON file — the envelope ``{format, export_schema,
-profile, buffs}`` — that embeds not just the document but **any user-DB buffs
-it references**, so a profile built around custom buffs survives import into
-a fresh install whose shipped database has never heard of them.
+A profile file (`profile.yml`, an export `*.kazbars.yml`, the stock
+`Default.yml`) is the document itself under a `format: kazbars-profile` line,
+plus — in an export — **the user-DB buffs it references**, so a profile built
+around custom buffs survives import into a fresh install whose shipped
+database has never heard of them.
 
-  - ``build_export(registry, doc, by_id, by_name, provenance)`` → envelope.
-  - ``parse_export(raw)`` → ``(profile_raw, embedded_buffs)``; accepts the
-    envelope or a bare document (a file copied straight out of ``profiles/``
-    — no buffs ride along); raises ``ValueError`` otherwise. The profile
-    itself is validated downstream by ``profile_document.validate_document``
-    (which is also what gives an old-format profile its "older KazBars"
-    rejection).
-  - ``collect_embedded_buffs(...)`` → exactly the referenced buffs whose
-    provenance is ``user``, sourced from each registered section's
-    ``harvest_refs`` hook (int-ID and legacy name refs both resolve to
-    ``ids[0]``).
+  - ``build_profile_file(doc, buffs=())`` → ``{format, **doc, [buffs]}``.
+  - ``parse_profile_file(raw)`` → ``(profile_raw, embedded_buffs)``; accepts
+    the profile file, the older export envelope ``{format:
+    kazbars-profile-export, export_schema, profile, buffs}`` and a bare
+    document (a 3.1 ``profiles/*.json``); raises ``ValueError`` with a
+    user-presentable message otherwise (a grids file gets pointed at Import
+    grids…). The profile itself is validated downstream by
+    ``profile_document.validate_document`` (which is also what gives an
+    old-format profile its "older KazBars" rejection).
+  - ``collect_embedded_buffs(...)`` / ``collect_for_refs(...)`` → exactly the
+    referenced buffs whose provenance is ``user`` (int-ID and legacy name refs
+    both resolve to ``ids[0]``); the first takes the refs from each
+    registered section's ``harvest_refs`` hook.
   - ``merge_imported_buffs(delta_store, embedded_buffs, existing_ids,
     existing_names)`` → merge into ``database_user.json``: skip on an ID
     collision, rename on a name-only collision.
+  - ``slugify(name)`` → a Windows-safe file name stem.
 
 Pure — stdlib + ``buff_db_layers`` (the ``ids[0]`` identity helper) only.
 """
 
 import copy
+import re
 
 from . import buff_db_layers
 
+PROFILE_FORMAT = 'kazbars-profile'
+GRIDS_FORMAT = 'kazbars-grids'
+# The 3.1 export envelope: read, never written.
 EXPORT_FORMAT = 'kazbars-profile-export'
 EXPORT_SCHEMA = 1
 
-
-def build_export(registry, doc, by_id, by_name, provenance):
-    """The export envelope for `doc`: full document (deep-copied) plus every
-    referenced user-provenance buff."""
-    return {
-        'format': EXPORT_FORMAT,
-        'export_schema': EXPORT_SCHEMA,
-        'profile': copy.deepcopy(doc),
-        'buffs': collect_embedded_buffs(registry, doc, by_id, by_name, provenance),
-    }
+_ILLEGAL_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 
-def parse_export(raw):
-    """A loaded JSON object → ``(profile_raw, embedded_buffs)``.
+def slugify(name: str) -> str:
+    """A Windows-safe filename stem from a display name. Keeps case and spaces
+    (tool-honest, browsable in Explorer); strips illegal chars and trailing
+    dots/spaces; never empty."""
+    slug = _ILLEGAL_FILENAME_CHARS.sub('', str(name))
+    slug = ' '.join(slug.split()).rstrip('. ')
+    return slug or 'Profile'
 
-    Accepts the export envelope or a bare profile document; anything else
-    raises ``ValueError`` with a user-presentable message. Old-format bare
-    profiles pass through so the document gate downstream rejects them with
-    its own "older KazBars" message."""
+
+def build_profile_file(doc, buffs=()):
+    """The file for `doc`: its `format` line, the document (deep-copied), and
+    `buffs` last — only when there are any."""
+    out = {'format': PROFILE_FORMAT, **copy.deepcopy(doc)}
+    if buffs:
+        out['buffs'] = list(buffs)
+    return out
+
+
+def parse_profile_file(raw):
+    """A loaded file → ``(profile_raw, embedded_buffs)``.
+
+    Accepts a profile file, the 3.1 export envelope or a bare profile
+    document; anything else raises ``ValueError`` with a user-presentable
+    message. Old-format bare profiles pass through so the document gate
+    downstream rejects them with its own "older KazBars" message."""
     if not isinstance(raw, dict):
         raise ValueError("That file isn't a KazBars profile.")
-    if raw.get('format') == EXPORT_FORMAT:
+    fmt = raw.get('format')
+    if fmt == PROFILE_FORMAT:
+        profile = {k: v for k, v in raw.items() if k not in ('format', 'buffs')}
+        return profile, _buff_list(raw.get('buffs'))
+    if fmt == EXPORT_FORMAT:
         schema = raw.get('export_schema', 1)
         if isinstance(schema, int) and schema > EXPORT_SCHEMA:
             raise ValueError('This export needs a newer KazBars — update the app first.')
-        profile = raw.get('profile')
-        if not isinstance(profile, dict):
+        inner = raw.get('profile')
+        if not isinstance(inner, dict):
             raise ValueError('This export file is missing its profile data.')
-        buffs = raw.get('buffs', [])
-        return profile, buffs if isinstance(buffs, list) else []
+        return inner, _buff_list(raw.get('buffs'))
+    if fmt == GRIDS_FORMAT:
+        raise ValueError("That file is a grids file, not a profile. "
+                         "Use Import grids… on the Grids tab.")
     if any(key in raw for key in ('modules', 'schema', 'profile_schema', 'grids')):
         return raw, []
     raise ValueError("That file isn't a KazBars profile.")
 
 
+def _buff_list(buffs):
+    return buffs if isinstance(buffs, list) else []
+
+
 def collect_embedded_buffs(registry, doc, by_id, by_name, provenance):
     """The user-provenance buffs `doc` references — the ones an importer
     wouldn't already have. Refs come from each registered section's
-    ``harvest_refs`` hook; int IDs and legacy name strings both resolve to
-    ``ids[0]``; only ``user`` buffs embed (stock/OTA the importer has).
-    Deterministic order (sorted by primary id)."""
-    referenced = set()
+    ``harvest_refs`` hook; see ``collect_for_refs``."""
+    refs = []
     modules = doc.get('modules', {})
     for spec in registry.specs():
-        if spec.harvest_refs is None:
+        if spec.harvest_refs is not None:
+            refs.extend(spec.harvest_refs(modules.get(spec.key, {})))
+    return collect_for_refs(refs, by_id, by_name, provenance)
+
+
+def collect_for_refs(refs, by_id, by_name, provenance):
+    """The user-provenance buffs `refs` name: int IDs and legacy name strings
+    both resolve to ``ids[0]``; only ``user`` buffs embed (stock/OTA the
+    importer has). Deterministic order (sorted by primary id)."""
+    referenced = set()
+    for ref in refs:
+        if isinstance(ref, bool):
             continue
-        for ref in spec.harvest_refs(modules.get(spec.key, {})):
-            if isinstance(ref, bool):
-                continue
-            if isinstance(ref, int):
-                entry = by_id.get(ref)
-            elif isinstance(ref, str):
-                entry = by_name.get(ref)
-            else:
-                continue
-            if entry and entry.get('ids'):
-                referenced.add(entry['ids'][0])
+        if isinstance(ref, int):
+            entry = by_id.get(ref)
+        elif isinstance(ref, str):
+            entry = by_name.get(ref)
+        else:
+            continue
+        if entry and entry.get('ids'):
+            referenced.add(entry['ids'][0])
     return [
         by_id[rid] for rid in sorted(referenced)
         if provenance.get(rid) == 'user' and rid in by_id

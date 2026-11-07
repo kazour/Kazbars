@@ -21,7 +21,6 @@ template file itself can never become a library entry.
 import copy
 import json
 import logging
-import re
 from pathlib import Path
 
 from .overlay import size_for_height
@@ -32,14 +31,13 @@ from .profile_document import (
     new_document,
     validate_document,
 )
+from .profile_share import slugify
 from .settings_manager import safe_save_json
 
 logger = logging.getLogger(__name__)
 
 TRASH_KEEP = 10
 SEED_NAME = 'My Setup'
-
-_ILLEGAL_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 
 def file_mtime(path: Path) -> float:
@@ -50,15 +48,6 @@ def file_mtime(path: Path) -> float:
         return path.stat().st_mtime
     except OSError:
         return 0.0
-
-
-def slugify(name: str) -> str:
-    """A Windows-safe filename stem from a display name. Keeps case and spaces
-    (tool-honest, browsable in Explorer); strips illegal chars and trailing
-    dots/spaces; never empty."""
-    slug = _ILLEGAL_FILENAME_CHARS.sub('', str(name))
-    slug = ' '.join(slug.split()).rstrip('. ')
-    return slug or 'Profile'
 
 
 class ProfileLibrary:

@@ -57,6 +57,7 @@
 | `src/kazbars/grid_preview.py` | 240 |
 | `src/kazbars/grid_preview_canvas.py` | 227 |
 | `src/kazbars/grid_settings_dialog.py` | 532 |
+| `src/kazbars/grid_templates.py` | 81 |
 | `src/kazbars/grids_generator.py` | 781 |
 | `src/kazbars/grids_panel.py` | 923 |
 | `src/kazbars/inspect.py` | 79 |
@@ -73,9 +74,9 @@
 | `src/kazbars/paths.py` | 46 |
 | `src/kazbars/prefs.py` | 224 |
 | `src/kazbars/profile_document.py` | 345 |
-| `src/kazbars/profile_io.py` | 326 |
-| `src/kazbars/profile_library.py` | 300 |
-| `src/kazbars/profile_share.py` | 140 |
+| `src/kazbars/profile_io.py` | 328 |
+| `src/kazbars/profile_library.py` | 289 |
+| `src/kazbars/profile_share.py` | 174 |
 | `src/kazbars/profile_store.py` | 130 |
 | `src/kazbars/self_update.py` | 487 |
 | `src/kazbars/settings_backup.py` | 484 |
@@ -112,6 +113,7 @@
 | `tests/test_combat_monitor.py` | 150 |
 | `tests/test_console.py` | 43 |
 | `tests/test_content_update.py` | 391 |
+| `tests/test_convert_profiles.py` | 73 |
 | `tests/test_cut_release.py` | 177 |
 | `tests/test_damageinfo_colors_panel.py` | 293 |
 | `tests/test_damageinfo_generator.py` | 208 |
@@ -131,6 +133,7 @@
 | `tests/test_game_persistence.py` | 748 |
 | `tests/test_grid_model.py` | 311 |
 | `tests/test_grid_preview.py` | 143 |
+| `tests/test_grid_templates.py` | 95 |
 | `tests/test_grids_generator.py` | 603 |
 | `tests/test_hud_overlay.py` | 141 |
 | `tests/test_imports.py` | 33 |
@@ -151,7 +154,7 @@
 | `tests/test_profile_document.py` | 249 |
 | `tests/test_profile_io.py` | 270 |
 | `tests/test_profile_library.py` | 275 |
-| `tests/test_profile_share.py` | 198 |
+| `tests/test_profile_share.py` | 234 |
 | `tests/test_profile_store.py` | 138 |
 | `tests/test_projection.py` | 89 |
 | `tests/test_release_assets.py` | 33 |

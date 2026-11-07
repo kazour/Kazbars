@@ -1,19 +1,19 @@
-"""Tests for kazbars.profile_share — the self-contained profile export files.
+"""Tests for kazbars.profile_share — the profile file's shape and the buffs
+it carries.
 
-Covers the envelope (build/parse, bare-document acceptance, junk + newer-export
-rejection), registry-hook buff harvesting (exactly the user-provenance refs,
-across int-ID and legacy name forms, via grid_model's PROFILE_SECTION hook),
-a self-contained round-trip into an empty DB through the document gate, and
-the skip-on-collision import merge.
+Covers the file (build/parse of the profile file, the 3.1 export envelope and
+a bare document; the grids-file pointer, junk and newer-export rejection),
+registry-hook buff harvesting (exactly the user-provenance refs, across int-ID
+and legacy name forms, via grid_model's PROFILE_SECTION hook), a
+self-contained round-trip into an empty DB through the document gate, the
+skip-on-collision import merge, and `slugify`.
 
 Run: `pytest tests/test_profile_share.py` (from repo root).
 """
 
-import json
-
 import pytest
 
-from kazbars import grid_model
+from kazbars import grid_model, yaml_io
 from kazbars import profile_share as PS
 from kazbars.buff_db_layers import DeltaStore
 from kazbars.profile_document import SectionRegistry, new_document, validate_document
@@ -35,34 +35,50 @@ def _doc_with_grids(reg, grids):
     return doc
 
 
+def _file(reg, doc, by_id, by_name, provenance):
+    """An export's value: the document plus its referenced custom buffs."""
+    return PS.build_profile_file(doc, PS.collect_embedded_buffs(reg, doc, by_id, by_name, provenance))
+
+
 # --------------------------------------------------------------------------- #
-# Envelope: build / parse
+# Profile file: build / parse
 # --------------------------------------------------------------------------- #
 
-def test_build_parse_round_trip_through_json():
+def test_build_parse_round_trip_through_yaml():
     reg = _registry()
     user = _b(9, "Mine")
     doc = _doc_with_grids(reg, [dict(grid_model.create_default_grid(), whitelist=[9])])
-    env = PS.build_export(reg, doc, {9: user}, {"Mine": user}, {9: "user"})
-    assert env["format"] == PS.EXPORT_FORMAT
-    profile_raw, buffs = PS.parse_export(json.loads(json.dumps(env)))
+    value = _file(reg, doc, {9: user}, {"Mine": user}, {9: "user"})
+    text = yaml_io.dumps(value)
+    assert text.startswith("format: kazbars-profile\nschema: ")
+    assert list(value)[-1] == "buffs", "buffs ride last"
+    profile_raw, buffs = PS.parse_profile_file(yaml_io.loads(text))
     assert profile_raw == doc
     assert buffs == [user]
     assert validate_document(reg, profile_raw)["modules"]["grids"]["grids"][0]["whitelist"] == [9]
 
 
-def test_build_export_deep_copies_document():
+def test_build_omits_buffs_when_none_and_deep_copies():
     reg = _registry()
     doc = _doc_with_grids(reg, [dict(grid_model.create_default_grid(), whitelist=[9])])
-    env = PS.build_export(reg, doc, {}, {}, {})
-    env["profile"]["modules"]["grids"]["grids"][0]["whitelist"].append(777)
+    value = PS.build_profile_file(doc)
+    assert "buffs" not in value and next(iter(value)) == "format"
+    value["modules"]["grids"]["grids"][0]["whitelist"].append(777)
     assert doc["modules"]["grids"]["grids"][0]["whitelist"] == [9]
+
+
+def test_parse_accepts_the_3_1_export_envelope():
+    reg = _registry()
+    user = _b(9, "Mine")
+    doc = _doc_with_grids(reg, [])
+    env = {"format": PS.EXPORT_FORMAT, "export_schema": 1, "profile": doc, "buffs": [user]}
+    assert PS.parse_profile_file(env) == (doc, [user])
 
 
 def test_parse_accepts_bare_document():
     reg = _registry()
     doc = _doc_with_grids(reg, [])
-    profile_raw, buffs = PS.parse_export(doc)
+    profile_raw, buffs = PS.parse_profile_file(doc)
     assert profile_raw is doc
     assert buffs == []
 
@@ -71,33 +87,46 @@ def test_parse_passes_old_format_through_for_gate_rejection():
     # A pre-revamp profile file parses (it IS profile-shaped) so the document
     # gate downstream can give it the decided "older KazBars" message.
     old = {"version": "2.2.2", "profile_schema": 1, "grids": []}
-    profile_raw, buffs = PS.parse_export(old)
+    profile_raw, buffs = PS.parse_profile_file(old)
     assert profile_raw is old and buffs == []
     with pytest.raises(ValueError, match="older KazBars"):
         validate_document(_registry(), profile_raw)
 
 
+def test_parse_points_a_grids_file_at_import_grids():
+    with pytest.raises(ValueError, match="grids file, not a profile"):
+        PS.parse_profile_file({"format": PS.GRIDS_FORMAT, "grids": []})
+
+
 def test_parse_rejects_junk():
-    for junk in (None, [1, 2], "KZBARS1:abc", {"hello": 1}):
+    for junk in (None, [1, 2], "KZBARS1:abc", {"hello": 1}, {"format": "other"}):
         with pytest.raises(ValueError, match="isn't a KazBars profile"):
-            PS.parse_export(junk)
+            PS.parse_profile_file(junk)
 
 
 def test_parse_rejects_envelope_missing_profile():
     with pytest.raises(ValueError, match="missing its profile"):
-        PS.parse_export({"format": PS.EXPORT_FORMAT, "buffs": []})
+        PS.parse_profile_file({"format": PS.EXPORT_FORMAT, "buffs": []})
 
 
 def test_parse_rejects_newer_export_schema():
     env = {"format": PS.EXPORT_FORMAT, "export_schema": PS.EXPORT_SCHEMA + 1,
            "profile": {"schema": 1}}
     with pytest.raises(ValueError, match="update the app"):
-        PS.parse_export(env)
+        PS.parse_profile_file(env)
 
 
 def test_parse_coerces_non_list_buffs():
     env = {"format": PS.EXPORT_FORMAT, "profile": {"schema": 1}, "buffs": "nope"}
-    assert PS.parse_export(env)[1] == []
+    assert PS.parse_profile_file(env)[1] == []
+    assert PS.parse_profile_file({"format": PS.PROFILE_FORMAT, "schema": 3, "buffs": 5})[1] == []
+
+
+def test_slugify_windows_safe():
+    assert PS.slugify('Raid <PoM>: "best"?') == "Raid PoM best"
+    assert PS.slugify("   ") == "Profile"
+    assert PS.slugify("dots...") == "dots"
+    assert PS.slugify("Bear  Shaman") == "Bear Shaman"
 
 
 # --------------------------------------------------------------------------- #
@@ -129,6 +158,13 @@ def test_collect_dedupes_and_ignores_unknown_and_bool_refs():
     assert [b["ids"][0] for b in out] == [9]
 
 
+def test_collect_for_refs_without_a_registry():
+    user, stock = _b(9, "U"), _b(1, "S")
+    out = PS.collect_for_refs([1, "U", None, 9], {1: stock, 9: user}, {"U": user, "S": stock},
+                              {1: "stock", 9: "user"})
+    assert out == [user]
+
+
 def test_collect_empty_for_sections_without_hook():
     reg = _registry()
     doc = _doc_with_grids(reg, [])
@@ -144,8 +180,8 @@ def test_self_contained_round_trip_into_empty_db(tmp_path):
     reg = _registry()
     user = _b(9, "Mine")
     doc = _doc_with_grids(reg, [dict(grid_model.create_default_grid(), whitelist=[9])])
-    env = json.loads(json.dumps(PS.build_export(reg, doc, {9: user}, {"Mine": user}, {9: "user"})))
-    profile_raw, embedded = PS.parse_export(env)
+    value = yaml_io.loads(yaml_io.dumps(_file(reg, doc, {9: user}, {"Mine": user}, {9: "user"})))
+    profile_raw, embedded = PS.parse_profile_file(value)
     imported = validate_document(reg, profile_raw)
     assert imported["modules"]["grids"]["grids"][0]["whitelist"] == [9]
     store = DeltaStore(tmp_path / "database_user.json")

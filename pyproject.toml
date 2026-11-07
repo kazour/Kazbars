@@ -105,6 +105,7 @@ files = [
     "src/kazbars/game_persistence.py",
     "src/kazbars/grid_model.py",
     "src/kazbars/grid_preview.py",
+    "src/kazbars/grid_templates.py",
     "src/kazbars/grids_generator.py",
     "src/kazbars/inspect.py",
     "src/kazbars/inspect_catalog.py",
