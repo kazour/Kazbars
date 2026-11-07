@@ -1007,9 +1007,10 @@ SECTIONS: list[_Section] = [
             _sub('Five displays', [
                 'Board — Mob list: the bosses, skulls and minis in view, '
                 'with their health. Wave timer: the wave and the time to the '
-                'next spawn, with the elapsed and remaining clocks in bold, '
-                'bright type. Hylda HP: Valkyrie Hylda, the ally you '
-                'defend in Skull Gate, with alerts at 50 % and 25 %.',
+                'next spawn, with the elapsed and remaining clocks drawn '
+                'large, in bold, bright type. Hylda HP: Valkyrie Hylda, '
+                'the ally you defend in Skull Gate, with alerts at 50 % and '
+                '25 %.',
                 'Alerts — Spawn alerts: a banner when a watched boss, skull '
                 "or mini spawns. AoE warnings: a banner when Thugra Khotan's "
                 'AoE helpers spawn in Kuthchemes.',
@@ -1036,7 +1037,7 @@ SECTIONS: list[_Section] = [
             _sub('Camp names', [
                 "A skull standing at one of its map's camps shows the "
                 "camp's name where its distance would be: "
-                '"72%  Temple". Out of view it reads "last Temple - 12 s '
+                '"Temple  72%". Out of view it reads "last Temple - 12 s '
                 'ago". Always on, no setting.',
                 'Skull Gate camps: Hub, Cave, WCave, Tower, Bridge, Altar. '
                 'Kuthchemes: Respad, South West, South East, Temple, East, '
