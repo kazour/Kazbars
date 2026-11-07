@@ -153,7 +153,7 @@ SECTIONS: list[_Section] = [
             _sub('Starting over, and getting back', [
                 'File ▸ Reset profile to defaults… asks first, then replaces '
                 'your profile with the starter layout, sized for your game '
-                'resolution.',
+                'resolution. The profile keeps its name.',
                 'File ▸ Revert to session start brings back the profile you '
                 'had when KazBars opened — after edits, an Import or a '
                 'Reset. It lasts until you close the app.',
@@ -172,7 +172,8 @@ SECTIONS: list[_Section] = [
                 'travel too, as fractions of your resolution — a shared '
                 'profile lands proportionally on any screen.',
                 'To share a few grids instead of the whole profile, use '
-                'Export grid… or Export tab… on the Grids tab.',
+                "Export grid… in a grid card's Move… menu. File ▸ Import "
+                'grid… adds a grids file to the Grids tab.',
                 _link('Class Tabs', 'class-tabs'),
             ]),
             _sub('Updating from 3.1', [
@@ -285,10 +286,11 @@ SECTIONS: list[_Section] = [
             _sub('Sharing grids', [
                 'The Move… menu ends with Export grid…, which saves that '
                 'grid to a <grid name>.kazbars-grids.yml file.',
-                'At the right end of the tab strip, Export tab… saves every '
-                'grid on the current tab to one file (greyed while the tab '
-                'is empty). Import grids… adds the grids from a grids file '
-                'to the current tab.',
+                'File ▸ Import grid…, right under Import profile…, adds the '
+                'grids from a grids file to the class tab the Grids tab is '
+                'showing, and switches to the Grids tab so you see them. '
+                'Pick a grids file in Import profile… and it points you '
+                'here instead.',
                 'A grid whose name is taken gets _2 added to it on import, '
                 'and the toast says so. Custom buffs travel inside the file '
                 'and are added to your database.',
@@ -302,8 +304,8 @@ SECTIONS: list[_Section] = [
         'title': 'The Grid Card',
         'body': [
             'Each grid is a card in the Grids tab: the grid drawn to scale '
-            "and a line naming the buffs it holds. Its ⚙ cog opens the grid's "
-            'settings.',
+            "and a line naming the buffs it holds. The ⚙ cog, just right of "
+            "the preview, opens the grid's settings.",
             _sub('The preview', [
                 'Icons are drawn at two-thirds of their in-game size. A grid '
                 'too big for the card steps down to a smaller scale, and the '
@@ -325,10 +327,8 @@ SECTIONS: list[_Section] = [
                 'dynamic or static — and, once the preview is drawn '
                 'smaller, its scale: "shown at 1:2". The Applied by me '
                 'toggle comes right after it.',
-                'The ⚙ cog, Move…, Enabled, ▲ ▼ and × sit at the right. '
-                '▲ ▼ move the card one place up or down the '
-                'list, greyed at the ends. Dragging the ☰ handle does the '
-                'same, and so does Alt+↑ / Alt+↓ once you Tab to it.',
+                'Move…, Enabled and × sit at the right. To reorder cards, '
+                'drag the ☰ handle, or Tab to it and press Alt+↑ / Alt+↓.',
                 'Applied by me — the grid shows only effects you cast, with '
                 'your own timer, even when other players cast the same '
                 'effect on the same character. It greys with the card when '

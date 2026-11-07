@@ -66,7 +66,7 @@ If the game ever patches (it hasn't in years), run the official patcher once, th
 
 Once you know the flow, make it yours: `+ Add Grid` for your own layouts, then click a grid's preview to pick what it watches (on a static grid, click a slot). A grid holds up to **64 slots** (16 for an overhead grid), with no cap across grids. Overhead grids sit against each head by an anchor that depends on your game's field of view — if they look off, nudge Right and Up in **Game ▸ Game resolution…** and rebuild.
 
-Sharing a layout: File ▸ Export profile… writes one `.kazbars.yml` file, with any custom buffs it references baked in — the recipient doesn't need those buffs in their own database first. File ▸ Import profile… reads one back, along with `.kazbars.json` exports from 3.1. To share just some grids, use **Export grid…** (a grid card's Move… menu) or **Export tab…**, and **Import grids…** to add them — all on the Grids tab.
+Sharing a layout: File ▸ Export profile… writes one `.kazbars.yml` file, with any custom buffs it references baked in — the recipient doesn't need those buffs in their own database first. File ▸ Import profile… reads one back, along with `.kazbars.json` exports from 3.1. To share just some grids, use **Export grid…** (a grid card's Move… menu), and File ▸ Import grid… to add a grids file to the Grids tab.
 
 KazBars keeps one profile, `userdata/profile.yml`, and autosaves it. **Reset profile to defaults…** puts the starter layout back; **Revert to session start** undoes it, or an import. Updating from 3.1? KazBars takes the profile you were using; your others stay in `userdata/profiles`, and File ▸ Import profile… opens any of them.
 
