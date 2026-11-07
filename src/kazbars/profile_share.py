@@ -10,7 +10,7 @@ database has never heard of them.
   - ``build_profile_file(doc, buffs=())`` → ``{format, **doc, [buffs]}``.
   - ``parse_profile_file(raw)`` → ``(profile_raw, embedded_buffs)``; accepts
     the profile file, the older export envelope ``{format:
-    kazbars-profile-export, export_schema, profile, buffs}`` and a bare
+    kazbars-profile-export, profile, buffs}`` and a bare
     document (a 3.1 ``profiles/*.json``); raises ``ValueError`` with a
     user-presentable message otherwise (a grids file gets pointed at File ▸
     Import grid…). The profile itself is validated downstream by
@@ -28,16 +28,16 @@ database has never heard of them.
 Pure — stdlib + ``buff_db_layers`` (the ``ids[0]`` identity helper) only.
 """
 
-import copy
 import re
 
 from . import buff_db_layers
 
 PROFILE_FORMAT = 'kazbars-profile'
+PROFILE_EXT = '.kazbars.yml'
 GRIDS_FORMAT = 'kazbars-grids'
+GRIDS_EXT = '.kazbars-grids.yml'
 # The 3.1 export envelope: read, never written.
 EXPORT_FORMAT = 'kazbars-profile-export'
-EXPORT_SCHEMA = 1
 
 _ILLEGAL_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
@@ -52,9 +52,10 @@ def slugify(name: str) -> str:
 
 
 def build_profile_file(doc, buffs=()):
-    """The file for `doc`: its `format` line, the document (deep-copied), and
-    `buffs` last — only when there are any."""
-    out = {'format': PROFILE_FORMAT, **copy.deepcopy(doc)}
+    """The file for `doc`: its `format` line, the document's keys, and
+    `buffs` last — only when there are any. A new top-level dict over the
+    document's own values: write it, don't edit it."""
+    out = {'format': PROFILE_FORMAT, **doc}
     if buffs:
         out['buffs'] = list(buffs)
     return out
@@ -74,9 +75,6 @@ def parse_profile_file(raw):
         profile = {k: v for k, v in raw.items() if k not in ('format', 'buffs')}
         return profile, buff_list(raw.get('buffs'))
     if fmt == EXPORT_FORMAT:
-        schema = raw.get('export_schema', 1)
-        if isinstance(schema, int) and schema > EXPORT_SCHEMA:
-            raise ValueError('This export needs a newer KazBars — update the app first.')
         inner = raw.get('profile')
         if not isinstance(inner, dict):
             raise ValueError('This export file is missing its profile data.')

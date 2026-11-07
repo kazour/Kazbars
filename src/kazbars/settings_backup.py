@@ -181,27 +181,42 @@ def _is_library_backup(zip_path):
             and any(n.startswith(f"{KAZBARS_ARC}/profiles/") for n in names))
 
 
+def _zip_json(zip_path, member):
+    """The JSON object `member` of the zip holds, or None (no such member, not
+    a zip, not JSON, not an object)."""
+    try:
+        with zipfile.ZipFile(zip_path) as zf:
+            data = json.loads(zf.read(member).decode("utf-8"))
+    except (OSError, KeyError, zipfile.BadZipFile, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def _zip_active_profile(zip_path):
     """The `active_profile` a 3.1 backup's own prefs.json names (restored or
     not), or None."""
-    try:
-        with zipfile.ZipFile(zip_path) as zf:
-            prefs = json.loads(zf.read(f"{KAZBARS_ARC}/{PREFS_FILENAME}").decode("utf-8"))
-        return prefs.get("active_profile") if isinstance(prefs, dict) else None
-    except (OSError, KeyError, zipfile.BadZipFile, ValueError):
-        return None
+    prefs = _zip_json(zip_path, f"{KAZBARS_ARC}/{PREFS_FILENAME}")
+    return prefs.get("active_profile") if prefs else None
 
 
 def read_manifest(zip_path):
     """Return the parsed manifest if `zip_path` is a KazBars backup, else None."""
-    try:
-        with zipfile.ZipFile(zip_path) as zf:
-            data = json.loads(zf.read(MANIFEST_NAME).decode("utf-8"))
-    except (OSError, KeyError, zipfile.BadZipFile, json.JSONDecodeError, UnicodeDecodeError):
-        return None
-    if isinstance(data, dict) and data.get("format") == BACKUP_FORMAT:
-        return data
-    return None
+    data = _zip_json(zip_path, MANIFEST_NAME)
+    return data if data and data.get("format") == BACKUP_FORMAT else None
+
+
+def _backup_userdata(app, zip_path):
+    """Everything a backup holds (the Funcom prefs, `profile.yml`, a 3.1
+    library, the user buffs and prefs.json) written to `zip_path`."""
+    return write_backup_zip(
+        zip_path,
+        funcom_dir=locate_funcom_prefs(),
+        profile_file=profile_path(),
+        profiles_dir=profiles_dir(),
+        database_user=database_user_path(),
+        prefs_file=prefs_path(),
+        app_version=app.app_version,
+    )
 
 
 def restore_zip(zip_path, *, funcom_dest, userdata_dest, include_prefs=False):
@@ -399,15 +414,7 @@ def backup_settings(app, dialog):
     if not path:
         return
     try:
-        sections = write_backup_zip(
-            path,
-            funcom_dir=locate_funcom_prefs(),
-            profile_file=profile_path(),
-            profiles_dir=profiles_dir(),
-            database_user=database_user_path(),
-            prefs_file=prefs_path(),
-            app_version=app.app_version,
-        )
+        sections = _backup_userdata(app, path)
     except OSError as e:
         Messagebox.show_error(
             "Failed to write the backup.\n\nCheck that the destination isn't "
@@ -465,15 +472,7 @@ def restore_settings(app, dialog, include_prefs=False):
     # Best-effort safety snapshot of current state (don't block restore on it).
     snapshot = app.app_path / f"KazBars_PreRestore_{datetime.now():%Y%m%d_%H%M%S}.zip"
     try:
-        write_backup_zip(
-            snapshot,
-            funcom_dir=locate_funcom_prefs(),
-            profile_file=profile_path(),
-            profiles_dir=profiles_dir(),
-            database_user=database_user_path(),
-            prefs_file=prefs_path(),
-            app_version=app.app_version,
-        )
+        _backup_userdata(app, snapshot)
     except OSError as e:
         logger.warning("Pre-restore snapshot failed: %s", e)
         snapshot = None

@@ -35,7 +35,11 @@ class ProfileStore:
         schedule: Callable[[int, Callable[[], None]], Any],
         cancel: Callable[[Any], None],
         write_bak: Callable[[dict], None] | None = None,
+        dirty: bool = False,
     ) -> None:
+        """`dirty`: the document is not on disk yet (a seed, an adopted library
+        profile, the `.bak` fallback) — the first `flush()` writes it, and a
+        failed write retries as any autosave does."""
         self._doc = document
         self._writer = writer
         self._schedule = schedule
@@ -44,7 +48,7 @@ class ProfileStore:
         self._session_start = copy.deepcopy(document)
         self._bak_written = False
         self._pending: Any = None
-        self._dirty = False
+        self._dirty = dirty
 
     # ------------------------------------------------------------------ #
     # READ

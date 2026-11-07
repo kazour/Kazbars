@@ -61,11 +61,7 @@ def build(app):
     if app._building:
         return
 
-    valid = (
-        bool(app.game_path)
-        and Path(app.game_path).is_dir()
-        and (Path(app.game_path) / "Data" / "Gui" / "Default").exists()
-    )
+    valid = bool(app.game_path) and game_folder.is_game_folder(app.game_path)
 
     grids = app.grids_panel.get_profile_data()
     # A hand-edited grid past its limit blocks the build only if it would be baked.

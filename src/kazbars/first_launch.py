@@ -44,11 +44,6 @@ COMMON_INSTALL_PATHS = [
 ]
 
 
-def _is_game_folder(path):
-    """The AoC marker the path hint and the pre-fill both key on."""
-    return (Path(path) / "Data" / "Gui" / "Default").exists()
-
-
 def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
                              on_resolution_set=None, default_profile_exists=True,
                              on_dialog_closed=None, on_start_empty=None):
@@ -108,7 +103,7 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
 
     def _validate_path_hint():
         p = path_var.get().strip()
-        if p and not _is_game_folder(p):
+        if p and not game_folder.is_game_folder(p):
             warn_label.configure(
                 text="This doesn't look like an AoC install — missing Data/Gui/Default/",
                 foreground=THEME_COLORS['warning'])
@@ -298,7 +293,7 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
     # the app. Two candidates is a choice only the user can make; zero leaves
     # the entry as the one thing to do. Set after the trace so it wires through
     # the same enable path as typing.
-    _detected = [cp for cp in existing_paths if _is_game_folder(cp)]
+    _detected = [cp for cp in existing_paths if game_folder.is_game_folder(cp)]
     auto_path = _detected[0] if len(_detected) == 1 else None
     if auto_path:
         path_var.set(auto_path)
@@ -398,5 +393,5 @@ def run_first_launch(app, app_name):
 
     show_first_launch_dialog(
         app, app_name, on_game_set, on_load_default, on_resolution_set,
-        profile_io.has_template(app), on_dialog_closed, on_start_empty,
+        profile_io.template_doc(app) is not None, on_dialog_closed, on_start_empty,
     )

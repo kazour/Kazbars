@@ -58,13 +58,11 @@ def test_build_parse_round_trip_through_yaml():
     assert validate_document(reg, profile_raw)["modules"]["grids"]["grids"][0]["whitelist"] == [9]
 
 
-def test_build_omits_buffs_when_none_and_deep_copies():
+def test_build_omits_buffs_when_none():
     reg = _registry()
     doc = _doc_with_grids(reg, [dict(grid_model.create_default_grid(), whitelist=[9])])
     value = PS.build_profile_file(doc)
     assert "buffs" not in value and next(iter(value)) == "format"
-    value["modules"]["grids"]["grids"][0]["whitelist"].append(777)
-    assert doc["modules"]["grids"]["grids"][0]["whitelist"] == [9]
 
 
 def test_parse_accepts_the_3_1_export_envelope():
@@ -107,13 +105,6 @@ def test_parse_rejects_junk():
 def test_parse_rejects_envelope_missing_profile():
     with pytest.raises(ValueError, match="missing its profile"):
         PS.parse_profile_file({"format": PS.EXPORT_FORMAT, "buffs": []})
-
-
-def test_parse_rejects_newer_export_schema():
-    env = {"format": PS.EXPORT_FORMAT, "export_schema": PS.EXPORT_SCHEMA + 1,
-           "profile": {"schema": 1}}
-    with pytest.raises(ValueError, match="update the app"):
-        PS.parse_profile_file(env)
 
 
 def test_parse_coerces_non_list_buffs():

@@ -176,7 +176,7 @@ def test_startup_falls_back_to_blank_without_a_template(app, root, tmp_path):
     profile_io.startup_profile(app)
     assert app.profile_store.document["name"] == "My Setup"
     assert app.profile_store.document["modules"]["grids"]["grids"] == []
-    assert not profile_io.has_template(app)
+    assert profile_io.template_doc(app) is None
 
 
 def test_the_store_writes_profile_yml_and_its_bak(app, root):
@@ -274,26 +274,16 @@ def test_import_continues_when_the_buff_merge_fails(app, root, monkeypatch, tmp_
     assert "custom buffs not added" in app.toasts[0][0]
 
 
-class _Dialog:
-    result = None
-
-    def __init__(self, *a, **k):
-        pass
-
-    def show(self):
-        pass
-
-
 def test_reset_cancelled_changes_nothing(app, root, monkeypatch):
     store = _open_store(app, _doc(app, "Home", A=1))
-    monkeypatch.setattr(profile_io, "MessageDialog", type("D", (_Dialog,), {"result": "Cancel"}))
+    monkeypatch.setattr(profile_io, "confirm", lambda *a, **k: False)
     profile_io.reset_to_defaults(app)
     assert store.document["name"] == "Home" and not store.dirty
 
 
 def test_reset_puts_the_template_in_place_and_revert_undoes_it(app, root, monkeypatch):
     store = _open_store(app, _doc(app, "Home", A=1))
-    monkeypatch.setattr(profile_io, "MessageDialog", type("D", (_Dialog,), {"result": "Reset"}))
+    monkeypatch.setattr(profile_io, "confirm", lambda *a, **k: True)
     profile_io.reset_to_defaults(app)
     assert store.document["name"] == "Home", "the profile keeps its name"
     assert store.document["modules"]["grids"]["grids"], "the starter grids"

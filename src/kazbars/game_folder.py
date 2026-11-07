@@ -61,13 +61,18 @@ def format_game_path(path, max_parts=3):
     return str(Path(parts[0], '...', parts[-1]))
 
 
+def is_game_folder(path):
+    """Whether `path` holds an Age of Conan install: its `Data/Gui/Default`."""
+    return (Path(path) / "Data" / "Gui" / "Default").exists()
+
+
 def change_game_folder(app):
     """Browse for a game folder and persist it."""
     path = filedialog.askdirectory(title="Select Age of Conan Folder")
     if not path:
         return
 
-    if not (Path(path) / "Data" / "Gui" / "Default").exists():
+    if not is_game_folder(path):
         Messagebox.show_warning(
             "This doesn't look like an Age of Conan install.\n\n"
             "The expected game folders weren't found. The folder will be set anyway.",

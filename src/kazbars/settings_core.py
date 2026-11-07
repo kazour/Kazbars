@@ -196,7 +196,7 @@ def _migrate(schema: Schema, raw: dict) -> dict:
 # FILE I/O                                                                    #
 # =========================================================================== #
 
-def _read_json(path: Path) -> dict | None:
+def read_json(path: Path) -> dict | None:
     """Read a JSON object, or None on missing/corrupt/non-dict (logged at
     debug; never raises)."""
     try:
@@ -212,7 +212,7 @@ def _read_json(path: Path) -> dict | None:
 def load(schema: Schema, folder: str | Path) -> dict[str, Any]:
     """Read `<folder>/<schema.filename>`, run the migration ladder, then validate
     + fill. A missing or corrupt file yields defaults — load never raises."""
-    raw = _read_json(Path(folder) / schema.filename)
+    raw = read_json(Path(folder) / schema.filename)
     if raw is None:
         return get_defaults(schema)
     return validate_all(schema, _migrate(schema, raw))

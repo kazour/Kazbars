@@ -8,15 +8,12 @@ card's Export grid…; File ▸ Import grid… lands in `append_grids`).
 import copy
 import logging
 import tkinter as tk
-from pathlib import Path
-from tkinter import filedialog, ttk
-
-from ttkbootstrap.dialogs import Messagebox
+from tkinter import ttk
 
 logger = logging.getLogger(__name__)
 
 
-from . import grid_preview, grid_templates, yaml_io
+from . import grid_preview, grid_templates
 from .classes import CLASSES, by_id
 from .extras_shortcuts import ExtrasShortcutsRow
 from .grid_dialogs import AddGridWizard
@@ -36,8 +33,9 @@ from .overlay import DEFAULT_FONT, DEFAULT_SIZE, FONT_CHOICES, SIZE_CHOICES, fon
 from .overlay_size import SCALE_DEFAULT, grid_metrics
 from .prefs import ANCHOR_SIDE_DEFAULT, ANCHOR_UP_DEFAULT
 from .profile_document import build_signature
-from .profile_share import slugify
-from .settings_manager import get_setting, safe_write_text, set_setting
+from .profile_io import custom_buffs_suffix, save_yaml_file
+from .profile_share import GRIDS_EXT
+from .settings_manager import get_setting, set_setting
 from .ui_components import (
     DragReorderManager,
     create_scrollable_frame,
@@ -248,22 +246,14 @@ class GridsPanel(ttk.Frame):
     def export_grid(self, panel):
         """One grid, with the custom buffs it references, to a grids file."""
         grid = panel.grid_config
-        path = filedialog.asksaveasfilename(
-            title="Export Grid", defaultextension=".kazbars-grids.yml",
-            initialfile=f"{slugify(grid['id'])}.kazbars-grids.yml",
-            filetypes=[("KazBars grids", "*.kazbars-grids.yml"), ("YAML files", "*.yml *.yaml")])
-        if not path:
-            return
         db = self.database
         value = grid_templates.build([grid], db.by_id, db.by_name, db.provenance)
-        try:
-            safe_write_text(path, yaml_io.dumps(value))
-        except (OSError, TypeError) as e:
-            Messagebox.show_error(f"Could not write the grids file.\n\n({e})", title="Export Failed")
+        path = save_yaml_file(value, title="Export Grid", ext=GRIDS_EXT, label="KazBars grids",
+                              stem=grid['id'], noun="grids")
+        if path is None:
             return
-        n = len(value.get('buffs', []))
-        suffix = f" (+{n} custom buff{'s' if n != 1 else ''})" if n else ""
-        app_toast(self, f"Exported ‘{grid['id']}’ to “{Path(path).name}”{suffix}", 'success')
+        suffix = custom_buffs_suffix(len(value.get('buffs', [])))
+        app_toast(self, f"Exported ‘{grid['id']}’ to “{path.name}”{suffix}", 'success')
 
     def append_grids(self, grids):
         """A grids file's grids appended to the current tab: each validated,

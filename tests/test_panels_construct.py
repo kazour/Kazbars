@@ -1667,14 +1667,14 @@ def test_the_tab_strip_ends_with_its_last_class(app):
 
 
 def test_export_grid_writes_the_grid_without_its_class(app, monkeypatch, tmp_path):
-    from kazbars import grids_panel, yaml_io
+    from kazbars import profile_io, yaml_io
     from kazbars.grid_model import create_default_grid
     gp = app.grids_panel
     gp.grids.append(dict(create_default_grid('player', 1, 5, 'dynamic', 'ShareDT'), **{'class': 31}))
     gp.refresh_panels()
     out = tmp_path / 'dt.kazbars-grids.yml'
     seen = {}
-    monkeypatch.setattr(grids_panel.filedialog, 'asksaveasfilename',
+    monkeypatch.setattr(profile_io.filedialog, 'asksaveasfilename',
                         lambda **k: seen.update(k) or str(out))
     gp.export_grid(gp.grid_panels[-1])
     assert seen['initialfile'] == 'ShareDT.kazbars-grids.yml'

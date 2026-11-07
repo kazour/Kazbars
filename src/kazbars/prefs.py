@@ -73,7 +73,8 @@ def _validate_last_build(value: Any) -> dict:
     what the last successful Build & Install baked (`anchor` the overhead
     anchor, this PC's and so in no profile hash). `{}` (never built through
     this pref) hides the status row. `profile_name` is display-only (the built
-    profile may have been renamed or deleted since); identity is the id + hash."""
+    profile may have been replaced by an Import or Reset since); identity is the
+    id + hash."""
     if not isinstance(value, dict):
         return {}
     pid = value.get("profile_id")
@@ -84,19 +85,20 @@ def _validate_last_build(value: Any) -> dict:
     name = value.get("profile_name")
     if isinstance(name, str) and name:
         out["profile_name"] = name
-    res = value.get("target_resolution")
-    if (
-        isinstance(res, list) and len(res) == 2
-        and all(isinstance(v, int) and not isinstance(v, bool) and v > 0 for v in res)
-    ):
-        out["target_resolution"] = res
-    anchor = value.get("anchor")
-    if (
-        isinstance(anchor, list) and len(anchor) == 2
-        and all(isinstance(v, int) and not isinstance(v, bool) for v in anchor)
-    ):
-        out["anchor"] = anchor
+    if _int_pair(value.get("target_resolution"), positive=True):
+        out["target_resolution"] = value["target_resolution"]
+    if _int_pair(value.get("anchor")):
+        out["anchor"] = value["anchor"]
     return out
+
+
+def _int_pair(value: Any, positive: bool = False) -> bool:
+    """Whether `value` is a list of two ints (never bools), all > 0 with `positive`."""
+    return (
+        isinstance(value, list) and len(value) == 2
+        and all(isinstance(v, int) and not isinstance(v, bool) and (v > 0 or not positive)
+                for v in value)
+    )
 
 
 def _validate_grids_tab(value: Any) -> int:
@@ -110,7 +112,7 @@ def _validate_last_patch(value: Any) -> dict:
     section (``damage_colors``/``buff_bars``) last actually wrote into *this
     game folder's* XML — the active profile's own section is the loadout-level
     intent, which can drift from this once a profile import or reset skips re-Applying
-    (PATCH lane never fires on switch). Written by the XML editors' Apply;
+    (the PATCH lane never fires on an import or reset). Written by the XML editors' Apply;
     consumption (a divergence badge) is a later phase."""
     if not isinstance(value, dict):
         return {}

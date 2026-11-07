@@ -21,23 +21,23 @@ skipped-count line.
 """
 
 import copy
-import json
 import logging
 import os
 from pathlib import Path
 from tkinter import filedialog
 
-from ttkbootstrap.dialogs import Messagebox, MessageDialog
+from ttkbootstrap.dialogs import Messagebox
 
 from . import content_update, grid_templates, profile_share, yaml_io
 from .buff_db_layers import DeltaStore
 from .grid_model import get_game_resolution_or_default
 from .overlay import size_for_height
 from .profile_document import mint_id, new_document, validate_document
-from .profile_share import slugify
+from .profile_share import GRIDS_EXT, PROFILE_EXT, slugify
 from .profile_store import ProfileStore
+from .settings_core import read_json
 from .settings_manager import safe_write_text
-from .ui_widgets import app_toast
+from .ui_widgets import app_toast, confirm
 from .userdata import (
     database_user_path,
     prefs_path,
@@ -51,7 +51,6 @@ from .userdata import (
 logger = logging.getLogger(__name__)
 
 SEED_NAME = 'My Setup'
-_UNREADABLE = "That file couldn't be read as a KazBars profile."
 
 
 def file_mtime(path: Path) -> float:
@@ -76,20 +75,27 @@ def template_paths(app):
 # ============================================================================
 # FILES
 # ============================================================================
+def _read_raw(path, noun):
+    """A data file's value (`yaml_io.read_file`), or ``ValueError`` naming
+    the kind of file it couldn't be read as."""
+    try:
+        return yaml_io.read_file(path)
+    except (OSError, ValueError) as e:
+        raise ValueError(f"That file couldn't be read as a KazBars {noun}.") from e
+
+
 def read_profile_file(registry, path):
     """A profile file through the gate → ``(doc, embedded_buffs)``. `.json`
     reads as JSON (a 3.1 export or library document), anything else as YAML.
     Raises ``ValueError`` with a user-presentable message."""
-    try:
-        raw = yaml_io.read_file(path)
-    except (OSError, ValueError) as e:
-        raise ValueError(_UNREADABLE) from e
-    profile_raw, embedded = profile_share.parse_profile_file(raw)
+    profile_raw, embedded = profile_share.parse_profile_file(_read_raw(path, 'profile'))
     return validate_document(registry, profile_raw), embedded
 
 
-def _profile_text(app, doc):
-    return yaml_io.dumps(profile_share.build_profile_file(validate_document(app.registry, doc)))
+def _profile_file(app, doc, buffs=()):
+    """The file for `doc` as `profile.yml` and an export carry it: through
+    the gate, under its `format` line, `buffs` last."""
+    return profile_share.build_profile_file(validate_document(app.registry, doc), buffs)
 
 
 def write_profile(app, doc):
@@ -98,9 +104,9 @@ def write_profile(app, doc):
     and surfaced on exit) — a disk error, or a value YAML can't hold."""
     path = profile_path()
     try:
-        safe_write_text(path, _profile_text(app, doc))
+        safe_write_text(path, yaml_io.dumps(_profile_file(app, doc)))
         return path
-    except (OSError, TypeError) as e:
+    except (OSError, yaml_io.YamlError) as e:
         logger.warning('Could not write the profile: %s', e)
         return None
 
@@ -109,21 +115,44 @@ def write_bak(app, doc):
     """The session-start snapshot behind File ▸ Revert and the damaged-file
     fallback. Best effort, never raises."""
     try:
-        safe_write_text(profile_bak_path(), _profile_text(app, doc))
-    except (OSError, TypeError) as e:
+        safe_write_text(profile_bak_path(), yaml_io.dumps(_profile_file(app, doc)))
+    except (OSError, yaml_io.YamlError) as e:
         logger.debug('Session snapshot skipped: %s', e)
 
 
-def make_store(app, doc):
+def make_store(app, doc, dirty=False):
     """A ProfileStore wired to this app: `profile.yml` writer, Tk scheduler,
-    session snapshot."""
+    session snapshot. `dirty`: `doc` is not on disk yet."""
     return ProfileStore(
         doc,
         writer=lambda d: write_profile(app, d),
         schedule=lambda ms, fn: app.after(ms, fn),
         cancel=app.after_cancel,
         write_bak=lambda d: write_bak(app, d),
+        dirty=dirty,
     )
+
+
+def save_yaml_file(value, *, title, ext, label, stem, noun):
+    """An Export… save dialog suggesting `<stem><ext>`, then `value` as YAML,
+    written atomically. The path, or None: cancelled, or a failed write (an
+    error box names the `noun` file)."""
+    path = filedialog.asksaveasfilename(
+        title=title, defaultextension=ext, initialfile=f"{slugify(stem)}{ext}",
+        filetypes=[(label, f"*{ext}"), ("YAML files", "*.yml *.yaml")])
+    if not path:
+        return None
+    try:
+        safe_write_text(Path(path), yaml_io.dumps(value))
+    except (OSError, yaml_io.YamlError) as e:  # a disk error, or a value YAML can't hold
+        Messagebox.show_error(f"Could not write the {noun} file.\n\n({e})", title="Export Failed")
+        return None
+    return Path(path)
+
+
+def custom_buffs_suffix(n):
+    """` (+N custom buffs)` on an Exported toast; nothing for none."""
+    return f" (+{n} custom buff{'s' if n != 1 else ''})" if n else ""
 
 
 def release_store(app) -> bool:
@@ -150,61 +179,58 @@ def startup_profile(app, active_hint=None):
     reads). `active_hint` names the library profile to adopt when prefs.json
     no longer does (a 3.1 backup restored without its prefs). Toasts wait for
     the window."""
-    doc, toast, unsaved = None, None, False
     path = profile_path()
-    if path.exists():
-        doc = _read_or_set_aside(app, path)
-        if doc is None:
-            bak = profile_bak_path()
-            doc = _read_or_set_aside(app, bak, keep=True) if bak.exists() else None
-            if doc is not None:
-                unsaved = True
-                toast = ("Your profile file was damaged — restored the copy from your last "
-                         "session", 'warning', None)
-            else:
-                toast = ("Your profile file was damaged and no copy could be read — "
-                         "starting from the defaults", 'warning', None)
-    else:
+    doc = _try_read(app, path) if path.exists() else None
+    on_disk = doc is not None
+    toast = None
+    if path.exists() and not on_disk:
+        _set_aside(path)
+        bak = profile_bak_path()
+        doc = _try_read(app, bak) if bak.exists() else None
+        toast = (("Your profile file was damaged — restored the copy from your last session",
+                  'warning', None) if doc is not None else
+                 ("Your profile file was damaged and no copy could be read — starting from "
+                  "the defaults", 'warning', None))
+    elif not on_disk:
         doc = _adopt_library(app, active_hint)
         if doc is not None:
-            unsaved = True
             toast = (f"Adopted “{doc['name']}” as your profile — your other profiles stay in "
                      "userdata/profiles; File ▸ Import profile… opens one", 'info', 8)
     if doc is None:
-        doc = _from_template(app, SEED_NAME, get_game_resolution_or_default())
+        doc = _from_template(app, SEED_NAME)
         if doc is None:
             logger.warning("No profile template reads — starting from a blank profile")
             doc = new_document(app.registry, SEED_NAME, get_game_resolution_or_default())
-        unsaved = True
-    app.profile_store = make_store(app, doc)
-    if unsaved and write_profile(app, doc) is None:
-        # Not on disk: through the store it stays dirty, retries, and the exit
-        # path offers the rescue.
-        app.profile_store.replace_document(doc)
+    # A document not yet on disk is written now; a failed write stays dirty,
+    # retries, and the exit path offers the rescue.
+    app.profile_store = make_store(app, doc, dirty=not on_disk)
+    app.profile_store.flush()
     apply_document(app)
     if toast:
         msg, style, duration = toast
-        app.after(0, lambda: app_toast(app, msg, style, *([duration] if duration else [])))
+        app.after(0, lambda: app_toast(app, msg, style, duration))
 
 
-def _read_or_set_aside(app, path, keep=False):
-    """`path` through the gate, or None — the damaged `profile.yml` moved to
-    `profile.damaged.yml` first, never over an earlier one (`keep`: leave the
-    file where it is)."""
+def _try_read(app, path):
+    """`path` through the gate, or None (logged) when it doesn't read."""
     try:
         return read_profile_file(app.registry, path)[0]
     except ValueError as e:
         logger.warning('Profile file %s unreadable: %s', path.name, e)
-    if not keep:
-        aside, n = profile_damaged_path(), 2
-        while aside.exists():
-            aside = aside.with_name(f'profile.damaged-{n}.yml')
-            n += 1
-        try:
-            os.replace(path, aside)
-        except OSError as e:
-            logger.warning('Could not set the damaged profile aside: %s', e)
-    return None
+        return None
+
+
+def _set_aside(path):
+    """Move the damaged `profile.yml` to `profile.damaged.yml`, never over an
+    earlier one."""
+    aside, n = profile_damaged_path(), 2
+    while aside.exists():
+        aside = aside.with_name(f'profile.damaged-{n}.yml')
+        n += 1
+    try:
+        os.replace(path, aside)
+    except OSError as e:
+        logger.warning('Could not set the damaged profile aside: %s', e)
 
 
 def _adopt_library(app, active_hint=None):
@@ -213,52 +239,42 @@ def _adopt_library(app, active_hint=None):
     without one. Reads only; `profiles/` stays as it is."""
     entries = []
     for path in sorted(profiles_dir().glob('*.json')):
-        try:
-            entries.append((path, read_profile_file(app.registry, path)[0]))
-        except ValueError:
-            continue
+        doc = _try_read(app, path)
+        if doc is not None:
+            entries.append((path, doc))
     if not entries:
         return None
-    try:
-        active = json.loads(prefs_path().read_text(encoding='utf-8')).get('active_profile')
-    except (OSError, ValueError, AttributeError):
-        active = None
+    active = (read_json(prefs_path()) or {}).get('active_profile')
     # The prefs id, then the hint, then the newest: a stale prefs id that names
-    # none of the files never hides the hint.
-    by_id: dict = {}
-    for _path, doc in entries:  # sorted by path: the first file with an id wins
-        by_id.setdefault(doc['id'], doc)
+    # none of the files never hides the hint. Sorted by path: the first file
+    # with an id wins.
     for wanted in (active, active_hint):
-        if isinstance(wanted, str) and wanted in by_id:
-            return by_id[wanted]
+        for _path, doc in entries:
+            if doc['id'] == wanted:
+                return doc
     return max(entries, key=lambda e: file_mtime(e[0]))[1]
 
 
-def _template(app):
+def template_doc(app):
+    """The first template on the chain that reads, through the gate; None
+    without one (first launch's Use Defaults asks)."""
     for path in template_paths(app):
-        if path.is_file():
-            try:
-                return read_profile_file(app.registry, path)[0]
-            except ValueError as e:
-                logger.debug('Skipping template %s: %s', path, e)
+        if path.is_file() and (doc := _try_read(app, path)) is not None:
+            return doc
     return None
 
 
-def has_template(app):
-    """Whether any template on the chain reads (first launch's Use Defaults)."""
-    return _template(app) is not None
-
-
-def _from_template(app, name, resolution):
-    """The first template that reads, instantiated: fresh id, `name`, the
-    overlay size for `resolution`'s height (grid positions are fractions and
-    land proportionally). None when no template reads."""
-    doc = _template(app)
+def _from_template(app, name):
+    """The template, instantiated: fresh id, `name`, the overlay size for the
+    game resolution's height (grid positions are fractions and land
+    proportionally). None when no template reads."""
+    doc = template_doc(app)
     if doc is None:
         return None
     doc['id'] = mint_id()
     doc['name'] = name
-    doc['modules'].setdefault('overlay', {})['size'] = size_for_height(resolution[1])
+    doc['modules'].setdefault('overlay', {})['size'] = size_for_height(
+        get_game_resolution_or_default()[1])
     return doc
 
 
@@ -312,26 +328,13 @@ def export_profile(app):
     store = app.profile_store
     release_store(app)  # best-effort; export reads the in-memory doc either way
     doc = store.document
-    path = filedialog.asksaveasfilename(
-        title="Export Profile",
-        defaultextension=".kazbars.yml",
-        initialfile=f"{slugify(doc['name'])}.kazbars.yml",
-        filetypes=[("KazBars profile", "*.kazbars.yml"), ("YAML files", "*.yml *.yaml")],
-    )
-    if not path:
-        return
     buffs = profile_share.collect_embedded_buffs(
         app.registry, doc, app.database.by_id, app.database.by_name,
         app.database.provenance)
-    try:
-        safe_write_text(Path(path), yaml_io.dumps(profile_share.build_profile_file(doc, buffs)))
-    except (OSError, TypeError) as e:  # a disk error, or a value YAML can't hold
-        Messagebox.show_error(f"Could not write the export file.\n\n({e})",
-                              title="Export Failed")
+    if save_yaml_file(_profile_file(app, doc, buffs), title="Export Profile", ext=PROFILE_EXT,
+                      label="KazBars profile", stem=doc['name'], noun="export") is None:
         return
-    n = len(buffs)
-    suffix = f" (+{n} custom buff{'s' if n != 1 else ''})" if n else ""
-    app_toast(app, f"Exported “{doc['name']}”{suffix}", 'success')
+    app_toast(app, f"Exported “{doc['name']}”{custom_buffs_suffix(len(buffs))}", 'success')
 
 
 def import_profile(app):
@@ -354,10 +357,9 @@ def import_profile(app):
         return
     doc['id'] = mint_id()
     app.profile_store.replace_document(doc)
-    added, skipped, failed = merge_embedded_buffs(app, embedded)
+    merged = merge_embedded_buffs(app, embedded)
     apply_document(app)
-    app_toast(app, " — ".join([f"Imported “{doc['name']}”", *buff_merge_parts(added, skipped, failed)]),
-              'success')
+    app_toast(app, " — ".join([f"Imported “{doc['name']}”", *merged]), 'success')
 
 
 def import_grids(app):
@@ -367,19 +369,13 @@ def import_grids(app):
     refused file."""
     path = filedialog.askopenfilename(
         title="Import Grid",
-        filetypes=[("KazBars grids", "*.kazbars-grids.yml"), ("YAML files", "*.yml *.yaml"),
+        filetypes=[("KazBars grids", f"*{GRIDS_EXT}"), ("YAML files", "*.yml *.yaml"),
                    ("All files", "*.*")],
     )
     if not path:
         return False
     try:
-        raw = yaml_io.read_file(path)
-    except (OSError, ValueError):
-        Messagebox.show_error("That file couldn't be read as a KazBars grids file.",
-                              title="Import Failed")
-        return False
-    try:
-        grids, buffs = grid_templates.parse(raw)
+        grids, buffs = grid_templates.parse(_read_raw(path, 'grids file'))
     except ValueError as e:
         Messagebox.show_error(str(e), title="Import Failed")
         return False
@@ -389,17 +385,17 @@ def import_grids(app):
     n = len(appended)
     parts = [f"Imported {n} grid{'s' if n != 1 else ''} into {panel.tab_name()}"]
     parts += [f"renamed ‘{old}’ to ‘{new}’ (name taken)" for old, new in renames]
-    app_toast(app, " — ".join([*parts, *buff_merge_parts(*merged)]), 'success')
+    app_toast(app, " — ".join([*parts, *merged]), 'success')
     return True
 
 
 def merge_embedded_buffs(app, embedded):
     """Merge a file's custom buffs into `database_user.json` (skip on an id
     collision, rename on a name one), reloading the DB when any landed.
-    Returns ``(added, skipped, failed)``; a write failure is logged, never
-    raised — the profile or grids still import."""
+    Returns the toast phrases for what happened; a write failure is logged,
+    never raised — the profile or grids still import."""
     if not embedded:
-        return 0, 0, False
+        return []
     existing_names = {b.get('name') for b in app.database.buffs if b.get('name')}
     try:
         added, skipped = profile_share.merge_imported_buffs(
@@ -407,22 +403,15 @@ def merge_embedded_buffs(app, embedded):
             existing_ids=set(app.database.by_id), existing_names=existing_names)
     except OSError as e:
         logger.warning("Could not merge imported buffs: %s", e)
-        return 0, 0, True
+        return ["custom buffs not added"]
     if added:
         app.database.reload()
         app.db_panel.refresh_from_database()
-    return added, skipped, False
-
-
-def buff_merge_parts(added, skipped, failed):
-    """The toast phrases for a custom-buff merge."""
     parts = []
     if added:
         parts.append(f"{added} custom buff{'s' if added != 1 else ''} added")
     if skipped:
         parts.append(f"{skipped} already existed")
-    if failed:
-        parts.append("custom buffs not added")
     return parts
 
 
@@ -430,14 +419,13 @@ def reset_to_defaults(app):
     """File ▸ Reset profile to defaults… — the stock (or OTA) template in place
     of the open profile, sized for the game resolution, after a confirm. The
     profile keeps its name."""
-    dialog = MessageDialog(
+    if not confirm(
         "Reset your profile to the defaults?\n\nEvery grid and extra goes back to the "
         "starter layout. Revert to session start brings your profile back.",
-        title="Reset Profile", parent=app, buttons=['Cancel:secondary', 'Reset:danger'])
-    dialog.show()
-    if dialog.result != 'Reset':
+        title="Reset Profile", action="Reset", parent=app, danger=True,
+    ):
         return
-    doc = _from_template(app, app.profile_store.document['name'], get_game_resolution_or_default())
+    doc = _from_template(app, app.profile_store.document['name'])
     if doc is None:
         Messagebox.show_warning("No profile template is available.", title="Reset Profile")
         return

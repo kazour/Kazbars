@@ -107,7 +107,7 @@ def test_the_pinned_layout():
 
 
 def test_keys_must_be_text():
-    with pytest.raises(TypeError):
+    with pytest.raises(yaml_io.YamlError):
         dumps({1: 'a'})
 
 

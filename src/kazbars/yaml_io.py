@@ -29,7 +29,7 @@ _ESCAPES = {'"': '\\"', '\\': '\\\\', '\n': '\\n', '\r': '\\r', '\t': '\\t', '\0
 
 
 class YamlError(ValueError):
-    """Text that isn't readable YAML."""
+    """Text that isn't readable YAML, or a value `dumps` has no form for."""
 
 
 # ============================================================================
@@ -44,8 +44,7 @@ def loads(text):
     one) is refused, so a self-referencing or fanned-out alias can't recurse
     or blow up. Raises `YamlError`."""
     try:
-        return _json_shaped(yaml.load(text, Loader=getattr(yaml, 'CSafeLoader', yaml.SafeLoader)),
-                            set())
+        return _shape(yaml.load(text, Loader=getattr(yaml, 'CSafeLoader', yaml.SafeLoader)))
     except yaml.YAMLError as e:
         raise YamlError(str(e)) from e
     except RecursionError as e:
@@ -61,9 +60,14 @@ def read_file(path):
     if path.suffix.lower() != '.json':
         return loads(text)
     try:
-        return _json_shaped(json.loads(text), set())
+        return _shape(json.loads(text))
     except RecursionError as e:
-        raise ValueError('nested too deep') from e
+        raise YamlError('nested too deep') from e
+
+
+def _shape(raw):
+    """`raw` in JSON's shapes, walked from a fresh `seen`."""
+    return _json_shaped(raw, set())
 
 
 def _json_shaped(value, seen):
@@ -87,17 +91,18 @@ def _json_shaped(value, seen):
 def _key_text(key):
     """A mapping key as JSON writes one: `1` → "1", `true` → "true"."""
     if isinstance(key, str):
-        return _json_shaped(key, set())
+        return _shape(key)
     if key is None or isinstance(key, bool):
         return json.dumps(key)
-    return str(_json_shaped(key, set()))
+    return str(_shape(key))
 
 
 # ============================================================================
 # WRITE
 # ============================================================================
 def dumps(value):
-    """`value` as YAML text in the fixed layout, one trailing newline."""
+    """`value` as YAML text in the fixed layout, one trailing newline. A value
+    with no YAML form (a non-text key, a type beyond JSON's) is a `YamlError`."""
     if _is_block(value):
         return '\n'.join(_block(value, 0)) + '\n'
     return _inline(value) + '\n'
@@ -117,7 +122,7 @@ def _block(value, indent):
     if isinstance(value, dict):
         for key, item in value.items():
             if not isinstance(key, str):
-                raise TypeError(f'YAML keys must be text, not {type(key).__name__}')
+                raise YamlError(f'YAML keys must be text, not {type(key).__name__}')
             if _is_block(item):
                 lines.append(f'{pad}{_str(key)}:')
                 lines.extend(_block(item, indent + 2))
@@ -150,7 +155,7 @@ def _inline(value):
         return _float(value)
     if isinstance(value, str):
         return _str(value)
-    raise TypeError(f'no YAML form for {type(value).__name__}')
+    raise YamlError(f'no YAML form for {type(value).__name__}')
 
 
 def _float(value):
@@ -160,9 +165,9 @@ def _float(value):
     if math.isinf(value):
         return '.inf' if value > 0 else '-.inf'
     text = repr(value)
-    if 'e' in text or 'E' in text:
+    if 'e' in text:
         text = format(Decimal(text), 'f')
-    if not any(c in text for c in '.eE'):
+    if '.' not in text:
         text += '.0'
     return text
 
