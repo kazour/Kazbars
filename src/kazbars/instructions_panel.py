@@ -1006,7 +1006,9 @@ SECTIONS: list[_Section] = [
             'nothing anywhere else.',
             _sub('Five displays', [
                 'Board — Mob list: the bosses, skulls and minis in view, '
-                'with their health. Wave timer: the wave and the time to the '
+                "with their health; a guard's bar turns light blue while "
+                'its Ancient Ward, a magic-dampening ward it casts on '
+                'itself, is up. Wave timer: the wave and the time to the '
                 'next spawn, with the elapsed and remaining clocks drawn '
                 'large, in bold, bright type. Hylda HP: Valkyrie Hylda, '
                 'the ally you defend in Skull Gate, with alerts at 50 % and '

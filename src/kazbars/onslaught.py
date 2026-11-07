@@ -113,7 +113,7 @@ AOE_HELPERS = ('Thugra Khotan',)
 # matched by name, as buff ids are per session.
 HEAL_BUFFS = ('Healing Radiance',)
 # Buff names that shield a mob from damage (its bar drawn light blue), by name.
-SHIELD_BUFFS: tuple[str, ...] = ()
+SHIELD_BUFFS: tuple[str, ...] = ('Ancient Ward',)
 
 
 class Camp(NamedTuple):

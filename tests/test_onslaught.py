@@ -7,7 +7,7 @@ Run: `pytest tests/test_onslaught.py` (from repo root).
 
 from kazbars import onslaught as ons
 from kazbars.buff_database import BuffDatabase
-from kazbars.grids_generator import CodeGenerator, _as2_strs
+from kazbars.grids_generator import CodeGenerator
 
 SHOWS = ("showList", "showAlerts", "showWave", "showAoe", "showAlly")
 
@@ -179,7 +179,7 @@ def test_the_tracker_bakes_its_block_hooks_and_instances():
             "alerts: true, wave: true, aoe: true, ally: true, alertMs: 6000};") in data
     assert '"Zug-Touched Scorpion"' not in data, "no camps without camps"
     assert ('        d.ONS.helpers = ["Thugra Khotan"];\n        d.ONS.heal = ["Healing Radiance"];\n'
-            f'        d.ONS.shield = [{_as2_strs(ons.SHIELD_BUFFS)}];\n'
+            '        d.ONS.shield = ["Ancient Ward"];\n'
             '        d.ONS.pf = {};') in data
     assert ('        d.ONS.pf[20010] = {start: "talk to Hylda", spawnMs: 200000, '
             'ally: "Valkyrie Hylda", aoe: false, camps: [{n: "Hub", r: 20, p: [185, 50, 76]}, '

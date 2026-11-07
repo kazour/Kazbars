@@ -4136,6 +4136,22 @@
       ],
       "category": "#Dungeons",
       "type": "debuff"
+    },
+    {
+      "name": "Healing Radiance",
+      "ids": [
+        5075612
+      ],
+      "category": "#Onslaught",
+      "type": "buff"
+    },
+    {
+      "name": "Ancient Ward",
+      "ids": [
+        5074563
+      ],
+      "category": "#Onslaught",
+      "type": "buff"
     }
   ]
 }
