@@ -4,7 +4,7 @@ The scheduler is injected, so the debounce is exercised deterministically: a
 fake records scheduled callbacks and fires them by hand. Pins the debounce
 collapse (N mutations → one write), flush-before-build semantics, the lazy
 once-only session .bak, revert-then-autosave, replace-then-revert, and the failed-write retry loop
-with `last_write_failed` for the exit rescue path.
+(`flush()` False until a write lands, for the exit rescue path).
 
 Run: `pytest tests/test_profile_store.py` (from repo root).
 """
@@ -63,14 +63,13 @@ def test_mutations_collapse_into_one_debounced_write():
     store, sched, writer = _store()
     store.update_section("alpha", {"count": 1})
     store.update_section("alpha", {"count": 2})
-    store.set_name("Renamed")
     assert writer.calls == []  # nothing until the debounce fires
     assert len(sched.pending) == 1  # re-armed, not stacked
     (ms, _fn), = sched.pending.values()
     assert ms == DEBOUNCE_MS
     sched.fire()
     assert len(writer.calls) == 1
-    assert writer.calls[0] == {"name": "Renamed", "alpha": {"count": 2}}
+    assert writer.calls[0] == {"name": "Setup", "alpha": {"count": 2}}
     assert not store.dirty
 
 
@@ -124,18 +123,16 @@ def test_replace_document_autosaves_and_revert_restores_the_session_start():
     assert writer.calls[-1] == {"name": "Setup", "alpha": {"count": 10}}
 
 
-def test_failed_write_sets_flag_and_retries_slower():
+def test_failed_write_retries_slower():
     store, sched, writer = _store()
     writer.fail = True
     store.update_section("alpha", {"count": 1})
     sched.fire()
-    assert store.last_write_failed is True
     assert store.dirty is True
     (ms, _fn), = sched.pending.values()
     assert ms == RETRY_MS
     writer.fail = False
     sched.fire()  # retry lands
-    assert store.last_write_failed is False
     assert not store.dirty
     assert len(writer.calls) == 2
 
@@ -148,5 +145,4 @@ def test_writer_oserror_is_a_failure_not_a_crash():
     store = ProfileStore(_doc(), exploding_writer, sched.schedule, sched.cancel)
     store.update_section("alpha", {"count": 1})
     sched.fire()
-    assert store.last_write_failed is True
     assert store.flush() is False  # still not on disk — exit path shows rescue

@@ -21,7 +21,7 @@ import logging
 from .overlay_size import SCALE_DEFAULT, scale_from
 from .profile_document import LANE_BUILD
 from .profile_document import SectionSpec as ProfileSectionSpec
-from .settings_core import Field, Schema, get_defaults, validate_all
+from .settings_core import Field, Schema, validate_all
 
 logger = logging.getLogger(__name__)
 
@@ -65,14 +65,6 @@ _SCHEMA = Schema('', 1, {
     "display": Field("elapsed", choices=DISPLAY_MODES),
     "color": Field("FFFFFF", validate=validate_color),
 })
-
-CAST_TIMER_DEFAULTS = get_defaults(_SCHEMA)
-
-
-def get_default_config():
-    """Return a fresh copy of the default cast-timer config."""
-    return get_defaults(_SCHEMA)
-
 
 def validate_config(config):
     """Validate/clamp a cast-timer config on load. Returns a sanitized dict

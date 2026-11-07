@@ -2,9 +2,9 @@
 
 Ports `Deeps/rust/deeps/src/trackers/window.rs`. Stores `(timestamp, value)`
 events bounded by a `capacity` duration (the longest window ever queried).
-On `record`, drops events older than `now - capacity`. Sample queries
-(`sum_since`, `count_since`) walk from the back, stopping at the first event
-older than the requested window — events are time-ordered by construction.
+On `record`, drops events older than `now - capacity`. The sample query
+(`sum_since`) walks from the back, stopping at the first event older than the
+requested window — events are time-ordered by construction.
 
 Time is float-valued seconds, supplied by the caller (typically
 `time.monotonic()`). The struct never reads the clock itself, so tests can
@@ -18,7 +18,7 @@ class RollingWindow:
     """A FIFO of (timestamp, value) pairs bounded by a capacity duration.
 
     The capacity must be at least the longest window ever passed to
-    `sum_since` / `count_since`, otherwise samples can drop events that are
+    `sum_since`, otherwise samples can drop events that are
     still in range.
     """
 
@@ -55,17 +55,6 @@ class RollingWindow:
             else:
                 break
         return total
-
-    def count_since(self, now: float, window_seconds: float) -> int:
-        """Count of events within `[now - window, now]`."""
-        cutoff = now - window_seconds
-        n = 0
-        for t, _ in reversed(self._events):
-            if t >= cutoff:
-                n += 1
-            else:
-                break
-        return n
 
     def first_event(self) -> float | None:
         """Timestamp of the first ever recorded event, or None if reset/empty.

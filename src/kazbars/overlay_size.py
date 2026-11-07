@@ -84,14 +84,10 @@ def cast_fs(base: int, scale: int) -> int:
 @dataclass(frozen=True)
 class GridMetrics:
     """A grid slot on screen: icon px, timer and stack pt (the slot clip scales
-    the art, not the text). `timer_capped`: the timer was brought down to fit
-    the icon; `*_floored`: the text would have been under MIN_TEXT_PT."""
+    the art, not the text)."""
     icon: int
     timer: int
     stack: int
-    timer_capped: bool
-    timer_floored: bool
-    stack_floored: bool
 
 
 def text_box_h(pt: int) -> int:
@@ -110,14 +106,7 @@ def icon_metrics(icon: int, want_stack: int, want_timer: int) -> GridMetrics:
     cap_width = (icon - GUTTER) * 10_000 // TIMER_DIGITS_EM_E4
     cap_height = (below - GUTTER) * 5 // 6
     timer = max(min(want_timer, cap_width, cap_height), MIN_TEXT_PT)
-    return GridMetrics(
-        icon=icon,
-        timer=timer,
-        stack=stack,
-        timer_capped=timer < want_timer,
-        timer_floored=want_timer < MIN_TEXT_PT,
-        stack_floored=want_stack < MIN_TEXT_PT,
-    )
+    return GridMetrics(icon=icon, timer=timer, stack=stack)
 
 
 def grid_metrics(base: int, scale: int) -> GridMetrics:

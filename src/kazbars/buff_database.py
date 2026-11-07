@@ -154,10 +154,6 @@ class BuffDatabase:
             return buff.get('type', 'buff')
         return 'buff'
 
-    def is_debuff(self, buff_id):
-        """Check if buff is a debuff."""
-        return self.get_type(buff_id) == 'debuff'
-
     def get_entry_by_name(self, name):
         """Return entry dict for the given entry name, or None."""
         return self.by_name.get(name)

@@ -23,20 +23,27 @@ from pathlib import Path
 
 import pytest
 
-from as2c.swf import TAG_DO_INIT_ACTION, Movie
+from as2c.swf import TAG_DO_INIT_ACTION, Movie, encode_tag
 from kazbars import damageinfo_settings, grids_generator, inspect_catalog, onslaught
 from kazbars.buff_database import BuffDatabase
 from kazbars.damageinfo_generator import build_damageinfo
 from kazbars.grid_model import create_default_grid, validate_grid
 from kazbars.grids_generator import build_grids
 from kazbars.paths import ASSETS, KAZBARS_ASSETS
-from kazbars.swf_font import font_tags
+from kazbars.swf_font import DEFINE_FONT3, DEFINE_FONT_NAME
 
 _BASE_SWF = KAZBARS_ASSETS / "base.swf"
 # The compiler's per-class cap is 32 KB; a class past the warning line is a
 # sign the next feature needs a split.
 CLASS_CAP = 32_000
 CLASS_WARN = 30_000
+
+
+def font_tags(swf: bytes) -> bytes:
+    """The DefineFont3 and DefineFontName records of `swf`, concatenated in
+    order: for a KazBars.swf built in a baked face, that face's blob."""
+    movie = Movie.from_bytes(swf)
+    return b"".join(encode_tag(t) for t in movie.tags if t.code in (DEFINE_FONT3, DEFINE_FONT_NAME))
 
 
 def _db():

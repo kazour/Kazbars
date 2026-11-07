@@ -10,14 +10,14 @@ PROFILE_SECTION contract app.py registers (BUILD lane, flat config-as-section).
 from kazbars.profile_document import LANE_BUILD
 from kazbars.stopwatch import (
     PROFILE_SECTION,
-    STOPWATCH_DEFAULTS,
-    get_default_config,
     validate_config,
 )
 
+STOPWATCH_DEFAULTS = PROFILE_SECTION.defaults()
+
 
 def test_defaults_disabled():
-    cfg = get_default_config()
+    cfg = PROFILE_SECTION.defaults()
     assert cfg["enabled"] is False
     assert cfg["startCollapsed"] is False
     assert cfg["scale"] == 100
@@ -96,5 +96,4 @@ def test_profile_section_contract():
     assert PROFILE_SECTION.lane == LANE_BUILD
     assert PROFILE_SECTION.sparse is False
     assert PROFILE_SECTION.harvest_refs is None
-    assert PROFILE_SECTION.defaults() == STOPWATCH_DEFAULTS
     assert PROFILE_SECTION.validate({"enabled": True})["enabled"] is True

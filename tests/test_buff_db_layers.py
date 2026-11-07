@@ -2,7 +2,7 @@
 
 Covers merge precedence (stock <- content <- user), provenance mapping,
 tombstones (incl. user re-add beating its own tombstone), missing/corrupt-layer
-fallbacks, load_effective/load_floor, compute_delta (add/override/tombstone/
+fallbacks, the disk load (`BuffDatabase.load_layers`)/load_floor, compute_delta (add/override/tombstone/
 cosmetic-no-op/primary-id-change), and the DeltaStore round-trip.
 
 Run: `pytest tests/test_buff_db_layers.py` (from repo root).
@@ -11,10 +11,10 @@ Run: `pytest tests/test_buff_db_layers.py` (from repo root).
 import json
 
 from kazbars import buff_db_layers as L
+from kazbars.buff_database import BuffDatabase
 from kazbars.buff_db_layers import (
     DeltaStore,
     compute_delta,
-    load_effective,
     load_floor,
     merge_layers,
 )
@@ -82,7 +82,7 @@ def test_user_readd_wins_over_own_tombstone():
 
 
 # --------------------------------------------------------------------------- #
-# load_effective / load_floor / missing + corrupt layers
+# disk load / load_floor / missing + corrupt layers
 # --------------------------------------------------------------------------- #
 
 def _write(p, buffs, deleted=None):
@@ -93,24 +93,30 @@ def _write(p, buffs, deleted=None):
     p.write_text(json.dumps(data), encoding="utf-8")
 
 
-def test_load_effective_missing_content_and_user(tmp_path):
+def _load_layers(*paths):
+    db = BuffDatabase()
+    db.load_layers(*paths)
+    return db.buffs, db.provenance
+
+
+def test_load_layers_missing_content_and_user(tmp_path):
     stock = tmp_path / "Database.json"
     _write(stock, [_b(1, "S")])
-    eff, prov = load_effective(
+    eff, prov = _load_layers(
         stock, tmp_path / "content" / "Database.json", tmp_path / "database_user.json"
     )
     assert [b["ids"][0] for b in eff] == [1]
     assert prov[1] == "stock"
 
 
-def test_load_effective_full_three_layers(tmp_path):
+def test_load_layers_full_three_layers(tmp_path):
     stock = tmp_path / "Database.json"
     _write(stock, [_b(1, "S1"), _b(2, "S2")])
     content = tmp_path / "content" / "Database.json"
     _write(content, [_b(2, "C2"), _b(3, "C3")])
     user = tmp_path / "database_user.json"
     _write(user, [_b(4, "U4")], deleted=[1])
-    eff, prov = load_effective(stock, content, user)
+    eff, prov = _load_layers(stock, content, user)
     by = {b["ids"][0]: b for b in eff}
     assert set(by) == {2, 3, 4}            # 1 tombstoned
     assert by[2]["name"] == "C2"           # content overrides stock

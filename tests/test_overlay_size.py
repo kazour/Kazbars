@@ -174,7 +174,6 @@ def test_every_choice_at_the_default_scale_is_a_clean_derivative():
     for base in SIZES:
         m = grid_metrics(base, 100)
         assert (m.icon, m.timer, m.stack) == (4 * base, base, base), base
-        assert not (m.timer_capped or m.timer_floored or m.stack_floored), base
 
 
 def test_the_scale_moves_the_icon_by_four_px_per_rounded_point():
@@ -189,20 +188,17 @@ def test_the_scale_moves_the_icon_by_four_px_per_rounded_point():
 def test_both_texts_are_floored_at_nine_points():
     m = grid_metrics(12, 50)
     assert (m.icon, m.stack, m.timer) == (24, 9, 9)
-    assert m.stack_floored and m.timer_floored and not m.timer_capped
     m = grid_metrics(10, 90)
     assert (m.icon, m.stack, m.timer) == (36, 9, 9)
-    assert not (m.stack_floored or m.timer_floored)
 
 
 def test_the_fit_caps_stay_a_net_the_body_role_timer_never_falls_into():
     m = grid_metrics(12, 70)
     assert (m.icon, m.stack, m.timer) == (32, 9, 9)
-    assert m.timer_floored and not m.timer_capped
-    assert not any(grid_metrics(b, p).timer_capped for b in SIZES for p in SCALES)
+    # Uncapped, the timer matches the stack counter (both want the same size).
+    assert all(m.timer == m.stack for m in (grid_metrics(b, p) for b in SIZES for p in SCALES))
     # A fixed icon asking for big text is capped to fit it.
-    m = icon_metrics(40, 12, 30)
-    assert m.timer_capped and m.timer < 30
+    assert icon_metrics(40, 12, 30).timer < 30
 
 
 def test_the_box_height_is_one_line_box_plus_the_gutter():
@@ -220,7 +216,6 @@ def test_the_sweep_of_every_size_and_scale_keeps_every_rule():
             assert m.stack >= MIN_TEXT_PT and m.timer >= MIN_TEXT_PT, at
             assert m.stack == max(asked, MIN_TEXT_PT), at
             assert m.timer <= max(asked, MIN_TEXT_PT), at
-            assert m.timer_capped == (m.timer < asked), at
             if m.timer > MIN_TEXT_PT:
                 assert m.timer * 2.2264 + GUTTER <= m.icon + 1e-9, at
                 assert INSET + text_box_h(m.stack) + text_box_h(m.timer) <= m.icon, at

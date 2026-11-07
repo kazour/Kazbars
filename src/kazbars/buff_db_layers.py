@@ -173,15 +173,6 @@ def merge_layers(stock_buffs: list, content_buffs: list, user_buffs: list,
     return effective, provenance
 
 
-def load_effective(stock_path, content_path=None, user_delta_path=None) -> tuple[list, dict]:
-    """Load + merge the three layers from disk. Missing layers are treated as
-    empty. Returns ``(effective_buffs, provenance)``."""
-    stock = _read_buffs(stock_path)
-    content = _read_buffs(content_path)
-    user_buffs, deleted = _read_user_delta(user_delta_path)
-    return merge_layers(stock, content, user_buffs, deleted)
-
-
 def load_floor(stock_path, content_path=None, stock_fallback_path=None) -> tuple[list, dict]:
     """The merge floor — stock ← content override, **no user deltas**. Returns
     ``(floor_buffs, floor_provenance)`` (provenance is ``stock`` | ``content``).

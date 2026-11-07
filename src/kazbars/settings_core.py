@@ -131,31 +131,6 @@ def _coerce_field(f: Field, value: Any) -> Any:
     return value
 
 
-def nullable_int(*, min: Any = None, max: Any = None) -> Callable[[Any], Any]:
-    """Validator for an int field where `None` means *unset* — the setting defers
-    to a shared value held elsewhere instead of carrying its own.
-
-    `kind='int'` cannot express this: it coerces every unparsable value to the
-    default, so there is no way to store "no opinion" distinctly from a number.
-    Here `None`, `''` and anything unparsable store as `None`; everything else
-    stores as an int clamped to `[min, max]`.
-    """
-    def validate(value: Any) -> int | None:
-        if value is None or value == '':
-            return None
-        try:
-            num = float(value)
-        except (TypeError, ValueError):
-            return None
-        if min is not None and num < min:
-            num = min
-        if max is not None and num > max:
-            num = max
-        return round(num)
-
-    return validate
-
-
 def coerce(schema: Schema, key: str, value: Any) -> Any:
     """Coerce one value for `key`. Unknown keys pass through unchanged — the
     drop-unknown step lives in `validate_all`, not here (mirrors the per-file
@@ -255,16 +230,6 @@ def save(schema: Schema, folder: str | Path, data: dict) -> bool:
     except OSError as e:
         logger.warning('Could not save %s: %s', schema.filename, e)
         return False
-
-
-def save_patch(schema: Schema, folder: str | Path, patch: dict) -> bool:
-    """Overwrite only `patch`'s keys in the on-disk settings (defaults when the
-    file is missing) and write the merged result atomically. For callers that
-    own one slice of a shared file — a blind `save` of a stale full copy would
-    clobber keys a sibling panel wrote since it loaded."""
-    current = load(schema, folder)
-    current.update(patch)
-    return save(schema, folder, current)
 
 
 # =========================================================================== #

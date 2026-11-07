@@ -32,7 +32,7 @@ from .inspect_catalog import find
 from .overlay_size import SCALE_DEFAULT, scale_from
 from .profile_document import LANE_BUILD
 from .profile_document import SectionSpec as ProfileSectionSpec
-from .settings_core import Field, Schema, get_defaults, validate_all
+from .settings_core import Field, Schema, validate_all
 
 logger = logging.getLogger(__name__)
 
@@ -56,14 +56,6 @@ _SCHEMA = Schema('', 1, {
     "startCollapsed": Field(False, kind='bool'),
     "rows": Field(None, validate=_validate_rows),
 })
-
-INSPECT_DEFAULTS = get_defaults(_SCHEMA)
-
-
-def get_default_config():
-    """Return a fresh copy of the default inspect-panel config."""
-    return get_defaults(_SCHEMA)
-
 
 def validate_config(config):
     """Validate/clamp an inspect-panel config on load. Returns a sanitized dict

@@ -20,7 +20,7 @@ from typing import Any
 from .overlay_size import SCALE_DEFAULT, scale_from
 from .profile_document import LANE_BUILD
 from .profile_document import SectionSpec as ProfileSectionSpec
-from .settings_core import Field, Schema, get_defaults, validate_all
+from .settings_core import Field, Schema, validate_all
 
 # Every tab, in its default order.
 TABS = ('buffs', 'casts')
@@ -42,10 +42,6 @@ _SCHEMA = Schema('', 1, {
     'scale': Field(SCALE_DEFAULT, validate=scale_from),
     'tabs': Field(list(TABS), validate=_validate_tabs),
 })
-
-
-def get_default_config() -> dict:
-    return get_defaults(_SCHEMA)
 
 
 def validate_config(config: Any) -> dict:

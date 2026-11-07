@@ -16,7 +16,7 @@ import zlib
 
 import pytest
 
-from as2c.swf import Movie
+from as2c.swf import Movie, encode_tag
 from kazbars import overlay
 from kazbars.paths import ASSETS, KAZBARS_ASSETS
 from kazbars.swf_font import (
@@ -32,12 +32,18 @@ from kazbars.swf_font import (
     _parse_import,
     dn_scale,
     font_id,
-    font_tags,
     import_game_font,
     records,
     set_damage_font,
     splice,
 )
+
+
+def font_tags(swf: bytes) -> bytes:
+    """The DefineFont3 and DefineFontName records of `swf`, concatenated in
+    order: for a KazBars.swf built in a baked face, that face's blob."""
+    movie = Movie.from_bytes(swf)
+    return b"".join(encode_tag(t) for t in movie.tags if t.code in (DEFINE_FONT3, DEFINE_FONT_NAME))
 
 BODY_SHA256 = {
     "roboto": "2b6b4190845577a7f2b412cbcf1419eeb82ec2c0d1bbb34b5bf90733f1af8e6e",

@@ -23,7 +23,7 @@ from typing import Any, NamedTuple
 from .overlay_size import SCALE_DEFAULT, scale_from
 from .profile_document import LANE_BUILD
 from .profile_document import SectionSpec as ProfileSectionSpec
-from .settings_core import Field, Schema, get_defaults, validate_all
+from .settings_core import Field, Schema, validate_all
 
 # ============================================================================
 # CATALOG
@@ -175,10 +175,6 @@ _SCHEMA = Schema('', 1, {
 })
 
 _DISPLAYS = ('showList', 'showAlerts', 'showWave', 'showAoe', 'showAlly')
-
-
-def get_default_config() -> dict:
-    return get_defaults(_SCHEMA)
 
 
 def validate_config(config: Any) -> dict:

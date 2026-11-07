@@ -165,39 +165,6 @@ class TestValidatePatch:
 
 
 # --------------------------------------------------------------------------- #
-# nullable_int — "no opinion" stored distinctly from a number
-# --------------------------------------------------------------------------- #
-
-class TestNullableInt:
-    def test_unset_values_stay_none(self):
-        # kind='int' cannot express this: it coerces every one of these to the
-        # default, so a setting could never say "defer to the shared value".
-        v = settings_core.nullable_int(min=8, max=48)
-        assert v(None) is None
-        assert v('') is None
-        assert v('garbage') is None
-        assert v([]) is None
-
-    def test_numbers_are_coerced_and_clamped(self):
-        v = settings_core.nullable_int(min=8, max=48)
-        assert v(16) == 16
-        assert v('16') == 16
-        assert v(16.4) == 16
-        assert v(2) == 8
-        assert v(99) == 48
-
-    def test_bounds_are_optional(self):
-        assert settings_core.nullable_int()(9999) == 9999
-
-    def test_reads_back_through_a_field(self):
-        s = Schema('n.json', 1, {'size': Field(None, validate=settings_core.nullable_int(
-            min=8, max=48))})
-        assert settings_core.validate_all(s, {})['size'] is None
-        assert settings_core.validate_all(s, {'size': 99})['size'] == 48
-        assert settings_core.validate_all(s, {'size': None})['size'] is None
-
-
-# --------------------------------------------------------------------------- #
 # get_defaults freshness
 # --------------------------------------------------------------------------- #
 
@@ -311,24 +278,6 @@ class TestFileIO:
         settings_core.save(s, tmp_path, bad)
         on_disk = json.loads((tmp_path / s.filename).read_text(encoding="utf-8"))
         assert on_disk["count"] == 100
-
-    def test_save_patch_overwrites_only_given_keys(self, tmp_path):
-        s = _schema()
-        data = settings_core.get_defaults(s)
-        data["count"] = 42
-        data["mode"] = "c"
-        settings_core.save(s, tmp_path, data)
-        assert settings_core.save_patch(s, tmp_path, {"mode": "b"}) is True
-        loaded = settings_core.load(s, tmp_path)
-        assert loaded["mode"] == "b"    # patched
-        assert loaded["count"] == 42    # sibling key preserved from disk
-
-    def test_save_patch_on_missing_file_starts_from_defaults(self, tmp_path):
-        s = _schema()
-        assert settings_core.save_patch(s, tmp_path, {"count": 7}) is True
-        loaded = settings_core.load(s, tmp_path)
-        assert loaded["count"] == 7
-        assert loaded["mode"] == "a"    # default filled
 
     def test_structured_dict_round_trip(self, tmp_path):
         s = _schema()

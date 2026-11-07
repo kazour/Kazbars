@@ -32,7 +32,7 @@ tag at fault.
 import struct
 import zlib
 
-from as2c.swf import Movie, SwfError, Tag, encode_tag
+from as2c.swf import Movie, SwfError, Tag
 
 from .overlay import HYBORIAN
 
@@ -174,13 +174,6 @@ def splice(base: bytes, blob: bytes) -> bytes:
         raise _missing('base', _TAG_NAMES[r.code], font_id(r) or 0)
     movie.tags = kept
     return movie.to_bytes()
-
-
-def font_tags(swf: bytes) -> bytes:
-    """The DefineFont3 and DefineFontName records of `swf`, concatenated in
-    order: for a KazBars.swf built in a baked face, that face's blob."""
-    movie = Movie.from_bytes(swf)
-    return b''.join(encode_tag(t) for t in movie.tags if t.code in (DEFINE_FONT3, DEFINE_FONT_NAME))
 
 
 def _cstr(b: bytes, at: int) -> tuple[bytes, int]:

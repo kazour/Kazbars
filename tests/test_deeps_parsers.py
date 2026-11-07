@@ -25,14 +25,24 @@ from kazbars.deeps_parsers import (
     is_pet,
     parse_incoming_damage,
     parse_incoming_heal,
-    parse_outgoing_damage,
     parse_outgoing_damage_with_target,
     parse_outgoing_heal,
-    parse_pet_hit,
     parse_pet_hit_with_target,
     strip_log_timestamp,
     target_is_own_pet,
 )
+
+
+def parse_outgoing_damage(line: str) -> int | None:
+    """The amount alone, as Deeps's parse_me_damage returns it."""
+    result = parse_outgoing_damage_with_target(line)
+    return result[0] if result is not None else None
+
+
+def parse_pet_hit(line: str) -> int | None:
+    """The amount alone, as Deeps's parse_pet_hit returns it."""
+    result = parse_pet_hit_with_target(line)
+    return result[0] if result is not None else None
 
 # =========================================================================== #
 # parse_outgoing_damage — accepted cases                                      #

@@ -11,9 +11,9 @@ Scheduling is injected (`schedule(ms, fn) -> token` / `cancel(token)`; app.py
 passes `after`/`after_cancel`) so the debounce is deterministic under test.
 On the first mutation of a session the pre-mutation document is handed to
 `write_bak` once — the snapshot behind `revert_to_session_start` and the
-corrupt-load fallback. A failed write keeps the document dirty, sets
-`last_write_failed` (the exit path shows a rescue offer while it's set), and
-retries on a slower cadence until a write lands.
+corrupt-load fallback. A failed write keeps the document dirty and retries
+on a slower cadence until a write lands; `flush()` returns False meanwhile, so
+the exit path can offer a rescue.
 """
 
 import copy
@@ -45,7 +45,6 @@ class ProfileStore:
         self._bak_written = False
         self._pending: Any = None
         self._dirty = False
-        self.last_write_failed = False
 
     # ------------------------------------------------------------------ #
     # READ
@@ -74,10 +73,6 @@ class ProfileStore:
 
     def update_section(self, key: str, patch: dict) -> None:
         self._doc['modules'].setdefault(key, {}).update(patch)
-        self._touch()
-
-    def set_name(self, name: str) -> None:
-        self._doc['name'] = str(name).strip() or self._doc['name']
         self._touch()
 
     def replace_document(self, doc: dict) -> None:
@@ -120,9 +115,7 @@ class ProfileStore:
             result = None
         if result:
             self._dirty = False
-            self.last_write_failed = False
         else:
-            self.last_write_failed = True
             self._arm(RETRY_MS)
 
     def flush(self) -> bool:

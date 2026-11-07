@@ -603,7 +603,7 @@ def create_scrollable_frame(parent, resize_flag=None):
             canvas.itemconfig(canvas_window, width=w)
             _set_scrollregion()
     canvas._force_layout = _force_layout
-    _bind_canvas_mousewheel(canvas, inner)
+    _bind_canvas_mousewheel(canvas)
 
     # Keyboard scrolling
     canvas.configure(takefocus=True)
@@ -660,12 +660,11 @@ def _global_mousewheel_handler(event):
         pass
 
 
-def _bind_canvas_mousewheel(canvas, *extra_widgets):
+def _bind_canvas_mousewheel(canvas):
     """Bind mousewheel scrolling to a canvas.
 
     Registers the canvas so the global mousewheel handler can find it.
     Scrolling works anywhere inside the canvas or its child widgets.
-    Extra widgets parameter is accepted but ignored (kept for call-site convenience).
     """
     _scrollable_canvases.add(canvas)
 

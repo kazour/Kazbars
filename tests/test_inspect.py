@@ -8,16 +8,16 @@ PROFILE_SECTION contract app.py registers (BUILD lane, flat config-as-section).
 """
 
 from kazbars.inspect import (
-    INSPECT_DEFAULTS,
     PROFILE_SECTION,
-    get_default_config,
     validate_config,
 )
 from kazbars.profile_document import LANE_BUILD
 
+INSPECT_DEFAULTS = PROFILE_SECTION.defaults()
+
 
 def test_defaults_disabled():
-    cfg = get_default_config()
+    cfg = PROFILE_SECTION.defaults()
     assert cfg["enabled"] is False
     assert cfg["scale"] == 100
     # A fresh copy, not the shared module dict.
@@ -68,7 +68,7 @@ def test_the_retired_font_size_is_dropped():
 
 
 def test_start_collapsed_defaults_off_and_coerces():
-    assert get_default_config()["startCollapsed"] is False
+    assert INSPECT_DEFAULTS["startCollapsed"] is False
     assert validate_config({"startCollapsed": 1})["startCollapsed"] is True
     assert validate_config({"startCollapsed": "garbage"})["startCollapsed"] is True
     assert validate_config({"startCollapsed": 0})["startCollapsed"] is False
@@ -99,5 +99,4 @@ def test_profile_section_contract():
     assert PROFILE_SECTION.lane == LANE_BUILD
     assert PROFILE_SECTION.sparse is False
     assert PROFILE_SECTION.harvest_refs is None
-    assert PROFILE_SECTION.defaults() == INSPECT_DEFAULTS
     assert PROFILE_SECTION.validate({"enabled": True})["enabled"] is True
