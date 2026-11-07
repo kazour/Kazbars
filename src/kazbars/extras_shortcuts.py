@@ -231,10 +231,10 @@ class ExtrasShortcutsRow(ttk.Frame):
         """Resync every card from its store; no-ops for unchanged tiles."""
         for tile in self._tiles.values():
             on = _ships(self.app, tile['key'], tile['ships'])
+            tile['var'].set(on)
             if on == tile['on']:
                 continue
             tile['on'] = on
-            tile['var'].set(on)
             tile['status'].configure(
                 text='In next build' if on else 'Off',
                 foreground=THEME_COLORS['success'] if on else TK_COLORS['dim_text'])
