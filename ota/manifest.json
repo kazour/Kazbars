@@ -1,16 +1,16 @@
 {
   "schema": 1,
-  "content_version": 34,
+  "content_version": 35,
   "min_app_version": "3.2.0",
-  "notes": "Default profile moves to the overlay size model (schema 3); requires KazBars 3.2.0",
+  "notes": "Priest of Mitra: Sacred Fire, Purifying Light; Assassin: Recently Struck by Grim Corruption; Veil of the Unliving alias ID; Corrupted Claws Wrack stack order",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
-      "sha256": "03ef3de617c1e20f2313708b2646ba1d4bfda64b777fd1b85a639944913b6b3f"
+      "sha256": "04283948c1d6a427413356f3922447cf0ac979e391642583edbeae2a16828d22"
     },
     "Default.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.json",
-      "sha256": "6a0c8b6ea35bc898f6f1e8b5af79e58851c4cb69aac1518a0e2c8d1e1f35a998"
+      "sha256": "418987e8c43f586ea8719eb1edd11ebcdc629f0adf6dc595a249aabf8db382d4"
     }
   }
 }
