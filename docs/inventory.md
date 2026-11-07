@@ -45,7 +45,7 @@
 | `src/kazbars/deeps_settings.py` | 336 |
 | `src/kazbars/deeps_trackers.py` | 182 |
 | `src/kazbars/extras_shortcuts.py` | 282 |
-| `src/kazbars/first_launch.py` | 400 |
+| `src/kazbars/first_launch.py` | 402 |
 | `src/kazbars/focus_watcher.py` | 85 |
 | `src/kazbars/foreground.py` | 111 |
 | `src/kazbars/game_folder.py` | 430 |
@@ -74,11 +74,11 @@
 | `src/kazbars/paths.py` | 46 |
 | `src/kazbars/prefs.py` | 223 |
 | `src/kazbars/profile_document.py` | 345 |
-| `src/kazbars/profile_io.py` | 444 |
+| `src/kazbars/profile_io.py` | 446 |
 | `src/kazbars/profile_share.py` | 174 |
 | `src/kazbars/profile_store.py` | 136 |
 | `src/kazbars/self_update.py` | 487 |
-| `src/kazbars/settings_backup.py` | 524 |
+| `src/kazbars/settings_backup.py` | 528 |
 | `src/kazbars/settings_core.py` | 298 |
 | `src/kazbars/settings_manager.py` | 56 |
 | `src/kazbars/stopwatch.py` | 59 |
@@ -96,7 +96,7 @@
 | `src/kazbars/update_orchestrator.py` | 148 |
 | `src/kazbars/userdata.py` | 119 |
 | `src/kazbars/window_position.py` | 162 |
-| `src/kazbars/yaml_io.py` | 196 |
+| `src/kazbars/yaml_io.py` | 210 |
 | `tests/test_app_contract.py` | 104 |
 | `tests/test_app_icon.py` | 43 |
 | `tests/test_as2_class_names.py` | 77 |
@@ -151,13 +151,13 @@
 | `tests/test_prefs_migration.py` | 68 |
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |
 | `tests/test_profile_document.py` | 249 |
-| `tests/test_profile_io.py` | 356 |
+| `tests/test_profile_io.py` | 364 |
 | `tests/test_profile_share.py` | 234 |
 | `tests/test_profile_store.py` | 152 |
 | `tests/test_projection.py` | 89 |
 | `tests/test_release_assets.py` | 33 |
 | `tests/test_self_update.py` | 505 |
-| `tests/test_settings_backup.py` | 278 |
+| `tests/test_settings_backup.py` | 281 |
 | `tests/test_settings_core.py` | 373 |
 | `tests/test_settings_manager.py` | 33 |
 | `tests/test_stopwatch.py` | 100 |
@@ -169,4 +169,4 @@
 | `tests/test_update_check.py` | 83 |
 | `tests/test_update_orchestrator.py` | 226 |
 | `tests/test_userdata.py` | 73 |
-| `tests/test_yaml_io.py` | 156 |
+| `tests/test_yaml_io.py` | 172 |

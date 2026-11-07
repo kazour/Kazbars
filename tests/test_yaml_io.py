@@ -154,3 +154,19 @@ def test_a_lone_surrogate_in_a_json_file_reads_as_the_replacement_character(tmp_
     path = tmp_path / 'old.json'
     path.write_text('{"k\\ud83d": ["a\\ud83db"]}', encoding='utf-8')
     assert yaml_io.read_file(path) == {'k\ufffd': ['a\ufffdb']}
+
+
+def test_a_container_alias_is_refused_not_recursed(loader):
+    for text in ("&a [*a]", "a: &x [1]\nb: *x", "a: &x {k: 1}\nb: [*x, *x]"):
+        with pytest.raises(YamlError):
+            loads(text)
+    assert loads("a: &x 1\nb: *x") == {"a": 1, "b": 1}, "a scalar alias is only a value"
+
+
+def test_too_deep_a_nest_is_a_read_error(loader, tmp_path):
+    with pytest.raises(YamlError):
+        loads("[" * 5000 + "]" * 5000)
+    path = tmp_path / "deep.json"
+    path.write_text("[" * 100000 + "]" * 100000, encoding="utf-8")
+    with pytest.raises(ValueError):
+        yaml_io.read_file(path)

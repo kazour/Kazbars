@@ -150,7 +150,7 @@ def startup_profile(app, active_hint=None):
     reads). `active_hint` names the library profile to adopt when prefs.json
     no longer does (a 3.1 backup restored without its prefs). Toasts wait for
     the window."""
-    doc, toast = None, None
+    doc, toast, unsaved = None, None, False
     path = profile_path()
     if path.exists():
         doc = _read_or_set_aside(app, path)
@@ -158,7 +158,7 @@ def startup_profile(app, active_hint=None):
             bak = profile_bak_path()
             doc = _read_or_set_aside(app, bak, keep=True) if bak.exists() else None
             if doc is not None:
-                write_profile(app, doc)
+                unsaved = True
                 toast = ("Your profile file was damaged — restored the copy from your last "
                          "session", 'warning', None)
             else:
@@ -167,7 +167,7 @@ def startup_profile(app, active_hint=None):
     else:
         doc = _adopt_library(app, active_hint)
         if doc is not None:
-            write_profile(app, doc)
+            unsaved = True
             toast = (f"Adopted “{doc['name']}” as your profile — your other profiles stay in "
                      "userdata/profiles; File ▸ Import profile… opens one", 'info', 8)
     if doc is None:
@@ -175,8 +175,12 @@ def startup_profile(app, active_hint=None):
         if doc is None:
             logger.warning("No profile template reads — starting from a blank profile")
             doc = new_document(app.registry, SEED_NAME, get_game_resolution_or_default())
-        write_profile(app, doc)
+        unsaved = True
     app.profile_store = make_store(app, doc)
+    if unsaved and write_profile(app, doc) is None:
+        # Not on disk: through the store it stays dirty, retries, and the exit
+        # path offers the rescue.
+        app.profile_store.replace_document(doc)
     apply_document(app)
     if toast:
         msg, style, duration = toast
@@ -348,7 +352,6 @@ def import_profile(app):
     except ValueError as e:  # user-presentable, incl. the gate's "older KazBars"
         Messagebox.show_error(str(e), title="Import Failed")
         return
-    app._on_grids_edited()
     doc['id'] = mint_id()
     app.profile_store.replace_document(doc)
     added, skipped, failed = merge_embedded_buffs(app, embedded)
@@ -438,7 +441,6 @@ def reset_to_defaults(app):
     if doc is None:
         Messagebox.show_warning("No profile template is available.", title="Reset Profile")
         return
-    app._on_grids_edited()
     app.profile_store.replace_document(doc)
     apply_document(app)
     app_toast(app, "Reset to defaults", 'info')

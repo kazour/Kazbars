@@ -160,9 +160,9 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
     res_var = tk.StringVar(value=detected)
 
     # --- Shared actions ---
-    def _set_game_if_provided():
+    def _set_game_if_provided(unless=None):
         p = path_var.get().strip()
-        if p:
+        if p and p != unless:
             on_game_set(str(Path(p).resolve()))
         if on_resolution_set:
             on_resolution_set(res_var.get())
@@ -191,8 +191,9 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
 
     def skip():
         # Keep a typed game path even on "Set up later" / X — losing it because
-        # the user closed the dialog is worse than skipping the re-arm.
-        _set_game_if_provided()
+        # the user closed the dialog is worse than skipping the re-arm. The
+        # path filled in for them is not kept: they never confirmed it.
+        _set_game_if_provided(unless=auto_path)
         _close()
 
     # --- Two equal-weight option cards ---
@@ -298,8 +299,9 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
     # the entry as the one thing to do. Set after the trace so it wires through
     # the same enable path as typing.
     _detected = [cp for cp in existing_paths if _is_game_folder(cp)]
-    if len(_detected) == 1:
-        path_var.set(_detected[0])
+    auto_path = _detected[0] if len(_detected) == 1 else None
+    if auto_path:
+        path_var.set(auto_path)
         (btn_defaults or btn_empty).focus_set()
     else:
         path_entry.focus_set()

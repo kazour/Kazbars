@@ -53,6 +53,7 @@ from .userdata import (
     database_user_path,
     funcom_prefs_path,
     prefs_path,
+    profile_bak_path,
     profile_path,
     profiles_dir,
     userdata_root,
@@ -493,12 +494,15 @@ def restore_settings(app, dialog, include_prefs=False):
         return
 
     # A 3.1 backup holds a profile library, no profile.yml: once it has landed,
-    # drop ours so the reopen below adopts from the restored library.
-    if library:
+    # drop ours so the reopen below adopts from the restored library. The
+    # session snapshot goes either way: it is the pre-restore profile, and a
+    # restored file the reopen can't read must not fall back to it.
+    stale = [profile_bak_path(), *([profile_path()] if library else [])]
+    for old in stale:
         try:
-            profile_path().unlink(missing_ok=True)
+            old.unlink(missing_ok=True)
         except OSError as e:
-            logger.warning("Could not clear the profile for the library restore: %s", e)
+            logger.warning("Could not clear %s for the restore: %s", old.name, e)
 
     # The running app holds prefs in memory and re-saves on exit; resync from
     # disk so a freshly-restored prefs.json (when opted in) isn't clobbered.

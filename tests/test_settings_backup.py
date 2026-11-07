@@ -189,6 +189,7 @@ def _stub_restore_settings_deps(monkeypatch, tmp_path, order, *, release_store_o
     monkeypatch.setattr(settings_backup, "database_user_path", lambda: tmp_path / "db.json")
     monkeypatch.setattr(settings_backup, "prefs_path", lambda: tmp_path / "prefs.json")
     monkeypatch.setattr(settings_backup, "userdata_root", lambda: tmp_path)
+    monkeypatch.setattr(settings_backup, "profile_bak_path", lambda: tmp_path / "profile.yml.bak")
     monkeypatch.setattr(
         settings_backup, "restore_zip",
         lambda *a, **k: order.append("restore_zip") or {"funcom": 1, "kazbars": 1})
@@ -215,11 +216,13 @@ def test_restore_settings_flushes_before_restoring_then_reopens(monkeypatch, tmp
     order = []
     _stub_restore_settings_deps(monkeypatch, tmp_path, order)
     app = _restore_app(order, tmp_path)
+    (tmp_path / "profile.yml.bak").write_text("pre-restore", encoding="utf-8")
 
     restore_settings(app, SimpleNamespace(destroy=lambda: None))
 
     assert order == [
         "release_store", "restore_zip", "settings.reload", "database.reload", "startup_profile:None"]
+    assert not (tmp_path / "profile.yml.bak").exists(), "an unreadable restore never falls back to it"
 
 
 def test_restore_settings_aborts_before_restore_zip_when_release_store_fails(

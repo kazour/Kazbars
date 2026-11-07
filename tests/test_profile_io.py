@@ -161,6 +161,14 @@ def test_startup_seeds_from_the_template_sized_for_the_resolution(app, root):
     assert doc["modules"]["overlay"]["size"] == size_for_height(1440)
     assert doc["modules"]["grids"]["grids"], "the stock grids"
     assert (root / "profile.yml").exists() and app.toasts == []
+    assert not app.profile_store.dirty
+
+
+def test_a_failed_first_write_keeps_the_profile_dirty(app, root, monkeypatch):
+    monkeypatch.setattr(profile_io, "write_profile", lambda a, d: None)
+    app.after = lambda ms, fn: None
+    profile_io.startup_profile(app)
+    assert app.profile_store.dirty, "the store retries and the exit path offers the rescue"
 
 
 def test_startup_falls_back_to_blank_without_a_template(app, root, tmp_path):

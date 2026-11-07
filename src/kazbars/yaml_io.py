@@ -40,11 +40,16 @@ def loads(text):
     mapping key is always text and a value YAML types beyond JSON (a date,
     a set, binary) reads as text or a list, and a lone surrogate reads as
     U+FFFD as `dumps` writes it, so whatever loads, `dumps` writes back the
-    same. Raises `YamlError`."""
+    same. A list or mapping reached twice (a YAML alias; `dumps` never writes
+    one) is refused, so a self-referencing or fanned-out alias can't recurse
+    or blow up. Raises `YamlError`."""
     try:
-        return _json_shaped(yaml.load(text, Loader=getattr(yaml, 'CSafeLoader', yaml.SafeLoader)))
+        return _json_shaped(yaml.load(text, Loader=getattr(yaml, 'CSafeLoader', yaml.SafeLoader)),
+                            set())
     except yaml.YAMLError as e:
         raise YamlError(str(e)) from e
+    except RecursionError as e:
+        raise YamlError('nested too deep') from e
 
 
 def read_file(path):
@@ -53,14 +58,23 @@ def read_file(path):
     (`UnicodeDecodeError`, a JSON or YAML error)."""
     path = Path(path)
     text = path.read_text(encoding='utf-8')
-    return _json_shaped(json.loads(text)) if path.suffix.lower() == '.json' else loads(text)
+    if path.suffix.lower() != '.json':
+        return loads(text)
+    try:
+        return _json_shaped(json.loads(text), set())
+    except RecursionError as e:
+        raise ValueError('nested too deep') from e
 
 
-def _json_shaped(value):
+def _json_shaped(value, seen):
+    if isinstance(value, (dict, list, tuple, set)):
+        if id(value) in seen:
+            raise YamlError('anchors and aliases are not supported')
+        seen.add(id(value))
     if isinstance(value, dict):
-        return {_key_text(k): _json_shaped(v) for k, v in value.items()}
+        return {_key_text(k): _json_shaped(v, seen) for k, v in value.items()}
     if isinstance(value, (list, tuple, set)):
-        return [_json_shaped(v) for v in value]
+        return [_json_shaped(v, seen) for v in value]
     if isinstance(value, str):
         return _SURROGATES.sub('\ufffd', value)
     if value is None or isinstance(value, (bool, int, float)):
@@ -73,10 +87,10 @@ def _json_shaped(value):
 def _key_text(key):
     """A mapping key as JSON writes one: `1` → "1", `true` → "true"."""
     if isinstance(key, str):
-        return _json_shaped(key)
+        return _json_shaped(key, set())
     if key is None or isinstance(key, bool):
         return json.dumps(key)
-    return str(_json_shaped(key))
+    return str(_json_shaped(key, set()))
 
 
 # ============================================================================
