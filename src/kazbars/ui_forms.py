@@ -40,7 +40,8 @@ def labeled_spinbox(
     padx=0,
     label_sink=None,
 ):
-    """Labeled spinbox with key-validation and a clamp on focus-out or Enter.
+    """Labeled spinbox with key-validation and a clamp on focus-out or Enter
+    (a field left empty gets its last committed value back).
 
     `var` is a caller-owned StringVar or IntVar; the helper reads its type
     to drive the clamp. `on_change`, if given, fires on spinbox arrows AND
@@ -70,6 +71,27 @@ def labeled_spinbox(
         except ValueError:
             return False
 
+    is_str_var = isinstance(var, tk.StringVar)
+
+    def _read():
+        try:
+            return int(var.get()) if is_str_var else var.get()
+        except (ValueError, tk.TclError):
+            return None
+
+    # The field's last committed value (as built, stepped, entered or
+    # clamped): a field left empty or half-typed ("-") gets it back.
+    last = _read()
+
+    def _commit():
+        nonlocal last
+        last = _read()
+
+    def _stepped():
+        _commit()
+        if on_change is not None:
+            on_change()
+
     vcmd = (parent.register(_validate), "%P")
     spin = ttk.Spinbox(
         parent,
@@ -79,22 +101,21 @@ def labeled_spinbox(
         width=width,
         validate="key",
         validatecommand=vcmd,
-        command=on_change or "",
+        command=_stepped,
     )
     spin.pack(side="left", padx=padx)
 
-    is_str_var = isinstance(var, tk.StringVar)
-
     def _clamp(_evt=None):
-        try:
-            v = int(var.get()) if is_str_var else var.get()
-        except (ValueError, tk.TclError):
-            v = from_
-        clamped = max(from_, min(to, v))
-        var.set(str(clamped) if is_str_var else clamped)
+        nonlocal last
+        v = _read()
+        if v is None:
+            v = from_ if last is None else last
+        last = max(from_, min(to, v))
+        var.set(str(last) if is_str_var else last)
         if on_change is not None:
             on_change()
 
+    spin.bind("<FocusIn>", lambda _e: _commit(), add="+")
     spin.bind("<FocusOut>", _clamp)
     spin.bind("<Return>", _clamp)
     if tooltip:

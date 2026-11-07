@@ -75,8 +75,9 @@ def center_on_parent(window, parent, width=None, height=None):
     the window keeps sizing to its content. The frame's title bar (the client
     area winfo_reqheight leaves out) is counted, the parent wearing the same.
     """
-    if width is None or height is None:
-        window.update_idletasks()
+    # Always, sizes given or not: an override-redirect window (the build
+    # screen) is placed and shown only once the idle pass has applied the flag.
+    window.update_idletasks()
     w = window.winfo_reqwidth() if width is None else width
     h = window.winfo_reqheight() if height is None else height
     bar = max(0, parent.winfo_rooty() - parent.winfo_y())

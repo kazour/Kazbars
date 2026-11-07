@@ -221,7 +221,8 @@ def test_a_box_has_no_cap_and_keeps_its_shape():
     assert "rowCap" not in g and "maxSlots" not in g
     assert (g["rows"], g["cols"], slot_count(g)) == (2, 8, 16)
     g = validate_grid({"type": "player", "rows": 2, "cols": 8, "rowCap": 5})
-    assert "rowCap" not in g and g["fillDirection"] == "TL-BR", "a box's fill, never a band's C"
+    assert "rowCap" not in g and g["fillDirection"] == "TL-BR", (
+        "a box with a stray band key and no fill snaps the default LR to its 2x8 shape")
 
 
 def test_an_unfit_box_fill_snaps_on_load_to_the_order_it_draws_in():

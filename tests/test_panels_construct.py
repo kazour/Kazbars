@@ -691,7 +691,7 @@ class _StubWindow:
         self.geometry_calls = []
 
     def update_idletasks(self):
-        pass
+        self.geometry_calls.append('idle')
 
     def winfo_reqheight(self):
         return self._reqheight
@@ -716,11 +716,24 @@ def test_fit_window_height_follows_its_content():
     from kazbars.window_position import fit_window_height
     grown = _StubWindow(height=744, reqheight=759)
     fit_window_height(grown, 440)
-    assert grown.geometry_calls and grown.geometry_calls[0].startswith('440x759+')
+    assert grown.geometry_calls[-1].startswith('440x759+')
 
     settled = _StubWindow(height=744, reqheight=744)
     fit_window_height(settled, 440)
-    assert settled.geometry_calls == []          # no churn on the status tick
+    assert settled.geometry_calls == ['idle']    # no churn on the status tick
+
+
+def test_center_on_parent_runs_the_idle_pass_before_placing():
+    """The build screen (override-redirect) paints only if the idle pass has
+    applied the flag before it is placed and shown."""
+    from kazbars.window_position import center_on_parent
+    window = _StubWindow(height=1, reqheight=1)
+    parent = _StubWindow(height=600, reqheight=600)
+    parent.winfo_rootx = lambda: 100
+    parent.winfo_width = lambda: 800
+    center_on_parent(window, parent, 420, 340)
+    assert window.geometry_calls[0] == 'idle'
+    assert window.geometry_calls[1].startswith('420x340+')
 
 
 def test_fit_window_height_floors_and_grows_about_its_centre(monkeypatch):
@@ -730,10 +743,10 @@ def test_fit_window_height_floors_and_grows_about_its_centre(monkeypatch):
                         lambda x, y, w, h: boxes.append((x, y, w, h)) or (x, y))
     short = _StubWindow(height=500, reqheight=300)
     window_position.fit_window_height(short, 720, 500)
-    assert short.geometry_calls == [], "never under the floor"
+    assert short.geometry_calls == ['idle'], "never under the floor"
     tall = _StubWindow(height=500, reqheight=560)
     window_position.fit_window_height(tall, 720, 500, about_centre=True)
-    assert tall.geometry_calls == ['720x560+100+70'], "60 px more: 30 up, 30 down"
+    assert tall.geometry_calls == ['idle', '720x560+100+70'], "60 px more: 30 up, 30 down"
     assert boxes[-1] == (100, 70, 720, 590), "the title bar is clamped with it"
 
 
@@ -1111,10 +1124,11 @@ def test_the_draft_previews_what_apply_stores(app):
     assert dlg.draft()['fillDirection'] == 'BL-TR', "a row's LR no longer fits a box"
     dlg.rows_var.set('10')
     dlg.cols_var.set('8')
-    assert (dlg.draft()['rows'], dlg.draft()['cols']) == (10, 6), "the slot limit holds"
+    # Both typed since the last settle: Rows, the moved one, gives way.
+    assert (dlg.draft()['rows'], dlg.draft()['cols']) == (8, 8), "the slot limit holds"
     dlg.apply()
     cfg = card.grid_config
-    assert (cfg['rows'], cfg['cols'], cfg['fillDirection']) == (10, 6, 'BL-TR')
+    assert (cfg['rows'], cfg['cols'], cfg['fillDirection']) == (8, 8, 'BL-TR')
 
 
 def test_applying_a_smaller_shape_trims_slots_with_the_warning(app, monkeypatch):
@@ -1457,6 +1471,77 @@ def test_applied_by_me_sits_after_the_mode(app):
     left = [w for w in slaves if w.pack_info()['side'] == 'left']
     assert left[-2:] == [card.summary_label, card._self_cast_cb]
     assert slaves.index(card.cog_label) < slaves.index(card._self_cast_cb)
+
+
+def test_the_side_typed_since_the_last_settle_gives_way(app):
+    from kazbars.grid_model import create_default_grid
+    card = _card_for(app, create_default_grid('player', 1, 5, 'static', 'SeamGiveDraft'))
+    dlg = _settings(card)
+    try:
+        dlg.cols_var.set('8')
+        dlg._on_shape('cols')        # settled at 1x8
+        dlg.rows_var.set('10')       # typed, no arrow, focus-out or Enter yet
+        assert (dlg.draft()['rows'], dlg.draft()['cols']) == (8, 8)
+        dlg.rows_var.set('8')
+        dlg._on_shape('rows')        # settled at 8x8
+        dlg.cols_var.set('10')
+        assert (dlg.draft()['rows'], dlg.draft()['cols']) == (8, 8)
+        assert dlg.rows_var.get() == '8', "the draft never writes the fields"
+    finally:
+        dlg.cancel()
+
+
+def test_an_emptied_number_field_gets_its_value_back(app):
+    from tkinter import ttk
+
+    from kazbars.ui_forms import labeled_spinbox
+    top = tk.Toplevel(app)
+    try:
+        var = tk.StringVar(value='7')
+        changes = []
+        spin = labeled_spinbox(top, None, var, from_=-5, to=40, on_change=lambda: changes.append(var.get()))
+        assert isinstance(spin, ttk.Spinbox)
+        var.set('')
+        _fire_binding(spin, '<Return>')
+        assert var.get() == '7', "empty: the last committed value, never the minimum"
+        var.set('99')
+        _fire_binding(spin, '<FocusOut>')
+        assert var.get() == '40', "out of range: clamped"
+        var.set('-')
+        _fire_binding(spin, '<Return>')
+        assert var.get() == '40', "half-typed: the last committed value"
+        assert changes == ['7', '40', '40']
+    finally:
+        top.destroy()
+
+
+def test_the_onslaught_dialog_refits_when_its_hint_comes_or_goes(app, monkeypatch):
+    from tkinter import ttk
+
+    from kazbars import onslaught_panel
+    before = app.profile_store.get_section('onslaught')
+    app.profile_store.set_section('onslaught', {**before, 'enabled': True,
+                                                'showList': True, 'showAlerts': True})
+    calls = []
+    monkeypatch.setattr(onslaught_panel, 'fit_window_height', lambda *a, **k: calls.append(a))
+    app._open_onslaught_settings()
+    dlg = app.onslaught_dialog
+    try:
+        dlg.winfo_ismapped = lambda: True  # the test app never maps its dialogs
+        boxes = {str(w.cget('text')): w for w in _widgets(dlg, ttk.Checkbutton)}
+        calls.clear()
+        boxes['Mob list'].invoke()
+        assert calls == [], "a recolour alone never re-fits"
+        boxes['Spawn alerts'].invoke()
+        assert len(calls) == 1, "the hint line came"
+        boxes['Spawn alerts'].invoke()
+        assert len(calls) == 2, "the hint line went"
+        boxes['Wave timer'].invoke()
+        assert len(calls) == 2
+    finally:
+        _close_via_protocol(dlg)
+        app.update()
+        app.profile_store.set_section('onslaught', before)
 
 
 def _fire_binding(widget, sequence):

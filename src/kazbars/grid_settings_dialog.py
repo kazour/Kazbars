@@ -262,6 +262,9 @@ class GridSettingsDialog(tk.Toplevel):
             labeled_spinbox(cell, None, self.cols_var, from_=1, to=max_cols, width=4,
                             tooltip=f"Grid columns (width). A grid holds up to {limit} slots.",
                             on_change=lambda: self._on_shape('cols'))
+            # The shape as last settled: a side typed into since (no arrow,
+            # focus-out or Enter yet) is the one `draft` lets give way.
+            self._settled = self._shape()
 
         if not self._plate:
             # Positions are fractions; the fields show px at the game resolution.
@@ -399,6 +402,7 @@ class GridSettingsDialog(tk.Toplevel):
         show their result, with a toast when one gave way."""
         rows, cols = self._shape()
         new_rows, new_cols, _ = settle_box(rows, cols, '', self._type, not self._static, give=dim)
+        self._settled = (new_rows, new_cols)
         if (new_rows, new_cols) != (rows, cols):
             self.rows_var.set(str(new_rows))
             self.cols_var.set(str(new_cols))
@@ -452,8 +456,10 @@ class GridSettingsDialog(tk.Toplevel):
         else:
             fill = (_FILL_CODE_BY_LABEL.get(self.fill_var.get(), cfg.get('fillDirection'))
                     if not self._static else cfg.get('fillDirection'))
+            rows, cols = self._shape()
+            give = 'rows' if rows != self._settled[0] else 'cols'
             out['rows'], out['cols'], out['fillDirection'] = settle_box(
-                *self._shape(), fill, self._type, not self._static)
+                rows, cols, fill, self._type, not self._static, give=give)
         if not self._plate:
             x = _int(self.x_var, self._px0[0], 0, self._res[0])
             y = _int(self.y_var, self._px0[1], 0, self._res[1])
