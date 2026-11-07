@@ -41,7 +41,7 @@ def test_only_one_of_the_twelve_ids_reads_as_a_class():
 
 def test_a_class_grid_bakes_cls_last_and_an_all_grid_none():
     db = BuffDatabase()
-    db.load(KAZBARS_ASSETS / "Database.json")
+    db.load_layers(KAZBARS_ASSETS / "Database.json")
     grids = [validate_grid({"id": "G", "whitelist": [222609], "class": 44}),
              validate_grid({"id": "H", "type": "target", "whitelist": [222609]})]
     _, data = CodeGenerator(grids, db, "0.0.0").generate()

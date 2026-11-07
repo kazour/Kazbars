@@ -49,7 +49,7 @@ def _db():
     global _DB
     if _DB is None:
         _DB = BuffDatabase()
-        _DB.load(KAZBARS_ASSETS / "Database.json")
+        _DB.load_layers(KAZBARS_ASSETS / "Database.json")
     return _DB
 
 

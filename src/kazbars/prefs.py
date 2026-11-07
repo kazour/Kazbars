@@ -20,7 +20,7 @@ from typing import Any
 
 from . import CONTENT_BASELINE_VERSION
 from .classes import id_of as class_id_of
-from .settings_core import Field, Migration, Schema, Store
+from .settings_core import Field, Schema, Store
 from .userdata import PREFS_FILENAME
 
 logger = logging.getLogger(__name__)
@@ -124,41 +124,6 @@ def _validate_last_patch(value: Any) -> dict:
     return out
 
 
-# The v1 → v2 rung's default for the shared panel text size it lifted.
-_PANEL_FONT_DEFAULT = 12
-
-
-def _stored_font_size(section: Any) -> Any:
-    """The `fontSize` a stored `stopwatch`/`inspect` sub-dict carried, or None."""
-    return section.get("fontSize") if isinstance(section, dict) else None
-
-
-def _upgrade_panel_font(data: dict) -> dict:
-    """v1 → v2: lift the two per-panel font sizes onto the shared one.
-
-    Anchored on Inspect rather than on `max()`: the shared control lives in the
-    Inspect dialog, and the console and control panel are documented as the
-    inspect panel's visual family, so a user who only ever enlarged the stopwatch
-    keeps those two where they were instead of having them track the least
-    related panel. Inspect defined the shared value, so it follows it from here;
-    a stopwatch that disagreed keeps its number as a deliberate override.
-
-    Runs on the raw dict before `validate_all`. The stopwatch/inspect configs
-    later moved into the profile document, so the sub-dicts this rung rewrites
-    are dropped as undeclared keys, and `panel_font_size` itself later retired
-    for the profile's overlay size, so `validate_all` now erases everything this
-    rung writes. Frozen history; the body stays as written.
-    """
-    sizes = {name: _stored_font_size(data.get(name)) for name in ("inspect", "stopwatch")}
-    shared = _PANEL_FONT_DEFAULT if sizes["inspect"] is None else sizes["inspect"]
-    data["panel_font_size"] = shared
-    for name, size in sizes.items():
-        section = data.get(name)
-        if isinstance(section, dict) and (name == "inspect" or size == shared):
-            data[name] = {**section, "fontSize": None}
-    return data
-
-
 ANCHOR_SIDE_DEFAULT = 389
 ANCHOR_UP_DEFAULT = -13
 ANCHOR_MIN = -2000
@@ -204,7 +169,6 @@ PREFS_SCHEMA = Schema(
         # _validate_last_build) — drives the grids panel's status row.
         "last_build": Field({}, validate=_validate_last_build),
     },
-    migrations=(Migration(2, _upgrade_panel_font),),
 )
 
 

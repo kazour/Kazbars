@@ -1,6 +1,6 @@
 """KazBars — Buff database (pure data layer).
 
-JSON load/save plus in-memory indexes and search. No Tk, no ttkbootstrap —
+The layered load (`load_layers`) plus in-memory indexes and search. No Tk, no ttkbootstrap —
 safe to import from CI without the UI extra.
 
 v2 Format:
@@ -16,9 +16,7 @@ v2 Format:
 }
 """
 
-import json
 import logging
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -42,24 +40,6 @@ class BuffDatabase:
         self.grouped_buffs = []
         self.provenance = {}        # ids[0] -> 'stock' | 'content' | 'user'
         self._layer_paths = None    # remembered by load_layers so reload() can re-merge
-
-    def load(self, json_path):
-        """Load a single v2 database file (back-compat / tests). For the app's
-        layered load use `load_layers`."""
-        from . import buff_db_layers
-        try:
-            with open(json_path, encoding='utf-8') as f:
-                data = json.load(f)
-            raw = data.get('buffs', []) if isinstance(data, dict) else []
-            if not isinstance(raw, list):
-                raw = []
-            self.buffs = buff_db_layers._keep_valid(raw, Path(json_path).name)
-            self.provenance = {}
-            self._rebuild_indexes()
-            return True
-        except (OSError, json.JSONDecodeError) as e:
-            logger.error("Error loading buff database: %s", e)
-            return False
 
     def load_layers(self, stock_path, content_path=None, user_delta_path=None,
                     stock_fallback_path=None):

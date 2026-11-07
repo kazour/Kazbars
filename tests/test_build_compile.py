@@ -48,7 +48,7 @@ def font_tags(swf: bytes) -> bytes:
 
 def _db():
     db = BuffDatabase()
-    db.load(KAZBARS_ASSETS / "Database.json")
+    db.load_layers(KAZBARS_ASSETS / "Database.json")
     return db
 
 

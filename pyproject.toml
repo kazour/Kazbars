@@ -52,17 +52,16 @@ src = ["src", "tests"]
 select = ["E", "F", "W", "I", "UP", "B", "RUF", "N"]
 ignore = [
     "E501",   # line too long — let formatter handle
-    "N812",   # lowercase imported as non-lowercase — 4 deliberate module aliases
+    "N812",   # lowercase imported as non-lowercase — 10 deliberate aliases (APP_VERSION, test module aliases)
     "E402",   # module-import-not-at-top — codebase convention: logger = getLogger() after imports
     "E741",   # ambiguous variable names (l, I, O) — used as AS2 loop counters in generators
-    "B008",   # function call in default argument (common in tk callbacks)
-    "B905",   # zip-without-explicit-strict — one site, low value
+    "B905",   # zip-without-explicit-strict — 8 sites + 3 in vendored as2c, equal-length pairs
     "RUF001", # ambiguous unicode in strings — em dashes / × are intentional brand voice
     "RUF002", # same, in docstrings
     "RUF003", # same, in comments
-    "RUF005", # collection-literal-concatenation — 3 sites, fine as-is
-    "RUF012", # mutable-class-default — TODO: convert to ClassVar/field(default_factory=...)
-    "RUF059", # unused-unpacked-variable — one site, fine as-is
+    "RUF005", # collection-literal-concatenation — 5 sites, fine as-is
+    "RUF012", # mutable-class-default — 7 read-only lookup tables on classes
+    "RUF059", # unused-unpacked-variable — 10 sites (9 in tests), names kept as documentation
 ]
 
 [tool.ruff.lint.per-file-ignores]

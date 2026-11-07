@@ -26,7 +26,7 @@ def _db():
     db = BuffDatabase()
     path = ASSETS / 'Database.json'
     if path.exists():
-        db.load(path)
+        db.load_layers(path)
     else:
         db.buffs = []
     return db

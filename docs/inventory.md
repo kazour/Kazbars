@@ -16,7 +16,7 @@
 | `src/kazbars/app.py` | 819 |
 | `src/kazbars/app_popups.py` | 491 |
 | `src/kazbars/boss_timer.py` | 399 |
-| `src/kazbars/buff_database.py` | 185 |
+| `src/kazbars/buff_database.py` | 165 |
 | `src/kazbars/buff_db_layers.py` | 258 |
 | `src/kazbars/buff_display_editor.py` | 711 |
 | `src/kazbars/buff_xml.py` | 377 |
@@ -72,7 +72,7 @@
 | `src/kazbars/overlay_engine.py` | 800 |
 | `src/kazbars/overlay_size.py` | 115 |
 | `src/kazbars/paths.py` | 46 |
-| `src/kazbars/prefs.py` | 223 |
+| `src/kazbars/prefs.py` | 187 |
 | `src/kazbars/profile_document.py` | 345 |
 | `src/kazbars/profile_io.py` | 446 |
 | `src/kazbars/profile_share.py` | 174 |
@@ -112,7 +112,6 @@
 | `tests/test_combat_monitor.py` | 150 |
 | `tests/test_console.py` | 43 |
 | `tests/test_content_update.py` | 391 |
-| `tests/test_convert_profiles.py` | 73 |
 | `tests/test_cut_release.py` | 177 |
 | `tests/test_damageinfo_colors_panel.py` | 293 |
 | `tests/test_damageinfo_generator.py` | 208 |
@@ -147,8 +146,7 @@
 | `tests/test_overlay_size.py` | 221 |
 | `tests/test_panel_ratios.py` | 162 |
 | `tests/test_panels_construct.py` | 1778 |
-| `tests/test_prefs.py` | 76 |
-| `tests/test_prefs_migration.py` | 68 |
+| `tests/test_prefs.py` | 95 |
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |
 | `tests/test_profile_document.py` | 249 |
 | `tests/test_profile_io.py` | 364 |
