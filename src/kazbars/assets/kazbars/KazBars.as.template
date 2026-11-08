@@ -160,6 +160,9 @@ class KazBars {
         }
         var i:Number;
         for (i = 0; i < grids.views.length; i++) ppanel.addGrid(grids.views[i]);
+//#if PLATE
+        for (i = 0; i < overhead.smp.length; i++) ppanel.addGrid(overhead.smp[i]);
+//#end
         // Explicit adds, not a modules loop: this sequence IS the panel's Tools
         // row order, decoupled from the registration order above (which is
         // z-order). Each row is seeded from what its module is doing right now,

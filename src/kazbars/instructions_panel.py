@@ -648,10 +648,12 @@ SECTIONS: list[_Section] = [
             ]),
             _sub('The KazBars Preview panel', [
                 'Preview mode also shows a KazBars Preview panel: one '
-                'checkbox per floating grid and extra, grouped under Player '
-                'Grids, Target Grids and Tools. Click a header to toggle its '
-                'whole group. Each box is a persistent master switch — '
-                'unchecked stays off until you re-check it.',
+                'checkbox per grid and extra, grouped under Player Grids, '
+                'Target Grids, Overhead Grids and Tools. Click a header to '
+                'toggle its whole group. Each box is a persistent master '
+                'switch — unchecked stays off until you re-check it. An '
+                'unchecked overhead grid draws over nobody, and its sample '
+                'over your target goes too.',
                 'Its footer repeats the exit keybind, the /reloadui '
                 'reminder and the app version. Its text follows the Overlay '
                 'size. With many grids it shrinks itself to stay on screen.',

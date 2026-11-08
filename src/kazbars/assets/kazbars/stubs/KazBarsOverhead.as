@@ -1,7 +1,8 @@
 // KazBarsOverhead.as - Overhead grids (types friendly and hostile): per character KazBarsRelations knows to be of a
 // grid's relation (you among the friendly, for a grid with showSelf), a pooled KazBarsGridView over the character, fed from its Effects
-// (KazBarsWorld). No archive position and no control-panel row; preview shows one empty sample of each grid over
-// your target.
+// (KazBarsWorld). No archive position; preview shows one empty sample of each grid over your target, and the
+// sample's control-panel row is the grid's master switch (cfg.vis, archived as gk_<key>_v): off, the grid draws
+// over nobody.
 //
 // The client gives a projected point by the top of the head (KazBarsRelations.point), the one the game hangs its
 // nameplate from. A character's views are one stack centred KazBarsRelations.side px left of the point (the head's
@@ -74,6 +75,7 @@ class KazBarsOverhead implements KazBarsModule {
         for (i = 0; i < cfgs.length; i++) {
             g = cfgs[i];
             g.one = true;
+            if (g.vis == undefined) g.vis = true;
             g._r = (g.type == "friendly") ? 1 : 2;
             if (g._p == null) g._p = [];
         }
@@ -162,7 +164,7 @@ class KazBarsOverhead implements KazBarsModule {
         for (i = 0; i < r.vs.length; i++) {
             v = r.vs[i];
             if (v == null) continue;
-            ok = p != null && r.d <= v.cfg.maxDistance;
+            ok = p != null && v.cfg.vis && r.d <= v.cfg.maxDistance;
             if (ok) {
                 if (!v.shown || redo || v.stale) {
                     v.shown = true;
@@ -233,7 +235,8 @@ class KazBarsOverhead implements KazBarsModule {
         for (i = 0; i < cfgs.length; i++) {
             smp[i] = take(i);
             smp[i].fill();
-            smp[i].mc._visible = true;
+            smp[i].shown = smp[i].cfg.vis;
+            smp[i].mc._visible = smp[i].shown;
         }
         clk.go(kF);
     }
@@ -246,7 +249,8 @@ class KazBarsOverhead implements KazBarsModule {
         smp.length = 0;
     }
 
-    // The samples stacked as the views would be, over your target (the screen centre with none).
+    // The samples stacked as the views would be, over your target (the screen centre with none); an unchecked one
+    // takes no place. A sample's check is its grid's flag the same frame, so the views over characters follow.
     private function placeSamples():Void {
         var x:Number = S.x + W / 2;
         var y:Number = S.y + H / 2;
@@ -260,9 +264,13 @@ class KazBarsOverhead implements KazBarsModule {
         }
         var i:Number;
         var v:KazBarsGridView;
+        var up:Boolean = false;
         for (i = 0; i < smp.length; i++) {
             v = smp[i];
-            y -= ((i == 0) ? ros.lift(v.cfg.plateOffset, cd, H) : STACK) + v.H;
+            v.cfg.vis = v.shown;
+            if (!v.shown) continue;
+            y -= (up ? STACK : ros.lift(v.cfg.plateOffset, cd, H)) + v.H;
+            up = true;
             v.to(x - v.W / 2, y);
         }
     }
@@ -278,8 +286,28 @@ class KazBarsOverhead implements KazBarsModule {
         for (i = 0; i < g.length; i++) g[i]._p = [];
     }
 
-    public function loadState(config:Object):Void {}
-    public function saveState(config:Object):Void {}
+    // Every class's overhead grids, not cfgs: the archive arrives once. Views already up hide on the next place().
+    public function loadState(config:Object):Void {
+        if (config == null) return;
+        var g:Array = d.CFG.grids;
+        var i:Number;
+        var x:Object;
+        for (i = 0; i < g.length; i++) {
+            if (g[i].type != "friendly" && g[i].type != "hostile") continue;
+            x = config.FindEntry("gk_" + g[i].key + "_v");
+            if (x !== undefined) g[i].vis = (x == 1);
+        }
+    }
+
+    public function saveState(config:Object):Void {
+        if (config == null) return;
+        var g:Array = d.CFG.grids;
+        var i:Number;
+        for (i = 0; i < g.length; i++) {
+            if (g[i].type == "friendly" || g[i].type == "hostile")
+                config.ReplaceEntry("gk_" + g[i].key + "_v", (g[i].vis != false) ? 1 : 0);
+        }
+    }
     public function isActive():Boolean { return true; }
     public function setActive(a:Boolean):Void {}
     public function previewKey():String { return ""; }

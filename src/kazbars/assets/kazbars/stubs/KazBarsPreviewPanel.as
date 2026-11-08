@@ -1,7 +1,7 @@
 // KazBarsPreviewPanel.as - Preview-mode control panel: one checkbox per grid
 // and one per compiled-in extra, so a single overlay can be isolated while it
-// is being positioned. Rows sit under three section headers — Player Grids,
-// Target Grids, Tools — and a dim footer carries the exit keybind, the
+// is being positioned. Rows sit under four section headers — Player Grids,
+// Target Grids, Overhead Grids, Tools — and a dim footer carries the exit keybind, the
 // /reloadui recipe and the version credit, so the panel also orients a user
 // who has never seen preview mode before.
 //
@@ -17,8 +17,8 @@
 // is actually doing right now, and a box IS that item's master switch: unchecked
 // survives the exit and the relog. A header is its group's master: one click
 // checks the group, another unchecks it. The panel itself stays stateless — the
-// owner persists the grid flags (g<i>_v) and each stub persists its own (inv/
-// ctv/cnv/onv). Its own drag position rides in the module config archive as
+// grid stubs persist the grid flags (gk_<key>_v) and each extra persists its own
+// (inv/ctv/cnv/onv). Its own drag position rides in the module config archive as
 // ppx/ppy, beside the other panels' keys.
 class KazBarsPreviewPanel extends KazBarsPanel {
     // The one call that flows back to the core (the contract note atop
@@ -27,9 +27,10 @@ class KazBarsPreviewPanel extends KazBarsPanel {
     // same compile unit, so the compiler checks the call for free.
     private var owner:KazBars;
     private var titleTF:TextField;
-    // Three fixed groups [{label, rows}]; a row is {obj, key, label, checked,
+    // Four fixed groups [{label, rows}]; a row is {obj, key, label, checked,
     // cb} — obj set for grids, key for extras. addGrid buckets by the grid's
-    // cfg.type, addExtra lands in Tools; a group nothing landed in emits no
+    // cfg.type (target; friendly or hostile overhead; else player), addExtra
+    // lands in Tools; a group nothing landed in emits no
     // header. Group order here IS the panel's section order.
     private var groups:Array;
     private var ver:String;   // app version for the footer credit (d.PF.version)
@@ -116,17 +117,19 @@ class KazBarsPreviewPanel extends KazBarsPanel {
     public function begin():Void {
         groups = [{label: "Player Grids", rows: new Array()},
                   {label: "Target Grids", rows: new Array()},
+                  {label: "Overhead Grids", rows: new Array()},
                   {label: "Tools", rows: new Array()}];
     }
 
     public function addGrid(obj:Object):Void {
-        var g:Object = (obj.cfg.type == "target") ? groups[1] : groups[0];
+        var t:String = obj.cfg.type;
+        var g:Object = groups[(t == "target") ? 1 : ((t == "friendly" || t == "hostile") ? 2 : 0)];
         g.rows.push({obj: obj, key: null, label: String(obj.cfg.id),
                      checked: (obj.shown == true), cb: null});
     }
 
     public function addExtra(label:String, key:String, checked:Boolean):Void {
-        groups[2].rows.push({obj: null, key: key, label: label,
+        groups[3].rows.push({obj: null, key: key, label: label,
                              checked: (checked == true), cb: null});
     }
 

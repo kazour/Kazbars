@@ -129,3 +129,15 @@ def test_no_subclass_redeclares_a_field_of_its_base(cls):
     own = _members(_stub(chain[0]), "var ")
     inherited = set().union(*(_members(_stub(c), "var ") for c in chain[1:]))
     assert not own & inherited, f"{cls} redeclares {sorted(own & inherited)}"
+
+
+def test_the_preview_panel_has_a_row_group_per_kind_of_grid():
+    """Overhead grids get their own rows, between the target grids and the tools."""
+    src = _stub("KazBarsPreviewPanel")
+    begin = src[src.index("public function begin()"):src.index("public function addGrid(")]
+    labels = re.findall(r'label: "([^"]+)"', begin)
+    assert labels == ["Player Grids", "Target Grids", "Overhead Grids", "Tools"]
+    assert "groups[3].rows.push" in src
+    tpl = (KAZBARS_ASSETS / "KazBars.as.template").read_text(encoding="utf-8")
+    assert re.search(r"//#if PLATE\n\s+for \(i = 0; i < overhead\.smp\.length; i\+\+\) "
+                     r"ppanel\.addGrid\(overhead\.smp\[i\]\);\n//#end", tpl.replace("\r\n", "\n"))
