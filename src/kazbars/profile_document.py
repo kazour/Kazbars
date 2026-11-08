@@ -205,11 +205,11 @@ def _overlay_scale(data: dict) -> dict:
     of one profile-wide base size (`modules.overlay.size`). The base size is
     seeded from `authored_at`'s height (≤1080 → 11, ≤1440 → 13, else 16), so
     the shipped seeds land on the same icons (48 / 56 / 64 px at scales
-    109 / 108 / 100) and a tuned size keeps to the nearest step. Panel
-    sizes scale against the size table's timer pt for the base size. `showTimers` becomes `timerStyle`; the inspect
-    panel's `showPvp`/`showPerks` go (PvP is a tab in game, perks always
-    show). Frozen like `_px_to_fractions`: inline arithmetic, no live imports,
-    deep copy first."""
+    109 / 108 / 100) and a tuned size keeps to the nearest step. Panel sizes
+    scale against the size table's timer pt for the base size. `showTimers`
+    becomes `timerStyle`; the inspect panel's `showPvp`/`showPerks` go (PvP is
+    a tab in game, perks always show). Frozen like `_px_to_fractions`: inline
+    arithmetic, no live imports, deep copy first."""
     data = copy.deepcopy(data)
     modules = data.get('modules')
     if not isinstance(modules, dict):

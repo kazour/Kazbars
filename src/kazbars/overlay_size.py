@@ -20,8 +20,8 @@ a grid) and stores the percent that gives the size picked (`panel_scale`,
 
 The generator bakes these results and the dialogs read them back for their
 hints, so the two cannot drift. Every rounding is half-up in integer
-arithmetic (AS2's `Math.round`), so a tie such as `12 x 1.25 = 15` or
-`10 x 1.25 = 12.5` (13) is the same on both sides.
+arithmetic (AS2's `Math.round`), so a tie such as `10 pt x 125 % = 12.5` is
+13 on both sides.
 """
 
 from dataclasses import dataclass

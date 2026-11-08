@@ -301,12 +301,12 @@ def test_grid_settings_text_sizes_round_trip(app):
         auto, pt, spin, _ = dlg._text_rows['timerPt']
         assert auto.get() and pt.get() == str(grid_metrics(base, 100).timer) and 'disabled' in spin.state()
         dlg.scale_var.set(200)
-        dlg._on_size_move()
+        dlg._on_text_size()
         assert pt.get() == str(grid_metrics(base, 200).timer), "Auto follows the slider"
         assert dlg.draft()['timerPt'] is None
         dlg.scale_var.set(100)
         auto.set(False)
-        dlg._on_text_auto()
+        dlg._on_text_size()
         assert 'disabled' not in spin.state()
         pt.set('21')
         dlg._text_rows['stackPt'][0].set(False)
@@ -328,7 +328,7 @@ def test_grid_settings_text_sizes_round_trip(app):
         auto, pt, _, _ = dlg._text_rows['timerPt']
         assert not auto.get() and pt.get() == '21'
         auto.set(True)
-        dlg._on_text_auto()
+        dlg._on_text_size()
         dlg.apply()
     finally:
         if dlg.winfo_exists():

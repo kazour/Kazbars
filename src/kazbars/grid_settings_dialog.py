@@ -289,7 +289,7 @@ class GridSettingsDialog(tk.Toplevel):
         cell, _ = self._field(card, "Size:")
         _, self.scale_var = size_slider(
             cell, self.card.base_size(), cfg.get('scale', CLAMP_SPECS['scale'][0]), icons=True,
-            label=None, on_move=lambda p: self._on_size_move(),
+            label=None, on_move=lambda p: self._on_text_size(),
             tooltip="Icon size in game, 32-92 px; timer and stack text on Auto follow it. "
                     "Moves with the Overlay size on the Grids tab.")
         # key -> (auto var, pt var, spinbox, row label): Auto shows the size
@@ -302,7 +302,7 @@ class GridSettingsDialog(tk.Toplevel):
             auto_var = tk.BooleanVar(value=own is None)
             pt_var = tk.StringVar(value=str(own if own is not None else self._auto_pt(key)))
             auto_cb = ttk.Checkbutton(cell, text="Auto", variable=auto_var,
-                                      command=self._on_text_auto)
+                                      command=self._on_text_size)
             auto_cb.pack(side='left', padx=(0, PAD_MID))
             add_tooltip(auto_cb, f"Size the {what} from the Size slider; "
                                  f"untick to set your own pt")
@@ -474,11 +474,8 @@ class GridSettingsDialog(tk.Toplevel):
             spin.configure(state='normal' if live and not auto else 'disabled')
             lbl.configure(foreground='' if live else TK_COLORS['dim_text'])
 
-    def _on_size_move(self):
-        self._sync_text_fields()
-        self._changed()
-
-    def _on_text_auto(self):
+    def _on_text_size(self):
+        """The Size slider moved or an Auto box toggled: the text rows first."""
         self._sync_text_fields()
         self._changed()
 

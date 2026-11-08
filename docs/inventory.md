@@ -57,7 +57,7 @@
 | `src/kazbars/grid_model.py` | 468 |
 | `src/kazbars/grid_preview.py` | 238 |
 | `src/kazbars/grid_preview_canvas.py` | 224 |
-| `src/kazbars/grid_settings_dialog.py` | 580 |
+| `src/kazbars/grid_settings_dialog.py` | 577 |
 | `src/kazbars/grid_templates.py` | 85 |
 | `src/kazbars/grids_generator.py` | 804 |
 | `src/kazbars/grids_panel.py` | 927 |
