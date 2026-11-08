@@ -1,6 +1,6 @@
 """Tests for `onslaught` — the Onslaught Tracker's catalog, its profile section
-(defaults, clamps, the camps and the custom names, the build gate) — and the
-`d.ONS` block the build bakes from it.
+(defaults, clamps, the camps, the guards and the custom names, the build gate),
+its skull camps — and the `d.ONS` block the build bakes from it.
 
 Run: `pytest tests/test_onslaught.py` (from repo root).
 """
@@ -27,6 +27,8 @@ def test_the_catalog_has_its_35_names_in_seven_groups_and_27_always_watched():
     assert sum(1 for r in ons.ROWS if r.kind != ons.CAMP) == 27
     assert max(len(r.name) for r in ons.ROWS) == ons.NAME_MAX
     assert next(r for r in ons.ROWS if r.name == "Louhi").kind == ons.BOSS
+    guards = [r for r in ons.ROWS if r.kind == ons.GUARD]
+    assert len(guards) == 2 and all(r.group.endswith(" skull") for r in guards)
     assert [(i.playfield, i.ally, i.aoe) for i in ons.INSTANCES] == [
         (20010, "Valkyrie Hylda", False), (20000, "", True)]
 
@@ -42,6 +44,7 @@ def test_defaults_from_absent_or_non_object_section():
         assert not c["enabled"] and c["scale"] == 100
         assert all(c[k] for k in SHOWS)
         assert c["alertSeconds"] == 6 and not c["camps"] and c["custom"] == []
+        assert c["guards"] is True
 
 
 def test_clamps_scale_and_alert_time_and_coerces_truthiness():
@@ -67,7 +70,7 @@ def test_keys_an_older_build_wrote_are_dropped():
         assert key not in c, key
     assert c["custom"] == ["Pict Shaman"] and c["scale"] == 100
     assert "Taskmaster Mijoral" in ons.names_of(c, ons.BOSS), "a picked watch list narrows nothing"
-    assert list(c) == ["enabled", "scale", *SHOWS, "alertSeconds", "camps", "custom"]
+    assert list(c) == ["enabled", "scale", *SHOWS, "alertSeconds", "camps", "guards", "custom"]
 
 
 def test_the_catalog_is_watched_and_the_camps_only_when_asked():
@@ -81,6 +84,28 @@ def test_the_catalog_is_watched_and_the_camps_only_when_asked():
     assert ons.names_of(camps, ons.CAMP) == rows(ons.CAMP)
     assert ons.names_of(camps, ons.BOSS) == rows(ons.BOSS)
     assert _cfg({"camps": 1})["camps"] and not _cfg({"camps": ""})["camps"]
+
+
+def test_guards_list_apart_only_when_asked():
+    guards = ["Gurnakhi Juggernaut", "Ancient Kuthcheman Guardian"]
+    apart = _cfg({})
+    assert ons.names_of(apart, ons.GUARD) == guards
+    assert not set(guards) & set(ons.names_of(apart, ons.SKULL))
+    together = _cfg({"guards": False})
+    assert ons.names_of(together, ons.GUARD) == []
+    assert ons.names_of(together, ons.SKULL) == [r.name for r in ons.ROWS if r.group.endswith(" skull")]
+    assert ons.names_of(together, ons.SKULL)[0] == guards[0]
+
+
+def test_camps_name_each_instance():
+    camps = {i.playfield: i.camps for i in ons.INSTANCES}
+    assert [c.name for c in camps[20010]] == ["Hub", "Cave", "WCave", "Tower", "Bridge", "Altar"]
+    assert [c.name for c in camps[20000]] == [
+        "Respad", "South West", "South East", "Temple", "East", "South", "West", "North"]
+    assert [sum(len(c.points) for c in camps[pf]) for pf in (20010, 20000)] == [7, 22]
+    for camp in (c for cs in camps.values() for c in cs):
+        assert camp.r > 0 and len(camp.name) <= 10, camp
+        assert all(len(p) == 3 and all(isinstance(v, int) for v in p) for p in camp.points), camp
 
 
 def test_custom_names_are_trimmed_kept_in_order_and_watched_last_among_the_minis():
@@ -154,10 +179,16 @@ def test_the_tracker_bakes_its_block_hooks_and_instances():
             "alerts: true, wave: true, aoe: true, ally: true, alertMs: 6000};") in data
     assert '"Zug-Touched Scorpion"' not in data, "no camps without camps"
     assert ('        d.ONS.helpers = ["Thugra Khotan"];\n        d.ONS.heal = ["Healing Radiance"];\n'
+            '        d.ONS.shield = ["Ancient Ward"];\n'
             '        d.ONS.pf = {};') in data
     assert ('        d.ONS.pf[20010] = {start: "talk to Hylda", spawnMs: 200000, '
-            'ally: "Valkyrie Hylda", aoe: false};') in data
-    assert '        d.ONS.pf[20000] = {start: "click the banner", spawnMs: 200000, ally: "", aoe: true};' in data
+            'ally: "Valkyrie Hylda", aoe: false, camps: [{n: "Hub", r: 20, p: [185, 50, 76]}, '
+            '{n: "Cave", r: 20, p: [283, 35, 137]}, {n: "WCave", r: 19, p: [181, 30, 145, 222, 25, 173]}, '
+            '{n: "Tower", r: 20, p: [57, 33, 230]}, {n: "Bridge", r: 20, p: [34, 39, 281]}, '
+            '{n: "Altar", r: 20, p: [104, 36, 140]}]};') in data
+    assert ('        d.ONS.pf[20000] = {start: "click the banner", spawnMs: 200000, ally: "", aoe: true, '
+            'camps: [{n: "Respad", r: 10, p: [283, 111, 133]}, '
+            '{n: "South West", r: 5, p: [128, 104, 225, 160, 106, 174]}, ') in data
     assert data.index("d.ONS = ") < data.index("d.ONS.watch")
 
 
@@ -165,19 +196,27 @@ def test_the_watch_table_holds_only_what_a_display_reads():
     def quoted(kind, section):
         return ", ".join(f'"{n}"' for n in ons.names_of(ons.validate_config(section), kind))
     every = {"camps": True}
-    b, s, m, c = (f"{k}: [{quoted(k, every)}]" for k in (ons.BOSS, ons.SKULL, ons.MINI, ons.CAMP))
+    b, s, g, m, c = (f"{k}: [{quoted(k, every)}]"
+                     for k in (ons.BOSS, ons.SKULL, ons.GUARD, ons.MINI, ons.CAMP))
+    assert g != "g: []"
     alerts = {"enabled": True, "camps": True, **{k: k == "showAlerts" for k in SHOWS}}
-    assert _kinds(_build(alerts)[1]) == [b, s, m, "c: []"], "a camp never alerts"
+    assert _kinds(_build(alerts)[1]) == [b, s, g, m, "c: []"], "a camp never alerts"
+    assert "camps: []}" in _build(alerts)[1], "only the list reads a skull's camp"
     listed = {"enabled": True, "camps": True, **{k: k == "showList" for k in SHOWS}}
-    assert _kinds(_build(listed)[1]) == [b, s, m, c]
+    assert _kinds(_build(listed)[1]) == [b, s, g, m, c]
     wave = {"enabled": True, "camps": True, **{k: k == "showWave" for k in SHOWS}}
-    assert _kinds(_build(wave)[1]) == ["b: []", "s: []", "m: []", "c: []"]
-    assert sum(line.count('"') // 2 for line in _kinds(_build({"enabled": True})[1])) == 27
+    assert _kinds(_build(wave)[1]) == ["b: []", "s: []", "g: []", "m: []", "c: []"]
+    together = {**listed, "guards": False}
+    assert _kinds(_build(together)[1]) == [b, f"s: [{quoted(ons.SKULL, together)}]", "g: []", m, c]
+    assert '"Gurnakhi Juggernaut"' in _kinds(_build(together)[1])[1]
+    for guards in (True, False):
+        kinds = _kinds(_build({"enabled": True, "guards": guards})[1])
+        assert sum(line.count('"') // 2 for line in kinds) == 27, guards
 
 
 def test_custom_names_bake_last_among_the_minis_escaped():
     _, data = _build({"enabled": True, "custom": ['Pict "Shaman"']})
-    assert _kinds(data)[2].endswith('"Kushite Firedancer", "Pict \\"Shaman\\""]')
+    assert _kinds(data)[3].endswith('"Kushite Firedancer", "Pict \\"Shaman\\""]')
 
 
 def test_the_spots_follow_the_build_resolution():

@@ -30,7 +30,7 @@ Most of what KazBars builds is set up once and runs on its own after you close t
 
 **Console** — an in-game log of every buff and debuff on you and your target with its buff ID, plus a Casts tab for how casts ended: finished, interrupted or lost. Off by default
 
-**Onslaught Tracker** — for Skull Gate and Kuthchemes: a board of bosses, skulls and minis with their health, the wave timer, Hylda's health, spawn alerts and AoE warnings. Watches the mobs it knows, plus names you add. Off by default
+**Onslaught Tracker** — for Skull Gate and Kuthchemes: a board of bosses, skulls, guards and minis with their health, the wave timer, Hylda's health, spawn alerts and AoE warnings. Watches the mobs it knows, plus names you add. Off by default
 
 **Damage Numbers** — a leaner, faster rewrite of the game's floating combat numbers, with new layout and behavior settings and a choice of typeface. It replaces one stock game file; if the game ever patches, rebuild once to put it back. Off by default
 

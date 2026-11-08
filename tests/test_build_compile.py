@@ -93,7 +93,7 @@ def _worst_case():
         stopwatch_config={"enabled": True, "scale": 200},
         inspect_config={"enabled": True, "scale": 200, "rows": [r.key for r in inspect_catalog.ROWS]},
         console_config={"enabled": True, "scale": 200, "tabs": ["casts", "buffs"]},
-        onslaught_config={"enabled": True, "scale": 200, "camps": True,
+        onslaught_config={"enabled": True, "scale": 200, "camps": True, "guards": True,
                           "custom": [f"Mob {i:02d} " + "x" * (onslaught.NAME_MAX - 7)
                                      for i in range(onslaught.CUSTOM_MAX)]},
         overlay={"size": 24, "font": "Arial"},

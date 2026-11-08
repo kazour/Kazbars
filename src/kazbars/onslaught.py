@@ -5,15 +5,19 @@ The in-game tracker (KazBarsOnslaught / KazBarsOnsScan stubs) watches the
 Onslaught instances (Skull Gate, Kuthchemes): a board listing the bosses,
 skull minis and minis in view with their health, the wave line and timer,
 spawn alerts, AoE warnings and the defended ally's health. It always watches
-the catalog's bosses, skulls and minis; the Kuthchemes camp beasts with
-`camps`; and up to 20 names of the user's own, as minis. In game a name
+the catalog's bosses, skulls, guards and minis; the Kuthchemes camp beasts
+with `camps`; and up to 20 names of the user's own, as minis. In game a name
 matches exactly and case-sensitively, so the spelling here is the game's own.
+The guards list in their own tier at the bottom of the board with `guards`,
+else among the skulls. A skull standing on one of its instance's camps shows
+the camp's name in place of its distance; a mob carrying a SHIELD_BUFFS buff draws
+its bar light blue.
 
 The section (`onslaught`, BUILD lane): `enabled`, `scale` (the board's text,
 `overlay_size.panel_fs`; the alerts draw 1.6 times as large), the five
 displays (`showList` Mob list, `showWave` Wave timer, `showAlly` Hylda HP,
 `showAlerts` Spawn alerts, `showAoe` AoE warnings), `alertSeconds` (how long a
-banner stays), `camps` and `custom`. It ships when enabled with at least one
+banner stays), `camps`, `guards` and `custom`. It ships when enabled with at least one
 display. The board and the alerts are placed in game, in preview mode.
 """
 
@@ -29,8 +33,9 @@ from .settings_core import Field, Schema, validate_all
 # CATALOG
 # ============================================================================
 # What a watched name is, and so which board tier it lists under: boss (b),
-# skull mini (s), mini (m), or camp beast (c: listed, but it never alerts).
-BOSS, SKULL, MINI, CAMP = 'b', 's', 'm', 'c'
+# skull mini (s), guard (g: a skull, in a tier of its own with `guards`),
+# mini (m), or camp beast (c: listed, but it never alerts).
+BOSS, SKULL, GUARD, MINI, CAMP = 'b', 's', 'g', 'm', 'c'
 
 class Row(NamedTuple):
     name: str
@@ -47,7 +52,7 @@ ROWS: tuple[Row, ...] = (
     Row('Thror Ironhand', 'Skull Gate boss', BOSS),  # waves 5-9
     Row('Vammatar the Cruel', 'Skull Gate boss', BOSS),  # waves 10-14
     Row('Louhi', 'Skull Gate boss', BOSS),  # waves 15-19
-    Row('Gurnakhi Juggernaut', 'Skull Gate skull', SKULL),
+    Row('Gurnakhi Juggernaut', 'Skull Gate skull', GUARD),
     Row('Concubine of Vammatar', 'Skull Gate skull', SKULL),
     Row('Acolyte of Louhi', 'Skull Gate skull', SKULL),
     Row('Priest of the Purple Plague', 'Skull Gate skull', SKULL),
@@ -60,7 +65,7 @@ ROWS: tuple[Row, ...] = (
     Row('Prince Kutamun', 'Kuthchemes boss', BOSS),  # waves 10-14 and 30-34
     # Its AoE helpers share the name; they drive the AoE warnings, not this row.
     Row('Thugra Khotan', 'Kuthchemes boss', BOSS),  # waves 15-19 and 35-39
-    Row('Ancient Kuthcheman Guardian', 'Kuthchemes skull', SKULL),
+    Row('Ancient Kuthcheman Guardian', 'Kuthchemes skull', GUARD),
     Row('Ancient Kuthcheman Witch', 'Kuthchemes skull', SKULL),
     Row('Concubine of Khotan', 'Kuthchemes skull', SKULL),
     Row('Excavator of Souls', 'Kuthchemes skull', SKULL),
@@ -86,20 +91,47 @@ _NAMES = {r.name for r in ROWS}
 GROUPS = tuple(dict.fromkeys(r.group for r in ROWS))
 
 
+class Camp(NamedTuple):
+    """A spot a skull walks to before it casts: the board names it while the
+    skull stands within `r` metres (3-D) of any of its `points` (x, y, z)."""
+    name: str
+    r: int
+    points: tuple[tuple[int, int, int], ...]
+
+
 class Instance(NamedTuple):
     """Per-playfield facts, so the AS2 hardcodes no game ids or text. `ally` is
     an NPC the group defends (never a watched mob); `aoe` marks an instance
-    whose AOE_HELPERS spawn."""
+    whose AOE_HELPERS spawn; `camps` in check order (the first in reach names
+    the spot; coordinates measured in game)."""
     playfield: int
     start_hint: str
     spawn_ms: int
     ally: str
     aoe: bool
+    camps: tuple[Camp, ...]
 
 
 INSTANCES = (
-    Instance(20010, 'talk to Hylda', 200_000, 'Valkyrie Hylda', False),  # Skull Gate
-    Instance(20000, 'click the banner', 200_000, '', True),  # Kuthchemes
+    Instance(20010, 'talk to Hylda', 200_000, 'Valkyrie Hylda', False, (  # Skull Gate
+        Camp('Hub', 20, ((185, 50, 76),)),
+        Camp('Cave', 20, ((283, 35, 137),)),
+        Camp('WCave', 19, ((181, 30, 145), (222, 25, 173))),
+        Camp('Tower', 20, ((57, 33, 230),)),
+        Camp('Bridge', 20, ((34, 39, 281),)),
+        Camp('Altar', 20, ((104, 36, 140),)),
+    )),
+    Instance(20000, 'click the banner', 200_000, '', True, (  # Kuthchemes
+        Camp('Respad', 10, ((283, 111, 133),)),
+        Camp('South West', 5, ((128, 104, 225), (160, 106, 174))),
+        Camp('South East', 5, ((293, 103, 201),)),
+        Camp('Temple', 5, ((283, 104, 203), (242, 114, 268), (259, 114, 275),
+                           (235, 114, 271), (264, 114, 263), (253, 114, 259))),
+        Camp('East', 5, ((351, 105, 227), (360, 105, 207), (311, 106, 262))),
+        Camp('South', 5, ((241, 102, 188), (218, 105, 177))),
+        Camp('West', 5, ((159, 106, 174), (139, 104, 202), (123, 103, 226))),
+        Camp('North', 5, ((235, 95, 329), (291, 98, 322), (335, 94, 318), (375, 94, 320))),
+    )),
 )
 
 # Spawns with these names are AoE-warning candidates first, watched or not.
@@ -107,6 +139,9 @@ AOE_HELPERS = ('Thugra Khotan',)
 # Buff names that mark a boss as being healed (a green cross on its row);
 # matched by name, as buff ids are per session.
 HEAL_BUFFS = ('Healing Radiance',)
+# Buff names that shield a mob from damage (its bar drawn light blue), by name.
+SHIELD_BUFFS: tuple[str, ...] = ('Ancient Ward',)
+
 
 # The longest catalog name: the board's name column and the alert width are
 # sized to it, so a custom name may be no longer.
@@ -165,6 +200,7 @@ _SCHEMA = Schema('', 1, {
     'showAlly': Field(True, kind='bool'),
     'alertSeconds': Field(6, kind='int', min=ALERT_SECONDS[0], max=ALERT_SECONDS[1]),
     'camps': Field(False, kind='bool'),
+    'guards': Field(True, kind='bool'),
     'custom': Field([], validate=_validate_custom),
 })
 
@@ -182,9 +218,15 @@ def ships(config: dict) -> bool:
 
 def names_of(config: dict, kind: str) -> list[str]:
     """The watched names of one kind: the catalog's rows of it in catalog
-    order (the camps only with `camps`), then, for minis, the custom names in
-    the user's order."""
-    names = [] if kind == CAMP and not config.get('camps') else [r.name for r in ROWS if r.kind == kind]
+    order (the camps only with `camps`; the guards only with `guards`, else
+    among the skulls), then, for minis, the custom names in the user's
+    order."""
+    apart = config.get('guards')
+
+    def listed_as(row):
+        return SKULL if row.kind == GUARD and not apart else row.kind
+
+    names = [] if kind == CAMP and not config.get('camps') else [r.name for r in ROWS if listed_as(r) == kind]
     if kind == MINI:
         names += config.get('custom', [])
     return names
