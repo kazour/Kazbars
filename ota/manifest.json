@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "content_version": 37,
+  "content_version": 38,
   "min_app_version": "3.2.0",
-  "notes": "Onslaught: Healing Radiance, Ancient Ward",
+  "notes": "Blood Pact (Dark Templar) and Soul of Mitra (Priest of Mitra) added to the catalog",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
-      "sha256": "216c831f3d7987ada73746795d23dc77fa3c69bddc212c16e75402c5e8727ef7"
+      "sha256": "d6073ef0b4eba49458da3058a8af2c6c54769fa5eaa5618152dbff905d024458"
     },
     "Default.yml": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.yml",

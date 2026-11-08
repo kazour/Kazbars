@@ -4152,6 +4152,23 @@
       ],
       "category": "#Onslaught",
       "type": "buff"
+    },
+    {
+      "name": "Blood Pact",
+      "ids": [
+        145538,
+        145539
+      ],
+      "category": "Dark Templar",
+      "type": "buff"
+    },
+    {
+      "name": "Soul of Mitra",
+      "ids": [
+        197061
+      ],
+      "category": "Priest of Mitra",
+      "type": "buff"
     }
   ]
 }
