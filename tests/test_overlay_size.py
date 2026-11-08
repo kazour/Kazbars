@@ -50,7 +50,7 @@ def test_the_size_choices_and_their_labels():
 
 def test_the_font_list_and_its_labels():
     assert overlay.FONT_CHOICES == (
-        "Arial", "Verdana", "GG", "Roboto", "Inter", "Noto Sans", "Source Sans 3",
+        "GG", "Arial", "Verdana", "Roboto", "Inter", "Noto Sans", "Source Sans 3",
         "PT Sans", "Fira Sans", "Barlow Semi Condensed", "Exo 2", "Alegreya Sans")
     assert overlay.font_label("Verdana") == "Verdana (game font)"
     assert overlay.font_label("Hyborian") == "Hyborian (game font)"
@@ -64,7 +64,7 @@ def test_every_baked_face_has_a_slug_and_arial_and_verdana_have_none():
     assert overlay.font_slug("Verdana") is None
     for unknown in ("Ubuntu", "arial", "roboto", "", "Comic Sans"):
         assert overlay.font_slug(unknown) is None, unknown
-    slugs = [overlay.font_slug(f) for f in overlay.FONT_CHOICES[2:]]
+    slugs = [overlay.font_slug(f) for f in overlay.FONT_CHOICES if f not in ("Arial", "Verdana")]
     assert slugs == ["gg", "roboto", "inter", "noto-sans", "source-sans-3", "pt-sans",
                      "fira-sans", "barlow-semi-condensed", "exo-2", "alegreya-sans"]
 
@@ -82,8 +82,8 @@ def test_each_slug_ships_its_tags_and_its_licence_and_nothing_else_does():
 
 
 def test_the_section_reads_a_size_that_is_a_choice_and_a_font_on_the_list():
-    assert overlay.validate_config(None) == {"size": 11, "font": "Arial"}
-    assert overlay.validate_config([1, 2]) == {"size": 11, "font": "Arial"}
+    assert overlay.validate_config(None) == {"size": 11, "font": "GG"}
+    assert overlay.validate_config([1, 2]) == {"size": 11, "font": "GG"}
     assert overlay.validate_config({"size": 17, "font": "Exo 2"}) == {"size": 17, "font": "Exo 2"}
     for size in SIZES:
         assert overlay.validate_config({"size": size})["size"] == size
@@ -95,7 +95,7 @@ def test_anything_else_is_the_default_size_and_font():
     for raw in (7, 18, 20, 24, 0, -12, True, None, [12], "big", float("nan"), float("inf")):
         assert overlay.validate_config({"size": raw})["size"] == 11, raw
     for raw in ("Comic Sans", "arial", "", 7, None, ["Roboto"], "Ubuntu"):
-        assert overlay.validate_config({"font": raw})["font"] == "Arial", raw
+        assert overlay.validate_config({"font": raw})["font"] == "GG", raw
     assert overlay.validate_config({"size": "16"})["size"] == 16
     assert overlay.validate_config({"size": 15.9})["size"] == 15
 
@@ -106,7 +106,7 @@ def test_the_section_is_written_in_declared_order_and_is_idempotent():
     assert overlay.validate_config(section) == section
     assert overlay.PROFILE_SECTION.key == "overlay"
     assert overlay.PROFILE_SECTION.lane == "build"
-    assert overlay.PROFILE_SECTION.defaults() == {"size": 11, "font": "Arial"}
+    assert overlay.PROFILE_SECTION.defaults() == {"size": 11, "font": "GG"}
 
 
 def test_the_stock_profile_follows_the_size_rules():

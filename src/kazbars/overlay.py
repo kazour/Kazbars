@@ -33,12 +33,12 @@ DEFAULT_SIZE = 11
 
 VERDANA = 'Verdana'
 HYBORIAN = 'Hyborian'
-DEFAULT_FONT = 'Arial'
+DEFAULT_FONT = 'GG'
 
-# The Font dropdown, in order: Arial, the game's own Verdana, then the baked
-# faces. A stored name that is not on this list reads as Arial.
+# The Font dropdown, in order: GG (the default), Arial, the game's own Verdana,
+# then the other baked faces. A stored name not on this list reads as GG.
 FONT_CHOICES: tuple[str, ...] = (
-    'Arial', VERDANA, 'GG', 'Roboto', 'Inter', 'Noto Sans', 'Source Sans 3',
+    'GG', 'Arial', VERDANA, 'Roboto', 'Inter', 'Noto Sans', 'Source Sans 3',
     'PT Sans', 'Fira Sans', 'Barlow Semi Condensed', 'Exo 2', 'Alegreya Sans',
 )
 
@@ -114,7 +114,7 @@ _SCHEMA = Schema('', 1, {
 
 
 def validate_config(config) -> dict:
-    """The section with exactly its two keys: absent or non-dict → 11 / Arial."""
+    """The section with exactly its two keys: absent or non-dict → 11 / GG."""
     return validate_all(_SCHEMA, config)
 
 # Registered by app.py at startup.

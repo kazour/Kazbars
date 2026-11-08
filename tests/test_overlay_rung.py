@@ -50,7 +50,7 @@ def test_the_shipped_seeds_land_on_the_same_icons(height, size, icon, scale):
     raw = _schema2_doc(height)
     raw["modules"]["grids"]["grids"][0]["iconSize"] = icon
     out = _migrated(raw)
-    assert out["overlay"] == {"size": size, "font": "Arial"}
+    assert out["overlay"] == {"size": size, "font": "GG"}
     grid = out["grids"]["grids"][0]
     assert grid["scale"] == scale
     assert grid_metrics(size, scale).icon == icon

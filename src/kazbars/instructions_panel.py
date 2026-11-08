@@ -487,8 +487,8 @@ SECTIONS: list[_Section] = [
                 'for a panel.',
             ]),
             _sub('Font', [
-                "Arial, Verdana (the game's own font), GG, or one of nine "
-                'open fonts: Roboto, Inter, Noto Sans, Source Sans 3, PT '
+                "GG (the default), Arial, Verdana (the game's own font), or one of "
+                'nine open fonts: Roboto, Inter, Noto Sans, Source Sans 3, PT '
                 'Sans, Fira Sans, Barlow Semi Condensed, Exo 2, Alegreya '
                 'Sans.',
                 'Damage Numbers has its own Font.',

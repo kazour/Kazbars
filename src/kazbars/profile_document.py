@@ -231,7 +231,7 @@ def _overlay_scale(data: dict) -> dict:
     if isinstance(overlay, dict):
         overlay['size'] = size
     else:
-        modules['overlay'] = {'size': size, 'font': 'Arial'}
+        modules['overlay'] = {'size': size, 'font': 'GG'}
     # The size table's timer pt for the base size, what panels scale against.
     pt = 2 * (size // 2) + 2
 
