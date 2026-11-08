@@ -19,7 +19,7 @@ from .grid_model import DEFAULT_GAME_RESOLUTION, is_band, is_plate, project_px, 
 from .inspect import validate_config as validate_inspect_config
 from .overlay import VERDANA, as2_face, font_blob_path
 from .overlay import validate_config as validate_overlay
-from .overlay_size import cast_fs, grid_metrics, panel_fs
+from .overlay_size import grid_metrics, panel_fs
 from .prefs import ANCHOR_SIDE_DEFAULT, ANCHOR_UP_DEFAULT
 from .stopwatch import validate_config as validate_stopwatch_config
 from .swf_font import SwfFontError, import_game_font, splice
@@ -384,7 +384,7 @@ class CodeGenerator:
             f"playerY: {project_px(c['playerFy'], self.game_h)}, "
             f"targetX: {project_px(c['targetFx'], self.game_w)}, "
             f"targetY: {project_px(c['targetFy'], self.game_h)}, "
-            f"bold: {_bool(c['bold'])}, fontSize: {cast_fs(self.base_size, c['scale'])}, "
+            f"bold: {_bool(c['bold'])}, fontSize: {panel_fs(self.base_size, c['scale'])}, "
             f'display: "{c["display"]}", color: 0x{c["color"]}'
             "};"
         )

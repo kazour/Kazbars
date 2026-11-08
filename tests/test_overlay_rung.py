@@ -15,7 +15,7 @@ import copy
 import pytest
 
 from kazbars import cast_timer, grid_model, inspect, overlay, stopwatch
-from kazbars.overlay_size import cast_fs, grid_metrics, panel_fs
+from kazbars.overlay_size import grid_metrics, panel_fs
 from kazbars.profile_document import DOC_SCHEMA_VERSION, SectionRegistry, validate_document
 
 
@@ -95,14 +95,14 @@ def test_panel_and_cast_sizes_become_scales_that_bake_back():
     assert panel_fs(13, out["stopwatch"]["scale"]) == 20
     assert out["inspect"]["scale"] == 100
     assert "showPvp" not in out["inspect"] and "showPerks" not in out["inspect"]
-    assert cast_fs(13, out["cast_timer"]["scale"]) == 20
+    assert panel_fs(13, out["cast_timer"]["scale"]) == 20
     for key in ("stopwatch", "inspect", "cast_timer"):
         assert "fontSize" not in out[key]
 
 
 def test_the_1080p_cast_default_keeps_its_size():
     out = _migrated(_schema2_doc(cast_timer={"fontSize": 12}))
-    assert cast_fs(11, out["cast_timer"]["scale"]) == 12
+    assert panel_fs(11, out["cast_timer"]["scale"]) == 12
 
 
 def test_an_overlay_section_already_present_is_kept_and_sizes_against_it():

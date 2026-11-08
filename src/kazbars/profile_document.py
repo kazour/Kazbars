@@ -269,7 +269,7 @@ def _overlay_scale(data: dict) -> dict:
     cast = modules.get('cast_timer')
     if isinstance(cast, dict):
         fs = cast.pop('fontSize', None)
-        cast['scale'] = 100 if fs is None else scale(fs, 400, 5 * pt)
+        cast['scale'] = 100 if fs is None else scale(fs, 100, pt)
     return data
 
 

@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 # The face is the profile's overlay font (`overlay`), like every other text
 # KazBars.swf draws; bold is the timer's own choice. `scale` is a percent of the
-# overlay size: the build bakes the text size from the two (`overlay_size.cast_fs`).
+# overlay size: the build bakes the text size from the two (`overlay_size.panel_fs`).
 
 # display: what the timer text shows.
 #   "elapsed" — count up,        e.g. "1.2"

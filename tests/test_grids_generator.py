@@ -310,13 +310,13 @@ def test_cast_on_emits_hooks_and_data():
     assert "modules.push(castTimer);" in main
     assert _block(data, "CAST") == (
         "d.CAST = {enableP: true, enableT: true, playerX: 900, playerY: 600, "
-        "targetX: 900, targetY: 560, bold: true, fontSize: 15, display: \"both\", "
+        "targetX: 900, targetY: 560, bold: true, fontSize: 12, display: \"both\", "
         "color: 0xFF8800};")
 
 
-def test_the_cast_timer_takes_the_title_role_of_its_scaled_size():
+def test_the_cast_timer_takes_the_panel_size():
     _, data = _gen(cast_config=_cast_cfg(scale=50), overlay={"size": 17}).generate()
-    assert _num(_block(data, "CAST"), "fontSize") == 11
+    assert _num(_block(data, "CAST"), "fontSize") == 9
 
 
 def test_stopwatch_off_emits_no_refs():

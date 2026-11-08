@@ -10,16 +10,15 @@ own `scale` `p` (percent, 50-200, default 100).
   table. A new grid's gap and timer Y offset come from the base size
   (`default_gap`, `default_timer_y`); stored per grid after that, they are
   the user's.
-- Panels (inspect, stopwatch, onslaught, console): `panel_fs`, the table's
-  timer pt for `B` times `p`, floor 8; the AS2 role scale (small, title,
-  alert) hangs off it in `KazBarsPanel`. The preview control panel and the
-  layout-preview labels take it at 100 %.
-- Cast timer: `cast_fs`, the Title role of the panel size, `1.25` times it.
+- Panels (inspect, stopwatch, onslaught, console) and the cast timer:
+  `panel_fs`, the table's timer pt for `B` times `p`, floor 8; the AS2 role
+  scale (small, title, alert) hangs off it in `KazBarsPanel`. The preview
+  control panel and the layout-preview labels take it at 100 %.
 
 The generator bakes these results and the dialogs read them back for their
 hints, so the two cannot drift. Every rounding is half-up in integer
-arithmetic (AS2's `Math.round`), so a tie such as `1.25 x 10 = 12.5` is 13 on
-both sides.
+arithmetic (AS2's `Math.round`), so a tie such as `12 x 1.25 = 15` or
+`10 x 1.25 = 12.5` (13) is the same on both sides.
 """
 
 from dataclasses import dataclass
@@ -101,12 +100,6 @@ def panel_fs(base: int, scale: int) -> int:
     """A panel's body size, `FS` in `KazBarsPanel`: the base size's timer pt
     times the scale, floor 8."""
     return max(_round_div(_row(TIMER_PT, base) * clamp_scale(scale), 100), PANEL_MIN_PT)
-
-
-def cast_fs(base: int, scale: int) -> int:
-    """The cast timer's text size, `1.25` times the panel size as one
-    rounding, floor 8."""
-    return max(_round_div(_row(TIMER_PT, base) * clamp_scale(scale) * 5, 400), PANEL_MIN_PT)
 
 
 @dataclass(frozen=True)

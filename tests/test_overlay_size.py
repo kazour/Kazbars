@@ -13,7 +13,6 @@ from kazbars.overlay_size import (
     SCALE_MAX,
     SCALE_MIN,
     SCALE_STEP,
-    cast_fs,
     clamp_scale,
     default_gap,
     default_timer_y,
@@ -198,7 +197,7 @@ def test_the_inset_scales_with_the_icon():
 
 
 # --------------------------------------------------------------------------
-# Panels and the cast timer
+# Panels and the cast timer (the same size)
 # --------------------------------------------------------------------------
 
 
@@ -209,9 +208,3 @@ def test_panels_take_the_timer_column_times_the_scale_with_a_floor_of_eight():
                        (13, 105, 15), (16, 110, 20)]:
         assert panel_fs(b, p) == want, (b, p)
     assert panel_fs(9, 125) == 13, "12.5 ties up"
-
-
-def test_the_cast_timer_takes_the_title_role_of_the_panel_size():
-    for b, p, want in [(8, 100, 13), (9, 100, 13), (11, 100, 15), (13, 100, 18), (16, 100, 23),
-                       (17, 200, 45), (8, 50, 8), (11, 70, 11)]:
-        assert cast_fs(b, p) == want, (b, p)

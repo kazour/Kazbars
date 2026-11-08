@@ -71,7 +71,7 @@
 | `src/kazbars/onslaught_panel.py` | 316 |
 | `src/kazbars/overlay.py` | 121 |
 | `src/kazbars/overlay_engine.py` | 800 |
-| `src/kazbars/overlay_size.py` | 125 |
+| `src/kazbars/overlay_size.py` | 118 |
 | `src/kazbars/paths.py` | 46 |
 | `src/kazbars/prefs.py` | 189 |
 | `src/kazbars/profile_document.py` | 352 |
@@ -144,7 +144,7 @@
 | `tests/test_onslaught.py` | 224 |
 | `tests/test_overlay_config.py` | 102 |
 | `tests/test_overlay_rung.py` | 144 |
-| `tests/test_overlay_size.py` | 217 |
+| `tests/test_overlay_size.py` | 210 |
 | `tests/test_panel_ratios.py` | 162 |
 | `tests/test_panels_construct.py` | 1988 |
 | `tests/test_prefs.py` | 95 |
