@@ -319,8 +319,7 @@ SECTIONS: list[_Section] = [
             ]),
             _sub('The buffs line', [
                 'Under the preview: the buffs the grid holds, ending in '
-                '"+ 3 more" when they do not all fit. Hover it for the full '
-                'list.',
+                '"+ 3 more" when they do not all fit.',
             ]),
             _sub('The title line', [
                 'After the name and type, a muted note gives the mode — '
