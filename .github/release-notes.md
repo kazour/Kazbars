@@ -23,7 +23,7 @@ Buff/debuff overlay editor for **Age of Conan**. Design icon grids or bars that 
 
 **Stopwatch** — a simple, draggable Start / Pause / Reset count-up timer. Off by default
 
-**Inspect panel** — an in-game combat sheet for your current target, with the rows you pick from 112 stats and a PvP tab on players; drag or fold it and the game remembers. Off by default
+**Inspect Target** — an in-game combat sheet for your current target, with the rows you pick from 112 stats and a PvP tab on players; drag or fold it and the game remembers. Off by default
 
 **Console** — an in-game log of every buff and debuff on you and your target with its buff ID, plus how each cast ended. Off by default
 

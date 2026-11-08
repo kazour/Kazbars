@@ -6,47 +6,139 @@ authored_at: [1920, 1080]
 modules:
   grids:
     grids:
-      - id: My Buffs
-        enabled: true
-        type: player
-        rows: 3
-        cols: 4
-        gap: -2
-        slotMode: dynamic
-        timerFlashThreshold: 6
-        timerYOffset: -4
-        enableFlashing: true
-        fillDirection: TL-BR
-        sortOrder: longest
-        layout: buffFirst
-        whitelist: [222609, 4707552, 5064042, 4680545, 4049150, 5051640, 5052352, 5051633, 144105, 3202863, 5052277, 4189297, 4259934, 4239695, 5017457, 3963062, 5055907, 5054121, 154750, 4549368, 3191514, 5017472, 4548156, 145782, 146122, 4935118, 3963059, 146099, 4281931, 4704872, 4507663, 5014715, 4051322, 4732527, 5016222, 4043129, 5014793, 4490631, 5016796, 4471707, 5017456, 4826763, 5015024, 4515827, 4866663, 4836737, 4757361, 5064067, 5056777, 143626, 5014916, 3963268, 5014940, 4932986, 4732523, 4552666, 5016774, 4935086, 5056787, 4701862, 4549463, 4515806, 4046208, 4283403, 3963247, 4836424, 5064063, 4552633, 5016792, 4857492, 5015019, 154770, 143948, 3963068, 4836698, 4752750, 4704447, 4239993, 4489251, 4836609, 4857503, 4226929, 5014799, 3963299, 5014753, 4053112, 4502966, 4484855, 146103, 5052580, 5052584, 4836738, 4704427, 4924714, 3963061, 4281812, 154775, 145790, 4922964, 4414104, 4553214, 3963165, 4047227, 4857484, 3963058, 4383111, 4991713, 4991521, 146124, 4706108, 4239687, 4924718, 4244612, 4990471, 3963274, 5052211, 5052200, 4268087, 4550619, 4281285, 4752047, 4838302, 5064459, 4757309, 4549364, 4261544, 3963193, 4283587, 3963070, 5014791, 145626, 4357732, 4383191, 4857485, 4989883, 4732526, 5017458, 5052114, 4757336, 791221, 4838217, 4836739, 5054493, 143746, 4357818, 5062623, 5016429, 4383121]
-        slotAssignments: {}
-        fx: 0.32447916666666665
-        fy: 0.5555555555555556
-        scale: 100
-        timerStyle: digits
-      - id: Target Buffs
+      - id: Wrack_Torment_Ruin
         enabled: true
         type: target
         rows: 3
-        cols: 4
-        gap: -2
-        slotMode: dynamic
+        cols: 3
+        scale: 100
+        gap: -1
+        fx: 0.15625
+        fy: 0.3701388888888889
+        slotMode: static
+        timerStyle: "off"
         timerFlashThreshold: 6
-        timerYOffset: -4
+        timerYOffset: -3
         enableFlashing: true
-        fillDirection: TL-BR
+        fillDirection: BL-TR
+        sortOrder: longest
+        layout: debuffFirst
+        whitelist: []
+        slotAssignments:
+          "0": [3963058]
+          "1": [3963061]
+          "2": [3963068]
+          "3": [3963299]
+          "4": [3963193]
+          "5": [3963268]
+          "6": [3963059]
+          "7": [3963062]
+          "8": [3963070]
+      - id: Tank
+        enabled: true
+        type: target
+        rows: 2
+        cols: 3
+        scale: 100
+        gap: -1
+        fx: 0.15625
+        fy: 0.37037037037037035
+        slotMode: static
+        timerStyle: digits
+        timerFlashThreshold: 6
+        timerYOffset: -3
+        enableFlashing: true
+        fillDirection: BL-TR
+        sortOrder: longest
+        layout: debuffFirst
+        whitelist: []
+        slotAssignments:
+          "3": [4325954, 4487417]
+          "4": [4086624]
+          "5": [1126126, 4931433, 1126127, 792739, 4927248]
+          "0": [3076662, 974157]
+          "1": [4380771, 5014929, 4757285, 4857490, 4206340, 4857489, 5014930, 5052693, 5014931, 5052177, 4857536, 4857488]
+          "2": [974548, 4924367, 3727070, 1126244, 4277186, 4350347]
+      - id: Raid_Debuffs
+        enabled: true
+        type: player
+        rows: 1
+        cols: 3
+        scale: 100
+        gap: -1
+        fx: 0.052083333333333336
+        fy: 0.37037037037037035
+        slotMode: dynamic
+        timerStyle: digits
+        timerFlashThreshold: 6
+        timerYOffset: -3
+        enableFlashing: true
+        fillDirection: LR
+        sortOrder: longest
+        layout: debuffFirst
+        whitelist: [4549364, 4259934, 3963059, 4383191, 4550619, 5014791, 4836737, 4836609, 5052211, 5016774, 4680545, 4991521, 4549368, 4935086, 4268087, 4991713, 4515827, 4239695, 5064042, 4838302, 4932986, 4261544, 4704447, 5014940, 4752047, 4281812, 4281931, 4553214, 4935118, 4283403, 3963193, 5056787, 4838217, 4549463, 4548156, 4990471, 4552666, 5014715, 5051640, 5052580, 5056777, 4383121, 4046208, 4706108, 4757336, 4283587, 3963299, 5014753, 5052277, 3963062, 5016792, 4857484, 4836698, 4414104, 4502966, 4836739, 4836738, 5052352, 4051322, 4924714, 4924718, 5055907, 5064063, 3963068, 4826763, 5062623, 4857485, 5052114, 4752750, 4239687, 4357818, 5014916, 4732527, 3963165, 5016429, 4515806, 5054121, 4857503, 3963061, 4704872, 4732523, 4704427, 4757309, 4836424, 4226929, 3963247, 4281285, 4189297, 3963268, 4989883, 4857492, 5064067, 4552633, 5015019, 4701862, 4383111, 5014799, 3963058, 3963070, 5014793, 4707552, 4757361, 5052584, 4043129, 3963274, 5051633, 4490631, 5064459, 4049150, 4507663, 5054493, 5016796, 4357732, 5016222, 5015024, 4732526, 5052200, 4866663]
+        slotAssignments: {}
+      - id: We_Survive
+        enabled: true
+        type: friendly
+        rows: 1
+        cols: 3
+        scale: 100
+        gap: -1
+        fx: 0.15625
+        fy: 0.37037037037037035
+        slotMode: dynamic
+        timerStyle: bar
+        timerFlashThreshold: 6
+        timerYOffset: -3
+        enableFlashing: true
+        fillDirection: C
         sortOrder: longest
         layout: buffFirst
-        whitelist: [4930599, 3494035, 792735, 4857488, 792741, 1282531, 5077874, 3816130, 1148666, 4924367, 4188307, 1148639, 4332487, 4206340, 196430, 3727070, 217127, 3963062, 5077953, 3763216, 3499109, 4309904, 1093979, 5052177, 3784874, 3766763, 1095413, 5015832, 3074485, 4079364, 3963059, 146402, 3663585, 3130398, 974548, 1092543, 792739, 3078446, 149410, 4350137, 4086624, 4239176, 3074186, 3105515, 5014931, 4380771, 3766764, 4742630, 3156306, 4372820, 974759, 3182089, 3964868, 198393, 3487056, 3487052, 1376440, 4892126, 4487417, 5077888, 3882133, 3882135, 4229891, 4478650, 3202576, 156681, 5014929, 4927248, 1148638, 872865, 4056369, 3666157, 3882140, 3591149, 4277186, 3499696, 974216, 5077955, 3882154, 4351401, 3203611, 5014930, 1126244, 223235, 3184165, 783747, 4717943, 217733, 5052693, 4857489, 223495, 3514544, 3536860, 217104, 3075406, 3539351, 710440, 4646963, 1136432, 1126126, 4350334, 5077873, 4203944, 5077889, 4857536, 872844, 4478385, 4268126, 3055164, 4931433, 3542742, 1094673, 3203620, 198397, 792747, 792742, 1148380, 3203789, 149422, 3963070, 4050865, 1126208, 4325954, 3105441, 1093905, 4486969, 4350347, 4757285, 893047, 3675546, 4857490, 3076662, 195143, 974157, 4349387, 198391, 4784832, 872911]
+        whitelist: [1126208, 3077701, 872865, 3074161, 4239176, 3074186, 1142203, 974216, 197061, 3667218, 974759, 3074485, 3761363, 145538, 3513707, 4350674, 4489251, 195143, 3202576, 217733, 4208084, 3202863, 3191514]
         slotAssignments: {}
-        fx: 0.5796875
-        fy: 0.5555555555555556
-        scale: 100
-        timerStyle: digits
+        plateOffset: 75
+        maxDistance: 40
+        rowCap: 3
+        maxSlots: 3
+        showSelf: true
   overlay:
     size: 12
-    font: Arial
+    font: GG
+  boss_timer:
+    overlay:
+      x: 0
+      "y": 150
+      width: 269
+      height: 104
+      locked: false
+      bg_opacity: 0.66
+      font_family: Segoe UI
+      font_size: 20
+      visible: true
+      positioned: false
+  deeps:
+    alarm_threshold: 2500.0
+    survival_preset: standard
+    hpis_green_threshold: 50.0
+    dpis_tint_start: 100.0
+    dpis_tint_full: 200.0
+    dpis_flash: 300.0
+    include_pet_damage: true
+    window_seconds: 5
+    readout_preset: steady
+    smoothing: 50
+    round_step: 10
+    refresh_ms: 100
+    layout: horizontal
+    overlay_font_family: Segoe UI
+    overlay_font_size: 22
+    overlay_bg_opacity: 0.66
+    overlay_x: 0
+    overlay_y: 150
+    overlay_locked: false
+    overlay_positioned: false
+    visible_cells: [dps, dpis, hps]
   stopwatch:
     enabled: false
     fx: 0.1890625
@@ -55,25 +147,26 @@ modules:
     startCollapsed: true
   inspect:
     enabled: false
-    fx: 0.6661458333333333
+    fx: 0.666015625
     fy: 0.008333333333333333
-    scale: 100
+    scale: 85
     startCollapsed: true
+    rows: null
   cast_timer:
     enabled: false
     enableP: false
     enableT: false
-    playerFx: 0.37447916666666664
-    playerFy: 0.7407407407407407
+    playerFx: 0.374609375
+    playerFy: 0.7409722222222223
     targetFx: 0.628125
-    targetFy: 0.7407407407407407
+    targetFy: 0.7409722222222223
     bold: false
     scale: 80
     display: elapsed
     color: FFFFFF
   damage_numbers:
-    shadow_mode: 2
-    shadow_distance: 0
+    shadow_mode: 1
+    shadow_distance: -2
     shadow_blur: 0
     dir1_x_offset: 0
     dir1_y_offset: 0
@@ -81,14 +174,33 @@ modules:
     fixed_col_y: 0
     fixed_col_split: 1
     col_b_x: 0
-    col_b_y: 0
-    fixed_x_base: 0
-    fixed_y_base: 0
-    fixed_x_offset: 0
-    fixed_y_spacing: 0
+    col_b_y: 150
+    fixed_x_base: -50
+    fixed_y_base: -180
+    fixed_x_offset: -100
+    fixed_y_spacing: -20
     ranged_keep: 1
-    essential_labels_only: 0
-    other_resource_loss_to_target: 0
-    show_duration: 0
-    fade_duration: 0
+    essential_labels_only: 1
+    other_resource_loss_to_target: 1
+    show_duration: -0.1
+    fade_duration: -0.1
     enabled: false
+    font: GG Comic
+  console:
+    enabled: false
+    scale: 85
+    tabs: [buffs, casts]
+  onslaught:
+    enabled: false
+    scale: 85
+    showList: true
+    showAlerts: true
+    showWave: true
+    showAoe: true
+    showAlly: true
+    alertSeconds: 6
+    camps: false
+    guards: true
+    custom: []
+  damage_colors: {}
+  buff_bars: {}

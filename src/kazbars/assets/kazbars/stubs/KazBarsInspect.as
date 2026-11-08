@@ -974,7 +974,7 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
     }
 
     public function previewKey():String { return "ins"; }
-    public function previewLabel():String { return "Inspect Panel"; }
+    public function previewLabel():String { return "Inspect Target"; }
 
     // The master switch (control panel and archive), folded into the one visibility gate.
     public function isActive():Boolean {

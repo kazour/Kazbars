@@ -2,7 +2,7 @@
 
 What the inspect panel reads (the `KazBarsInspect` / `KazBarsInspectRows` stubs and the stat catalog behind them), and why every constant is the number it is. Update when the catalog, a synthesis formula, or a display gate changes — the stubs carry the rules as comments, this doc carries the reasoning and the id table behind them.
 
-The panel is an optional in-game overlay (Extras ▸ Inspect panel…) that renders a combat sheet for the current target — the rows the user picked, or the Default Summary sheet — in the visual language of the game's own inspect window. It is off by default; when off the build emits zero references and the compiler skips the stub entirely.
+The panel is an optional in-game overlay (Extras ▸ Inspect Target…) that renders a combat sheet for the current target — the rows the user picked, or the Default Summary sheet — in the visual language of the game's own inspect window. It is off by default; when off the build emits zero references and the compiler skips the stub entirely.
 
 | Piece | Where |
 |---|---|

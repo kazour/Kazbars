@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "content_version": 38,
+  "content_version": 39,
   "min_app_version": "3.2.0",
-  "notes": "Blood Pact (Dark Templar) and Soul of Mitra (Priest of Mitra) added to the catalog",
+  "notes": "Stock profile: 1080p layout with static Wrack/Tank grids",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
@@ -10,7 +10,7 @@
     },
     "Default.yml": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.yml",
-      "sha256": "24842af41df514d10e2630468477285e52e92d160c5147873957267424213e95"
+      "sha256": "05715aa45f13c3b9bfeec789472bc8fa5d27b106e10fccc5ec0017bb44b8c6a1"
     }
   }
 }

@@ -439,7 +439,7 @@ class KazBarsApp(ttkb.Window):
              'command': self._open_console_settings},
             {'type': 'command', 'label': 'Damage number mod…',
              'command': self._open_damage_numbers},
-            {'type': 'command', 'label': 'Inspect panel…',
+            {'type': 'command', 'label': 'Inspect Target…',
              'command': self._open_inspect_settings},
             {'type': 'command', 'label': 'Onslaught tracker…',
              'command': self._open_onslaught_settings},
@@ -621,7 +621,7 @@ class KazBarsApp(ttkb.Window):
         open_stopwatch_dialog(self)
 
     def _open_inspect_settings(self):
-        """Open the Inspect Panel settings dialog (modal)."""
+        """Open the Inspect Target settings dialog (modal)."""
         from .inspect_panel import open_inspect_dialog
         open_inspect_dialog(self)
 

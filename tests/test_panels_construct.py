@@ -380,13 +380,14 @@ def test_an_overlay_size_change_unticks_the_build_step(app):
 
 
 def test_extras_switch_on_with_nothing_to_build_stays_off(app):
+    from kazbars.onslaught import _DISPLAYS
     store = app.profile_store
-    store.update_section('console', {'enabled': False, 'tabs': []})
+    store.update_section('onslaught', {'enabled': False, **dict.fromkeys(_DISPLAYS, False)})
     app.grids_panel.refresh_extras_shortcuts()
-    tile = app.grids_panel.extras_row._tiles['console']
+    tile = app.grids_panel.extras_row._tiles['onslaught']
     tile['var'].set(True)
-    app.grids_panel.extras_row._on_toggle('console')
-    assert store.get_section('console')['enabled'] is False
+    app.grids_panel.extras_row._on_toggle('onslaught')
+    assert store.get_section('onslaught')['enabled'] is False
     assert tile['var'].get() is False
 
 
@@ -406,15 +407,17 @@ def _widgets(root, cls):
     return out
 
 
-def _open_first_launch(app, monkeypatch, paths):
+def _open_first_launch(app, monkeypatch, paths, template=True, **callbacks):
     from tkinter import ttk
 
     from kazbars import first_launch
     monkeypatch.setattr(first_launch, 'COMMON_INSTALL_PATHS', [str(p) for p in paths])
+    kw = {'on_game_set': lambda p: None, 'on_resolution_set': lambda r: None,
+          'on_start_empty': lambda: None, 'on_import_profile': lambda d: False}
+    kw.update(callbacks)
     first_launch.show_first_launch_dialog(
-        app, 'KazBars', lambda p: None, lambda r: None,
-        on_resolution_set=lambda r: None, default_profile_exists=True,
-        on_start_empty=lambda: None)
+        app, 'KazBars', kw.pop('on_game_set'), lambda r: None,
+        default_profile_exists=template, **kw)
     app.update()
     dialog = next(w for w in app.winfo_children()
                   if isinstance(w, tk.Toplevel) and w.title() == 'Welcome to KazBars')
@@ -453,6 +456,58 @@ def test_enter_can_reach_a_focused_button(app):
     import ttkbootstrap as ttkb
     assert isinstance(app, ttkb.Window)
     assert app.bind_class('TButton', '<Return>')
+
+
+@pytest.mark.parametrize('template', [True, False])
+def test_first_launch_offers_equal_cards_under_one_resolution_row(app, monkeypatch, template):
+    """Use Defaults (when a template ships), Import Profile, Start Empty: one
+    equal column each, every button gated on the folder, and the resolution
+    picker once, above the cards — it applies to every path."""
+    from tkinter import ttk
+    dialog, entry, buttons, _texts = _open_first_launch(app, monkeypatch, [], template)
+    try:
+        want = ['Load Defaults', 'Import Profile', 'Start Empty'][0 if template else 1:]
+        assert [b for b in buttons if b in want] == want
+        assert all(str(buttons[b].cget('state')) == 'disabled' for b in want)
+        cards = buttons['Start Empty'].master.master.master
+        assert [cards.grid_columnconfigure(c)['uniform'] for c in range(len(want))] == \
+            ['card'] * len(want)
+        combos = _widgets(dialog, ttk.Combobox)
+        assert len(combos) == 1 and combos[0] not in _widgets(cards, ttk.Combobox)
+        entry.insert(0, str(app.game_path))
+        app.update()
+        assert all(str(buttons[b].cget('state')) == 'normal' for b in want)
+    finally:
+        dialog.grab_release()
+        dialog.destroy()
+        app.update()
+
+
+def _first_launch_import(app, monkeypatch, lands):
+    saved, closed = [], []
+    dialog, _entry, buttons, _texts = _open_first_launch(
+        app, monkeypatch, [app.game_path], on_game_set=saved.append,
+        on_import_profile=lambda d: lands, on_dialog_closed=lambda: closed.append(1))
+    buttons['Import Profile'].invoke()
+    app.update()
+    return dialog, saved, closed
+
+
+def test_first_launch_import_cancel_keeps_the_dialog(app, monkeypatch):
+    dialog, saved, closed = _first_launch_import(app, monkeypatch, False)
+    try:
+        assert dialog.winfo_exists() and not closed
+        assert len(saved) == 1, "the folder the click confirmed is kept"
+    finally:
+        dialog.grab_release()
+        dialog.destroy()
+        app.update()
+
+
+def test_first_launch_import_lands_and_closes(app, monkeypatch):
+    dialog, saved, closed = _first_launch_import(app, monkeypatch, True)
+    assert not dialog.winfo_exists() and closed == [1]
+    assert len(saved) == 1
 
 
 def test_first_launch_leaves_ambiguous_install_blank(app, monkeypatch, tmp_path):
@@ -831,11 +886,9 @@ def test_start_button_label_fits_its_button(app):
 
 EXTRAS_OPENERS = {
     'cast_timer': '_open_cast_timer_settings',
-    'console': '_open_console_settings',
     'damage_numbers': '_open_damage_numbers',
     'inspect': '_open_inspect_settings',
     'onslaught': '_open_onslaught_settings',
-    'stopwatch': '_open_stopwatch_settings',
 }
 
 
@@ -869,7 +922,7 @@ def test_extras_switch_toggles_without_opening_settings(app, monkeypatch):
     opened = []
     for opener in EXTRAS_OPENERS.values():
         monkeypatch.setattr(app, opener, lambda: opened.append(opener))
-    tile = app.grids_panel.extras_row._tiles['stopwatch']
+    tile = app.grids_panel.extras_row._tiles['inspect']
     switch = _widgets(tile['card'], ttk.Checkbutton)[0]
     before = bool(tile['var'].get())
 
@@ -878,7 +931,7 @@ def test_extras_switch_toggles_without_opening_settings(app, monkeypatch):
     app.update()
 
     assert bool(tile['var'].get()) is not before
-    assert app.profile_store.get_section('stopwatch')['enabled'] is not before
+    assert app.profile_store.get_section('inspect')['enabled'] is not before
     assert opened == []
 
 

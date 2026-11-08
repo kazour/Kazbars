@@ -221,8 +221,9 @@ def show_close_game_required_dialog(parent, process_name="the game"):
 
 
 def show_welcome_popup(parent, grid_count, enabled_count,
-                       resolution_str=None, profile_name=None):
-    """Show a welcome popup after loading the default profile.
+                       resolution_str=None, profile_name=None, source=None):
+    """Show a welcome popup after the first-launch profile landed: the
+    default one, or (`source`, its name) an imported file.
 
     Same visual style as the build summary — frameless dark canvas, CRT scanlines,
     glowing accent, styled close button.
@@ -266,12 +267,15 @@ def show_welcome_popup(parent, grid_count, enabled_count,
     # Info lines
     y = sep_y + 20
     canvas.create_text(WIDTH // 2, y,
-                       text=f"{grid_count} grids loaded from default profile",
+                       text=f"{grid_count} grid{'' if grid_count == 1 else 's'} "
+                            f"imported from “{source}”" if source
+                       else f"{grid_count} grids loaded from default profile",
                        font=FONT_BODY, fill=THEME_COLORS['heading'])
     y += line_spacing
     if disabled_count > 0:
         canvas.create_text(WIDTH // 2, y,
-                           text=f"{disabled_count} are disabled — enable them when you're ready",
+                           text=f"{disabled_count} {'is' if disabled_count == 1 else 'are'} disabled — "
+                                f"enable {'it' if disabled_count == 1 else 'them'} when you're ready",
                            font=FONT_SMALL, fill=THEME_COLORS['warning'])
         y += line_spacing
     if resolution_str:
