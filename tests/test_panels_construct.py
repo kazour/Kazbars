@@ -293,15 +293,16 @@ def _settings(card):
 def test_grid_settings_text_sizes_round_trip(app):
     """Auto shows the size rules' value and follows Size; unticked, the set
     pt lands on the grid and reopens unticked; Auto again drops the key."""
+    from kazbars.overlay_size import grid_metrics
     card, idx = _add_seam_grid(app, 'SeamText')
     base = card.base_size()
     dlg = _settings(card)
     try:
         auto, pt, spin, _ = dlg._text_rows['timerPt']
-        assert auto.get() and pt.get() == str(base) and 'disabled' in spin.state()
+        assert auto.get() and pt.get() == str(grid_metrics(base, 100).timer) and 'disabled' in spin.state()
         dlg.scale_var.set(200)
         dlg._on_size_move()
-        assert pt.get() == str(2 * base), "Auto follows the slider"
+        assert pt.get() == str(grid_metrics(base, 200).timer), "Auto follows the slider"
         assert dlg.draft()['timerPt'] is None
         dlg.scale_var.set(100)
         auto.set(False)
@@ -1349,7 +1350,7 @@ def test_a_tall_grid_says_its_preview_stepped_down(app):
     from kazbars.grid_model import create_default_grid
     card = _card_for(app, create_default_grid('player', 6, 6, 'static', 'SeamTall'))
     summary = card.summary_label.cget('text')
-    assert summary.endswith('· shown at 2:5')
+    assert summary.endswith('· shown at 1:2')
     assert card.preview.layout.height <= 128
 
 

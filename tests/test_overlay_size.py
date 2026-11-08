@@ -1,17 +1,15 @@
 """Tests for `overlay_size` — the size model's arithmetic — and the `overlay`
 section that carries the base size and the font.
 
-Hand-computed rows for every base size, the floor and the caps, ties (every
+The maintainer's size table row by row, the 32..92 px hold, ties (every
 rounding is half up, as AS2's `Math.round`), and a sweep of every size at
-every scale for the invariants the in-game text relies on.
+every scale.
 
 Run: `pytest tests/test_overlay_size.py` (from repo root).
 """
 
 from kazbars import overlay, yaml_io
 from kazbars.overlay_size import (
-    GUTTER,
-    MIN_TEXT_PT,
     SCALE_MAX,
     SCALE_MIN,
     SCALE_STEP,
@@ -20,13 +18,10 @@ from kazbars.overlay_size import (
     default_gap,
     default_timer_y,
     grid_metrics,
-    icon_metrics,
     inset,
     panel_fs,
     scale_from,
     snap_scale,
-    stack_pt,
-    text_box_h,
 )
 from kazbars.paths import KAZBARS_ASSETS
 from kazbars.swf_font import DN_FONTS
@@ -45,16 +40,12 @@ def _round_div(n, d):
 
 
 def test_the_size_choices_and_their_labels():
-    assert SIZES == [10, 11, 12, 13, 14, 16, 18, 20, 24]
-    labels = dict(overlay.SIZE_CHOICES)
-    assert labels[10] == "10 · Compact"
-    assert labels[11] == "11 · 720p"
-    assert labels[13] == "13 · Default (1080p)"
-    assert labels[14] == "14 · 1440p"
-    assert labels[16] == "16 · 4K"
-    for plain in (12, 18, 20, 24):
-        assert labels[plain] == str(plain)
-    assert overlay.DEFAULT_SIZE == 13
+    assert overlay.SIZE_CHOICES == (
+        (8, "720p compact"), (9, "720p"), (10, "1080p compact"), (11, "1080p"),
+        (12, "1440p compact"), (13, "1440p"), (14, "1440p large"),
+        (15, "2160p compact"), (16, "2160p"), (17, "2160p large"))
+    assert [grid_metrics(b, 100).icon for b in SIZES] == list(range(32, 69, 4))
+    assert overlay.DEFAULT_SIZE == 11
 
 
 def test_the_font_list_and_its_labels():
@@ -91,9 +82,9 @@ def test_each_slug_ships_its_tags_and_its_licence_and_nothing_else_does():
 
 
 def test_the_section_reads_a_size_that_is_a_choice_and_a_font_on_the_list():
-    assert overlay.validate_config(None) == {"size": 13, "font": "Arial"}
-    assert overlay.validate_config([1, 2]) == {"size": 13, "font": "Arial"}
-    assert overlay.validate_config({"size": 24, "font": "Exo 2"}) == {"size": 24, "font": "Exo 2"}
+    assert overlay.validate_config(None) == {"size": 11, "font": "Arial"}
+    assert overlay.validate_config([1, 2]) == {"size": 11, "font": "Arial"}
+    assert overlay.validate_config({"size": 17, "font": "Exo 2"}) == {"size": 17, "font": "Exo 2"}
     for size in SIZES:
         assert overlay.validate_config({"size": size})["size"] == size
     for font in overlay.FONT_CHOICES:
@@ -101,12 +92,12 @@ def test_the_section_reads_a_size_that_is_a_choice_and_a_font_on_the_list():
 
 
 def test_anything_else_is_the_default_size_and_font():
-    for raw in (15, 0, -12, True, None, [12], "big", float("nan"), float("inf")):
-        assert overlay.validate_config({"size": raw})["size"] == 13, raw
+    for raw in (7, 18, 20, 24, 0, -12, True, None, [12], "big", float("nan"), float("inf")):
+        assert overlay.validate_config({"size": raw})["size"] == 11, raw
     for raw in ("Comic Sans", "arial", "", 7, None, ["Roboto"], "Ubuntu"):
         assert overlay.validate_config({"font": raw})["font"] == "Arial", raw
     assert overlay.validate_config({"size": "16"})["size"] == 16
-    assert overlay.validate_config({"size": 20.9})["size"] == 20
+    assert overlay.validate_config({"size": 15.9})["size"] == 15
 
 
 def test_the_section_is_written_in_declared_order_and_is_idempotent():
@@ -115,7 +106,7 @@ def test_the_section_is_written_in_declared_order_and_is_idempotent():
     assert overlay.validate_config(section) == section
     assert overlay.PROFILE_SECTION.key == "overlay"
     assert overlay.PROFILE_SECTION.lane == "build"
-    assert overlay.PROFILE_SECTION.defaults() == {"size": 13, "font": "Arial"}
+    assert overlay.PROFILE_SECTION.defaults() == {"size": 11, "font": "Arial"}
 
 
 def test_the_stock_profile_follows_the_size_rules():
@@ -132,7 +123,7 @@ def test_the_stock_profile_follows_the_size_rules():
 
 def test_size_for_height_picks_the_tier():
     assert [overlay.size_for_height(h) for h in (600, 720, 721, 1080, 1081, 1440, 1441, 2160)] == [
-        11, 11, 13, 13, 14, 14, 16, 16]
+        9, 9, 11, 11, 13, 13, 16, 16]
 
 
 # --------------------------------------------------------------------------
@@ -159,114 +150,68 @@ def test_snapping_rounds_to_the_nearest_five_inside_the_range():
 
 
 # --------------------------------------------------------------------------
+# The size table
+# --------------------------------------------------------------------------
+
+
+# The maintainer's table, set in game: icon px, timer pt, stack pt.
+TABLE = [(32, 10, 10), (36, 10, 10), (40, 12, 10), (44, 12, 12), (48, 14, 12), (52, 14, 12),
+         (56, 16, 14), (60, 16, 14), (64, 18, 16), (68, 18, 16), (72, 20, 18), (76, 20, 18),
+         (80, 22, 20), (84, 22, 20), (88, 24, 22), (92, 24, 22)]
+# A new grid's gap and timer Y offset per s = 8..23.
+NEW_GRID = [(0, -2), (0, -2), (-1, -2), (-1, -3), (-1, -4), (-1, -4), (-2, -5), (-2, -5),
+            (-2, -5), (-2, -5), (-3, -5), (-3, -6), (-3, -6), (-3, -6), (-4, -7), (-4, -7)]
+
+
+def test_every_row_of_the_table_is_what_a_grid_bakes():
+    for icon, timer, stack in TABLE:
+        s = icon // 4
+        m = grid_metrics(s, 100)
+        assert (m.icon, m.timer, m.stack) == (icon, timer, stack), icon
+    m = grid_metrics(12, 150)
+    assert (m.icon, m.timer, m.stack) == (72, 20, 18)
+
+
+def test_a_grid_icon_is_held_to_32_92_px():
+    assert grid_metrics(8, 50).icon == 32
+    assert grid_metrics(17, 200).icon == 92
+    assert grid_metrics(17, 200).timer == 24
+    assert grid_metrics(8, 50).timer == 10
+    for base in SIZES:
+        for scale in SCALES:
+            m = grid_metrics(base, scale)
+            asked = _round_div(base * scale, 100)
+            assert m.icon == 4 * max(8, min(asked, 23)), (base, scale)
+            assert (m.icon, m.timer, m.stack) in TABLE, (base, scale)
+
+
+def test_new_grid_defaults_follow_the_size():
+    for s, (gap, y) in enumerate(NEW_GRID, start=8):
+        assert (default_gap(s), default_timer_y(s)) == (gap, y), s
+    assert (default_gap(5), default_timer_y(5)) == NEW_GRID[0]
+    assert (default_gap(48), default_timer_y(48)) == NEW_GRID[-1]
+
+
+def test_the_inset_scales_with_the_icon():
+    assert [inset(i) for i in (20, 24, 32, 48, 52, 56, 64, 92, 96)] == [
+        2, 2, 3, 4, 4, 5, 5, 8, 8]
+
+
+# --------------------------------------------------------------------------
 # Panels and the cast timer
 # --------------------------------------------------------------------------
 
 
-def test_panels_take_the_rounded_scaled_size_with_a_floor_of_eight():
-    for b, p, want in [(12, 100, 12), (10, 100, 10), (24, 100, 24), (12, 50, 8), (10, 50, 8),
-                       (12, 150, 18), (13, 110, 14), (11, 105, 12), (24, 200, 48)]:
+def test_panels_take_the_timer_column_times_the_scale_with_a_floor_of_eight():
+    for b, timer, _ in [(icon // 4, t, st) for icon, t, st in TABLE[:10]]:
+        assert panel_fs(b, 100) == timer, b
+    for b, p, want in [(11, 85, 10), (11, 150, 18), (17, 200, 36), (8, 50, 8), (9, 75, 8),
+                       (13, 105, 15), (16, 110, 20)]:
         assert panel_fs(b, p) == want, (b, p)
-    assert panel_fs(12, 105) == 13
-    assert panel_fs(14, 105) == 15, "14.7"
-    assert panel_fs(10, 125) == 13, "12.5 ties up"
+    assert panel_fs(9, 125) == 13, "12.5 ties up"
 
 
-def test_the_cast_timer_takes_the_title_role_of_the_scaled_size():
-    for b, p, want in [(12, 100, 15), (10, 100, 13), (11, 100, 14), (13, 100, 16), (14, 100, 18),
-                       (16, 100, 20), (18, 100, 23), (20, 100, 25), (24, 100, 30), (12, 50, 8),
-                       (24, 200, 60), (12, 70, 11)]:
+def test_the_cast_timer_takes_the_title_role_of_the_panel_size():
+    for b, p, want in [(8, 100, 13), (9, 100, 13), (11, 100, 15), (13, 100, 18), (16, 100, 23),
+                       (17, 200, 45), (8, 50, 8), (11, 70, 11)]:
         assert cast_fs(b, p) == want, (b, p)
-
-
-# --------------------------------------------------------------------------
-# Grids
-# --------------------------------------------------------------------------
-
-
-# The maintainer's table, measured in game: s, stack pt, gap, timer Y offset.
-TABLE = [(8, 8, 0, -2), (9, 8, 0, -2), (10, 10, -1, -2), (11, 10, -1, -3), (12, 10, -1, -4),
-         (13, 11, -1, -4), (14, 12, -2, -5), (15, 13, -2, -5), (16, 14, -2, -5)]
-
-
-def test_stack_pt_follows_the_maintainers_table():
-    for s, stack, _, _ in TABLE:
-        assert stack_pt(s) == stack, s
-    assert stack_pt(20) == 18 and stack_pt(48) == 46
-    assert stack_pt(5) == stack_pt(7) == 8
-
-
-def test_new_grid_defaults_follow_the_size():
-    for s, _, gap, y in TABLE:
-        assert (default_gap(s), default_timer_y(s)) == (gap, y), s
-    assert (default_gap(24), default_timer_y(24)) == (-4, -7)
-    assert (default_gap(48), default_timer_y(48)) == (-10, -14)
-    assert (default_gap(5), default_timer_y(5)) == (0, -2)
-    # Never a jump past the table, and never less overlap as the size grows.
-    gaps = [default_gap(s) for s in range(5, 49)]
-    ys = [default_timer_y(s) for s in range(5, 49)]
-    assert gaps == sorted(gaps, reverse=True) and ys == sorted(ys, reverse=True)
-
-
-def test_the_inset_scales_with_the_icon():
-    assert [inset(i) for i in (20, 24, 32, 48, 52, 56, 64, 96, 192)] == [
-        2, 2, 3, 4, 4, 5, 5, 8, 16]
-
-
-def test_every_choice_at_the_default_scale_is_a_clean_derivative():
-    for base in SIZES:
-        m = grid_metrics(base, 100)
-        assert (m.icon, m.timer, m.stack) == (4 * base, base, stack_pt(base)), base
-
-
-def test_the_scale_moves_the_icon_by_four_px_per_rounded_point():
-    assert grid_metrics(12, 110).icon == 4 * 13
-    assert grid_metrics(12, 150).icon == 72
-    assert grid_metrics(12, 200).icon == 96
-    assert grid_metrics(24, 200).icon == 192
-    m = grid_metrics(13, 100)
-    assert (m.icon, m.timer, m.stack) == (52, 13, 11)
-    m = grid_metrics(24, 200)
-    assert (m.icon, m.timer, m.stack) == (192, 48, 46)
-
-
-def test_both_texts_are_floored_at_eight_points():
-    assert MIN_TEXT_PT == 8
-    m = grid_metrics(12, 50)
-    assert (m.icon, m.stack, m.timer) == (24, 8, 8)
-    m = grid_metrics(10, 90)
-    assert (m.icon, m.stack, m.timer) == (36, 8, 9)
-    m = grid_metrics(10, 50)
-    assert (m.icon, m.stack, m.timer) == (20, 8, 8)
-
-
-def test_the_fit_caps_stay_a_net_the_body_role_timer_never_falls_into():
-    m = grid_metrics(12, 70)
-    assert (m.icon, m.stack, m.timer) == (32, 8, 8)
-    # Uncapped, the timer is the scaled size and never under the stack counter.
-    for b in SIZES:
-        for p in SCALES:
-            m = grid_metrics(b, p)
-            assert m.timer >= m.stack, (b, p)
-    # A fixed icon asking for big text is capped to fit it.
-    assert icon_metrics(40, 12, 30).timer < 30
-
-
-def test_the_box_height_is_one_line_box_plus_the_gutter():
-    for pt, h in [(8, 14), (9, 15), (10, 16), (12, 19), (13, 20), (15, 22), (24, 33), (30, 40), (48, 62)]:
-        assert text_box_h(pt) == h, pt
-
-
-def test_the_sweep_of_every_size_and_scale_keeps_every_rule():
-    for base in SIZES:
-        for scale in SCALES:
-            m = grid_metrics(base, scale)
-            at = (base, scale, m)
-            asked = _round_div(base * scale, 100)
-            assert m.icon % 4 == 0 and 20 <= m.icon <= 192, at
-            assert m.stack >= MIN_TEXT_PT and m.timer >= MIN_TEXT_PT, at
-            assert m.stack == stack_pt(max(asked, MIN_TEXT_PT)), at
-            assert m.timer <= max(asked, MIN_TEXT_PT), at
-            if m.timer > MIN_TEXT_PT:
-                assert m.timer * 2.2264 + GUTTER <= m.icon + 1e-9, at
-                assert inset(m.icon) + text_box_h(m.stack) + text_box_h(m.timer) <= m.icon, at

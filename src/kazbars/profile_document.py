@@ -203,10 +203,10 @@ def _px_to_fractions(data: dict) -> dict:
 def _overlay_scale(data: dict) -> dict:
     """Schema 2 → 3: per-module pixel and point sizes become a percent `scale`
     of one profile-wide base size (`modules.overlay.size`). The base size is
-    seeded from `authored_at`'s height on the tiers the old seed sizes used
-    (≤1080 → 12, ≤1440 → 16, else 24), so the shipped seeds land on the same
-    icons (48 / 56 / 64 px at scales 100 / 90 / 65) and a tuned size keeps to
-    within one 5 % step. `showTimers` becomes `timerStyle`; the inspect
+    seeded from `authored_at`'s height (≤1080 → 11, ≤1440 → 13, else 16), so
+    the shipped seeds land on the same icons (48 / 56 / 64 px at scales
+    110 / 110 / 100) and a tuned size keeps to within one 5 % step. Panel
+    sizes scale against the size table's timer pt for the base size. `showTimers` becomes `timerStyle`; the inspect
     panel's `showPvp`/`showPerks` go (PvP is a tab in game, perks always
     show). Frozen like `_px_to_fractions`: inline arithmetic, no live imports,
     deep copy first."""
@@ -214,7 +214,7 @@ def _overlay_scale(data: dict) -> dict:
     modules = data.get('modules')
     if not isinstance(modules, dict):
         return data
-    choices = (10, 11, 12, 13, 14, 16, 18, 20, 24)
+    choices = tuple(range(8, 18))
     overlay = modules.get('overlay')
     size = overlay.get('size') if isinstance(overlay, dict) else None
     if not (isinstance(size, int) and not isinstance(size, bool) and size in choices):
@@ -226,12 +226,14 @@ def _overlay_scale(data: dict) -> dict:
             height = authored[1]
         else:
             height = _DEFAULT_AUTHORED_AT[1]
-        size = 12 if height <= 1080 else 16 if height <= 1440 else 24
+        size = 11 if height <= 1080 else 13 if height <= 1440 else 16
     # Every scale below is relative to `size`, so the section must carry it.
     if isinstance(overlay, dict):
         overlay['size'] = size
     else:
         modules['overlay'] = {'size': size, 'font': 'Arial'}
+    # The size table's timer pt for the base size, what panels scale against.
+    pt = 2 * (size // 2) + 2
 
     def scale(value: Any, num: int, den: int) -> int:
         """snap5(clamp(round(value x num / den))), half-up; junk → 100."""
@@ -259,7 +261,7 @@ def _overlay_scale(data: dict) -> dict:
         section = modules.get(key)
         if isinstance(section, dict):
             fs = section.pop('fontSize', None)
-            section['scale'] = 100 if fs is None else scale(fs, 100, size)
+            section['scale'] = 100 if fs is None else scale(fs, 100, pt)
     inspect = modules.get('inspect')
     if isinstance(inspect, dict):
         inspect.pop('showPvp', None)
@@ -267,7 +269,7 @@ def _overlay_scale(data: dict) -> dict:
     cast = modules.get('cast_timer')
     if isinstance(cast, dict):
         fs = cast.pop('fontSize', None)
-        cast['scale'] = 100 if fs is None else scale(fs, 400, 5 * size)
+        cast['scale'] = 100 if fs is None else scale(fs, 400, 5 * pt)
     return data
 
 

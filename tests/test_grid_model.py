@@ -96,13 +96,13 @@ def test_text_sizes_are_kept_in_range_else_auto():
 
 
 def test_a_new_grid_takes_gap_and_timer_y_from_the_overlay_size():
-    for base, gap, y in [(11, -1, -3), (13, -1, -4), (14, -2, -5), (16, -2, -5), (24, -4, -7)]:
+    for base, gap, y in [(8, 0, -2), (11, -1, -3), (13, -1, -4), (14, -2, -5), (17, -2, -5)]:
         grid = create_default_grid(base_size=base)
         assert (grid["gap"], grid["timerYOffset"]) == (gap, y), base
         assert validate_grid(dict(grid)) == grid, base
     grid = create_default_grid()
-    assert (grid["gap"], grid["timerYOffset"]) == (-1, -4), "the default size, 13"
-    assert (CLAMP_SPECS["gap"][0], CLAMP_SPECS["timerYOffset"][0]) == (-1, -4)
+    assert (grid["gap"], grid["timerYOffset"]) == (-1, -3), "the default size, 11"
+    assert (CLAMP_SPECS["gap"][0], CLAMP_SPECS["timerYOffset"][0]) == (-1, -3)
 
 
 def test_dedupe_grid_ids_renames_duplicates_first_wins():

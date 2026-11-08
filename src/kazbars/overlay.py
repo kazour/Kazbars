@@ -15,20 +15,21 @@ from .profile_document import LANE_BUILD
 from .profile_document import SectionSpec as ProfileSectionSpec
 from .settings_core import Field, Schema, validate_all
 
-# The base size's choices as the toolbar dropdown rows: (size, label), the
-# label naming the screen a size is meant for where there is one.
+# The base size's choices as the toolbar dropdown rows: (size, label), a
+# 32..68 px icon (overlay_size), one 4 px step apiece, named for the screen.
 SIZE_CHOICES: tuple[tuple[int, str], ...] = (
-    (10, '10 · Compact'),
-    (11, '11 · 720p'),
-    (12, '12'),
-    (13, '13 · Default (1080p)'),
-    (14, '14 · 1440p'),
-    (16, '16 · 4K'),
-    (18, '18'),
-    (20, '20'),
-    (24, '24'),
+    (8, '720p compact'),
+    (9, '720p'),
+    (10, '1080p compact'),
+    (11, '1080p'),
+    (12, '1440p compact'),
+    (13, '1440p'),
+    (14, '1440p large'),
+    (15, '2160p compact'),
+    (16, '2160p'),
+    (17, '2160p large'),
 )
-DEFAULT_SIZE = 13
+DEFAULT_SIZE = 11
 
 VERDANA = 'Verdana'
 HYBORIAN = 'Hyborian'
@@ -94,15 +95,15 @@ def as2_face(font: str) -> str:
 
 
 def size_for_height(height: int) -> int:
-    """The base size a game resolution starts on: 11 up to 720 px tall, 13 up
-    to 1080, 14 up to 1440, 16 above (44 / 52 / 56 / 64 px icons at scale
-    100, measured in game)."""
+    """The base size a game resolution starts on, its screen's plain entry:
+    9 up to 720 px tall, 11 up to 1080, 13 up to 1440, 16 above (36 / 44 /
+    52 / 64 px icons at scale 100)."""
     if height <= 720:
-        return 11
+        return 9
     if height <= 1080:
-        return 13
+        return 11
     if height <= 1440:
-        return 14
+        return 13
     return 16
 
 
@@ -113,7 +114,7 @@ _SCHEMA = Schema('', 1, {
 
 
 def validate_config(config) -> dict:
-    """The section with exactly its two keys: absent or non-dict → 13 / Arial."""
+    """The section with exactly its two keys: absent or non-dict → 11 / Arial."""
     return validate_all(_SCHEMA, config)
 
 # Registered by app.py at startup.

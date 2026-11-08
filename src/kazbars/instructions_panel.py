@@ -433,9 +433,12 @@ SECTIONS: list[_Section] = [
             'own, an overhead grid 16; there is no total across grids.',
             'Size — a slider, 50–200 %, of the Overlay size. It sets the '
             'icon, and the timer and stack text while they are on Auto; the '
-            'hint beside it shows the icon in px.',
-            'Timer text and Stack text — Auto, the default, sizes them from '
-            'Size and shows the result greyed out. Untick Auto to set your '
+            'hint beside it shows the icon in px. Icons move in 4 px steps '
+            'and stay between 32 and 92 px — past either end the slider '
+            'changes nothing.',
+            'Timer text and Stack text — Auto, the default, takes the size '
+            'set for that icon size and shows it greyed out. Untick Auto to '
+            'set your '
             'own, 6–72 pt: the grid uses exactly that in game, whatever Size '
             'or the Overlay size say, and large text can spill past the '
             'icon. Tick Auto to go back.',
@@ -466,9 +469,12 @@ SECTIONS: list[_Section] = [
             'of everything KazBars draws in game. Both are saved in the '
             'profile; rebuild to apply.',
             _sub('Overlay', [
-                'The base size, 10 to 24 — 11 suits 720p, 13 suits 1080p, '
-                '14 suits 1440p, 16 suits 4K. First launch and Reset '
-                'profile to defaults… pick the one for your resolution; '
+                'Ten entries named for the screen, each a 4 px step of icon '
+                'size, from 720p compact (32 px icons) through 1080p (44 px) '
+                'to 2160p large (68 px). Compact is one step smaller than '
+                "its screen's plain entry, large one step bigger.",
+                'First launch and Reset profile to defaults… pick the plain '
+                'entry for your resolution — 720p, 1080p, 1440p or 2160p; '
                 'an imported profile keeps its own.',
                 'Change it and every grid and panel resizes together, each '
                 'in proportion.',
@@ -664,8 +670,8 @@ SECTIONS: list[_Section] = [
             'It must match the resolution you play at.',
             'Change it and nothing in your profile moves: positions are '
             'fractions of the screen and sizes a percent of the Overlay '
-            'size. On a bigger screen, pick a bigger Overlay size on the '
-            'Grids tab. Rebuild to apply.',
+            "size. On a bigger screen, pick that screen's entry in the "
+            'Overlay dropdown on the Grids tab. Rebuild to apply.',
             _sub('Overhead anchor', [
                 'The same dialog has Right and Up fields: where overhead '
                 "grids sit against a character's head. Positive moves them "

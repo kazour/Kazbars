@@ -1,8 +1,8 @@
 """Tests for the document schema 2 → 3 rung: per-module pixel and point sizes
 become a percent `scale` of one profile-wide base size (`modules.overlay`).
 
-The base size is seeded from `authored_at`'s height on the tiers the old seed
-sizes used, so a profile built today keeps its in-game sizes: the shipped seeds
+The base size is seeded from `authored_at`'s height, so a profile built
+today keeps its in-game sizes: the shipped seeds
 (48 / 56 / 64 px icons at 1080p / 1440p / 4K) land exactly, a tuned size keeps
 to within one 5 % step, positions are untouched. The rung is frozen history
 inside `profile_document` and must never mutate the caller's raw dict.
@@ -45,7 +45,7 @@ def _migrated(raw):
 
 
 @pytest.mark.parametrize("height, size, icon, scale", [
-    (1080, 12, 48, 100), (1440, 16, 56, 90), (2160, 24, 64, 65)])
+    (1080, 11, 48, 110), (1440, 13, 56, 110), (2160, 16, 64, 100)])
 def test_the_shipped_seeds_land_on_the_same_icons(height, size, icon, scale):
     raw = _schema2_doc(height)
     raw["modules"]["grids"]["grids"][0]["iconSize"] = icon
@@ -57,9 +57,8 @@ def test_the_shipped_seeds_land_on_the_same_icons(height, size, icon, scale):
 
 
 def test_a_tuned_icon_keeps_within_one_step():
-    # The rung's own frozen tiers (12 / 16 / 24), not today's size_for_height.
-    for height, size in ((1080, 12), (1440, 16), (2160, 24)):
-        for icon in range(24, 129, 4):
+    for height, size in ((1080, 11), (1440, 13), (2160, 16)):
+        for icon in range(32, 93, 4):
             raw = _schema2_doc(height)
             raw["modules"]["grids"]["grids"][0]["iconSize"] = icon
             scale = _migrated(raw)["grids"]["grids"][0]["scale"]
@@ -93,24 +92,24 @@ def test_panel_and_cast_sizes_become_scales_that_bake_back():
                        inspect={"enabled": True, "fontSize": None, "showPvp": True, "showPerks": False},
                        cast_timer={"enabled": True, "fontSize": 20})
     out = _migrated(raw)
-    assert panel_fs(16, out["stopwatch"]["scale"]) == 20
+    assert panel_fs(13, out["stopwatch"]["scale"]) == 20
     assert out["inspect"]["scale"] == 100
     assert "showPvp" not in out["inspect"] and "showPerks" not in out["inspect"]
-    assert cast_fs(16, out["cast_timer"]["scale"]) == 20
+    assert cast_fs(13, out["cast_timer"]["scale"]) == 20
     for key in ("stopwatch", "inspect", "cast_timer"):
         assert "fontSize" not in out[key]
 
 
 def test_the_1080p_cast_default_keeps_its_size():
     out = _migrated(_schema2_doc(cast_timer={"fontSize": 12}))
-    assert cast_fs(12, out["cast_timer"]["scale"]) == 12
+    assert cast_fs(11, out["cast_timer"]["scale"]) == 12
 
 
 def test_an_overlay_section_already_present_is_kept_and_sizes_against_it():
-    raw = _schema2_doc(1080, overlay={"size": 24, "font": "Inter"})
-    raw["modules"]["grids"]["grids"][0]["iconSize"] = 96
+    raw = _schema2_doc(1080, overlay={"size": 16, "font": "Inter"})
+    raw["modules"]["grids"]["grids"][0]["iconSize"] = 64
     out = _migrated(raw)
-    assert out["overlay"] == {"size": 24, "font": "Inter"}
+    assert out["overlay"] == {"size": 16, "font": "Inter"}
     assert out["grids"]["grids"][0]["scale"] == 100
 
 
@@ -134,12 +133,12 @@ def test_a_schema_1_document_climbs_both_rungs():
            "modules": {"grids": {"grids": [{"id": "G", "x": 1280, "y": 720, "iconSize": 56}]}}}
     out = _migrated(raw)
     grid = out["grids"]["grids"][0]
-    assert (grid["fx"], grid["fy"], grid["scale"]) == (0.5, 0.5, 90)
-    assert out["overlay"]["size"] == 16
+    assert (grid["fx"], grid["fy"], grid["scale"]) == (0.5, 0.5, 110)
+    assert out["overlay"]["size"] == 13
 
 
 def test_an_overlay_section_with_a_size_off_the_list_takes_the_one_its_scales_use():
-    raw = _schema2_doc(1440, overlay={"size": 15, "font": "Inter"})
+    raw = _schema2_doc(1440, overlay={"size": 24, "font": "Inter"})
     out = _migrated(raw)
-    assert out["overlay"] == {"size": 16, "font": "Inter"}
-    assert grid_metrics(16, out["grids"]["grids"][0]["scale"]).icon == 48
+    assert out["overlay"] == {"size": 13, "font": "Inter"}
+    assert grid_metrics(13, out["grids"]["grids"][0]["scale"]).icon == 48

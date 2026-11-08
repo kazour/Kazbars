@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "content_version": 40,
+  "content_version": 41,
   "min_app_version": "3.2.0",
-  "notes": "Stock profile: Overlay 13, gap and timer Y from the size rules",
+  "notes": "Stock profile: 1080p overlay size, timer Y offset -3",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
@@ -10,7 +10,7 @@
     },
     "Default.yml": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.yml",
-      "sha256": "97f5b2e52a6f2ceaa24a409e1d9b9705cfc952b856ee82b4b224469a911b972f"
+      "sha256": "3b6ddde566dc3d697fd827608564111a6964930ed117b8d9c9a54d7b5e3a46c3"
     }
   }
 }

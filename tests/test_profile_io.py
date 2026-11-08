@@ -432,9 +432,9 @@ def test_the_hint_wins_over_the_prefs_id(app, root):
 
 
 @pytest.mark.parametrize("prefs, font, scale", [
-    ({"panel_font_size": 18}, None, 115),  # 18/16 → 112.5 → snap 115
-    ({}, None, 75),                        # the 3.1 default 12 → 12/16
-    ({"panel_font_size": 18}, 14, 90),     # an explicit size ignores the pref
+    ({"panel_font_size": 18}, None, 130),  # 18/14 → 128.6 → snap 130
+    ({}, None, 85),                        # the 3.1 default 12 → 12/14
+    ({"panel_font_size": 18}, 14, 100),    # an explicit size ignores the pref
 ])
 def test_adoption_lifts_the_3_1_panel_font_pref(app, root, prefs, font, scale):
     app.registry.register(stopwatch.PROFILE_SECTION)
@@ -449,7 +449,7 @@ def test_adoption_lifts_the_3_1_panel_font_pref(app, root, prefs, font, scale):
     (root / "prefs.json").write_text(json.dumps(prefs), encoding="utf-8")
     profile_io.startup_profile(app)
     modules = app.profile_store.document["modules"]
-    assert modules["overlay"]["size"] == 16
+    assert modules["overlay"]["size"] == 13
     assert modules["stopwatch"]["scale"] == scale
     assert modules["inspect"]["scale"] == scale
 

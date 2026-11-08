@@ -175,7 +175,7 @@ def test_the_tracker_bakes_its_block_hooks_and_instances():
     assert "onslaught = new KazBarsOnslaught(rootClip);" in main
     assert "onslaught.configure(d.ONS, world, clock);" in main
     assert "modules.push(onslaught);" in main
-    assert ("        d.ONS = {x: 1560, y: 300, ax: 960, ay: 200, fontSize: 23, list: true, "
+    assert ("        d.ONS = {x: 1560, y: 300, ax: 960, ay: 200, fontSize: 21, list: true, "
             "alerts: true, wave: true, aoe: true, ally: true, alertMs: 6000};") in data
     assert '"Zug-Touched Scorpion"' not in data, "no camps without camps"
     assert ('        d.ONS.helpers = ["Thugra Khotan"];\n        d.ONS.heal = ["Healing Radiance"];\n'
@@ -221,4 +221,4 @@ def test_custom_names_bake_last_among_the_minis_escaped():
 
 def test_the_spots_follow_the_build_resolution():
     _, data = _build({"enabled": True}, game_resolution=(2560, 1440))
-    assert "d.ONS = {x: 2080, y: 400, ax: 1280, ay: 267, fontSize: 13," in data
+    assert "d.ONS = {x: 2080, y: 400, ax: 1280, ay: 267, fontSize: 12," in data

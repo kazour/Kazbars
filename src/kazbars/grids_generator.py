@@ -359,14 +359,14 @@ class CodeGenerator:
         return codes
 
     def _panel_font_data_block(self):
-        """AS2 `d.PF = {...}` literal — the base size itself (the preview
+        """AS2 `d.PF = {...}` literal — the panel size at 100 % (the preview
         control panel and the layout-preview labels are drawn at it), the face
         every text field asks for, the version the control panel's footer
         credits, and the overhead anchor (`KazBarsRelations.side` / `.lift`).
         Emitted unconditionally: `KazBarsPreviewPanel` is not gated and
         compiles into every build."""
         side, up = self.anchor
-        return (f"\n        d.PF = {{fontSize: {self.base_size}, "
+        return (f"\n        d.PF = {{fontSize: {panel_fs(self.base_size, 100)}, "
                 f'face: "{as2_face(self.overlay["font"])}", '
                 f'version: "{escape_as2_string(self.app_version)}", '
                 f"side: {int(side)}, up: {int(up)}}};")
