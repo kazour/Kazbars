@@ -205,7 +205,7 @@ def _overlay_scale(data: dict) -> dict:
     of one profile-wide base size (`modules.overlay.size`). The base size is
     seeded from `authored_at`'s height (≤1080 → 11, ≤1440 → 13, else 16), so
     the shipped seeds land on the same icons (48 / 56 / 64 px at scales
-    110 / 110 / 100) and a tuned size keeps to within one 5 % step. Panel
+    109 / 108 / 100) and a tuned size keeps to the nearest step. Panel
     sizes scale against the size table's timer pt for the base size. `showTimers` becomes `timerStyle`; the inspect
     panel's `showPvp`/`showPerks` go (PvP is a tab in game, perks always
     show). Frozen like `_px_to_fractions`: inline arithmetic, no live imports,
@@ -236,14 +236,13 @@ def _overlay_scale(data: dict) -> dict:
     pt = 2 * (size // 2) + 2
 
     def scale(value: Any, num: int, den: int) -> int:
-        """snap5(clamp(round(value x num / den))), half-up; junk → 100."""
+        """clamp(round(value x num / den)) to 40-300, half-up; junk → 100."""
         try:
             v = int(value)
         except (TypeError, ValueError, OverflowError):
             return 100
         n = max(0, v) * num
-        p = max(50, min((2 * n + den) // (2 * den), 200))
-        return max(50, min((p + 2) // 5 * 5, 200))
+        return max(40, min((2 * n + den) // (2 * den), 300))
 
     grids = modules.get('grids')
     entries = grids.get('grids') if isinstance(grids, dict) else None

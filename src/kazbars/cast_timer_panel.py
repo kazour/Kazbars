@@ -11,7 +11,7 @@ the values into the generated SWF. The shell is `extras_dialog.ExtrasShell`.
 Functions take the KazBarsApp instance as first arg.
 
 The face is the profile's overlay font (Grids tab), so the dialog offers Bold
-and a Size (a percent of the overlay size, hinted in pt) rather than a family
+and a Size (a percent of the overlay size, shown as pt) rather than a family
 picker; the sample preview draws in Arial at the baked size, and dims with
 the gate so it never looks live on a disabled dialog.
 """
@@ -130,10 +130,9 @@ def open_cast_timer_dialog(app):
     size_row = ttk.Frame(style_col)
     size_row.pack(anchor='w', pady=(0, PAD_XS))
     size_scale, size_var = size_slider(
-        size_row, cfg['scale'], lambda p: f"{panel_fs(shell.base, p)} pt",
+        size_row, shell.base, cfg['scale'],
         on_move=_redraw_preview, length=100,
-        tooltip="Timer text size, a percent of the overlay size (Overlay, top "
-                "of the Grids tab).",
+        tooltip="Timer text size in game, 8-28 pt. Moves with the Overlay size on the Grids tab.",
         label_sink=sink)
     shell.gate(size_scale)
 

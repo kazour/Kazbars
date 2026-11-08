@@ -288,11 +288,10 @@ class GridSettingsDialog(tk.Toplevel):
         card = self._card(parent, "Icons")
         cell, _ = self._field(card, "Size:")
         _, self.scale_var = size_slider(
-            cell, cfg.get('scale', CLAMP_SPECS['scale'][0]),
-            lambda p: f"{grid_metrics(self.card.base_size(), p).icon} px icons",
+            cell, self.card.base_size(), cfg.get('scale', CLAMP_SPECS['scale'][0]), icons=True,
             label=None, on_move=lambda p: self._on_size_move(),
-            tooltip="Icon size, and timer and stack text on Auto, as a percent of the overlay size "
-                    "(Overlay, top of the Grids tab)")
+            tooltip="Icon size in game, 32-92 px; timer and stack text on Auto follow it. "
+                    "Moves with the Overlay size on the Grids tab.")
         # key -> (auto var, pt var, spinbox, row label): Auto shows the size
         # rules' value and follows the slider; unticked, the grid's own pt.
         self._text_rows = {}

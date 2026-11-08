@@ -432,8 +432,8 @@ def test_the_hint_wins_over_the_prefs_id(app, root):
 
 
 @pytest.mark.parametrize("prefs, font, scale", [
-    ({"panel_font_size": 18}, None, 130),  # 18/14 → 128.6 → snap 130
-    ({}, None, 85),                        # the 3.1 default 12 → 12/14
+    ({"panel_font_size": 18}, None, 129),  # 18/14 → 128.6 → 129
+    ({}, None, 86),                        # the 3.1 default 12 → 12/14
     ({"panel_font_size": 18}, 14, 100),    # an explicit size ignores the pref
 ])
 def test_adoption_lifts_the_3_1_panel_font_pref(app, root, prefs, font, scale):

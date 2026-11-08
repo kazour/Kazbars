@@ -26,7 +26,6 @@ from tkinter import ttk
 
 from . import onslaught
 from .extras_dialog import ExtrasShell, raise_if_open
-from .overlay_size import panel_fs
 from .ui_forms import create_card, create_slider_row, size_slider
 from .ui_helpers import (
     BTN_SMALL,
@@ -89,9 +88,9 @@ def open_onslaught_dialog(app):
     size_row.pack(anchor='w', pady=(0, PAD_XS))
     size_sink: list = []
     size_scale, size_var = size_slider(
-        size_row, cfg['scale'], lambda p: f"{panel_fs(shell.base, p)} pt text",
-        tooltip="The board's text, a percent of the overlay size (Overlay, top of the "
-                "Grids tab); the alerts draw 1.6 times as large.",
+        size_row, shell.base, cfg['scale'],
+        tooltip="Board text size in game, 8-28 pt; the alerts draw 1.6 times as large. "
+                "Moves with the Overlay size on the Grids tab.",
         label_sink=size_sink)
     shell.gate(size_scale)
     shell.dim(*size_sink)

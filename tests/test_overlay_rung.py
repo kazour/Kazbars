@@ -3,8 +3,8 @@ become a percent `scale` of one profile-wide base size (`modules.overlay`).
 
 The base size is seeded from `authored_at`'s height, so a profile built
 today keeps its in-game sizes: the shipped seeds
-(48 / 56 / 64 px icons at 1080p / 1440p / 4K) land exactly, a tuned size keeps
-to within one 5 % step, positions are untouched. The rung is frozen history
+(48 / 56 / 64 px icons at 1080p / 1440p / 4K) land exactly, as does any icon
+from 32 to 92 px, positions are untouched. The rung is frozen history
 inside `profile_document` and must never mutate the caller's raw dict.
 
 Run: `pytest tests/test_overlay_rung.py` (from repo root).
@@ -45,7 +45,7 @@ def _migrated(raw):
 
 
 @pytest.mark.parametrize("height, size, icon, scale", [
-    (1080, 11, 48, 110), (1440, 13, 56, 110), (2160, 16, 64, 100)])
+    (1080, 11, 48, 109), (1440, 13, 56, 108), (2160, 16, 64, 100)])
 def test_the_shipped_seeds_land_on_the_same_icons(height, size, icon, scale):
     raw = _schema2_doc(height)
     raw["modules"]["grids"]["grids"][0]["iconSize"] = icon
@@ -56,15 +56,14 @@ def test_the_shipped_seeds_land_on_the_same_icons(height, size, icon, scale):
     assert grid_metrics(size, scale).icon == icon
 
 
-def test_a_tuned_icon_keeps_within_one_step():
+def test_every_icon_size_lands_exactly():
     for height, size in ((1080, 11), (1440, 13), (2160, 16)):
         for icon in range(32, 93, 4):
             raw = _schema2_doc(height)
             raw["modules"]["grids"]["grids"][0]["iconSize"] = icon
             scale = _migrated(raw)["grids"]["grids"][0]["scale"]
             baked = grid_metrics(size, scale).icon
-            if 50 < scale < 200:
-                assert abs(baked - icon) <= 4 * max(1, round(size * 0.05)), (height, icon, baked)
+            assert baked == icon, (height, icon, baked)
 
 
 def test_the_retired_grid_keys_go_and_the_timer_style_follows_show_timers():
@@ -133,7 +132,7 @@ def test_a_schema_1_document_climbs_both_rungs():
            "modules": {"grids": {"grids": [{"id": "G", "x": 1280, "y": 720, "iconSize": 56}]}}}
     out = _migrated(raw)
     grid = out["grids"]["grids"][0]
-    assert (grid["fx"], grid["fy"], grid["scale"]) == (0.5, 0.5, 110)
+    assert (grid["fx"], grid["fy"], grid["scale"]) == (0.5, 0.5, 108)
     assert out["overlay"]["size"] == 13
 
 

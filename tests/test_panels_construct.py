@@ -382,13 +382,36 @@ def test_size_slider_previews_live_and_lands_on_apply(app):
     dlg = _settings(card)
     scale = _find_scale(dlg)
     assert scale is not None
-    scale.set(152.6)  # a drag: snapped to 155, the card's preview follows
+    assert round(float(scale.get())) == 44, "the slider shows the icon px, 1080p at 100 %"
+    scale.set(62.6)  # a drag: snapped to 64 px, the card's preview follows
     app.update()
-    assert dlg.scale_var.get() == 155
+    assert dlg.scale_var.get() == 145, "the percent that gives 64 px at 1080p"
     assert card.preview.layout.cell > cell
     assert card.grid_config['scale'] == 100
     dlg.apply()
-    assert _stored_grid(app, idx)['scale'] == 155
+    assert _stored_grid(app, idx)['scale'] == 145
+
+
+def test_a_panel_size_slider_shows_pt_and_follows_the_overlay(app):
+    """An extra's Size slider shows the pt it gives at the current overlay
+    size; a new overlay size moves it with the panel."""
+    from kazbars.overlay_size import panel_fs
+    store = app.profile_store
+    size_before = store.get_section('overlay')['size']
+    scale_pct = store.get_section('stopwatch').get('scale', 100)
+    try:
+        for size in (11, 13):
+            store.update_section('overlay', {'size': size})
+            app._open_stopwatch_settings()
+            dlg = app.stopwatch_dialog
+            try:
+                assert round(float(_find_scale(dlg).get())) == panel_fs(size, scale_pct), size
+            finally:
+                dlg.destroy()
+                app.update()
+    finally:
+        store.update_section('overlay', {'size': size_before})
+        app.update()
 
 
 def test_size_slider_keys_step_a_notch(app):
@@ -403,13 +426,14 @@ def test_size_slider_keys_step_a_notch(app):
         return scale.tk.call(name, *(['0'] * 14 + [str(scale)] + ['0'] * 4))
 
     try:
-        for key, want in (('Right', 105), ('Right', 110), ('Left', 105), ('End', 200), ('Home', 50)):
+        for key, px, pct in (('Right', 48, 109), ('Right', 52, 118), ('Left', 48, 109),
+                             ('End', 92, 209), ('Home', 32, 73)):
             assert fire(f'<{key}>') == 'break', key
             fire('<KeyRelease>')
-            assert (dlg.scale_var.get(), round(float(scale.get()))) == (want, want), key
+            assert (dlg.scale_var.get(), round(float(scale.get()))) == (pct, px), key
         scale.state(['disabled'])
         assert fire('<Right>') == 'break'
-        assert dlg.scale_var.get() == 50, "a greyed slider's keys change nothing"
+        assert dlg.scale_var.get() == 73, "a greyed slider's keys change nothing"
     finally:
         dlg.cancel()
 

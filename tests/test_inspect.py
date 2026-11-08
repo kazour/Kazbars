@@ -54,9 +54,9 @@ def test_legacy_px_position_keys_are_dropped():
 
 
 def test_validate_clamps_scale():
-    # A percent of the overlay size: int()-coerced, clamped to 50-200.
-    assert validate_config({"scale": 4})["scale"] == 50
-    assert validate_config({"scale": 999})["scale"] == 200
+    # A percent of the overlay size: int()-coerced, clamped to 40-300.
+    assert validate_config({"scale": 4})["scale"] == 40
+    assert validate_config({"scale": 999})["scale"] == 300
     assert validate_config({"scale": 135})["scale"] == 135
     assert validate_config({"scale": "120"})["scale"] == 120
     assert validate_config({})["scale"] == 100

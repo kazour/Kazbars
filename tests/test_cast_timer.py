@@ -80,7 +80,7 @@ def test_clamp_positions_and_size():
     assert out["playerFy"] == 1.0
     assert out["targetFx"] == 1.0
     assert out["targetFy"] == 0.0
-    assert out["scale"] == 200
+    assert out["scale"] == 300
     # In-range fractions store as full floats, unrounded.
     assert validate_config({"playerFx": 0.4739583})["playerFx"] == 0.4739583
 

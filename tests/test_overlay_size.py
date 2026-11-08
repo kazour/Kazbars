@@ -12,21 +12,21 @@ from kazbars import overlay, yaml_io
 from kazbars.overlay_size import (
     SCALE_MAX,
     SCALE_MIN,
-    SCALE_STEP,
     clamp_scale,
     default_gap,
     default_timer_y,
     grid_metrics,
+    grid_scale,
     inset,
     panel_fs,
+    panel_scale,
     scale_from,
-    snap_scale,
 )
 from kazbars.paths import KAZBARS_ASSETS
 from kazbars.swf_font import DN_FONTS
 
 SIZES = [s for s, _ in overlay.SIZE_CHOICES]
-SCALES = range(SCALE_MIN, SCALE_MAX + 1, SCALE_STEP)
+SCALES = range(SCALE_MIN, SCALE_MAX + 1)
 
 
 def _round_div(n, d):
@@ -130,22 +130,26 @@ def test_size_for_height_picks_the_tier():
 # --------------------------------------------------------------------------
 
 
-def test_a_scale_is_an_int_clamped_to_50_200_defaulting_to_100():
+def test_a_scale_is_a_whole_percent_clamped_to_40_300_defaulting_to_100():
     assert scale_from(None) == 100
-    assert (scale_from(50), scale_from(200), scale_from(130)) == (50, 200, 130)
-    assert [scale_from(v) for v in (49, 0, -5, 201, 9999)] == [50, 50, 50, 200, 200]
-    assert (scale_from("75"), scale_from(110.9), scale_from(True)) == (75, 110, 50)
+    assert (scale_from(40), scale_from(300), scale_from(133)) == (40, 300, 133)
+    assert [scale_from(v) for v in (39, 0, -5, 301, 9999)] == [40, 40, 40, 300, 300]
+    assert (scale_from("75"), scale_from(110.9), scale_from(True)) == (75, 110, 40)
     for junk in ("x", None, [1], float("nan"), float("inf"), {}):
         assert scale_from(junk) == 100, junk
-    assert clamp_scale(10) == 50 and clamp_scale(300) == 200
+    assert clamp_scale(10) == 40 and clamp_scale(400) == 300
 
 
-def test_snapping_rounds_to_the_nearest_five_inside_the_range():
-    table = [(100, 100), (102, 100), (103, 105), (107, 105), (108, 110), (50, 50), (52, 50),
-             (48, 50), (10, 50), (198, 200), (203, 200), (999, 200)]
-    for given, want in table:
-        assert snap_scale(given) == want, given
-    assert all(snap_scale(p) % SCALE_STEP == 0 for p in range(SCALE_MIN, SCALE_MAX + 1))
+def test_every_slider_size_round_trips_at_every_overlay_size():
+    """A Size slider stores the percent for the pt / px picked; that percent
+    gives the same pt / px back, at whatever overlay size it was picked."""
+    for base in SIZES:
+        for pt in range(8, 29):
+            assert panel_fs(base, panel_scale(base, pt)) == pt, (base, pt)
+        for icon in range(32, 93, 4):
+            assert grid_metrics(base, grid_scale(base, icon)).icon == icon, (base, icon)
+    assert (panel_scale(11, 14), panel_scale(13, 14), grid_scale(11, 52), grid_scale(13, 52)) == (
+        117, 100, 118, 100)
 
 
 # --------------------------------------------------------------------------
@@ -201,10 +205,10 @@ def test_the_inset_scales_with_the_icon():
 # --------------------------------------------------------------------------
 
 
-def test_panels_take_the_timer_column_times_the_scale_with_a_floor_of_eight():
+def test_panels_take_the_timer_column_times_the_scale_held_to_8_28():
     for b, timer, _ in [(icon // 4, t, st) for icon, t, st in TABLE[:10]]:
         assert panel_fs(b, 100) == timer, b
-    for b, p, want in [(11, 85, 10), (11, 150, 18), (17, 200, 36), (8, 50, 8), (9, 75, 8),
+    for b, p, want in [(11, 85, 10), (11, 150, 18), (17, 200, 28), (8, 50, 8), (9, 75, 8),
                        (13, 105, 15), (16, 110, 20)]:
         assert panel_fs(b, p) == want, (b, p)
     assert panel_fs(9, 125) == 13, "12.5 ties up"

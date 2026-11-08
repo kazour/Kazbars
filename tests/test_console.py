@@ -14,7 +14,7 @@ def test_the_section_reads_leniently_in_schema_order():
     assert TABS == ("buffs", "casts")
     assert validate_config(None) == {"enabled": False, "scale": 100, "tabs": ["buffs", "casts"]}
     c = validate_config({"enabled": "yes", "scale": 999, "tabs": ["casts", "nope", "buffs", 3, "casts"]})
-    assert c == {"enabled": True, "scale": 200, "tabs": ["casts", "buffs"]}
+    assert c == {"enabled": True, "scale": 300, "tabs": ["casts", "buffs"]}
     assert list(c) == ["enabled", "scale", "tabs"]
     assert validate_config({"tabs": "buffs"})["tabs"] == ["buffs", "casts"], "not a list: every tab"
     assert validate_config({"tabs": ["stats", "world"]})["tabs"] == [], "tabs this app does not build"

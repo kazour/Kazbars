@@ -3,7 +3,10 @@
 The profile has ONE base size `B` (`overlay.size`, the Grids toolbar's Overlay
 dropdown, 8..17: a 32..68 px icon) and every size in game derives from it, so
 one value moves everything in proportion. A module that should differ has its
-own `scale` `p` (percent, 50-200, default 100).
+own `scale` `p` (a whole percent, 40-300, default 100). Its Size slider shows
+the absolute size `p` gives at the current base (pt for a panel, icon px for
+a grid) and stores the percent that gives the size picked (`panel_scale`,
+`grid_scale`), so a new base moves the slider with the item.
 
 - A buff grid: `grid_metrics`, scaled size `s = round(B x p / 100)` held to
   8..23, icon `4 s` px (32..92), timer and stack pt straight from the size
@@ -11,7 +14,7 @@ own `scale` `p` (percent, 50-200, default 100).
   (`default_gap`, `default_timer_y`); stored per grid after that, they are
   the user's.
 - Panels (inspect, stopwatch, onslaught, console) and the cast timer:
-  `panel_fs`, the table's timer pt for `B` times `p`, floor 8; the AS2 role
+  `panel_fs`, the table's timer pt for `B` times `p`, held to 8..28; the AS2 role
   scale (small, title, alert) hangs off it in `KazBarsPanel`. The preview
   control panel and the layout-preview labels take it at 100 %.
 
@@ -24,13 +27,13 @@ arithmetic (AS2's `Math.round`), so a tie such as `12 x 1.25 = 15` or
 from dataclasses import dataclass
 from typing import Any
 
-SCALE_MIN = 50
-SCALE_MAX = 200
-SCALE_STEP = 5
+SCALE_MIN = 40
+SCALE_MAX = 300
 SCALE_DEFAULT = 100
 
-# A panel never draws its body text under this many points.
+# A panel's body text, pt: what its Size slider offers and what it bakes.
 PANEL_MIN_PT = 8
+PANEL_MAX_PT = 28
 # A grid's icon is this many px per point of s.
 ICON_PX_PER_PT = 4
 # Flash's text gutter, both sides of a field together, in px.
@@ -44,6 +47,8 @@ TIMER_DIGITS_EM_E4 = 22_264
 # its timer Y offset (px).
 SIZE_MIN = 8
 SIZE_MAX = 23
+ICON_MIN_PX = ICON_PX_PER_PT * SIZE_MIN
+ICON_MAX_PX = ICON_PX_PER_PT * SIZE_MAX
 TIMER_PT = (10, 10, 12, 12, 14, 14, 16, 16, 18, 18, 20, 20, 22, 22, 24, 24)
 STACK_PT = (10, 10, 10, 12, 12, 12, 14, 14, 16, 16, 18, 18, 20, 20, 22, 22)
 GAP_BY_SIZE = (0, 0, -1, -1, -1, -1, -2, -2, -2, -2, -3, -3, -3, -3, -4, -4)
@@ -62,12 +67,6 @@ def scale_from(value: Any) -> int:
     except (TypeError, ValueError, OverflowError):
         p = SCALE_DEFAULT
     return clamp_scale(p)
-
-
-def snap_scale(p: int) -> int:
-    """`p` snapped to the nearest step of 5 inside the range: what a Size
-    slider commits, whatever value it was dragged to."""
-    return clamp_scale((p + SCALE_STEP // 2) // SCALE_STEP * SCALE_STEP)
 
 
 def _round_div(n: int, d: int) -> int:
@@ -98,8 +97,20 @@ def inset(icon: int) -> int:
 
 def panel_fs(base: int, scale: int) -> int:
     """A panel's body size, `FS` in `KazBarsPanel`: the base size's timer pt
-    times the scale, floor 8."""
-    return max(_round_div(_row(TIMER_PT, base) * clamp_scale(scale), 100), PANEL_MIN_PT)
+    times the scale, held to 8..28."""
+    pt = _round_div(_row(TIMER_PT, base) * clamp_scale(scale), 100)
+    return max(PANEL_MIN_PT, min(pt, PANEL_MAX_PT))
+
+
+def panel_scale(base: int, pt: int) -> int:
+    """The scale that gives a panel `pt` at `base`: `panel_fs`'s inverse."""
+    return clamp_scale(_round_div(pt * 100, _row(TIMER_PT, base)))
+
+
+def grid_scale(base: int, icon: int) -> int:
+    """The scale that gives a grid `icon` px at `base`: `grid_metrics`'s
+    inverse (`s = icon / 4`)."""
+    return clamp_scale(_round_div(icon * 100, ICON_PX_PER_PT * base))
 
 
 @dataclass(frozen=True)

@@ -17,7 +17,6 @@ from tkinter import ttk
 
 from .extras_dialog import ExtrasShell, raise_if_open
 from .grid_model import get_game_resolution_or_default
-from .overlay_size import panel_fs
 from .stopwatch import validate_config
 from .ui_forms import create_card, position_fields, size_slider
 from .ui_helpers import FONT_SMALL, PAD_ROW, PAD_XS, THEME_COLORS
@@ -65,9 +64,9 @@ def open_stopwatch_dialog(app):
     size_row = ttk.Frame(size_card)
     size_row.pack(anchor='w')
     size_scale, size_var = size_slider(
-        size_row, cfg['scale'], lambda p: f"{panel_fs(shell.base, p)} pt text",
-        tooltip="A percent of the overlay size (Overlay, top of the Grids tab). "
-                "The whole panel scales with it, collapsed bar included.",
+        size_row, shell.base, cfg['scale'],
+        tooltip="Text size in game, 8-28 pt; the whole panel scales with it, collapsed "
+                "bar included. Moves with the Overlay size on the Grids tab.",
         label_sink=sink)
     shell.gate(size_scale)
 

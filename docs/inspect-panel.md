@@ -336,7 +336,7 @@ The perk row is the one place the panel departs from that palette, mirroring the
 | Archetype | 2–3 | `0xA34A4A` red | `0x260F0F` |
 | Class | 4–5 | `0x555555` grey | `0x151515` |
 
-Every dimension is `Math.round(FS × ratio)`, so the whole panel scales as one piece from the baked body size `FS = panel_fs(overlay.size, inspect.scale)` (`max(8, round(TIMER_PT[size] × scale / 100))`, `overlay_size.py`). The family's ratios come from `KazBarsPanel.applyBaseSize` (text roles Small 0.8, Title 1.25, Alert 1.6 through `roleFS`); the panel's own are:
+Every dimension is `Math.round(FS × ratio)`, so the whole panel scales as one piece from the baked body size `FS = panel_fs(overlay.size, inspect.scale)` (`round(TIMER_PT[size] × scale / 100)` held to 8–28, `overlay_size.py`). The family's ratios come from `KazBarsPanel.applyBaseSize` (text roles Small 0.8, Title 1.25, Alert 1.6 through `roleFS`); the panel's own are:
 
 | Constant | Ratio | @ FS 12 | Role |
 |---|---|---|---|
@@ -351,7 +351,7 @@ Every dimension is `Math.round(FS × ratio)`, so the whole panel scales as one p
 | `SECT_GAP` | 0.75 | 9 | space above a section header |
 | `RULE_GAP` | 0.2 | 2 | section header bottom → rule top |
 | `ROWS_GAP` | 0.4 | 5 | rule → first stat row |
-| `ICO` | 2.4 | 29 | perk icon box (six across: `6·ICO + 5·ICO_GAP` ≤ `W − 2·PAD` at every FS — 194 of 257 at FS 12, and the margin holds at both ends of the 8–48 range) — the icon itself is inset 1px and scaled to `ICO − 2`, inside the border |
+| `ICO` | 2.4 | 29 | perk icon box (six across: `6·ICO + 5·ICO_GAP` ≤ `W − 2·PAD` at every FS — 194 of 257 at FS 12, and the margin holds at both ends of the 8–28 range) — the icon itself is inset 1px and scaled to `ICO − 2`, inside the border |
 | `ICO_GAP` | 0.35 | 4 | gap between perk boxes |
 | `COLA` | 5.5 | 66 | a PvP section's first value column → its second (its column titles sit on the same pitch) |
 | `TAB_W` | 2.4 | 29 | the PvP glyph's box; the name field stops short of it on a player |

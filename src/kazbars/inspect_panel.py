@@ -254,10 +254,10 @@ def open_inspect_dialog(app):
     group_combo.bind('<<ComboboxSelected>>', lambda e: _refresh_lists())
 
     size_scale, size_var = size_slider(
-        size_row, cfg['scale'], lambda p: f"{panel_fs(shell.base, p)} pt text",
+        size_row, shell.base, cfg['scale'],
         on_commit=_refresh_status,
-        tooltip="A percent of the overlay size (Overlay, top of the Grids tab). "
-                "The whole panel scales with it, collapsed bar included.",
+        tooltip="Text size in game, 8-28 pt; the whole panel scales with it, collapsed "
+                "bar included. Moves with the Overlay size on the Grids tab.",
         label_sink=sink)
     shell.gate(size_scale)
 
