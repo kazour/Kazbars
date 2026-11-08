@@ -439,6 +439,9 @@ SECTIONS: list[_Section] = [
             "draws a line inside the icon's bottom edge that shrinks as "
             'time runs out, Off shows none. Y offset nudges digits only, so '
             'it greys out for Bar and Off.',
+            'A new grid starts with the Gap and Y offset that suit the '
+            'Overlay size. Changing the Overlay size later leaves them '
+            'as set.',
             'Flash — icons pulse near expiry. Under sets the threshold in '
             'seconds; it greys out while Flash is off.',
             "Applied by me is not here — it is the toggle on the card's "
@@ -458,9 +461,10 @@ SECTIONS: list[_Section] = [
             'of everything KazBars draws in game. Both are saved in the '
             'profile; rebuild to apply.',
             _sub('Overlay', [
-                'The base size, 10 to 24 — 12 suits 1080p, 16 suits 1440p, '
-                '24 suits 4K. First launch picks the one for your '
-                'resolution; an imported profile keeps its own.',
+                'The base size, 10 to 24 — 11 suits 720p, 13 suits 1080p, '
+                '14 suits 1440p, 16 suits 4K. First launch and Reset '
+                'profile to defaults… pick the one for your resolution; '
+                'an imported profile keeps its own.',
                 'Change it and every grid and panel resizes together, each '
                 'in proportion.',
             ]),

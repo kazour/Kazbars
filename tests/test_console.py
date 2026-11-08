@@ -33,10 +33,10 @@ def test_a_build_carries_the_shell_and_each_chosen_tab_only_while_it_ships():
     assert "console.add(new KazBarsConBuffs());" in main
     assert "console.follow(world);" in main and "modules.push(console);" in main
     assert "KazBarsConCasts" not in main
-    assert '        d.CON = {fontSize: 18, tabs: ["buffs"]};' in data
+    assert '        d.CON = {fontSize: 20, tabs: ["buffs"]};' in data
     main, data = _build({"enabled": True, "tabs": ["casts", "buffs"]})
     assert "console.add(new KazBarsConCasts());" in main and "console.add(new KazBarsConBuffs());" in main
-    assert '        d.CON = {fontSize: 12, tabs: ["casts", "buffs"]};' in data
+    assert '        d.CON = {fontSize: 13, tabs: ["casts", "buffs"]};' in data
     for off in ({"enabled": False}, {"enabled": True, "tabs": []}):
         main, data = _build(off)
         assert "KazBarsConsole" not in main and "KazBarsConBuffs" not in main, off

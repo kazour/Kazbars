@@ -1448,6 +1448,44 @@ def _wizard_grid(app, gtype, setup):
             wiz.destroy()
 
 
+def test_a_new_grid_takes_gap_and_timer_y_from_the_profiles_overlay_size(app, monkeypatch):
+    """Both ways in (the wizard, the empty-state preset cards) pass the
+    profile's overlay size, so a 4K-tier profile gets that row's defaults."""
+    from kazbars import grids_panel
+    gp = app.grids_panel
+    store = app.profile_store
+    size_before = store.get_section('overlay')['size']
+    n = len(gp.grids)
+    asked = []
+
+    class Wizard:
+        def __init__(self, *a, base_size, **k):
+            asked.append(base_size)
+            self.result = None
+    monkeypatch.setattr(grids_panel, 'AddGridWizard', Wizard)
+    monkeypatch.setattr(app, 'wait_window', lambda w: None)
+    try:
+        store.update_section('overlay', {'size': 16})
+        gp.add_grid()
+        assert asked == [16]
+        gp._create_from_empty_state(1, 5, 'dynamic')
+        assert (gp.grids[-1]['gap'], gp.grids[-1]['timerYOffset']) == (-2, -5)
+    finally:
+        del gp.grids[n:]
+        gp.refresh_panels()
+        store.update_section('overlay', {'size': size_before})
+        app.update()
+
+    from kazbars.grid_dialogs import AddGridWizard
+    wiz = AddGridWizard(app, set(), name_in_use=lambda name, cfg: False, base_size=11)
+    try:
+        wiz.on_create()
+        assert (wiz.result['gap'], wiz.result['timerYOffset']) == (-1, -3)
+    finally:
+        if wiz.winfo_exists():
+            wiz.destroy()
+
+
 def test_the_add_grid_wizard_makes_bands_with_a_snapped_row_cap(app):
     def custom(wiz):
         wiz.mode_var.set('dynamic')

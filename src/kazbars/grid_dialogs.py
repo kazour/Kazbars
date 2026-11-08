@@ -23,6 +23,7 @@ from .grid_model import (
     settle_box,
     snap_row_cap,
 )
+from .overlay import DEFAULT_SIZE
 from .settings_manager import get_setting, set_setting
 from .ui_forms import picker_list
 from .ui_headers import create_dialog_header
@@ -98,7 +99,7 @@ class AddGridWizard(tk.Toplevel):
     _PRESET_STYLES = {'player': 'info-outline', 'target': 'warning-outline',
                       'friendly': 'success-outline', 'hostile': 'danger-outline'}
 
-    def __init__(self, parent, existing_ids, name_in_use):
+    def __init__(self, parent, existing_ids, name_in_use, base_size=DEFAULT_SIZE):
         super().__init__(parent)
         self.withdraw()
         self.title("Add New Grid")
@@ -110,6 +111,8 @@ class AddGridWizard(tk.Toplevel):
         # One owner for the uniqueness rule (grids_panel._grid_name_in_use);
         # existing_ids stays for the default-name suggestion only.
         self.name_in_use = name_in_use
+        # The profile's overlay size: the new grid's gap and timer Y follow it.
+        self.base_size = base_size
         self.result = None
 
         self._mode_forced_static = False
@@ -360,7 +363,8 @@ class AddGridWizard(tk.Toplevel):
             rows=rows,
             cols=cols,
             mode=self.mode_var.get(),
-            grid_id=grid_id
+            grid_id=grid_id,
+            base_size=self.base_size,
         )
         self.destroy()
 

@@ -18,7 +18,7 @@ modules:
         slotMode: static
         timerStyle: "off"
         timerFlashThreshold: 6
-        timerYOffset: -3
+        timerYOffset: -4
         enableFlashing: true
         fillDirection: BL-TR
         sortOrder: longest
@@ -46,7 +46,7 @@ modules:
         slotMode: static
         timerStyle: digits
         timerFlashThreshold: 6
-        timerYOffset: -3
+        timerYOffset: -4
         enableFlashing: true
         fillDirection: BL-TR
         sortOrder: longest
@@ -71,7 +71,7 @@ modules:
         slotMode: dynamic
         timerStyle: digits
         timerFlashThreshold: 6
-        timerYOffset: -3
+        timerYOffset: -4
         enableFlashing: true
         fillDirection: LR
         sortOrder: longest
@@ -90,7 +90,7 @@ modules:
         slotMode: dynamic
         timerStyle: bar
         timerFlashThreshold: 6
-        timerYOffset: -3
+        timerYOffset: -4
         enableFlashing: true
         fillDirection: C
         sortOrder: longest
@@ -103,7 +103,7 @@ modules:
         maxSlots: 3
         showSelf: true
   overlay:
-    size: 12
+    size: 13
     font: GG
   boss_timer:
     overlay:

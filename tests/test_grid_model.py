@@ -82,6 +82,16 @@ def test_valid_default_grid_passes_through_unchanged():
     assert validate_grid(dict(grid)) == grid
 
 
+def test_a_new_grid_takes_gap_and_timer_y_from_the_overlay_size():
+    for base, gap, y in [(11, -1, -3), (13, -1, -4), (14, -2, -5), (16, -2, -5), (24, -4, -7)]:
+        grid = create_default_grid(base_size=base)
+        assert (grid["gap"], grid["timerYOffset"]) == (gap, y), base
+        assert validate_grid(dict(grid)) == grid, base
+    grid = create_default_grid()
+    assert (grid["gap"], grid["timerYOffset"]) == (-1, -4), "the default size, 13"
+    assert (CLAMP_SPECS["gap"][0], CLAMP_SPECS["timerYOffset"][0]) == (-1, -4)
+
+
 def test_dedupe_grid_ids_renames_duplicates_first_wins():
     grids = [{"id": "X"}, {"id": "X"}, {"id": "Y"}, {"id": "X"}]
     renamed = dedupe_grid_ids(grids)

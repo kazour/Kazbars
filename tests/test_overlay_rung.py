@@ -57,8 +57,8 @@ def test_the_shipped_seeds_land_on_the_same_icons(height, size, icon, scale):
 
 
 def test_a_tuned_icon_keeps_within_one_step():
-    for height in (1080, 1440, 2160):
-        size = overlay.size_for_height(height)
+    # The rung's own frozen tiers (12 / 16 / 24), not today's size_for_height.
+    for height, size in ((1080, 12), (1440, 16), (2160, 24)):
         for icon in range(24, 129, 4):
             raw = _schema2_doc(height)
             raw["modules"]["grids"]["grids"][0]["iconSize"] = icon

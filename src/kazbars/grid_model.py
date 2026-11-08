@@ -7,7 +7,8 @@ import copy
 import math
 
 from .classes import id_of as class_id_of
-from .overlay_size import SCALE_DEFAULT, SCALE_MAX, SCALE_MIN
+from .overlay import DEFAULT_SIZE
+from .overlay_size import SCALE_DEFAULT, SCALE_MAX, SCALE_MIN, default_gap, default_timer_y
 from .profile_document import LANE_BUILD
 from .profile_document import SectionSpec as ProfileSectionSpec
 from .settings_core import Field, Schema
@@ -40,12 +41,13 @@ DEFAULT_GAME_RESOLUTION = (1920, 1080)
 # Declarative validation specs: key → (default, min, max). A grid has no pixel
 # or point size of its own: `scale` is a percent of the profile's overlay size
 # and the generator derives icon, timer and stack sizes from it
-# (overlay_size.grid_metrics).
+# (overlay_size.grid_metrics). Gap and timer Y offset default to a new grid's
+# at the default overlay size (create_default_grid).
 CLAMP_SPECS = {
     'rows': (1, 1, MAX_ROWS), 'cols': (10, 1, MAX_COLS),
-    'scale': (SCALE_DEFAULT, SCALE_MIN, SCALE_MAX), 'gap': (-1, -5, 10),
+    'scale': (SCALE_DEFAULT, SCALE_MIN, SCALE_MAX), 'gap': (default_gap(DEFAULT_SIZE), -10, 10),
     'timerFlashThreshold': (6, 0, 11),
-    'timerYOffset': (-3, -10, 10),
+    'timerYOffset': (default_timer_y(DEFAULT_SIZE), -20, 20),
 }
 # The overhead keys, the same shape: height (`plateOffset`, px of room for the
 # nameplate) and range (`maxDistance`, m).
@@ -191,10 +193,13 @@ def _type_defaults(grid_type):
             'layout': 'debuffFirst' if grid_type in ('target', 'hostile') else 'buffFirst'}
 
 
-def create_default_grid(grid_type="player", rows=1, cols=10, mode="dynamic", grid_id=None):
+def create_default_grid(grid_type="player", rows=1, cols=10, mode="dynamic", grid_id=None,
+                        base_size=DEFAULT_SIZE):
     """Return a grid configuration dictionary with sensible defaults. An
     overhead dynamic grid is a band: its row cap from `cols` (snapped to 3, 5
-    or 7), its max slots `rows x cols`; a screen grid's 1x1 is static."""
+    or 7), its max slots `rows x cols`; a screen grid's 1x1 is static. Gap
+    and timer Y offset follow the profile's overlay size `base_size` (the
+    grid's scale is 100 %, so its scaled size is `base_size`)."""
     plate = is_plate(grid_type)
     if rows == 1 and cols == 1 and not plate:
         mode = "static"
@@ -209,13 +214,13 @@ def create_default_grid(grid_type="player", rows=1, cols=10, mode="dynamic", gri
         'rows': rows,
         'cols': cols,
         'scale': SCALE_DEFAULT,
-        'gap': -1,
+        'gap': default_gap(base_size),
         'fx': (100 if grid_type == "player" else 300) / 1920,
         'fy': 400 / 1080,
         'slotMode': mode,
         'timerStyle': by_type['timerStyle'],
         'timerFlashThreshold': 6,
-        'timerYOffset': -3,
+        'timerYOffset': default_timer_y(base_size),
         'enableFlashing': True,
         'fillDirection': fill_dir,
         'sortOrder': 'longest',

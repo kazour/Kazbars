@@ -141,21 +141,21 @@ def test_an_empty_grid_is_left_out_as_it_is_and_the_header_counts_what_ships():
 # --------------------------------------------------------------------------
 
 
-def test_the_default_size_bakes_a_48px_grid_and_12pt_text():
+def test_the_default_size_bakes_a_52px_grid_13pt_timer_and_11pt_stack():
     _, data = _gen().generate()
-    assert (_num(data, "iconSize"), _num(data, "timerFont"), _num(data, "stackFont")) == (48, 12, 12)
+    assert (_num(data, "iconSize"), _num(data, "timerFont"), _num(data, "stackFont")) == (52, 13, 11)
 
 
 def test_the_base_size_and_the_grid_scale_move_the_sizes_in_proportion():
     _, data = _gen([_grid(scale=150)], overlay={"size": 24}).generate()
-    assert (_num(data, "iconSize"), _num(data, "timerFont"), _num(data, "stackFont")) == (144, 36, 36)
+    assert (_num(data, "iconSize"), _num(data, "timerFont"), _num(data, "stackFont")) == (144, 36, 34)
     _, data = _gen([_grid(scale=50)], overlay={"size": 10}).generate()
-    assert (_num(data, "iconSize"), _num(data, "timerFont"), _num(data, "stackFont")) == (20, 9, 9)
+    assert (_num(data, "iconSize"), _num(data, "timerFont"), _num(data, "stackFont")) == (20, 8, 8)
 
 
-def test_a_base_size_that_is_not_a_choice_bakes_as_twelve():
+def test_a_base_size_that_is_not_a_choice_bakes_as_the_default():
     _, data = _gen(overlay={"size": 15, "font": "Comic Sans"}).generate()
-    assert _num(data, "iconSize") == 48
+    assert _num(data, "iconSize") == 52
     assert 'face: "Arial"' in data
 
 
@@ -264,7 +264,7 @@ def test_custom_icons_follow_the_grids_once_each():
 
 def test_the_panel_block_carries_base_size_face_version_and_anchor():
     main, data = _gen().generate()
-    assert _block(data, "PF") == 'd.PF = {fontSize: 12, face: "Arial", version: "0.0.0", side: 389, up: -13};'
+    assert _block(data, "PF") == 'd.PF = {fontSize: 13, face: "Arial", version: "0.0.0", side: 389, up: -13};'
     assert "ppanel.configure(d.PF);" in main
     _, data = _gen(overlay={"size": 16, "font": "Verdana"}, anchor=(-40, 120)).generate()
     assert _block(data, "PF") == ('d.PF = {fontSize: 16, face: "_StandardFont", version: "0.0.0", '
@@ -298,7 +298,7 @@ def test_cast_on_emits_hooks_and_data():
     assert "modules.push(castTimer);" in main
     assert _block(data, "CAST") == (
         "d.CAST = {enableP: true, enableT: true, playerX: 900, playerY: 600, "
-        "targetX: 900, targetY: 560, bold: true, fontSize: 15, display: \"both\", "
+        "targetX: 900, targetY: 560, bold: true, fontSize: 16, display: \"both\", "
         "color: 0xFF8800};")
 
 
@@ -322,7 +322,7 @@ def test_stopwatch_on_emits_hooks_and_data():
     assert "stopwatch = new KazBarsStopwatch(rootClip);" in main
     assert "stopwatch.configure(d.SW);" in main
     assert "modules.push(stopwatch);" in main
-    assert _block(data, "SW") == "d.SW = {x: 750, y: 410, fontSize: 18, collapsed: true};"
+    assert _block(data, "SW") == "d.SW = {x: 750, y: 410, fontSize: 20, collapsed: true};"
 
 
 def test_extras_positions_project_to_the_build_resolution():

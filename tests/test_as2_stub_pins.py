@@ -18,7 +18,7 @@ import re
 
 import pytest
 
-from kazbars.overlay_size import GUTTER, INSET, TIMER_DIGITS_EM_E4
+from kazbars.overlay_size import GUTTER, TIMER_DIGITS_EM_E4
 from kazbars.paths import KAZBARS_ASSETS
 
 STUBS = KAZBARS_ASSETS / "stubs"
@@ -40,12 +40,20 @@ def test_the_stub_states_the_geometry_the_size_model_measures():
     src = _slot_text()
     for size in ("sp", "tp", "n"):
         assert f"Math.ceil({size} * 6 / 5) + {GUTTER}" in src, size
-    assert f"var sX:Number = sz - sW - {INSET};" in src
-    assert f'mkTF(s, "stk", 13, sX, {INSET}, ' in src
-    assert (f"if (tH <= sz - {INSET} - sH) tY = Math.max(Math.min(tY, sz - tH), {INSET} + sH);"
-            in src)
+    # overlay_size.inset, the stack counter's inset from the top and right edges.
+    assert "var ins:Number = Math.max(2, Math.round(sz / 12));" in src
+    assert "var sX:Number = sz - sW - ins;" in src
+    assert 'mkTF(s, "stk", 13, sX, ins, ' in src
+    assert "if (tH <= sz - ins - sH) tY = Math.max(Math.min(tY, sz - tH), ins + sH);" in src
     digits = TIMER_DIGITS_EM_E4 / 10_000
     assert f"Math.ceil(tp * {digits}) + {GUTTER}" in src
+    assert f"var sW:Number = Math.ceil(sp * {digits}) + {GUTTER};" in src  # "x" and three digits
+
+
+def test_the_stack_counter_reads_x_and_the_count():
+    src = _stub("KazBarsGridView")
+    body = src[src.index("private function draw("):src.index("private function hide(")]
+    assert 'var t:String = (k > 0) ? "x" + String(k) : "";' in body
 
 
 def test_the_stub_reads_the_baked_keys_and_converts_once_to_native_units():

@@ -186,7 +186,7 @@ class KazBarsGridView {
         if (!s._visible) s._visible = true;
         s._buff = e;
         var k:Number = f >> 2 & 1023;
-        var t:String = (k > 0) ? String(k) : "";
+        var t:String = (k > 0) ? "x" + String(k) : "";
 
         if (s._stk != t) {
             s._stk = t;
@@ -297,19 +297,21 @@ class KazBarsGridView {
     }
 
     // cfg.iconSize, cfg.stackFont and cfg.timerFont are on-screen values baked by the generator's overlay_size.grid_metrics.
-    // The stack counter sits 4 px in from the icon's top and right; the timer digits are centred, their box ending at
+    // The stack counter ("x3") sits ins px in from the icon's top and right, ins scaling with the icon (overlay_size.inset:
+    // 4 at 48 px), its field wide enough for "x" and three digits; the timer digits are centred, their box ending at
     // the icon's bottom plus timerYOffset, then kept inside the icon and clear of the stack counter when its box fits
     // there; the shadow is one screen pixel. The bar timer (cfg.timerStyle "bar") is a sibling of the icon at depth
     // 10 (never inside the masked m_icon; 9 is the art's ring), drawn by drawBar; it keeps its height in native px.
     private function createTexts(s:MovieClip):Void {
         var sz:Number = cfg.iconSize;
+        var ins:Number = Math.max(2, Math.round(sz / 12));
 
         var sp:Number = cfg.stackFont;
         var sH:Number = Math.ceil(sp * 6 / 5) + 4;
-        var sW:Number = sp * 2 + 2;
-        var sX:Number = sz - sW - 4;
-        mkTF(s, "stkShadow", 12, sX + 1, 5, sW, sp, 0x000000, "right");
-        mkTF(s, "stk", 13, sX, 4, sW, sp, 0xFFFFFF, "right");
+        var sW:Number = Math.ceil(sp * 2.2264) + 4;
+        var sX:Number = sz - sW - ins;
+        mkTF(s, "stkShadow", 12, sX + 1, ins + 1, sW, sp, 0x000000, "right");
+        mkTF(s, "stk", 13, sX, ins, sW, sp, 0xFFFFFF, "right");
         if (cfg.timerStyle == "bar") {
             var b:MovieClip = s.createEmptyMovieClip("bar", 10);
             b.bh = Math.max(2, Math.round(sz / 12)) * K;
@@ -324,7 +326,7 @@ class KazBarsGridView {
         var tW:Number = Math.max(sz, Math.ceil(tp * 2.2264) + 4);
         var tX:Number = (sz - tW) / 2;
         var tY:Number = sz - 4 - tp + cfg.timerYOffset;
-        if (tH <= sz - 4 - sH) tY = Math.max(Math.min(tY, sz - tH), 4 + sH);
+        if (tH <= sz - ins - sH) tY = Math.max(Math.min(tY, sz - tH), ins + sH);
         mkTF(s, "tmrShadow", 10, tX + 1, tY + 1, tW, tp, 0x000000, "center");
         mkTF(s, "tmr", 11, tX, tY, tW, tp, 0xFFFFFF, "center");
     }
