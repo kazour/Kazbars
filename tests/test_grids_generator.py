@@ -153,6 +153,16 @@ def test_the_base_size_and_the_grid_scale_move_the_sizes_in_proportion():
     assert (_num(data, "iconSize"), _num(data, "timerFont"), _num(data, "stackFont")) == (20, 8, 8)
 
 
+def test_a_set_text_size_bakes_as_typed_and_auto_follows_the_rules():
+    _, data = _gen([_grid(timerPt=20, stackPt=9)], overlay={"size": 24}).generate()
+    assert (_num(data, "iconSize"), _num(data, "timerFont"), _num(data, "stackFont")) == (96, 20, 9)
+    _, data = _gen([_grid(scale=50, timerPt=40)], overlay={"size": 10}).generate()
+    assert (_num(data, "iconSize"), _num(data, "timerFont"), _num(data, "stackFont")) == (20, 40, 8), \
+        "no fit cap on a size the grid sets"
+    _, data = _gen([_grid(stackPt=14)]).generate()
+    assert (_num(data, "timerFont"), _num(data, "stackFont")) == (13, 14)
+
+
 def test_a_base_size_that_is_not_a_choice_bakes_as_the_default():
     _, data = _gen(overlay={"size": 15, "font": "Comic Sans"}).generate()
     assert _num(data, "iconSize") == 52

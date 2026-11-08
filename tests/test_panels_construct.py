@@ -290,6 +290,54 @@ def _settings(card):
     return open_grid_settings(card)
 
 
+def test_grid_settings_text_sizes_round_trip(app):
+    """Auto shows the size rules' value and follows Size; unticked, the set
+    pt lands on the grid and reopens unticked; Auto again drops the key."""
+    card, idx = _add_seam_grid(app, 'SeamText')
+    base = card.base_size()
+    dlg = _settings(card)
+    try:
+        auto, pt, spin, _ = dlg._text_rows['timerPt']
+        assert auto.get() and pt.get() == str(base) and 'disabled' in spin.state()
+        dlg.scale_var.set(200)
+        dlg._on_size_move()
+        assert pt.get() == str(2 * base), "Auto follows the slider"
+        assert dlg.draft()['timerPt'] is None
+        dlg.scale_var.set(100)
+        auto.set(False)
+        dlg._on_text_auto()
+        assert 'disabled' not in spin.state()
+        pt.set('21')
+        dlg._text_rows['stackPt'][0].set(False)
+        dlg._text_rows['stackPt'][1].set('7')
+        dlg.timer_style_var.set('bar')
+        dlg._on_timers()
+        assert 'disabled' in spin.state(), "timer text greys with Bar"
+        dlg.timer_style_var.set('digits')
+        dlg._on_timers()
+        dlg.apply()
+    finally:
+        if dlg.winfo_exists():
+            dlg.cancel()
+    app.update()
+    stored = _stored_grid(app, idx)
+    assert (stored['timerPt'], stored['stackPt']) == (21, 7)
+    dlg = _settings(card)
+    try:
+        auto, pt, _, _ = dlg._text_rows['timerPt']
+        assert not auto.get() and pt.get() == '21'
+        auto.set(True)
+        dlg._on_text_auto()
+        dlg.apply()
+    finally:
+        if dlg.winfo_exists():
+            dlg.cancel()
+    app.update()
+    stored = _stored_grid(app, idx)
+    assert 'timerPt' not in stored and stored['stackPt'] == 7
+    assert 'timerPt' not in card.grid_config
+
+
 def test_grid_settings_apply_reaches_profile_store(app):
     card, idx = _add_seam_grid(app, 'SeamSpin')
     dlg = _settings(card)

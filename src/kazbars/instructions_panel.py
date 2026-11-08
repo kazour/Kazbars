@@ -431,14 +431,19 @@ SECTIONS: list[_Section] = [
             'its card.',
             'Rows and Cols — the shape. A grid holds up to 64 slots on its '
             'own, an overhead grid 16; there is no total across grids.',
-            'Size — a slider, 50–200 %, of the Overlay size. It sets icon, '
-            'timer and stack-count size together; the hint beside it shows '
-            'the icon in px.',
+            'Size — a slider, 50–200 %, of the Overlay size. It sets the '
+            'icon, and the timer and stack text while they are on Auto; the '
+            'hint beside it shows the icon in px.',
+            'Timer text and Stack text — Auto, the default, sizes them from '
+            'Size and shows the result greyed out. Untick Auto to set your '
+            'own, 6–72 pt: the grid uses exactly that in game, whatever Size '
+            'or the Overlay size say, and large text can spill past the '
+            'icon. Tick Auto to go back.',
             'Gap — the space between icons. Negative overlaps them.',
             'Timers — Digits shows the seconds left under each icon, Bar '
             "draws a line inside the icon's bottom edge that shrinks as "
-            'time runs out, Off shows none. Y offset nudges digits only, so '
-            'it greys out for Bar and Off.',
+            'time runs out, Off shows none. Y offset and Timer text apply '
+            'to digits only, so they grey out for Bar and Off.',
             'A new grid starts with the Gap and Y offset that suit the '
             'Overlay size. Changing the Overlay size later leaves them '
             'as set.',

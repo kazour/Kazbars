@@ -55,6 +55,12 @@ PLATE_SPECS = {
     'plateOffset': (PLATE_OFFSET_DEFAULT, 0, 400),
     'maxDistance': (PLATE_DISTANCE_DEFAULT, 5, 100),
 }
+# A grid's own text sizes, pt (`timerPt`, `stackPt`): written only when the
+# user set one, used in game as is (no floor, no fit cap); absent is Auto, the
+# size rules (overlay_size.grid_metrics).
+TEXT_PT_KEYS = ('timerPt', 'stackPt')
+TEXT_PT_MIN = 6
+TEXT_PT_MAX = 72
 # Fraction position specs: key → default. Positions are stored as fractions of
 # the game resolution (full floats, clamped to [0.0, 1.0]); pixels exist only
 # at display/emit via project_px/unproject_px, so a document is never rewritten
@@ -274,6 +280,10 @@ def validate_grid(grid):
         grid[key] = max(0.0, min(frac, 1.0))
     for key in _RETIRED_KEYS:
         grid.pop(key, None)
+    for key in TEXT_PT_KEYS:
+        pt = grid.get(key)
+        if not (type(pt) is int and TEXT_PT_MIN <= pt <= TEXT_PT_MAX):
+            grid.pop(key, None)
 
     # Validate enums
     for key, (enum_default, valid) in ENUM_SPECS.items():

@@ -576,7 +576,8 @@ class CodeGenerator:
         `d.WL[gid]` as `[id, code, …]` pairs read in by a loop. A dynamic grid
         gets its set even empty (the pick reads it), a static one only with
         ids. `iconSize`, `timerFont` and `stackFont` are the on-screen values
-        `grid_metrics` derives from the base size and the grid's scale."""
+        `grid_metrics` derives from the base size and the grid's scale; a
+        text size the grid sets itself (`timerPt`, `stackPt`) is baked as is."""
         gid = grid["id"]
         gid_lit = escape_as2_string(gid)
         vid = f"{sanitize_id(gid)}_{idx}"
@@ -602,10 +603,10 @@ class CodeGenerator:
             sortOrder: "{grid["sortOrder"]}",
             layout: "{grid["layout"]}",
             timerStyle: "{grid["timerStyle"]}",
-            timerFont: {m.timer},
+            timerFont: {grid.get("timerPt") or m.timer},
             timerFlashThreshold: {grid["timerFlashThreshold"]},
             timerYOffset: {grid["timerYOffset"]},
-            stackFont: {m.stack},
+            stackFont: {grid.get("stackPt") or m.stack},
             enableFlashing: {_bool(grid["enableFlashing"])}'''
         # Only where they apply, so a screen grid without selfCastOnly bakes as before.
         if is_plate(grid["type"]):

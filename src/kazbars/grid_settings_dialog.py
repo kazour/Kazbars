@@ -9,8 +9,8 @@ Cards, built only where they apply:
 
 - **Grid**: Name; Rows × Cols, or a band's Row cap and Max slots; a screen
   grid's Position (X / Y).
-- **Icons**: Size, Gap, Timers (Bar / Digits / Off), their Y offset, Flash
-  and its threshold.
+- **Icons**: Size, Timer text and Stack text (Auto, or the grid's own pt),
+  Gap, Timers (Bar / Digits / Off), their Y offset, Flash and its threshold.
 - **Overhead** (overhead grids): Height, Range; Over me (friendly).
 - **Sorting** (dynamic grids): Fill (a band's reads Centred), Sort, Order.
 
@@ -32,6 +32,8 @@ from .grid_model import (
     CLAMP_SPECS,
     PLATE_MAX_SLOTS,
     PLATE_SPECS,
+    TEXT_PT_MAX,
+    TEXT_PT_MIN,
     band_fields,
     get_game_resolution_or_default,
     is_band,
@@ -288,9 +290,30 @@ class GridSettingsDialog(tk.Toplevel):
         _, self.scale_var = size_slider(
             cell, cfg.get('scale', CLAMP_SPECS['scale'][0]),
             lambda p: f"{grid_metrics(self.card.base_size(), p).icon} px icons",
-            label=None, on_move=lambda p: self._changed(),
-            tooltip="Icon, timer and stack size, as a percent of the overlay size "
+            label=None, on_move=lambda p: self._on_size_move(),
+            tooltip="Icon size, and timer and stack text on Auto, as a percent of the overlay size "
                     "(Overlay, top of the Grids tab)")
+        # key -> (auto var, pt var, spinbox, row label): Auto shows the size
+        # rules' value and follows the slider; unticked, the grid's own pt.
+        self._text_rows = {}
+        for key, label, what in (('timerPt', "Timer text:", "timer digits"),
+                                 ('stackPt', "Stack text:", "stack count")):
+            cell, lbl = self._field(card, label)
+            own = cfg.get(key)
+            auto_var = tk.BooleanVar(value=own is None)
+            pt_var = tk.StringVar(value=str(own if own is not None else self._auto_pt(key)))
+            auto_cb = ttk.Checkbutton(cell, text="Auto", variable=auto_var,
+                                      command=self._on_text_auto)
+            auto_cb.pack(side='left', padx=(0, PAD_MID))
+            add_tooltip(auto_cb, f"Size the {what} from the Size slider; "
+                                 f"untick to set your own pt")
+            spin = labeled_spinbox(cell, None, pt_var, from_=TEXT_PT_MIN, to=TEXT_PT_MAX, width=4,
+                                   tooltip=f"The {what} in game, {TEXT_PT_MIN}-{TEXT_PT_MAX} pt. "
+                                           f"Your own size is used exactly, whatever Size says; "
+                                           f"large text can spill past the icon",
+                                   on_change=self._changed)
+            self._unit(cell, "pt")
+            self._text_rows[key] = (auto_var, pt_var, spin, lbl)
         default, lo, hi = CLAMP_SPECS['gap']
         self.gap_var = tk.StringVar(value=str(max(lo, min(cfg.get('gap', default), hi))))
         cell, _ = self._field(card, "Gap:")
@@ -433,6 +456,32 @@ class GridSettingsDialog(tk.Toplevel):
         digits = self.timer_style_var.get() == 'digits'
         self._timer_offset_spin.configure(state='normal' if digits else 'disabled')
         self._timer_offset_label.configure(foreground='' if digits else TK_COLORS['dim_text'])
+        self._sync_text_fields()
+
+    def _auto_pt(self, key):
+        """What the size rules give the timer / stack at the slider's Size."""
+        m = grid_metrics(self.card.base_size(), self.scale_var.get())
+        return m.timer if key == 'timerPt' else m.stack
+
+    def _sync_text_fields(self):
+        """An Auto size shows the rules' value, greyed; Timer text sizes the
+        digits only, so the whole row is greyed for Bar and Off."""
+        digits = self.timer_style_var.get() == 'digits'
+        for key, (auto_var, pt_var, spin, lbl) in self._text_rows.items():
+            auto = auto_var.get()
+            if auto:
+                pt_var.set(str(self._auto_pt(key)))
+            live = key != 'timerPt' or digits
+            spin.configure(state='normal' if live and not auto else 'disabled')
+            lbl.configure(foreground='' if live else TK_COLORS['dim_text'])
+
+    def _on_size_move(self):
+        self._sync_text_fields()
+        self._changed()
+
+    def _on_text_auto(self):
+        self._sync_text_fields()
+        self._changed()
 
     def _sync_flash_fields(self):
         """Under is greyed while Flash is off; every field stays, so the
@@ -473,6 +522,9 @@ class GridSettingsDialog(tk.Toplevel):
                          ('timerFlashThreshold', self.flash_threshold_var)):
             default, lo, hi = CLAMP_SPECS[key]
             out[key] = _int(var, cfg.get(key, default), lo, hi)
+        for key, (auto_var, pt_var, _, _) in self._text_rows.items():
+            out[key] = (None if auto_var.get()
+                        else _int(pt_var, cfg.get(key) or self._auto_pt(key), TEXT_PT_MIN, TEXT_PT_MAX))
         out['timerStyle'] = self.timer_style_var.get()
         out['enableFlashing'] = bool(self.flashing_var.get())
         if self._plate:
