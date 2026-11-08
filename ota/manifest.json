@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "content_version": 44,
+  "content_version": 45,
   "min_app_version": "3.2.0",
-  "notes": "Catalog: Frenzy (Necromancer). Stock profile: extras at their default spots and settings, We_Survive list updated",
+  "notes": "Stock profile: Poisoned Blades out of Tank",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
@@ -10,7 +10,7 @@
     },
     "Default.yml": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.yml",
-      "sha256": "877f62f9422db866a3c04e39fc076f9c39283a0491341af36e8907e18b540f2d"
+      "sha256": "f6a310cf17777f2191005f97b387edb29ac624d923569a88c6d8eb62f9d7e669"
     }
   }
 }
