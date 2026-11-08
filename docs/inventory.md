@@ -14,7 +14,7 @@
 | `src/kazbars/__init__.py` | 11 |
 | `src/kazbars/__main__.py` | 71 |
 | `src/kazbars/app.py` | 810 |
-| `src/kazbars/app_popups.py` | 495 |
+| `src/kazbars/app_popups.py` | 508 |
 | `src/kazbars/boss_timer.py` | 399 |
 | `src/kazbars/buff_database.py` | 165 |
 | `src/kazbars/buff_db_layers.py` | 258 |
@@ -46,7 +46,7 @@
 | `src/kazbars/deeps_trackers.py` | 182 |
 | `src/kazbars/extras_dialog.py` | 139 |
 | `src/kazbars/extras_shortcuts.py` | 246 |
-| `src/kazbars/first_launch.py` | 409 |
+| `src/kazbars/first_launch.py` | 402 |
 | `src/kazbars/focus_watcher.py` | 85 |
 | `src/kazbars/foreground.py` | 111 |
 | `src/kazbars/game_folder.py` | 435 |
@@ -75,7 +75,7 @@
 | `src/kazbars/paths.py` | 46 |
 | `src/kazbars/prefs.py` | 189 |
 | `src/kazbars/profile_document.py` | 350 |
-| `src/kazbars/profile_io.py` | 540 |
+| `src/kazbars/profile_io.py` | 543 |
 | `src/kazbars/profile_share.py` | 172 |
 | `src/kazbars/profile_store.py` | 133 |
 | `src/kazbars/self_update.py` | 487 |
@@ -146,11 +146,11 @@
 | `tests/test_overlay_rung.py` | 145 |
 | `tests/test_overlay_size.py` | 221 |
 | `tests/test_panel_ratios.py` | 162 |
-| `tests/test_panels_construct.py` | 1831 |
+| `tests/test_panels_construct.py` | 1901 |
 | `tests/test_prefs.py` | 95 |
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |
 | `tests/test_profile_document.py` | 249 |
-| `tests/test_profile_io.py` | 480 |
+| `tests/test_profile_io.py` | 460 |
 | `tests/test_profile_share.py` | 225 |
 | `tests/test_profile_store.py` | 148 |
 | `tests/test_projection.py` | 89 |

@@ -424,30 +424,32 @@ def pick_profile_file(app, parent=None):
     library document) and run it through the gate: `(doc, embedded)`, or None
     on a cancel or a refused file (its plain error shown). `parent` is the
     window the picker sits over (the app by default)."""
+    parent = parent or app
     path = filedialog.askopenfilename(
         title="Import Profile",
         initialdir=str(userdata_root()),
         filetypes=[("KazBars profile", "*.kazbars.yml *.yml *.yaml *.kazbars.json *.json"),
                    ("All files", "*.*")],
-        parent=parent or app,
+        parent=parent,
     )
     if not path:
         return None
     try:
         return read_profile_file(app.registry, path)
     except ValueError as e:  # user-presentable, incl. the gate's "older KazBars"
-        Messagebox.show_error(str(e), title="Import Failed", parent=parent or app)
+        Messagebox.show_error(str(e), title="Import Failed", parent=parent)
         return None
 
 
 def install_imported(app, doc, embedded):
     """Put a read profile in place of the open one: a fresh id, its custom
-    buffs merged, the app resynced, a toast."""
+    buffs merged, the app resynced. Returns the merge's phrases
+    (`merge_embedded_buffs`) for the caller's own confirmation."""
     doc['id'] = mint_id()
     app.profile_store.replace_document(doc)
     merged = merge_embedded_buffs(app, embedded)
     apply_document(app)
-    app_toast(app, " — ".join([f"Imported “{doc['name']}”", *merged]), 'success')
+    return merged
 
 
 def import_profile(app):
@@ -464,7 +466,8 @@ def import_profile(app):
         title="Import Profile", action="Import", parent=app, danger=True,
     ):
         return
-    install_imported(app, doc, embedded)
+    merged = install_imported(app, doc, embedded)
+    app_toast(app, " — ".join([f"Imported “{doc['name']}”", *merged]), 'success')
 
 
 def import_grids(app):

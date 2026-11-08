@@ -11,6 +11,7 @@ from ttkbootstrap.dialogs import Messagebox
 
 from . import game_folder, profile_io, update_orchestrator
 from .app_popups import show_welcome_popup
+from .game_resolution import COMMON_RESOLUTIONS
 from .grid_model import parse_resolution
 from .overlay import size_for_height
 from .ui_headers import create_dialog_header
@@ -152,7 +153,7 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
     screen_h = parent.winfo_screenheight()
     detected = f"{screen_w}x{screen_h}"
 
-    common_resolutions = ["1920x1080", "2560x1440", "3840x2160"]
+    common_resolutions = list(COMMON_RESOLUTIONS)
     if detected not in common_resolutions:
         common_resolutions.insert(0, detected)
 
@@ -182,45 +183,45 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
         if on_dialog_closed:
             on_dialog_closed()
 
-    def _resolution_ok():
-        if parse_resolution(res_var.get()):
-            return True
-        Messagebox.show_warning(
-            f"\"{res_var.get()}\" isn't a valid resolution.\n\n"
-            "Use WIDTHxHEIGHT, like 1920x1080.",
-            title="Invalid Resolution", parent=dialog)
-        return False
+    def _commit_setup():
+        """Every start button's prologue: the resolution must read, then the
+        folder and the resolution persist. False (warning shown) stops the
+        action; the dialog stays."""
+        if not parse_resolution(res_var.get()):
+            Messagebox.show_warning(
+                f"\"{res_var.get()}\" isn't a valid resolution.\n\n"
+                "Use WIDTHxHEIGHT, like 1920x1080.",
+                title="Invalid Resolution", parent=dialog)
+            return False
+        _set_game_if_provided()
+        return True
 
     def load_default():
-        if not _resolution_ok():
-            return
-        _set_game_if_provided()
-        on_load_default(res_var.get())
-        _close()
+        if _commit_setup():
+            on_load_default(res_var.get())
+            _close()
 
     def import_profile():
-        if not _resolution_ok():
+        # Persisted before the picker opens: the click confirmed the folder
+        # and the resolution, whatever the picker then returns.
+        if not _commit_setup():
             return
-        # Saved before the picker opens: the click confirmed the folder and
-        # the resolution, whatever the picker then returns.
-        _set_game_if_provided()
         if on_import_profile and on_import_profile(dialog):
             _close()
         else:
-            btn_import.focus_set()
+            buttons["Import Profile"].focus_set()
 
     def start_empty():
-        if not _resolution_ok():
-            return
-        _set_game_if_provided()
-        if on_start_empty:
-            on_start_empty()
-        _close()
+        if _commit_setup():
+            if on_start_empty:
+                on_start_empty()
+            _close()
 
     def skip():
         # Keep a typed game path even on "Set up later" / X — losing it because
         # the user closed the dialog is worse than skipping the re-arm. The
-        # path filled in for them is not kept: they never confirmed it.
+        # path filled in for them is not kept here: they never confirmed it
+        # (an Import Profile click did, and already saved it).
         _set_game_if_provided(unless=auto_path)
         _close()
 
@@ -236,7 +237,7 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
 
     cards_frame = ttk.Frame(content)
     cards_frame.pack(fill='x', pady=(0, PAD_SMALL))
-    buttons = []
+    buttons = {}   # by button label
     for col, (title, blurb, label, style, command) in enumerate(cards):
         cards_frame.columnconfigure(col, weight=1, uniform='card')
         card = tk.Frame(cards_frame, bg=_card_bg, highlightthickness=1,
@@ -253,8 +254,7 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
         btn = ttk.Button(inner, text=label, bootstyle=style, command=command,
                          state='disabled')
         btn.pack(anchor='w')
-        buttons.append(btn)
-    btn_import = buttons[-2]
+        buttons[label] = btn
 
     # Says why the buttons are off. Always packed (empty when a path is set) so
     # the cards don't shift as the user types.
@@ -267,7 +267,7 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
         p = path_var.get().strip()
         has_path = bool(p)
         state = 'normal' if has_path else 'disabled'
-        for btn in buttons:
+        for btn in buttons.values():
             btn.configure(state=state)
         gate_label.configure(
             text="" if has_path else "Set your game folder above to start.")
@@ -292,7 +292,8 @@ def show_first_launch_dialog(parent, app_name, on_game_set, on_load_default,
     auto_path = _detected[0] if len(_detected) == 1 else None
     if auto_path:
         path_var.set(auto_path)
-        buttons[0].focus_set()
+        # Enter then starts the app: Use Defaults, or Start Empty with no template.
+        (buttons.get("Load Defaults") or buttons["Start Empty"]).focus_set()
     else:
         path_entry.focus_set()
 
@@ -354,29 +355,30 @@ def run_first_launch(app, app_name):
             app.profile_store.update_section('overlay', {'size': size_for_height(parsed[1])})
             app.grids_panel.load_overlay()
 
-    def _note_welcome(source):
+    def _note_welcome(imported=False, notes=()):
+        """The welcome popup's kwargs, from the profile now in place."""
         grids = app.grids_panel.grids
-        welcome_data['grid_count'] = len(grids)
-        welcome_data['enabled_count'] = sum(1 for g in grids if g.get('enabled', True))
-        welcome_data['resolution'] = None
-        # An import's popup already names the profile on its grid line.
-        welcome_data['profile_name'] = None if source else app.profile_store.document['name']
-        welcome_data['source'] = source
+        welcome_data.update(
+            grid_count=len(grids),
+            enabled_count=sum(1 for g in grids if g.get('enabled', True)),
+            profile_name=app.profile_store.document['name'],
+            imported=imported, notes=notes)
 
     def on_load_default(resolution_str):
-        # Positions are fractions and fit any resolution as-is; the overlay
-        # size is set for the chosen one.
-        _save_resolution(resolution_str)
+        # The resolution is already saved (on_resolution_set); positions are
+        # fractions and fit any resolution as-is, the overlay size is set for
+        # the chosen one.
         _seed_overlay_size(resolution_str)
-        _note_welcome(None)
+        _note_welcome()
 
     def on_import_profile(dialog):
         # The file's own overlay size stands: it was set for its author's game.
         picked = profile_io.pick_profile_file(app, parent=dialog)
         if picked is None:
             return False
-        profile_io.install_imported(app, *picked)
-        _note_welcome(picked[0]['name'])
+        doc, embedded = picked
+        # No toast: the welcome popup is the one confirmation, buffs included.
+        _note_welcome(imported=True, notes=profile_io.install_imported(app, doc, embedded))
         return True
 
     def on_start_empty():
@@ -385,25 +387,16 @@ def run_first_launch(app, app_name):
         app.grids_panel.load_profile_data([])
         app._on_grids_edited()
 
-    def on_resolution_set(resolution_str):
-        _save_resolution(resolution_str)
-
     def on_dialog_closed():
         if welcome_data:
-            app.after(100, lambda: show_welcome_popup(
-                app,
-                welcome_data['grid_count'],
-                welcome_data['enabled_count'],
-                resolution_str=welcome_data['resolution'],
-                profile_name=welcome_data['profile_name'],
-                source=welcome_data['source']))
+            app.after(100, lambda: show_welcome_popup(app, **welcome_data))
         # First launch is complete — now safe to check for updates (app release,
         # then OTA buff-content; deferred so it never races the welcome popup).
         update_orchestrator.check_on_launch(app)
         game_folder.check_install_health(app)
 
     show_first_launch_dialog(
-        app, app_name, on_game_set, on_load_default, on_resolution_set,
+        app, app_name, on_game_set, on_load_default, _save_resolution,
         profile_io.template_doc(app) is not None, on_dialog_closed, on_start_empty,
         on_import_profile,
     )

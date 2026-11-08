@@ -309,26 +309,6 @@ def test_import_replaces_the_document_in_the_same_store(app, root, monkeypatch, 
     assert store.document["name"] == "Home", "Revert brings the previous profile back"
 
 
-def test_first_launch_import_skips_the_confirm(app, root, monkeypatch, tmp_path):
-    """The first-launch path is pick + install: the seed is nothing the user
-    made, so no "Replace your profile?" — a fresh id, the buffs merged."""
-    incoming = _doc(app, "Shared", B=1)
-    path = tmp_path / "x.kazbars.yml"
-    _write_yml(path, incoming)
-    store = _open_store(app, _doc(app, "Seed", A=1))
-    monkeypatch.setattr(profile_io.filedialog, "askopenfilename", lambda **k: str(path))
-
-    def no_confirm(*a, **k):
-        raise AssertionError("first launch never confirms")
-    monkeypatch.setattr(profile_io, "confirm", no_confirm)
-    merged = []
-    monkeypatch.setattr(profile_io, "merge_embedded_buffs", lambda a, e: merged.append(e) or [])
-    doc, embedded = profile_io.pick_profile_file(app)
-    profile_io.install_imported(app, doc, embedded)
-    assert store.document["name"] == "Shared" and store.document["id"] != incoming["id"]
-    assert merged == [embedded]
-
-
 def test_import_cancelled_changes_nothing(app, root, monkeypatch, tmp_path):
     path = tmp_path / "x.kazbars.yml"
     _write_yml(path, _doc(app, "Shared", B=1))

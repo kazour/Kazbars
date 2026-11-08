@@ -412,12 +412,11 @@ def _open_first_launch(app, monkeypatch, paths, template=True, **callbacks):
 
     from kazbars import first_launch
     monkeypatch.setattr(first_launch, 'COMMON_INSTALL_PATHS', [str(p) for p in paths])
-    kw = {'on_game_set': lambda p: None, 'on_resolution_set': lambda r: None,
-          'on_start_empty': lambda: None, 'on_import_profile': lambda d: False}
-    kw.update(callbacks)
+    # on_game_set is the one callback the dialog calls unguarded.
+    callbacks.setdefault('on_game_set', lambda p: None)
     first_launch.show_first_launch_dialog(
-        app, 'KazBars', kw.pop('on_game_set'), lambda r: None,
-        default_profile_exists=template, **kw)
+        app, 'KazBars', on_load_default=lambda r: None,
+        default_profile_exists=template, **callbacks)
     app.update()
     dialog = next(w for w in app.winfo_children()
                   if isinstance(w, tk.Toplevel) and w.title() == 'Welcome to KazBars')
@@ -508,6 +507,77 @@ def test_first_launch_import_lands_and_closes(app, monkeypatch):
     dialog, saved, closed = _first_launch_import(app, monkeypatch, True)
     assert not dialog.winfo_exists() and closed == [1]
     assert len(saved) == 1
+
+
+def test_first_launch_import_installs_without_a_confirm(app, monkeypatch, tmp_path):
+    """run_first_launch's Import Profile: the picked file replaces the seed
+    with no "Replace your profile?" (the seed is nothing the user made), the
+    dialog closes, no toast, and the welcome popup gets the profile."""
+    import copy
+    import json
+
+    from kazbars import first_launch, game_folder, profile_io
+
+    store = app.profile_store
+    before = copy.deepcopy(store.document)
+    res_before = app.settings.get('game_resolution')
+    incoming = copy.deepcopy(before)
+    incoming['name'] = 'Shared'
+    path = tmp_path / 'shared.json'
+    path.write_text(json.dumps(incoming), encoding='utf-8')
+
+    def no_confirm(*a, **k):
+        raise AssertionError('first launch never confirms')
+    popups, toasts = [], []
+    monkeypatch.setattr(first_launch, 'COMMON_INSTALL_PATHS', [str(app.game_path)])
+    monkeypatch.setattr(profile_io.filedialog, 'askopenfilename', lambda **k: str(path))
+    monkeypatch.setattr(profile_io, 'confirm', no_confirm)
+    monkeypatch.setattr(profile_io, 'app_toast', lambda *a, **k: toasts.append(a))
+    monkeypatch.setattr(first_launch, 'show_welcome_popup', lambda *a, **k: popups.append(k))
+    monkeypatch.setattr(game_folder, 'check_install_health', lambda a: None)
+    monkeypatch.setattr(app, 'after', lambda ms, fn=None, *a: fn(*a) if fn else None)
+    try:
+        first_launch.run_first_launch(app, 'KazBars')
+        app.update()
+        dialog = next(w for w in app.winfo_children()
+                      if isinstance(w, tk.Toplevel) and w.title() == 'Welcome to KazBars')
+        from tkinter import ttk
+        buttons = {b.cget('text'): b for b in _widgets(dialog, ttk.Button)}
+        buttons['Import Profile'].invoke()
+        app.update()
+        assert not dialog.winfo_exists()
+        assert store.document['name'] == 'Shared' and store.document['id'] != before['id']
+        assert toasts == []
+        grids = incoming['modules']['grids']['grids']
+        on = sum(1 for g in grids if g.get('enabled', True))
+        assert popups == [{'grid_count': len(grids), 'enabled_count': on,
+                           'profile_name': 'Shared', 'imported': True, 'notes': []}]
+    finally:
+        store.replace_document(before)
+        profile_io.apply_document(app)
+        app.settings.set('game_resolution', res_before)
+
+
+def test_welcome_popup_elides_a_long_imported_name(app):
+    """The popup's height is fixed and names are never capped: the import
+    line shortens the name with an ellipsis to stay inside the canvas."""
+    import tkinter.font as tkfont
+
+    from kazbars.app_popups import WIDTH, show_welcome_popup
+    from kazbars.ui_helpers import FONT_BODY
+    show_welcome_popup(app, 3, 3, 'X' * 200, imported=True)
+    app.update()
+    popup = [w for w in app.winfo_children() if isinstance(w, tk.Toplevel)][-1]
+    try:
+        canvas = _widgets(popup, tk.Canvas)[0]
+        line = next(canvas.itemcget(i, 'text') for i in canvas.find_all()
+                    if canvas.type(i) == 'text' and 'imported from' in canvas.itemcget(i, 'text'))
+        assert line.endswith('…”')
+        assert tkfont.Font(font=FONT_BODY).measure(line) <= WIDTH - 80
+    finally:
+        popup.grab_release()
+        popup.destroy()
+        app.update()
 
 
 def test_first_launch_leaves_ambiguous_install_blank(app, monkeypatch, tmp_path):
