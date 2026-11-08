@@ -23,7 +23,6 @@ class KazBarsStopwatch extends KazBarsPanel implements KazBarsModule {
     // Config (set by configure())
     private var START_X:Number;
     private var START_Y:Number;
-    private var START_COLLAPSED:Boolean;
 
     // Layout beyond the base set — all derived from FS in configure()
     private var W:Number;         // 15.8  the family's collapsed width
@@ -71,7 +70,6 @@ class KazBarsStopwatch extends KazBarsPanel implements KazBarsModule {
         if (cfg == null) return;
         START_X = Number(cfg.x);
         START_Y = Number(cfg.y);
-        START_COLLAPSED = (cfg.collapsed == true);
         applyBaseSize(Number(cfg.fontSize));
         W = Math.round(FS * 15.8);
         H = Math.round(FS * 8);
@@ -92,7 +90,7 @@ class KazBarsStopwatch extends KazBarsPanel implements KazBarsModule {
         panelClip._x = START_X;
         panelClip._y = START_Y;
         stageOn(true);
-        collapsed = START_COLLAPSED;
+        collapsed = false;   // a first-ever session opens; the archive (swc) has it after
 
         chrome = panelClip.createEmptyMovieClip("chrome", panelClip.getNextHighestDepth());
 

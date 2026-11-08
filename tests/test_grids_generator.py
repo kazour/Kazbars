@@ -329,12 +329,12 @@ def test_stopwatch_off_emits_no_refs():
 
 def test_stopwatch_on_emits_hooks_and_data():
     gen = _gen(stopwatch_config={"enabled": True, "fx": 750 / 1920, "fy": 410 / 1080,
-                                 "scale": 150, "startCollapsed": True})
+                                 "scale": 150})
     main, data = gen.generate()
     assert "stopwatch = new KazBarsStopwatch(rootClip);" in main
     assert "stopwatch.configure(d.SW);" in main
     assert "modules.push(stopwatch);" in main
-    assert _block(data, "SW") == "d.SW = {x: 750, y: 410, fontSize: 18, collapsed: true};"
+    assert _block(data, "SW") == "d.SW = {x: 750, y: 410, fontSize: 18};"
 
 
 def test_extras_positions_project_to_the_build_resolution():
@@ -354,12 +354,12 @@ def test_inspect_off_emits_no_refs():
 
 def test_inspect_on_emits_hooks_and_data():
     gen = _gen(inspect_config={"enabled": True, "fx": 40 / 1920, "fy": 240 / 1080,
-                               "scale": 50, "startCollapsed": True})
+                               "scale": 50})
     main, data = gen.generate()
     assert "inspect = new KazBarsInspect(rootClip);" in main
     assert "inspect.configure(d.INS, world, clock);" in main
     assert "modules.push(inspect);" in main
-    assert _block(data, "INS").startswith("d.INS = {x: 40, y: 240, fontSize: 8, collapsed: true")
+    assert _block(data, "INS").startswith("d.INS = {x: 40, y: 240, fontSize: 8};")
 
 
 # --------------------------------------------------------------------------
@@ -412,6 +412,7 @@ def test_preview_keys_are_distinct():
     assert set(keys) == {"KazBarsCastTimer.as", "KazBarsConsole.as", "KazBarsInspect.as",
                          "KazBarsOnslaught.as", "KazBarsStopwatch.as"}, keys
     assert len(set(keys.values())) == len(keys), keys
+    assert "onsa" not in keys.values(), "the onslaught alerts' row key is no module's"
 
 
 def test_preview_panel_rows_follow_the_tools_order_not_the_z_order():
@@ -429,11 +430,22 @@ def test_preview_panel_rows_follow_the_tools_order_not_the_z_order():
     assert "if (m.previewKey() == key) m.setActive(shown);" in main
 
 
+def test_the_onslaught_alerts_get_their_own_row_under_the_tracker():
+    main, _ = _gen(onslaught_config={"enabled": True}).generate()
+    board = "ppanel.addExtra(onslaught.previewLabel(), onslaught.previewKey(), onslaught.isActive());"
+    alerts = 'ppanel.addExtra("Onslaught Alerts", "onsa", onslaught.alertsShown());'
+    assert main.index(board) < main.index(alerts) < main.index("ppanel.show();")
+    toggle = main.split("public function previewToggle", 1)[1]
+    assert toggle.index('if (key == "onsa") {') < toggle.index("onslaught.setAlerts(shown);")         < toggle.index("while (mi < modules.length)")
+    main, _ = _gen().generate()
+    assert "onsa" not in main and "setAlerts" not in main
+
+
 def test_stub_archive_keys_present():
     stubs = KAZBARS_ASSETS / "stubs"
     for name, key in (("KazBarsStopwatch.as", "swv"), ("KazBarsInspect.as", "inv"),
                       ("KazBarsCastTimer.as", "ctv"), ("KazBarsConsole.as", "cnv"),
-                      ("KazBarsOnslaught.as", "onv")):
+                      ("KazBarsOnslaught.as", "onv"), ("KazBarsOnslaught.as", "onav")):
         src = (stubs / name).read_text(encoding="utf-8")
         assert f'FindEntry("{key}")' in src, f"{name} never reads {key}"
         assert f'ReplaceEntry("{key}"' in src, f"{name} never writes {key}"

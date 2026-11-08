@@ -3,8 +3,7 @@ KazBars — Target inspect panel dialog.
 
 Extras-menu settings for the in-game target inspect panel (KazBarsInspect
 stub): the build gate, the baked default position, its Size (a percent of the
-profile's overlay size, hinted in pt), the start-collapsed flag, and the stat
-rows it shows. Reads/writes the profile document's `inspect` section (data
+profile's overlay size, hinted in pt) and the stat rows it shows. Reads/writes the profile document's `inspect` section (data
 layer: `inspect.py`, rows from `inspect_catalog`; the store autosaves).
 Positions are stored as fractions of the game resolution; the X/Y fields
 display projected px at the current resolution (the grid editor convention).
@@ -100,15 +99,6 @@ def open_inspect_dialog(app):
     look_card.pack(side='left', fill='both', expand=True, pady=(0, PAD_ROW))
     size_row = ttk.Frame(look_card)
     size_row.pack(anchor='w')
-
-    collapsed_var = tk.BooleanVar(value=cfg['startCollapsed'])
-    collapsed_cb = ttk.Checkbutton(look_card, text="Start collapsed (name strip only)",
-                                   variable=collapsed_var)
-    collapsed_cb.pack(anchor='w', pady=(PAD_SMALL, 0))
-    add_tooltip(collapsed_cb,
-                "The panel loads folded to just its name strip — click its "
-                "+ button in-game to expand.")
-    shell.gate(collapsed_cb)
 
     # ---- Stat rows ---------------------------------------------------------
     rows_card = create_card(content, "Stat rows")
@@ -272,7 +262,6 @@ def open_inspect_dialog(app):
             'fx': fx,
             'fy': fy,
             'scale': size_var.get(),
-            'startCollapsed': collapsed_var.get(),
             'rows': None if mode_var.get() == 'default' else custom,
         })
         app.profile_store.set_section('inspect', new_cfg)

@@ -18,14 +18,13 @@
 // while the row is on screen (rollover handlers would put the slots in button mode and take the clicks).
 //
 // A HUD element: mouse-transparent in normal play but for the fold and PvP glyphs, dragged only in preview through the shared
-// overlay (KazBarsPreview). X/Y and the fold state baked into config are the first session's; the archive keeps inx,
-// iny, inc, inp and the master switch inv. Every size is Math.round(FS x ratio). Every engine call sits in a try.
+// overlay (KazBarsPreview). X/Y baked into config are the first session's, which opens unfolded; the archive keeps
+// inx, iny, inc, inp and the master switch inv. Every size is Math.round(FS x ratio). Every engine call sits in a try.
 class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
 
     // Config (set by configure())
     private var START_X:Number;
     private var START_Y:Number;
-    private var START_COLLAPSED:Boolean;
 
     // Geometry beyond the base set, each Math.round(FS x ratio).
     private var LABEL_W:Number;   // 8.6   label column (widened to the widest baked label)
@@ -165,7 +164,6 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         world.onTarget(onTarget, this);
         START_X = Number(cfg.x);
         START_Y = Number(cfg.y);
-        START_COLLAPSED = (cfg.collapsed == true);
         // COLL_* from the base make the collapsed bar the family's at any size.
         applyBaseSize(Number(cfg.fontSize));
         LABEL_W = Math.round(FS * 8.6);
@@ -237,7 +235,7 @@ class KazBarsInspect extends KazBarsPanel implements KazBarsModule {
         stageOn(true);
         panelClip._visible = false;
         panelVis = false;
-        collapsed = START_COLLAPSED;
+        collapsed = false;   // a first-ever session opens; the archive (inc) has it after
 
         chrome = panelClip.createEmptyMovieClip("chrome", panelClip.getNextHighestDepth());
         body = panelClip.createEmptyMovieClip("body", panelClip.getNextHighestDepth());

@@ -4169,6 +4169,14 @@
       ],
       "category": "Priest of Mitra",
       "type": "buff"
+    },
+    {
+      "name": "Frenzy",
+      "ids": [
+        3675524
+      ],
+      "category": "Necromancer",
+      "type": "buff"
     }
   ]
 }

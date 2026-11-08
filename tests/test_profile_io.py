@@ -19,7 +19,9 @@ from types import SimpleNamespace
 import pytest
 
 from kazbars import (
+    cast_timer,
     content_update,
+    damageinfo_settings,
     grid_model,
     inspect,
     profile_io,
@@ -88,6 +90,16 @@ def _tree(path):
 # --------------------------------------------------------------------------- #
 # Template chain
 # --------------------------------------------------------------------------- #
+
+def test_the_stock_extras_are_at_their_defaults():
+    """The template's cast timer, damage numbers, stopwatch and inspect
+    panel are a fresh profile's."""
+    stock = yaml_io.loads((ASSETS / "kazbars" / "Default.yml").read_text(encoding="utf-8"))["modules"]
+    for mod in (cast_timer, damageinfo_settings, stopwatch, inspect):
+        key = mod.PROFILE_SECTION.key
+        assert stock[key] == mod.PROFILE_SECTION.defaults(), key
+    assert stock["damage_numbers"] == {**damageinfo_settings.get_default_settings(), "enabled": False}
+
 
 def test_template_chain_order(monkeypatch, tmp_path):
     monkeypatch.setattr(userdata, "app_path", lambda: tmp_path)

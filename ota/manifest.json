@@ -1,16 +1,16 @@
 {
   "schema": 1,
-  "content_version": 42,
+  "content_version": 44,
   "min_app_version": "3.2.0",
-  "notes": "Stock profile: extras at 100 % size",
+  "notes": "Catalog: Frenzy (Necromancer). Stock profile: extras at their default spots and settings, We_Survive list updated",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
-      "sha256": "d6073ef0b4eba49458da3058a8af2c6c54769fa5eaa5618152dbff905d024458"
+      "sha256": "00e9086a8428d391c9254f07ea3ca775022a629767d7810658cae562a8354361"
     },
     "Default.yml": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.yml",
-      "sha256": "6412d5aad92bd504a65b89ac8502ba58380c5dac5df02a3e5a23a783d2df44c9"
+      "sha256": "877f62f9422db866a3c04e39fc076f9c39283a0491341af36e8907e18b540f2d"
     }
   }
 }

@@ -95,7 +95,7 @@ modules:
         fillDirection: C
         sortOrder: longest
         layout: buffFirst
-        whitelist: [1126208, 3077701, 872865, 3074161, 4239176, 3074186, 1142203, 974216, 197061, 3667218, 974759, 3074485, 3761363, 145538, 3513707, 4350674, 4489251, 195143, 3202576, 217733, 4208084, 3202863, 3191514]
+        whitelist: [3761363, 872865, 974216, 4239176, 1126208, 145538, 4208084, 197061, 146402, 4489251, 3074161, 3074485, 3077701, 3191514, 3667218, 195143, 974759, 3202576, 3513707, 217733, 1142203, 3074186, 3675524, 4350674]
         slotAssignments: {}
         plateOffset: 75
         maxDistance: 40
@@ -141,51 +141,49 @@ modules:
     visible_cells: [dps, dpis, hps]
   stopwatch:
     enabled: false
-    fx: 0.1890625
-    fy: 0.008333333333333333
+    fx: 0.4427083333333333
+    fy: 0.2777777777777778
     scale: 100
-    startCollapsed: true
   inspect:
     enabled: false
-    fx: 0.666015625
-    fy: 0.008333333333333333
+    fx: 0.020833333333333332
+    fy: 0.2222222222222222
     scale: 100
-    startCollapsed: true
     rows: null
   cast_timer:
     enabled: false
     enableP: false
     enableT: false
-    playerFx: 0.374609375
-    playerFy: 0.7409722222222223
-    targetFx: 0.628125
-    targetFy: 0.7409722222222223
-    bold: false
+    playerFx: 0.4739583333333333
+    playerFy: 0.5740740740740741
+    targetFx: 0.4739583333333333
+    targetFy: 0.5185185185185185
+    bold: true
     scale: 100
     display: elapsed
     color: FFFFFF
   damage_numbers:
-    shadow_mode: 1
-    shadow_distance: -2
+    shadow_mode: 2
+    shadow_distance: 0
     shadow_blur: 0
     dir1_x_offset: 0
     dir1_y_offset: 0
     fixed_col_x: 0
     fixed_col_y: 0
-    fixed_col_split: 1
-    col_b_x: 0
-    col_b_y: 150
-    fixed_x_base: -50
-    fixed_y_base: -180
-    fixed_x_offset: -100
-    fixed_y_spacing: -20
-    ranged_keep: 1
-    essential_labels_only: 1
-    other_resource_loss_to_target: 1
-    show_duration: -0.1
-    fade_duration: -0.1
+    fixed_col_split: 0
+    col_b_x: 50
+    col_b_y: 0
+    fixed_x_base: 0
+    fixed_y_base: 0
+    fixed_x_offset: 0
+    fixed_y_spacing: 0
+    ranged_keep: 0
+    essential_labels_only: 0
+    other_resource_loss_to_target: 0
+    show_duration: 0
+    fade_duration: 0
     enabled: false
-    font: GG Comic
+    font: Hyborian
   console:
     enabled: false
     scale: 100
@@ -200,7 +198,7 @@ modules:
     showAlly: true
     alertSeconds: 6
     camps: false
-    guards: true
+    guards: false
     custom: []
   damage_colors: {}
   buff_bars: {}

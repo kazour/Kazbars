@@ -14,7 +14,7 @@ body size from the two (`overlay_size.panel_fs`) and every dimension in the stub
 derives from it, so the panel scales as one piece. `fx`/`fy` are fractions of
 the game resolution (pixels exist only at dialog display and AS2 emit via
 `grid_model.project_px`/`unproject_px`), baked into the generated SWF as the
-first-session seed; from then on the game persists drag position, collapsed
+first-session seed (it opens unfolded); from then on the game persists drag position, collapsed
 state and the PvP tab in the module config archive, for every user
 (`game_persistence`).
 
@@ -51,7 +51,6 @@ _SCHEMA = Schema('', 1, {
     "fx": Field(40 / 1920, kind='float', min=0.0, max=1.0),
     "fy": Field(240 / 1080, kind='float', min=0.0, max=1.0),
     "scale": Field(SCALE_DEFAULT, validate=scale_from),
-    "startCollapsed": Field(False, kind='bool'),
     "rows": Field(None, validate=_validate_rows),
 })
 

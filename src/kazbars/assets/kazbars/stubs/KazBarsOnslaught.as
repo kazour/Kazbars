@@ -11,9 +11,10 @@
 // baked into d.ONS; nothing about the game is hardcoded here.
 //
 // Two anchors, each placed in preview through the shared overlay in
-// KazBarsPreview and remembered in the module archive (onpx onpy onax onay, and
-// the master switch onv): the board (wave line, fatality, ally line, then the
-// tiers) and the alerts (spawn alerts, the AoE line, low-ally alerts). They are
+// KazBarsPreview and remembered in the module archive (onpx onpy onax onay, the
+// master switch onv and the alerts' own switch onav): the board (wave line,
+// fatality, ally line, then the tiers) and the alerts (spawn alerts, the AoE
+// line, low-ally alerts, at their own baked size). They are
 // runtime-drawn clips with device-font text, and a HUD element: no handlers
 // outside preview, so they are mouse transparent. The class extends
 // KazBarsPanel for geometry, text fields and the plate alone, like the inspect
@@ -55,6 +56,7 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
     private var AOE:Boolean;
     private var ALLY:Boolean;
     private var ALERT_MS:Number;
+    private var ALF:Number;       // the alerts' text size (the board's ALERT_FS is the wave clocks')
     private var W:Object;         // watched name -> kind
     private var H:Object;         // AoE helper names
     private var HEAL:Object;      // heal buff names -> true
@@ -80,8 +82,9 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
     private var FAT_X:Number;     // what the fatality line takes: LINE + its bar + 2
     private var ALLY_X:Number;    // the same for the ally line
     private var PW:Number;        // NAME_W + VAL_W
-    private var AH:Number;        // an alert line: lh(ALERT_FS)
-    private var AW:Number;        // 37   alert width: the longest alert at ALERT_FS
+    private var AH:Number;        // the wave line: lh(ALERT_FS)
+    private var ALH:Number;       // an alert line: lh(ALF)
+    private var AW:Number;        // alert width: the longest alert at ALF
     private var FX:Array;         // each anchor's nominal footprint from its origin:
     private var FW:Array;         // the preview overlay and the archive clamp
     private var FH:Array;
@@ -96,6 +99,7 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
     private var w:KazBarsWorld;
     private var kD:Object;        // the frame task, on inside an instance
     private var active:Boolean;
+    private var alertsOn:Boolean; // the alerts anchor shown (the control panel's own row)
     private var previewMode:Boolean;
     private var hasAoe:Boolean;   // what the anchors show right now
     private var hasAlly:Boolean;
@@ -127,6 +131,7 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
     public function KazBarsOnslaught(root:MovieClip) {
         super(root);
         active = true;
+        alertsOn = true;
         previewMode = false;
         pf = null;
         pfId = -1;
@@ -166,15 +171,19 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         ALLY_X = LINE + ALLY_H + 2;
         PW = NAME_W + VAL_W;
         AH = lh(ALERT_FS);
-        // 37 x FS holds the longest alert there can be (SKULL or GUARD + the
-        // longest watched name + a three-digit distance) at ALERT_FS, at every FS.
-        AW = rd(37);
+        ALF = Number(cfg.alertFontSize);
+        if (isNaN(ALF) || ALF < 8) ALF = ALERT_FS;
+        ALH = lh(ALF);
+        // 23.125 x ALF (37 x FS at the 1.6 role) holds the longest alert there
+        // can be (SKULL or GUARD + the longest watched name + a three-digit
+        // distance) at every size.
+        AW = Math.round(ALF * 23.125);
         // The guards' tier exists only when the build lists them apart.
         GUARD = cfg.watch.g.length > 0;
         TIERS = GUARD ? "bsmcg" : "bsmc";
         TS = {b: tier(NAME_FS, true, 0xF7A22B, 0.6, "BOSS"), s: tier(FS, false, 0xE0703C, 0.5, "SKULL"),
               m: tier(FS, false, 0xC8C0B0, 0.4, "MINI"), c: tier(SMALL_FS, false, 0x9A9284, 0.35, "CAMPS")};
-        TS.g = tier(FS, false, TS.s.col, 0.5, "GUARDS");   // a skull's look under its own header
+        TS.g = tier(FS, false, TS.s.col, 0.5, "GUARD");   // a skull's look under its own header
         AL = {b: {t: "BOSS ", c: 0xE0503C}, s: {t: "SKULL ", c: TS.s.col}, g: {t: "GUARD ", c: TS.s.col},
               m: {t: "", c: 0xF7A22B}};
         FX = [0, -Math.round(AW / 2)];
@@ -183,7 +192,7 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         // five rows, and the guards' header and row when they list apart.
         FH = [PAD * 2 + (WAVE ? AH + FAT_X : 0) + (ALLY ? ALLY_X : 0)
               + (LIST ? SMALL_H * 4 + TS.b.rh + TS.s.rh + TS.m.rh * 2 + TS.c.rh
-                 + (GUARD ? SMALL_H + TS.g.rh : 0) : 0), AH * 2];
+                 + (GUARD ? SMALL_H + TS.g.rh : 0) : 0), ALH * 2];
         var k:String;
         var a:Array;
         var i:Number;
@@ -316,6 +325,16 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         else leave();
     }
 
+    public function alertsShown():Boolean {
+        return alertsOn;
+    }
+
+    // The alerts anchor alone (its preview frame is its child): the board runs on.
+    public function setAlerts(shown:Boolean):Void {
+        alertsOn = shown;
+        if (cl[1] != null) cl[1]._visible = shown;
+    }
+
     public function previewKey():String { return "ons"; }
     public function previewLabel():String { return "Onslaught"; }
 
@@ -383,6 +402,7 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
                 cl[i] = c;
             }
         }
+        if (cl[1] != null) cl[1]._visible = alertsOn;
         cl[0].createEmptyMovieClip("p", 0);
         if (LIST) {
             for (i = 0; i < TIERS.length; i++) hd[i] = mkHd(TS[TIERS.charAt(i)]);
@@ -454,7 +474,7 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
     private function render(now:Number):Void {
         pu.length = 0;
         paintP(scan, now, false);
-        if (cl[1] != null) paintA(scan, now);
+        if (cl[1] != null && alertsOn) paintA(scan, now);
     }
 
     // A mob out of view for 20 s has no row. The scan still holds and reads it (300 s), so
@@ -821,8 +841,8 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         var d:Number = cl[1].getNextHighestDepth();
         var m:MovieClip = cl[1].createEmptyMovieClip("a" + d, d);
         m._y = y;
-        makeTF(m, "s", FX[1] + 1, 1, AW, AH, ALERT_FS, true, 0, "center");
-        makeTF(m, "t", FX[1], 0, AW, AH, ALERT_FS, true, 0xF7A22B, "center");
+        makeTF(m, "s", FX[1] + 1, 1, AW, ALH, ALF, true, 0, "center");
+        makeTF(m, "t", FX[1], 0, AW, ALH, ALF, true, 0xF7A22B, "center");
         return m;
     }
 
@@ -836,7 +856,7 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         al.unshift({mc: mkAl(0), t: now});
         setAl(al[0].mc, s, c);
         var i:Number = al.length;
-        while (i--) al[i].mc._y = (i + 1) * AH;
+        while (i--) al[i].mc._y = (i + 1) * ALH;
     }
 
     // =========================================================================
@@ -963,6 +983,8 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
                 }
             }
         }
+        x = config.FindEntry("onav");
+        if (x !== undefined) setAlerts(x == 1);
         x = config.FindEntry("onv");
         if (x !== undefined) setActive(x == 1);
     }
@@ -979,5 +1001,6 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
             config.ReplaceEntry(k + "y", (c != null) ? c._y : P[i * 2 + 1]);
         }
         config.ReplaceEntry("onv", active ? 1 : 0);
+        config.ReplaceEntry("onav", alertsOn ? 1 : 0);
     }
 }

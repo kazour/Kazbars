@@ -81,6 +81,13 @@ def test_one_function_makes_every_slot_from_the_grids_own_cfg():
     assert src.count("createTexts(") == 2
 
 
+def test_the_onslaught_heads_its_guards_guard_and_sizes_its_alerts_from_the_bake():
+    src = _stub("KazBarsOnslaught")
+    assert '"GUARD");' in src and '"GUARDS"' not in src, "one header word per tier, like SKULL"
+    assert "ALF = Number(cfg.alertFontSize);" in src
+    assert 'makeTF(m, "t", FX[1], 0, AW, ALH, ALF,' in src, "the banners take the baked size"
+
+
 def _parent(src):
     m = re.search(r"^class \w+ extends (\w+)", src, re.M)
     return m.group(1) if m else None

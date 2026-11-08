@@ -29,6 +29,7 @@ new file in `docs/README.md`. Look an ID up across all of them with
 ---
 
 ## 2026-11-08
+- **Added:** `Frenzy` — `3675524`, Necromancer buff.
 - **Added:** `Healing Radiance` — `5075612`, #Onslaught buff (the Onslaught mobs' heal).
 - **Added:** `Ancient Ward` — `5074563`, #Onslaught buff (the Onslaught guards' magic ward).
 - `#Onslaught` is a new shared category.
@@ -396,5 +397,5 @@ unchanged, so no grid or profile whitelist is affected (`Default.json` untouched
 ---
 
 *Entries are reconstructed from `git log` on `Database.json` (this repo) and the predecessor
-`KzBuilder-public` repo; spell IDs reflect the current database, which holds **437 buffs**.
+`KzBuilder-public` repo; spell IDs reflect the current database, which holds **438 buffs**.
 Going forward, log changes here as they happen.*

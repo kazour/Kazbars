@@ -67,11 +67,10 @@ def test_the_retired_font_size_is_dropped():
     assert "fontSize" not in validate_config({"fontSize": 16})
 
 
-def test_start_collapsed_defaults_off_and_coerces():
-    assert INSPECT_DEFAULTS["startCollapsed"] is False
-    assert validate_config({"startCollapsed": 1})["startCollapsed"] is True
-    assert validate_config({"startCollapsed": "garbage"})["startCollapsed"] is True
-    assert validate_config({"startCollapsed": 0})["startCollapsed"] is False
+def test_there_is_no_start_collapsed_flag():
+    """A first session opens unfolded; the game keeps the fold after."""
+    assert "startCollapsed" not in INSPECT_DEFAULTS
+    assert "startCollapsed" not in validate_config({"startCollapsed": True})
 
 
 def test_validate_bad_values_fall_back():

@@ -396,8 +396,7 @@ class CodeGenerator:
         return (
             f"\n        d.SW = {{x: {project_px(c['fx'], self.game_w)}, "
             f"y: {project_px(c['fy'], self.game_h)}, "
-            f"fontSize: {panel_fs(self.base_size, c['scale'])}, "
-            f"collapsed: {_bool(c['startCollapsed'])}}};"
+            f"fontSize: {panel_fs(self.base_size, c['scale'])}}};"
         )
 
     def _inspect_data_block(self):
@@ -407,8 +406,7 @@ class CodeGenerator:
         return (
             f"\n        d.INS = {{x: {project_px(c['fx'], self.game_w)}, "
             f"y: {project_px(c['fy'], self.game_h)}, "
-            f"fontSize: {panel_fs(self.base_size, c['scale'])}, "
-            f"collapsed: {_bool(c['startCollapsed'])}}};"
+            f"fontSize: {panel_fs(self.base_size, c['scale'])}}};"
         )
 
     def _inspect_rows_block(self):
@@ -446,7 +444,8 @@ class CodeGenerator:
 
     def _onslaught_data_block(self):
         """`d.ONS`: the board's and the alerts' first-load spots (fixed
-        fractions — both are placed in game), the text size and displays;
+        fractions — both are placed in game), the board's and the alerts' text
+        sizes and the displays;
         `d.ONS.watch`, one array per kind (`b`, `s`, `g`, `m`, `c`), each the
         watched names of that kind, a kind no display reads left empty (bosses,
         skulls, guards and minis feed the list and the alerts, camps only the
@@ -463,7 +462,8 @@ class CodeGenerator:
             f"        d.ONS = {{x: {project_px(1560 / 1920, self.game_w)}, "
             f"y: {project_px(300 / 1080, self.game_h)}, "
             f"ax: {project_px(960 / 1920, self.game_w)}, ay: {project_px(200 / 1080, self.game_h)}, "
-            f"fontSize: {panel_fs(self.base_size, c['scale'])}, list: {_bool(c['showList'])}, "
+            f"fontSize: {panel_fs(self.base_size, c['scale'])}, "
+            f"alertFontSize: {panel_fs(self.base_size, c['alertScale'])}, list: {_bool(c['showList'])}, "
             f"alerts: {_bool(c['showAlerts'])}, wave: {_bool(c['showWave'])}, "
             f"aoe: {_bool(c['showAoe'])}, ally: {_bool(c['showAlly'])}, "
             f"alertMs: {c['alertSeconds'] * 1000}}};",
