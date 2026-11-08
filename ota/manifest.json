@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "content_version": 39,
+  "content_version": 42,
   "min_app_version": "3.2.0",
-  "notes": "Stock profile: 1080p layout with static Wrack/Tank grids",
+  "notes": "Stock profile: extras at 100 % size",
   "files": {
     "Database.json": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Database.json",
@@ -10,7 +10,7 @@
     },
     "Default.yml": {
       "url": "https://raw.githubusercontent.com/kazour/Kazbars/main/src/kazbars/assets/kazbars/Default.yml",
-      "sha256": "05715aa45f13c3b9bfeec789472bc8fa5d27b106e10fccc5ec0017bb44b8c6a1"
+      "sha256": "6412d5aad92bd504a65b89ac8502ba58380c5dac5df02a3e5a23a783d2df44c9"
     }
   }
 }

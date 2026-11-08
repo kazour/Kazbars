@@ -19,7 +19,7 @@ from .grid_model import DEFAULT_GAME_RESOLUTION, is_band, is_plate, project_px, 
 from .inspect import validate_config as validate_inspect_config
 from .overlay import VERDANA, as2_face, font_blob_path
 from .overlay import validate_config as validate_overlay
-from .overlay_size import cast_fs, grid_metrics, panel_fs
+from .overlay_size import grid_metrics, panel_fs
 from .prefs import ANCHOR_SIDE_DEFAULT, ANCHOR_UP_DEFAULT
 from .stopwatch import validate_config as validate_stopwatch_config
 from .swf_font import SwfFontError, import_game_font, splice
@@ -359,14 +359,14 @@ class CodeGenerator:
         return codes
 
     def _panel_font_data_block(self):
-        """AS2 `d.PF = {...}` literal — the base size itself (the preview
+        """AS2 `d.PF = {...}` literal — the panel size at 100 % (the preview
         control panel and the layout-preview labels are drawn at it), the face
         every text field asks for, the version the control panel's footer
         credits, and the overhead anchor (`KazBarsRelations.side` / `.lift`).
         Emitted unconditionally: `KazBarsPreviewPanel` is not gated and
         compiles into every build."""
         side, up = self.anchor
-        return (f"\n        d.PF = {{fontSize: {self.base_size}, "
+        return (f"\n        d.PF = {{fontSize: {panel_fs(self.base_size, 100)}, "
                 f'face: "{as2_face(self.overlay["font"])}", '
                 f'version: "{escape_as2_string(self.app_version)}", '
                 f"side: {int(side)}, up: {int(up)}}};")
@@ -384,7 +384,7 @@ class CodeGenerator:
             f"playerY: {project_px(c['playerFy'], self.game_h)}, "
             f"targetX: {project_px(c['targetFx'], self.game_w)}, "
             f"targetY: {project_px(c['targetFy'], self.game_h)}, "
-            f"bold: {_bool(c['bold'])}, fontSize: {cast_fs(self.base_size, c['scale'])}, "
+            f"bold: {_bool(c['bold'])}, fontSize: {panel_fs(self.base_size, c['scale'])}, "
             f'display: "{c["display"]}", color: 0x{c["color"]}'
             "};"
         )
@@ -576,7 +576,8 @@ class CodeGenerator:
         `d.WL[gid]` as `[id, code, …]` pairs read in by a loop. A dynamic grid
         gets its set even empty (the pick reads it), a static one only with
         ids. `iconSize`, `timerFont` and `stackFont` are the on-screen values
-        `grid_metrics` derives from the base size and the grid's scale."""
+        `grid_metrics` derives from the base size and the grid's scale; a
+        text size the grid sets itself (`timerPt`, `stackPt`) is baked as is."""
         gid = grid["id"]
         gid_lit = escape_as2_string(gid)
         vid = f"{sanitize_id(gid)}_{idx}"
@@ -602,10 +603,10 @@ class CodeGenerator:
             sortOrder: "{grid["sortOrder"]}",
             layout: "{grid["layout"]}",
             timerStyle: "{grid["timerStyle"]}",
-            timerFont: {m.timer},
+            timerFont: {grid.get("timerPt") or m.timer},
             timerFlashThreshold: {grid["timerFlashThreshold"]},
             timerYOffset: {grid["timerYOffset"]},
-            stackFont: {m.stack},
+            stackFont: {grid.get("stackPt") or m.stack},
             enableFlashing: {_bool(grid["enableFlashing"])}'''
         # Only where they apply, so a screen grid without selfCastOnly bakes as before.
         if is_plate(grid["type"]):

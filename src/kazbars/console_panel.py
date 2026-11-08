@@ -20,7 +20,6 @@ from tkinter import ttk
 
 from .console import TABS, ships, validate_config
 from .extras_dialog import ExtrasShell, raise_if_open
-from .overlay_size import panel_fs
 from .ui_forms import create_card, size_slider
 from .ui_helpers import FONT_SMALL, PAD_MICRO, PAD_ROW, PAD_XS, THEME_COLORS
 from .ui_widgets import add_tooltip, app_toast
@@ -59,8 +58,8 @@ def open_console_dialog(app):
     size_row = ttk.Frame(size_card)
     size_row.pack(anchor='w')
     size_scale, size_var = size_slider(
-        size_row, cfg['scale'], lambda p: f"{panel_fs(shell.base, p)} pt text",
-        tooltip="A percent of the overlay size (Overlay, top of the Grids tab).",
+        size_row, shell.base, cfg['scale'],
+        tooltip="Text size in game, 8-28 pt. Moves with the Overlay size on the Grids tab.",
         label_sink=sink)
     shell.gate(size_scale)
 

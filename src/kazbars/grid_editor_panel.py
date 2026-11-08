@@ -479,10 +479,13 @@ class GridEditorPanel(ttk.Frame):
     def apply_settings(self, draft):
         """Land a Grid Settings draft (the settings it owns, the shape already
         through `settle_box`) on the config; a static grid's change of slot
-        count trims its assignments (restored on a regrow)."""
+        count trims its assignments (restored on a regrow). A None value
+        (a text size back on Auto) removes its key."""
         cfg = self.grid_config
         old_total = grid_preview.slot_total(cfg)
         cfg.update(draft)
+        for key in [k for k, v in draft.items() if v is None]:
+            del cfg[key]
         new_total = grid_preview.slot_total(cfg)
         slots_moved = cfg.get('slotMode') == 'static' and new_total != old_total
         if slots_moved and new_total < old_total:

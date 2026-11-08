@@ -82,6 +82,29 @@ def test_valid_default_grid_passes_through_unchanged():
     assert validate_grid(dict(grid)) == grid
 
 
+def test_text_sizes_are_kept_in_range_else_auto():
+    """A grid's own timer / stack pt is an int 6-72; anything else is Auto
+    (the key dropped), and a new grid has none."""
+    grid = create_default_grid()
+    assert "timerPt" not in grid and "stackPt" not in grid
+    kept = validate_grid({"timerPt": 20, "stackPt": 6})
+    assert (kept["timerPt"], kept["stackPt"]) == (20, 6)
+    assert validate_grid({"timerPt": 72})["timerPt"] == 72
+    for junk in (5, 73, 500, 0, -3, True, False, "20", 20.0, None, [20], "big"):
+        out = validate_grid({"timerPt": junk, "stackPt": junk})
+        assert "timerPt" not in out and "stackPt" not in out, junk
+
+
+def test_a_new_grid_takes_gap_and_timer_y_from_the_overlay_size():
+    for base, gap, y in [(8, 0, -2), (11, -1, -3), (13, -1, -4), (14, -2, -5), (17, -2, -5)]:
+        grid = create_default_grid(base_size=base)
+        assert (grid["gap"], grid["timerYOffset"]) == (gap, y), base
+        assert validate_grid(dict(grid)) == grid, base
+    grid = create_default_grid()
+    assert (grid["gap"], grid["timerYOffset"]) == (-1, -3), "the default size, 11"
+    assert (CLAMP_SPECS["gap"][0], CLAMP_SPECS["timerYOffset"][0]) == (-1, -3)
+
+
 def test_dedupe_grid_ids_renames_duplicates_first_wins():
     grids = [{"id": "X"}, {"id": "X"}, {"id": "Y"}, {"id": "X"}]
     renamed = dedupe_grid_ids(grids)

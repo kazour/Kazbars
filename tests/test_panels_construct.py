@@ -290,6 +290,57 @@ def _settings(card):
     return open_grid_settings(card)
 
 
+def test_grid_settings_text_sizes_round_trip(app):
+    """Auto shows the size rules' value and follows Size; unticked, the set
+    pt lands on the grid and reopens unticked; Auto again drops the key."""
+    from kazbars.overlay_size import grid_metrics
+    card, idx = _add_seam_grid(app, 'SeamText')
+    base = card.base_size()
+    dlg = _settings(card)
+    try:
+        auto, pt, spin, _ = dlg._text_rows['timerPt']
+        assert auto.get() and pt.get() == str(grid_metrics(base, 100).timer) and 'disabled' in spin.state()
+        dlg.scale_var.set(200)
+        dlg._on_text_size()
+        assert pt.get() == str(grid_metrics(base, 200).timer), "Auto follows the slider"
+        assert dlg.draft()['timerPt'] is None
+        dlg.scale_var.set(100)
+        auto.set(False)
+        dlg._on_text_size()
+        assert 'disabled' not in spin.state()
+        pt.set('21')
+        dlg._text_rows['stackPt'][0].set(False)
+        dlg._text_rows['stackPt'][1].set('7')
+        dlg.timer_style_var.set('bar')
+        dlg._on_timers()
+        assert 'disabled' in spin.state(), "timer text greys with Bar"
+        assert 'disabled' in dlg._auto_boxes['timerPt'].state(), "its Auto box too"
+        assert 'disabled' not in dlg._auto_boxes['stackPt'].state()
+        dlg.timer_style_var.set('digits')
+        dlg._on_timers()
+        dlg.apply()
+    finally:
+        if dlg.winfo_exists():
+            dlg.cancel()
+    app.update()
+    stored = _stored_grid(app, idx)
+    assert (stored['timerPt'], stored['stackPt']) == (21, 7)
+    dlg = _settings(card)
+    try:
+        auto, pt, _, _ = dlg._text_rows['timerPt']
+        assert not auto.get() and pt.get() == '21'
+        auto.set(True)
+        dlg._on_text_size()
+        dlg.apply()
+    finally:
+        if dlg.winfo_exists():
+            dlg.cancel()
+    app.update()
+    stored = _stored_grid(app, idx)
+    assert 'timerPt' not in stored and stored['stackPt'] == 7
+    assert 'timerPt' not in card.grid_config
+
+
 def test_grid_settings_apply_reaches_profile_store(app):
     card, idx = _add_seam_grid(app, 'SeamSpin')
     dlg = _settings(card)
@@ -333,13 +384,36 @@ def test_size_slider_previews_live_and_lands_on_apply(app):
     dlg = _settings(card)
     scale = _find_scale(dlg)
     assert scale is not None
-    scale.set(152.6)  # a drag: snapped to 155, the card's preview follows
+    assert round(float(scale.get())) == 44, "the slider shows the icon px, 1080p at 100 %"
+    scale.set(62.6)  # a drag: snapped to 64 px, the card's preview follows
     app.update()
-    assert dlg.scale_var.get() == 155
+    assert dlg.scale_var.get() == 145, "the percent that gives 64 px at 1080p"
     assert card.preview.layout.cell > cell
     assert card.grid_config['scale'] == 100
     dlg.apply()
-    assert _stored_grid(app, idx)['scale'] == 155
+    assert _stored_grid(app, idx)['scale'] == 145
+
+
+def test_a_panel_size_slider_shows_pt_and_follows_the_overlay(app):
+    """An extra's Size slider shows the pt it gives at the current overlay
+    size; a new overlay size moves it with the panel."""
+    from kazbars.overlay_size import panel_fs
+    store = app.profile_store
+    size_before = store.get_section('overlay')['size']
+    scale_pct = store.get_section('stopwatch').get('scale', 100)
+    try:
+        for size in (11, 13):
+            store.update_section('overlay', {'size': size})
+            app._open_stopwatch_settings()
+            dlg = app.stopwatch_dialog
+            try:
+                assert round(float(_find_scale(dlg).get())) == panel_fs(size, scale_pct), size
+            finally:
+                dlg.destroy()
+                app.update()
+    finally:
+        store.update_section('overlay', {'size': size_before})
+        app.update()
 
 
 def test_size_slider_keys_step_a_notch(app):
@@ -354,13 +428,14 @@ def test_size_slider_keys_step_a_notch(app):
         return scale.tk.call(name, *(['0'] * 14 + [str(scale)] + ['0'] * 4))
 
     try:
-        for key, want in (('Right', 105), ('Right', 110), ('Left', 105), ('End', 200), ('Home', 50)):
+        for key, px, pct in (('Right', 48, 109), ('Right', 52, 118), ('Left', 48, 109),
+                             ('End', 92, 209), ('Home', 32, 73)):
             assert fire(f'<{key}>') == 'break', key
             fire('<KeyRelease>')
-            assert (dlg.scale_var.get(), round(float(scale.get()))) == (want, want), key
+            assert (dlg.scale_var.get(), round(float(scale.get()))) == (pct, px), key
         scale.state(['disabled'])
         assert fire('<Right>') == 'break'
-        assert dlg.scale_var.get() == 50, "a greyed slider's keys change nothing"
+        assert dlg.scale_var.get() == 73, "a greyed slider's keys change nothing"
     finally:
         dlg.cancel()
 
@@ -1301,7 +1376,7 @@ def test_a_tall_grid_says_its_preview_stepped_down(app):
     from kazbars.grid_model import create_default_grid
     card = _card_for(app, create_default_grid('player', 6, 6, 'static', 'SeamTall'))
     summary = card.summary_label.cget('text')
-    assert summary.endswith('· shown at 2:5')
+    assert summary.endswith('· shown at 1:2')
     assert card.preview.layout.height <= 128
 
 
@@ -1443,6 +1518,44 @@ def _wizard_grid(app, gtype, setup):
         setup(wiz)
         wiz.on_create()
         return wiz.result
+    finally:
+        if wiz.winfo_exists():
+            wiz.destroy()
+
+
+def test_a_new_grid_takes_gap_and_timer_y_from_the_profiles_overlay_size(app, monkeypatch):
+    """Both ways in (the wizard, the empty-state preset cards) pass the
+    profile's overlay size, so a 4K-tier profile gets that row's defaults."""
+    from kazbars import grids_panel
+    gp = app.grids_panel
+    store = app.profile_store
+    size_before = store.get_section('overlay')['size']
+    n = len(gp.grids)
+    asked = []
+
+    class Wizard:
+        def __init__(self, *a, base_size, **k):
+            asked.append(base_size)
+            self.result = None
+    monkeypatch.setattr(grids_panel, 'AddGridWizard', Wizard)
+    monkeypatch.setattr(app, 'wait_window', lambda w: None)
+    try:
+        store.update_section('overlay', {'size': 16})
+        gp.add_grid()
+        assert asked == [16]
+        gp._create_from_empty_state(1, 5, 'dynamic')
+        assert (gp.grids[-1]['gap'], gp.grids[-1]['timerYOffset']) == (-2, -5)
+    finally:
+        del gp.grids[n:]
+        gp.refresh_panels()
+        store.update_section('overlay', {'size': size_before})
+        app.update()
+
+    from kazbars.grid_dialogs import AddGridWizard
+    wiz = AddGridWizard(app, set(), name_in_use=lambda name, cfg: False, base_size=11)
+    try:
+        wiz.on_create()
+        assert (wiz.result['gap'], wiz.result['timerYOffset']) == (-1, -3)
     finally:
         if wiz.winfo_exists():
             wiz.destroy()

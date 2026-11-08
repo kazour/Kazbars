@@ -141,21 +141,33 @@ def test_an_empty_grid_is_left_out_as_it_is_and_the_header_counts_what_ships():
 # --------------------------------------------------------------------------
 
 
-def test_the_default_size_bakes_a_48px_grid_and_12pt_text():
+def test_the_default_size_bakes_a_44px_grid_12pt_timer_and_12pt_stack():
     _, data = _gen().generate()
-    assert (_num(data, "iconSize"), _num(data, "timerFont"), _num(data, "stackFont")) == (48, 12, 12)
+    assert (_num(data, "iconSize"), _num(data, "timerFont"), _num(data, "stackFont")) == (44, 12, 12)
 
 
-def test_the_base_size_and_the_grid_scale_move_the_sizes_in_proportion():
-    _, data = _gen([_grid(scale=150)], overlay={"size": 24}).generate()
-    assert (_num(data, "iconSize"), _num(data, "timerFont"), _num(data, "stackFont")) == (144, 36, 36)
+def test_the_base_size_and_the_grid_scale_pick_the_tables_row_held_to_32_92_px():
+    _, data = _gen([_grid(scale=150)], overlay={"size": 12}).generate()
+    assert (_num(data, "iconSize"), _num(data, "timerFont"), _num(data, "stackFont")) == (72, 20, 18)
+    _, data = _gen([_grid(scale=150)], overlay={"size": 17}).generate()
+    assert (_num(data, "iconSize"), _num(data, "timerFont"), _num(data, "stackFont")) == (92, 24, 22)
     _, data = _gen([_grid(scale=50)], overlay={"size": 10}).generate()
-    assert (_num(data, "iconSize"), _num(data, "timerFont"), _num(data, "stackFont")) == (20, 9, 9)
+    assert (_num(data, "iconSize"), _num(data, "timerFont"), _num(data, "stackFont")) == (32, 10, 10)
 
 
-def test_a_base_size_that_is_not_a_choice_bakes_as_twelve():
-    _, data = _gen(overlay={"size": 15, "font": "Comic Sans"}).generate()
-    assert _num(data, "iconSize") == 48
+def test_a_set_text_size_bakes_as_typed_and_auto_follows_the_rules():
+    _, data = _gen([_grid(timerPt=20, stackPt=9)], overlay={"size": 17}).generate()
+    assert (_num(data, "iconSize"), _num(data, "timerFont"), _num(data, "stackFont")) == (68, 20, 9)
+    _, data = _gen([_grid(scale=50, timerPt=40)], overlay={"size": 10}).generate()
+    assert (_num(data, "iconSize"), _num(data, "timerFont"), _num(data, "stackFont")) == (32, 40, 10), \
+        "no fit cap on a size the grid sets"
+    _, data = _gen([_grid(stackPt=14)]).generate()
+    assert (_num(data, "timerFont"), _num(data, "stackFont")) == (12, 14)
+
+
+def test_a_base_size_that_is_not_a_choice_bakes_as_the_default():
+    _, data = _gen(overlay={"size": 24, "font": "Comic Sans"}).generate()
+    assert _num(data, "iconSize") == 44
     assert 'face: "Arial"' in data
 
 
@@ -267,7 +279,7 @@ def test_the_panel_block_carries_base_size_face_version_and_anchor():
     assert _block(data, "PF") == 'd.PF = {fontSize: 12, face: "Arial", version: "0.0.0", side: 389, up: -13};'
     assert "ppanel.configure(d.PF);" in main
     _, data = _gen(overlay={"size": 16, "font": "Verdana"}, anchor=(-40, 120)).generate()
-    assert _block(data, "PF") == ('d.PF = {fontSize: 16, face: "_StandardFont", version: "0.0.0", '
+    assert _block(data, "PF") == ('d.PF = {fontSize: 18, face: "_StandardFont", version: "0.0.0", '
                                   'side: -40, up: 120};')
     _, data = _gen(overlay={"size": 12, "font": "Roboto"}).generate()
     assert 'face: "Arial"' in _block(data, "PF"), "a baked face is spliced in as Arial"
@@ -298,13 +310,13 @@ def test_cast_on_emits_hooks_and_data():
     assert "modules.push(castTimer);" in main
     assert _block(data, "CAST") == (
         "d.CAST = {enableP: true, enableT: true, playerX: 900, playerY: 600, "
-        "targetX: 900, targetY: 560, bold: true, fontSize: 15, display: \"both\", "
+        "targetX: 900, targetY: 560, bold: true, fontSize: 12, display: \"both\", "
         "color: 0xFF8800};")
 
 
-def test_the_cast_timer_takes_the_title_role_of_its_scaled_size():
-    _, data = _gen(cast_config=_cast_cfg(scale=50), overlay={"size": 24}).generate()
-    assert _num(_block(data, "CAST"), "fontSize") == 15
+def test_the_cast_timer_takes_the_panel_size():
+    _, data = _gen(cast_config=_cast_cfg(scale=50), overlay={"size": 17}).generate()
+    assert _num(_block(data, "CAST"), "fontSize") == 9
 
 
 def test_stopwatch_off_emits_no_refs():

@@ -103,7 +103,7 @@ modules:
         maxSlots: 3
         showSelf: true
   overlay:
-    size: 12
+    size: 11
     font: GG
   boss_timer:
     overlay:
@@ -149,7 +149,7 @@ modules:
     enabled: false
     fx: 0.666015625
     fy: 0.008333333333333333
-    scale: 85
+    scale: 100
     startCollapsed: true
     rows: null
   cast_timer:
@@ -161,7 +161,7 @@ modules:
     targetFx: 0.628125
     targetFy: 0.7409722222222223
     bold: false
-    scale: 80
+    scale: 100
     display: elapsed
     color: FFFFFF
   damage_numbers:
@@ -188,11 +188,11 @@ modules:
     font: GG Comic
   console:
     enabled: false
-    scale: 85
+    scale: 100
     tabs: [buffs, casts]
   onslaught:
     enabled: false
-    scale: 85
+    scale: 100
     showList: true
     showAlerts: true
     showWave: true

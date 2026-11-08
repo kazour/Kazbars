@@ -49,8 +49,8 @@ def test_defaults_from_absent_or_non_object_section():
 
 def test_clamps_scale_and_alert_time_and_coerces_truthiness():
     for raw, alert, scale in (
-        ({"alertSeconds": 0, "scale": 4}, 3, 50),
-        ({"alertSeconds": 99, "scale": 400}, 15, 200),
+        ({"alertSeconds": 0, "scale": 4}, 3, 40),
+        ({"alertSeconds": 99, "scale": 400}, 15, 300),
         ({"alertSeconds": "9", "scale": "120"}, 9, 120),
         ({"alertSeconds": 8.5, "scale": 120.7}, 8, 120),
         ({"alertSeconds": "x", "scale": float("nan")}, 6, 100),

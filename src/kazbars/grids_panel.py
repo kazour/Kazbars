@@ -667,7 +667,8 @@ class GridsPanel(ttk.Frame):
         existing = {g['id'] for g in self.grids}
         grid_config = create_default_grid(
             grid_type=grid_type, rows=rows, cols=cols, mode=mode,
-            grid_id=default_grid_name(grid_type, existing)
+            grid_id=default_grid_name(grid_type, existing),
+            base_size=self.base_size(),
         )
         self.grids.append(self._join_current_tab(grid_config))
         self._mark_modified()
@@ -757,7 +758,7 @@ class GridsPanel(ttk.Frame):
         """Open AddGridWizard dialog."""
         existing_ids = {g['id'] for g in self.grids}
         wizard = AddGridWizard(self.winfo_toplevel(), existing_ids,
-                               name_in_use=self._grid_name_in_use)
+                               name_in_use=self._grid_name_in_use, base_size=self.base_size())
         self.winfo_toplevel().wait_window(wizard)
         if wizard.result:
             self.grids.append(self._join_current_tab(wizard.result))

@@ -431,14 +431,24 @@ SECTIONS: list[_Section] = [
             'its card.',
             'Rows and Cols — the shape. A grid holds up to 64 slots on its '
             'own, an overhead grid 16; there is no total across grids.',
-            'Size — a slider, 50–200 %, of the Overlay size. It sets icon, '
-            'timer and stack-count size together; the hint beside it shows '
-            'the icon in px.',
+            'Size — the icon, 32–92 px in 4 px steps. Timer and stack text '
+            'follow it while they are on Auto. It moves with the Overlay '
+            'size: pick a bigger Overlay and the icon, and the slider, grow '
+            'with it.',
+            'Timer text and Stack text — Auto, the default, takes the size '
+            'set for that icon size and shows it greyed out. Untick Auto to '
+            'set your '
+            'own, 6–72 pt: the grid uses exactly that in game, whatever Size '
+            'or the Overlay size say, and large text can spill past the '
+            'icon. Tick Auto to go back.',
             'Gap — the space between icons. Negative overlaps them.',
             'Timers — Digits shows the seconds left under each icon, Bar '
             "draws a line inside the icon's bottom edge that shrinks as "
-            'time runs out, Off shows none. Y offset nudges digits only, so '
-            'it greys out for Bar and Off.',
+            'time runs out, Off shows none. Y offset and Timer text apply '
+            'to digits only, so they grey out for Bar and Off.',
+            'A new grid starts with the Gap and Y offset that suit the '
+            'Overlay size. Changing the Overlay size later leaves them '
+            'as set.',
             'Flash — icons pulse near expiry. Under sets the threshold in '
             'seconds; it greys out while Flash is off.',
             "Applied by me is not here — it is the toggle on the card's "
@@ -458,22 +468,29 @@ SECTIONS: list[_Section] = [
             'of everything KazBars draws in game. Both are saved in the '
             'profile; rebuild to apply.',
             _sub('Overlay', [
-                'The base size, 10 to 24 — 12 suits 1080p, 16 suits 1440p, '
-                '24 suits 4K. First launch picks the one for your '
-                'resolution; an imported profile keeps its own.',
+                'Ten entries named for the screen, each a 4 px step of icon '
+                'size, from 720p compact (32 px icons) through 1080p (44 px) '
+                'to 2160p large (68 px). Compact is one step smaller than '
+                "its screen's plain entry, large one step bigger.",
+                'First launch and Reset profile to defaults… pick the plain '
+                'entry for your resolution — 720p, 1080p, 1440p or 2160p; '
+                'an imported profile keeps its own.',
                 'Change it and every grid and panel resizes together, each '
                 'in proportion.',
             ]),
             _sub('Size sliders', [
                 'Each grid, and the Stopwatch, Inspect Target, Cast timer, '
-                'Console and Onslaught tracker, has its own Size: a percent '
-                'of the Overlay size, 50–200 %. The hint beside it says '
-                'what that comes to — icon px for a grid, points of text '
-                'for a panel.',
+                'Console and Onslaught tracker, has its own Size slider. It '
+                'shows the real size in game: icon px for a grid, 32–92; '
+                'text pt for a panel, 8–28.',
+                'Each Size is kept relative to the Overlay size, so a new '
+                'Overlay moves every item, and its slider, with it — a panel '
+                'set to 12 pt at 1080p shows 14 pt at 1440p. The size you '
+                'pick is exact on the Overlay you picked it on.',
             ]),
             _sub('Font', [
-                "Arial, Verdana (the game's own font), GG, or one of nine "
-                'open fonts: Roboto, Inter, Noto Sans, Source Sans 3, PT '
+                "GG (the default), Arial, Verdana (the game's own font), or one of "
+                'nine open fonts: Roboto, Inter, Noto Sans, Source Sans 3, PT '
                 'Sans, Fira Sans, Barlow Semi Condensed, Exo 2, Alegreya '
                 'Sans.',
                 'Damage Numbers has its own Font.',
@@ -654,9 +671,9 @@ SECTIONS: list[_Section] = [
             'Game ▸ Game resolution... sets the screen size builds target. '
             'It must match the resolution you play at.',
             'Change it and nothing in your profile moves: positions are '
-            'fractions of the screen and sizes a percent of the Overlay '
-            'size. On a bigger screen, pick a bigger Overlay size on the '
-            'Grids tab. Rebuild to apply.',
+            'fractions of the screen and sizes follow the Overlay '
+            "size. On a bigger screen, pick that screen's entry in the "
+            'Overlay dropdown on the Grids tab. Rebuild to apply.',
             _sub('Overhead anchor', [
                 'The same dialog has Right and Up fields: where overhead '
                 "grids sit against a character's head. Positive moves them "
@@ -764,9 +781,9 @@ SECTIONS: list[_Section] = [
             ]),
             _sub('One size, set once', [
                 'The Overlay size on the Grids tab is the base for every '
-                'panel. Each dialog has a Size slider — a percent of it, '
-                '50–200 % — and the panel scales as one piece, collapsed '
-                'bars included.',
+                'panel. Each dialog has a Size slider, 8–28 pt, that moves '
+                'with it; the panel scales as one piece, collapsed bars '
+                'included.',
                 _link('Overlay Size and Font', 'overlay-size'),
             ]),
         ],
@@ -868,8 +885,8 @@ SECTIONS: list[_Section] = [
                 'Drag the title bar. The game remembers position and fold — '
                 "the dialog's X/Y only seed the first session — and keeps "
                 'the spot when the screen resizes.',
-                'Size is a slider in the dialog: a percent of the Overlay '
-                'size.',
+                'Size is a slider in the dialog, in pt, and moves with the '
+                'Overlay size.',
             ]),
             [('Tick ', None),
              ('Include the stopwatch in builds', _SUCCESS),
@@ -925,8 +942,8 @@ SECTIONS: list[_Section] = [
                 'seed a first-ever session. Start collapsed loads it folded.',
                 'No target? Preview mode (Shift+Ctrl+Alt) shows a '
                 'placeholder.',
-                'Size is a slider in this dialog: a percent of the Overlay '
-                'size. The whole panel scales with it.',
+                'Size is a slider in this dialog, in pt, and the whole '
+                'panel scales with it. It moves with the Overlay size.',
             ]),
             [('Tick ', None),
              ('Include the Inspect Target in builds', _SUCCESS),
@@ -944,9 +961,9 @@ SECTIONS: list[_Section] = [
             _sub('What you can set', [
                 'Player position and Target position — where each timer sits '
                 'on screen.',
-                'Text — Bold, Size, Color; shared by both timers. Size is a '
-                'percent of the Overlay size, and the face is the Overlay '
-                'font. The sample shows the result.',
+                'Text — Bold, Size, Color; shared by both timers. Size is '
+                'in pt and moves with the Overlay size; the face is the '
+                'Overlay font. The sample shows the result.',
                 'Show — Elapsed counts up, Total is the estimated cast '
                 'length, Both shows 1.2 / 2.5.',
             ]),
@@ -988,8 +1005,8 @@ SECTIONS: list[_Section] = [
                 'and the tab you were on.',
                 'Its box in the KazBars Preview panel (Shift+Ctrl+Alt) '
                 'switches it off and on.',
-                'Size is a slider in the dialog: a percent of the Overlay '
-                'size.',
+                'Size is a slider in the dialog, in pt, and moves with the '
+                'Overlay size.',
             ]),
             [('Tick ', None),
              ('Include the console in builds', _SUCCESS),
@@ -1051,8 +1068,8 @@ SECTIONS: list[_Section] = [
                 'Place the board and the alerts in preview mode '
                 '(Shift+Ctrl+Alt): drag each where you want it, the game '
                 'remembers.',
-                'Size is a slider in the dialog: a percent of the Overlay '
-                'size. The alerts draw larger than the board.',
+                'Size is a slider in the dialog, in pt, and moves with the '
+                'Overlay size. The alerts draw larger than the board.',
             ]),
             [('Tick ', None),
              ('Include the onslaught tracker in builds', _SUCCESS),

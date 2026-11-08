@@ -11,7 +11,18 @@ import tkinter as tk
 from tkinter import ttk
 
 from .grid_model import project_px, unproject_px
-from .overlay_size import SCALE_MAX, SCALE_MIN, SCALE_STEP, snap_scale
+from .overlay_size import (
+    ICON_MAX_PX,
+    ICON_MIN_PX,
+    ICON_PX_PER_PT,
+    PANEL_MAX_PT,
+    PANEL_MIN_PT,
+    grid_metrics,
+    grid_scale,
+    panel_fs,
+    panel_scale,
+    scale_from,
+)
 from .ui_helpers import (
     FONT_BODY,
     FONT_FORM_LABEL,
@@ -488,83 +499,87 @@ def create_slider_row(parent, label_text, from_, to, initial, suffix, on_drag, o
     return scale, value_label
 
 
-def size_slider(parent, initial, hint, on_commit=None, *, label="Size:", length=120,
-                tooltip=None, label_sink=None, on_move=None):
-    """Inline `label · slider · "N %" · hint` for a module's `scale`: a percent
-    of the profile's overlay size, 50-200 in steps of 5 (`snap_scale`).
+def size_slider(parent, base, initial, on_commit=None, *, icons=False, label="Size:",
+                length=120, tooltip=None, label_sink=None, on_move=None):
+    """Inline `label · slider · "14 pt"` for a module's `scale` (a percent of
+    the overlay size `base`), shown as the absolute size it gives: a panel's
+    text, 8-28 pt in 1 pt steps, or with `icons` a grid's icon, 32-92 px in
+    4 px steps. Moving it stores the percent that gives the size picked
+    (`panel_scale` / `grid_scale`), so the item, and this slider, follow a
+    new overlay size.
 
-    `hint(p)` names what p means on screen ("48 px icons", "12 pt") and is
-    redrawn as the slider moves. `on_commit()` fires on button/key release
-    when the value moved, so a drag is one write; `on_move(p)`, when given,
-    fires on every 5 % step of a drag or key, for a live preview. Returns `(scale,
-    var)`: `var` is the IntVar holding the snapped value. `label_sink`, when
-    given a list, receives the three labels so a caller can grey them with the
-    scale."""
-    var = tk.IntVar(value=snap_scale(int(initial)))
+    `on_commit()` fires on button/key release when the value moved, so a
+    drag is one write; `on_move(p)`, when given, fires on every step of a drag
+    or key, for a live preview. Returns `(scale, var)`: `var` is the IntVar
+    holding the percent. `label_sink`, when given a list, receives the two
+    labels so a caller can grey them with the scale."""
+    if icons:
+        lo, hi, step, unit = ICON_MIN_PX, ICON_MAX_PX, ICON_PX_PER_PT, "px"
+        value_of, scale_of = (lambda p: grid_metrics(base, p).icon), (lambda v: grid_scale(base, v))
+    else:
+        lo, hi, step, unit = PANEL_MIN_PT, PANEL_MAX_PT, 1, "pt"
+        value_of, scale_of = (lambda p: panel_fs(base, p)), (lambda v: panel_scale(base, v))
+    var = tk.IntVar(value=scale_from(initial))
+    shown = [value_of(var.get())]
     lbl = _field_label(parent, label, FONT_FORM_LABEL)
     value_label = ttk.Label(parent, font=FONT_SMALL, foreground=THEME_COLORS["muted"],
-                            width=5, anchor="e")
-    hint_label = ttk.Label(parent, font=FONT_SMALL, foreground=THEME_COLORS["muted"])
+                            width=6, anchor="e")
 
     def _show():
-        p = var.get()
-        value_label.configure(text=f"{p} %")
-        hint_label.configure(text=hint(p))
+        value_label.configure(text=f"{shown[0]} {unit}")
 
-    def _drag(raw):
-        p = snap_scale(round(float(raw)))
-        if p != var.get():
-            var.set(p)
-            _show()
-            if on_move is not None:
-                on_move(p)
+    def _to(v):
+        """Move to size `v` (snapped to a step inside the range); False when
+        that is where the slider already is."""
+        v = max(lo, min(lo + round((v - lo) / step) * step, hi))
+        if v == shown[0]:
+            return False
+        shown[0] = v
+        var.set(scale_of(v))
+        _show()
+        if on_move is not None:
+            on_move(var.get())
+        return True
 
-    scale = ttk.Scale(parent, from_=SCALE_MIN, to=SCALE_MAX, value=var.get(),
-                      orient="horizontal", length=length, command=_drag)
+    scale = ttk.Scale(parent, from_=lo, to=hi, value=shown[0],
+                      orient="horizontal", length=length, command=lambda raw: _to(float(raw)))
     scale.pack(side="left", padx=(PAD_XS, 0))
     value_label.pack(side="left")
-    hint_label.pack(side="left", padx=(PAD_XS, 0))
 
     committed = [var.get()]
 
     def _commit(_e=None):
-        scale.set(var.get())
+        scale.set(shown[0])
         if on_commit is not None and var.get() != committed[0]:
             committed[0] = var.get()
             on_commit()
 
-    def _key_to(p):
-        # ttk.Scale's own keys step by 1, which the 5 % snap rounds straight
+    def _key_to(v):
+        # ttk.Scale's own keys step by 1, which a 4 px step rounds straight
         # back; step a whole notch instead (the release commits it). A
         # disabled scale's class bindings would refuse; these run first.
-        if scale.instate(["disabled"]) or snap_scale(p) == var.get():
-            return "break"
-        var.set(snap_scale(p))
-        scale.set(var.get())
-        _show()
-        if on_move is not None:
-            on_move(var.get())
+        if not scale.instate(["disabled"]) and _to(v):
+            scale.set(shown[0])
         return "break"
 
-    for seq, step in (("<Left>", -SCALE_STEP), ("<Up>", -SCALE_STEP),
-                      ("<Right>", SCALE_STEP), ("<Down>", SCALE_STEP)):
-        scale.bind(seq, lambda _e, d=step: _key_to(var.get() + d))
-    scale.bind("<Home>", lambda _e: _key_to(SCALE_MIN))
+    for seq, d in (("<Left>", -step), ("<Up>", -step), ("<Right>", step), ("<Down>", step)):
+        scale.bind(seq, lambda _e, d=d: _key_to(shown[0] + d))
+    scale.bind("<Home>", lambda _e: _key_to(lo))
 
     def _press(e):
         # A trough click is the same 1-step increment: a notch toward the click.
         if not scale.identify(e.x, e.y).endswith(("track", "trough")):
             return None  # the slider: ttk's own drag
-        return _key_to(var.get() + (SCALE_STEP if scale.get(e.x, e.y) > var.get() else -SCALE_STEP))
+        return _key_to(shown[0] + (step if scale.get(e.x, e.y) > shown[0] else -step))
 
     scale.bind("<Button-1>", _press)
-    scale.bind("<End>", lambda _e: _key_to(SCALE_MAX))
+    scale.bind("<End>", lambda _e: _key_to(hi))
     scale.bind("<ButtonRelease-1>", _commit)
     scale.bind("<KeyRelease>", _commit)
     if tooltip:
         add_tooltip(scale, tooltip)
     if label_sink is not None:
-        label_sink.extend(w for w in (lbl, value_label, hint_label) if w is not None)
+        label_sink.extend(w for w in (lbl, value_label) if w is not None)
     _show()
     return scale, var
 
