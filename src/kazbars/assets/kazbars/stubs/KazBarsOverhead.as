@@ -1,8 +1,9 @@
 // KazBarsOverhead.as - Overhead grids (types friendly and hostile): per character KazBarsRelations knows to be of a
 // grid's relation (you among the friendly, for a grid with showSelf), a pooled KazBarsGridView over the character, fed from its Effects
 // (KazBarsWorld). No archive position; preview shows one empty sample of each grid over your target, and the
-// sample's control-panel row is the grid's master switch (cfg.vis, archived as gk_<key>_v): off, the grid draws
-// over nobody.
+// sample's control-panel row is the grid's master switch (cfg.vis, written by the panel's applyRow, archived as
+// gk_<key>_v): off, the grid draws over nobody. An off grid still takes its views and its Effects watch (sync
+// does not read the flag): idle and hidden, cheaper than a resync on every flip.
 //
 // The client gives a projected point by the top of the head (KazBarsRelations.point), the one the game hangs its
 // nameplate from. A character's views are one stack centred KazBarsRelations.side px left of the point (the head's
@@ -34,6 +35,7 @@ class KazBarsOverhead implements KazBarsModule {
     private var out:Array;
     public var cfgs:Array;
     private var ids:Object;       // every built overhead grid's whitelist, for the Effects filter
+    private var all:Array;        // every class's overhead cfgs: the archive covers them all
     private var cls:Number;
     private var clip:MovieClip;
     private var kF:Object;
@@ -53,6 +55,15 @@ class KazBarsOverhead implements KazBarsModule {
         w = world;
         clk = clock;
         pk = new KazBarsGridPick(d);
+        all = [];
+        var i:Number;
+        var g:Object;
+        for (i = 0; i < d.CFG.grids.length; i++) {
+            g = d.CFG.grids[i];
+            if (g.type != "friendly" && g.type != "hostile") continue;
+            if (g.vis == undefined) g.vis = true;
+            all.push(g);
+        }
         kF = clk.add(frame, this, 1, false, 0);
         ros = new KazBarsRelations(this, w, "rel");
 
@@ -75,7 +86,6 @@ class KazBarsOverhead implements KazBarsModule {
         for (i = 0; i < cfgs.length; i++) {
             g = cfgs[i];
             g.one = true;
-            if (g.vis == undefined) g.vis = true;
             g._r = (g.type == "friendly") ? 1 : 2;
             if (g._p == null) g._p = [];
         }
@@ -164,6 +174,7 @@ class KazBarsOverhead implements KazBarsModule {
         for (i = 0; i < r.vs.length; i++) {
             v = r.vs[i];
             if (v == null) continue;
+            // cfg.vis is the grid's master switch, not r.vis (the character in view, read above).
             ok = p != null && v.cfg.vis && r.d <= v.cfg.maxDistance;
             if (ok) {
                 if (!v.shown || redo || v.stale) {
@@ -250,7 +261,7 @@ class KazBarsOverhead implements KazBarsModule {
     }
 
     // The samples stacked as the views would be, over your target (the screen centre with none); an unchecked one
-    // takes no place. A sample's check is its grid's flag the same frame, so the views over characters follow.
+    // takes no place.
     private function placeSamples():Void {
         var x:Number = S.x + W / 2;
         var y:Number = S.y + H / 2;
@@ -267,7 +278,6 @@ class KazBarsOverhead implements KazBarsModule {
         var up:Boolean = false;
         for (i = 0; i < smp.length; i++) {
             v = smp[i];
-            v.cfg.vis = v.shown;
             if (!v.shown) continue;
             y -= (up ? STACK : ros.lift(v.cfg.plateOffset, cd, H)) + v.H;
             up = true;
@@ -289,24 +299,18 @@ class KazBarsOverhead implements KazBarsModule {
     // Every class's overhead grids, not cfgs: the archive arrives once. Views already up hide on the next place().
     public function loadState(config:Object):Void {
         if (config == null) return;
-        var g:Array = d.CFG.grids;
         var i:Number;
         var x:Object;
-        for (i = 0; i < g.length; i++) {
-            if (g[i].type != "friendly" && g[i].type != "hostile") continue;
-            x = config.FindEntry("gk_" + g[i].key + "_v");
-            if (x !== undefined) g[i].vis = (x == 1);
+        for (i = 0; i < all.length; i++) {
+            x = config.FindEntry("gk_" + all[i].key + "_v");
+            if (x !== undefined) all[i].vis = (x == 1);
         }
     }
 
     public function saveState(config:Object):Void {
         if (config == null) return;
-        var g:Array = d.CFG.grids;
         var i:Number;
-        for (i = 0; i < g.length; i++) {
-            if (g[i].type == "friendly" || g[i].type == "hostile")
-                config.ReplaceEntry("gk_" + g[i].key + "_v", (g[i].vis != false) ? 1 : 0);
-        }
+        for (i = 0; i < all.length; i++) config.ReplaceEntry("gk_" + all[i].key + "_v", all[i].vis ? 1 : 0);
     }
     public function isActive():Boolean { return true; }
     public function setActive(a:Boolean):Void {}

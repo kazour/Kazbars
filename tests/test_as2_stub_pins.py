@@ -141,3 +141,21 @@ def test_the_preview_panel_has_a_row_group_per_kind_of_grid():
     tpl = (KAZBARS_ASSETS / "KazBars.as.template").read_text(encoding="utf-8")
     assert re.search(r"//#if PLATE\n\s+for \(i = 0; i < overhead\.smp\.length; i\+\+\) "
                      r"ppanel\.addGrid\(overhead\.smp\[i\]\);\n//#end", tpl.replace("\r\n", "\n"))
+
+
+def test_overhead_and_screen_grids_share_one_archive_key():
+    """Both grid stubs persist a grid's switch as gk_<key>_v (keys are unique
+    across all grids), and the overhead stub only ever touches its own
+    friendly/hostile cfgs — a rename on one side, or a dropped filter, would
+    silently stop the round-trip or stomp a floating grid's key."""
+    key = r'"gk_" \+ [\w.\[\]]+\.key \+ "_v"'
+    assert re.search(key, _stub("KazBarsGrids"))
+    oh = _stub("KazBarsOverhead")
+    assert len(re.findall(key, oh)) == 2          # loadState + saveState
+    seed = oh[oh.index("public function configure("):oh.index("public function onClass(")]
+    assert 'if (g.type != "friendly" && g.type != "hostile") continue;' in seed
+    assert "all.push(g);" in seed
+    for fn in ("loadState", "saveState"):
+        body = oh[oh.index(f"public function {fn}("):]
+        body = body[:body.index("\n    }\n")]
+        assert "all.length" in body and "d.CFG.grids" not in body, fn

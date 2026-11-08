@@ -18,7 +18,7 @@
 // survives the exit and the relog. A header is its group's master: one click
 // checks the group, another unchecks it. The panel itself stays stateless — the
 // grid stubs persist the grid flags (gk_<key>_v) and each extra persists its own
-// (inv/ctv/cnv/onv). Its own drag position rides in the module config archive as
+// (inv/ctv/cnv/onv/swv). Its own drag position rides in the module config archive as
 // ppx/ppy, beside the other panels' keys.
 class KazBarsPreviewPanel extends KazBarsPanel {
     // The one call that flows back to the core (the contract note atop
@@ -310,9 +310,15 @@ class KazBarsPreviewPanel extends KazBarsPanel {
     }
 
     // The one dispatch point: a grid is its clip, an extra is a key the owner
-    // knows how to route to whichever stub it belongs to.
+    // knows how to route to whichever stub it belongs to. A grid's cfg.vis is
+    // the overhead grids' master flag (KazBarsOverhead reads it over every
+    // character); on a floating grid nothing reads it.
     private function applyRow(r:Object):Void {
-        if (r.obj != null) { r.obj.shown = r.checked; r.obj.mc._visible = r.checked; }
+        if (r.obj != null) {
+            r.obj.shown = r.checked;
+            r.obj.mc._visible = r.checked;
+            r.obj.cfg.vis = r.checked;
+        }
         else owner.previewToggle(r.key, r.checked);
     }
 
