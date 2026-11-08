@@ -373,9 +373,11 @@ class KazBarsOnsScan {
             // unverified: every level is guarded.
             var bl:Object = r.ch.m_BuffList;
             var q:String;
+            var bn:String;
             for (q in bl) {
-                if (HL[bl[q].m_Name]) r.hl = Number(q);
-                if (SH[bl[q].m_Name]) r.sh = Number(q);
+                bn = bl[q].m_Name;
+                if (HL[bn]) r.hl = Number(q);
+                if (SH[bn]) r.sh = Number(q);
             }
         } catch (e) {}
         return r;
@@ -399,8 +401,9 @@ class KazBarsOnsScan {
         if (up) {
             var b:Object = r.ch.m_BuffList[id];
             if (b == undefined) return;
-            if (HL[b.m_Name]) r.hl = id;
-            if (SH[b.m_Name]) r.sh = id;
+            var nm:String = b.m_Name;
+            if (HL[nm]) r.hl = id;
+            if (SH[nm]) r.sh = id;
         } else {
             if (id == r.hl) r.hl = 0;
             if (id == r.sh) r.sh = 0;

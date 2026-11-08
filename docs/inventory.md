@@ -59,7 +59,7 @@
 | `src/kazbars/grid_preview_canvas.py` | 224 |
 | `src/kazbars/grid_settings_dialog.py` | 529 |
 | `src/kazbars/grid_templates.py` | 85 |
-| `src/kazbars/grids_generator.py` | 802 |
+| `src/kazbars/grids_generator.py` | 803 |
 | `src/kazbars/grids_panel.py` | 926 |
 | `src/kazbars/inspect.py` | 67 |
 | `src/kazbars/inspect_catalog.py` | 581 |
@@ -67,8 +67,8 @@
 | `src/kazbars/instructions_panel.py` | 1484 |
 | `src/kazbars/live_tracker_panel.py` | 521 |
 | `src/kazbars/live_tracker_settings.py` | 175 |
-| `src/kazbars/onslaught.py` | 241 |
-| `src/kazbars/onslaught_panel.py` | 315 |
+| `src/kazbars/onslaught.py` | 236 |
+| `src/kazbars/onslaught_panel.py` | 316 |
 | `src/kazbars/overlay.py` | 117 |
 | `src/kazbars/overlay_engine.py` | 800 |
 | `src/kazbars/overlay_size.py` | 115 |
@@ -141,7 +141,7 @@
 | `tests/test_log_name.py` | 22 |
 | `tests/test_manifest.py` | 124 |
 | `tests/test_mypy_gate.py` | 74 |
-| `tests/test_onslaught.py` | 223 |
+| `tests/test_onslaught.py` | 224 |
 | `tests/test_overlay_config.py` | 102 |
 | `tests/test_overlay_rung.py` | 145 |
 | `tests/test_overlay_size.py` | 221 |

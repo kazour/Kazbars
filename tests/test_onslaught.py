@@ -98,12 +98,12 @@ def test_guards_list_apart_only_when_asked():
 
 
 def test_camps_name_each_instance():
-    assert set(ons.CAMPS) == {i.playfield for i in ons.INSTANCES}
-    assert [c.name for c in ons.CAMPS[20010]] == ["Hub", "Cave", "WCave", "Tower", "Bridge", "Altar"]
-    assert [c.name for c in ons.CAMPS[20000]] == [
+    camps = {i.playfield: i.camps for i in ons.INSTANCES}
+    assert [c.name for c in camps[20010]] == ["Hub", "Cave", "WCave", "Tower", "Bridge", "Altar"]
+    assert [c.name for c in camps[20000]] == [
         "Respad", "South West", "South East", "Temple", "East", "South", "West", "North"]
-    assert [sum(len(c.points) for c in ons.CAMPS[pf]) for pf in (20010, 20000)] == [7, 22]
-    for camp in (c for camps in ons.CAMPS.values() for c in camps):
+    assert [sum(len(c.points) for c in camps[pf]) for pf in (20010, 20000)] == [7, 22]
+    for camp in (c for cs in camps.values() for c in cs):
         assert camp.r > 0 and len(camp.name) <= 10, camp
         assert all(len(p) == 3 and all(isinstance(v, int) for v in p) for p in camp.points), camp
 
@@ -201,6 +201,7 @@ def test_the_watch_table_holds_only_what_a_display_reads():
     assert g != "g: []"
     alerts = {"enabled": True, "camps": True, **{k: k == "showAlerts" for k in SHOWS}}
     assert _kinds(_build(alerts)[1]) == [b, s, g, m, "c: []"], "a camp never alerts"
+    assert "camps: []}" in _build(alerts)[1], "only the list reads a skull's camp"
     listed = {"enabled": True, "camps": True, **{k: k == "showList" for k in SHOWS}}
     assert _kinds(_build(listed)[1]) == [b, s, g, m, c]
     wave = {"enabled": True, "camps": True, **{k: k == "showWave" for k in SHOWS}}

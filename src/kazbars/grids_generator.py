@@ -480,15 +480,16 @@ class CodeGenerator:
             "        d.ONS.pf = {};",
         ]
 
-        def camps(playfield):
+        def camps(instance):
+            # Only the list reads a skull's camp: the scan skips the lookup on an empty table.
             return ", ".join(
                 f'{{n: "{escape_as2_string(camp.name)}", r: {camp.r}, '
                 f'p: [{", ".join(str(v) for point in camp.points for v in point)}]}}'
-                for camp in onslaught.CAMPS.get(playfield, ()))
+                for camp in instance.camps) if c["showList"] else ""
 
         lines += [f'        d.ONS.pf[{i.playfield}] = {{start: "{escape_as2_string(i.start_hint)}", '
                   f'spawnMs: {i.spawn_ms}, ally: "{escape_as2_string(i.ally)}", aoe: {_bool(i.aoe)}, '
-                  f'camps: [{camps(i.playfield)}]}};'
+                  f'camps: [{camps(i)}]}};'
                   for i in onslaught.INSTANCES]
         return "\n" + "\n".join(lines)
 

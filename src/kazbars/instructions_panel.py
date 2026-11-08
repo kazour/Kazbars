@@ -1028,8 +1028,8 @@ SECTIONS: list[_Section] = [
                 'Gurnakhi Juggernaut (Skull Gate) and Ancient Kuthcheman '
                 'Guardian (Kuthchemes) under GUARDS at the very bottom of '
                 'the board, below CAMPS, and tags their spawn alert GUARD '
-                'instead of SKULL. Untick it and they stay skulls. Like '
-                'the camps option, it greys out unless Mob list is on.',
+                'instead of SKULL. Untick it and they stay skulls. It greys '
+                'out unless Mob list or Spawn alerts is on.',
                 'Your own names — up to 20, watched as minis. A name has to '
                 "match the game's exactly, capitals included; the dialog "
                 'says why it refuses one as you type. × deletes a name; '

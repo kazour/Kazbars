@@ -61,18 +61,24 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
     private var SHIELD:Object;    // shield buff names -> true
     private var GUARD:Boolean;    // the guards list apart (their own tier)
     private var TIERS:String;     // the tiers' kind codes, top to bottom
-    private var INST:Object;      // playfield id -> {start, spawnMs, ally, aoe}
+    private var AL:Object;        // alert tag and colour by kind code: {t, c}; a mini's is the default
+    private var INST:Object;      // playfield id -> {start, spawnMs, ally, aoe, camps}
     private var PULSE:Array;      // 20 alpha steps, 70 + 30 cos
     private var P:Array;          // anchor x, y pairs: board, alerts
     private var TS:Object;        // tier style by kind code b s m c g: {fs, bold, col, bh, rh, hd}
 
     // Geometry beyond the base set, every value Math.round(FS x ratio). Type is
-    // the base's roles: boss rows and the wave line Title, camp rows and tier
-    // headers Small, alerts Alert, everything else Body (see KazBarsPanel).
+    // the base's roles: boss rows and the wave label Title, the wave clocks and
+    // the alerts Alert, camp rows and tier headers Small, everything else Body
+    // (see KazBarsPanel).
+    private static var TT:Array = ["w", "c1", "n", "c2", "l"];   // the title's fields, left to right
+    private static var GUT:Number = 4;   // a TextField's two 2 px gutters, around its textWidth
     private var NAME_W:Number;    // 16   name column
     private var VAL_W:Number;     // 9    value column
     private var FAT_H:Number;     // 0.75 the fatality line's bar, the board's thickest
     private var ALLY_H:Number;    // 0.5  the ally line's bar
+    private var FAT_X:Number;     // what the fatality line takes: LINE + its bar + 2
+    private var ALLY_X:Number;    // the same for the ally line
     private var PW:Number;        // NAME_W + VAL_W
     private var AH:Number;        // an alert line: lh(ALERT_FS)
     private var AW:Number;        // 37   alert width: the longest alert at ALERT_FS
@@ -156,21 +162,26 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         VAL_W = rd(9);
         FAT_H = rd(0.75);
         ALLY_H = rd(0.5);
+        FAT_X = LINE + FAT_H + 2;
+        ALLY_X = LINE + ALLY_H + 2;
         PW = NAME_W + VAL_W;
         AH = lh(ALERT_FS);
         // 37 x FS holds the longest alert there can be (SKULL or GUARD + the
         // longest watched name + a three-digit distance) at ALERT_FS, at every FS.
         AW = rd(37);
+        // The guards' tier exists only when the build lists them apart.
         GUARD = cfg.watch.g.length > 0;
-        TIERS = "bsmcg";
+        TIERS = GUARD ? "bsmcg" : "bsmc";
         TS = {b: tier(NAME_FS, true, 0xF7A22B, 0.6, "BOSS"), s: tier(FS, false, 0xE0703C, 0.5, "SKULL"),
-              m: tier(FS, false, 0xC8C0B0, 0.4, "MINI"), c: tier(SMALL_FS, false, 0x9A9284, 0.35, "CAMPS"),
-              g: tier(FS, false, 0xE0703C, 0.5, "GUARDS")};
+              m: tier(FS, false, 0xC8C0B0, 0.4, "MINI"), c: tier(SMALL_FS, false, 0x9A9284, 0.35, "CAMPS")};
+        TS.g = tier(FS, false, TS.s.col, 0.5, "GUARDS");   // a skull's look under its own header
+        AL = {b: {t: "BOSS ", c: 0xE0503C}, s: {t: "SKULL ", c: TS.s.col}, g: {t: "GUARD ", c: TS.s.col},
+              m: {t: "", c: 0xF7A22B}};
         FX = [0, -Math.round(AW / 2)];
         FW = [PW + PAD * 2, AW];
         // The board's footprint is its preview sample: wave, fatality and ally lines, four headers,
         // five rows, and the guards' header and row when they list apart.
-        FH = [PAD * 2 + (WAVE ? AH + LINE + FAT_H + 2 : 0) + (ALLY ? LINE + ALLY_H + 2 : 0)
+        FH = [PAD * 2 + (WAVE ? AH + FAT_X : 0) + (ALLY ? ALLY_X : 0)
               + (LIST ? SMALL_H * 4 + TS.b.rh + TS.s.rh + TS.m.rh * 2 + TS.c.rh
                  + (GUARD ? SMALL_H + TS.g.rh : 0) : 0), AH * 2];
         var k:String;
@@ -182,24 +193,23 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
             i = a.length;
             while (i--) W[a[i]] = k;
         }
-        H = {};
-        a = cfg.helpers;
-        i = a.length;
-        while (i--) H[a[i]] = true;
-        HEAL = {};
-        a = cfg.heal;
-        i = a.length;
-        while (i--) HEAL[a[i]] = true;
-        SHIELD = {};
-        a = cfg.shield;
-        i = a.length;
-        while (i--) SHIELD[a[i]] = true;
+        H = toSet(cfg.helpers);
+        HEAL = toSet(cfg.heal);
+        SHIELD = toSet(cfg.shield);
         PULSE = [];
         for (i = 0; i < 20; i++) PULSE.push(70 + 30 * Math.cos(i * Math.PI / 10));
     }
 
     // A geometry ratio of the base size (never a font: those are the base's roles).
     private function rd(k:Number):Number { return Math.round(FS * k); }
+
+    // The names of an array as a set: name -> true.
+    private function toSet(a:Array):Object {
+        var o:Object = {};
+        var i:Number = a.length;
+        while (i--) o[a[i]] = true;
+        return o;
+    }
 
     // A tier's look: name font (a role) and weight, name colour, bar height (at least 2) and the row's height.
     private function tier(fs:Number, bold:Boolean, col:Number, bk:Number, label:String):Object {
@@ -380,13 +390,14 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         if (cl[1] != null) a0 = mkAl(0);
         if (!prev) return;
 
+        // Sample records: hl, sh and cp are left out where they would be 0 or "".
         var mobs:Array = [
-            {nm: "Louhi", k: "b", st: 0, pct: 100, d: 180, hl: 1, sh: 0, cp: ""},
-            {nm: "Excavator of Souls", k: "s", st: 0, pct: 72, d: 210, hl: 0, sh: 0, cp: "Temple"},
-            {nm: "Gurnakhi Slaver", k: "m", st: 0, pct: 72, d: 240, hl: 0, sh: 0, cp: ""},
-            {nm: "Asshuri Sultan", k: "m", st: 0, pct: 100, d: 95, hl: 0, sh: 0, cp: ""},
-            {nm: "Zug-Touched Monitor", k: "c", st: 0, pct: 100, d: 141, hl: 0, sh: 0, cp: ""}];
-        if (GUARD) mobs.push({nm: "Gurnakhi Juggernaut", k: "g", st: 0, pct: 100, d: 60, hl: 0, sh: 1, cp: ""});
+            {nm: "Louhi", k: "b", st: 0, pct: 100, d: 180, hl: 1},
+            {nm: "Excavator of Souls", k: "s", st: 0, pct: 72, d: 210, cp: "South West"},
+            {nm: "Gurnakhi Slaver", k: "m", st: 0, pct: 72, d: 240},
+            {nm: "Asshuri Sultan", k: "m", st: 0, pct: 100, d: 95},
+            {nm: "Zug-Touched Monitor", k: "c", st: 0, pct: 100, d: 141}];
+        if (GUARD) mobs.push({nm: "Gurnakhi Juggernaut", k: "g", st: 0, pct: 100, d: 60, sh: 1});
         paintP({anchor: 1, ally: {st: 0, pct: 87}, mobs: mobs}, getTimer(), true);
         if (cl[1] != null) setAl(a0, "Gurnakhi Slaver - 240 m", 0xF7A22B);
         var lb:Array = ["Onslaught", "Onslaught Alerts"];
@@ -473,7 +484,7 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
             // The fatality line's bar is the game meter's: gold while it fills, red once
             // full, pulsing for 3 s from the moment it filled. A sample in preview.
             c = line(1, y, FAT_H);
-            y += LINE + FAT_H + 2;
+            y += FAT_X;
             pct = prev ? 75 : wPct;
             f = prev ? 0 : wFull;
             row(c, "Fatality", 0xC8C0B0, Math.round(pct) + "%", 0xC8C0B0);
@@ -498,7 +509,7 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
                 pct = r.pct;
             }
             c = line(2, y, ALLY_H);
-            y += LINE + ALLY_H + 2;
+            y += ALLY_X;
             row(c, t, col, v, col);
             fill(c.b, pct);
             flash(c, r != null && r.st == 0 && now - r.drop < 3000);
@@ -558,12 +569,13 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         var i:Number;
         var n:Number;
         var d:Number = -1;
-        var k:String;
-        for (i = 0; i < f.length; i++) {
-            k = f[i].k;
-            if (ALERTS) addAl(((k == "b") ? "BOSS " : ((k == "s") ? "SKULL " : ((k == "g") ? "GUARD " : ""))) + f[i].nm
-                              + ((f[i].d >= 0) ? " - " + f[i].d + " m" : ""),
-                              (k == "b") ? 0xE0503C : ((k == "s" || k == "g") ? 0xE0703C : 0xF7A22B), now);
+        var k:Object;
+        if (ALERTS) {
+            for (i = 0; i < f.length; i++) {
+                k = AL[f[i].k];
+                if (k == undefined) k = AL.m;
+                addAl(k.t + f[i].nm + ((f[i].d >= 0) ? " - " + f[i].d + " m" : ""), k.c, now);
+            }
         }
         if (hasAlly && r != null && r.st != 2) {
             // Below 50 and below 25 fire once each, and re-arm 5 points above.
@@ -590,29 +602,35 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
     // A board line: a pooled clip made on first use, put at the cursor (y written
     // only when it moved). The fatality and ally lines carry a bar bh tall under
     // their text (0: none). The wave line (0) is the board's title, AH tall:
-    // five fields on one bottom edge, the label (w, Title bold, gold), the
-    // elapsed clock (c1, Alert bold, bright), the phase (n, Body, centred), the
-    // remaining clock (c2, Alert bold, bright) and l (Body).
+    // the TT fields on one bottom edge, each with its own font, weight, colour
+    // and alignment (mkTitle).
     private function line(i:Number, y:Number, bh:Number):MovieClip {
         var c:MovieClip = ln[i];
         if (c == null) {
-            if (i == 0) {
-                var d:Number = cl[0].getNextHighestDepth();
-                c = cl[0].createEmptyMovieClip("r" + d, d);
-                var ids:Array = ["w", "c1", "n", "c2", "l"];
-                var fs:Number;
-                var j:Number;
-                for (j = 0; j < 5; j++) {
-                    fs = (j == 0) ? NAME_FS : ((j == 2 || j == 4) ? FS : ALERT_FS);
-                    makeTF(c, ids[j], PAD, AH - lh(fs), PW, lh(fs), fs, fs != FS,
-                           (j == 0) ? 0xF7A22B : ((fs == FS) ? 0xC8C0B0 : 0xE8E2D6),
-                           (j == 2) ? "center" : "left");
-                }
-            } else c = mkRow(cl[0], PW, FS, false, LINE);
+            c = (i == 0) ? mkTitle() : mkRow(cl[0], PW, FS, false, LINE);
             if (bh > 0) c.b = mkBar(c, PAD, LINE - 1, PW, bh);
             ln[i] = c;
         }
         if (c._y != y) c._y = y;
+        return c;
+    }
+
+    // The title clip: the TT fields, each a row of the spec table below (font,
+    // bold, colour, alignment) - the label (Title, gold), the elapsed clock
+    // (Alert, bright), the phase (Body, centred), the remaining clock (Alert,
+    // bright) and "left" (Body) - every one PW wide until title() lays it out.
+    private function mkTitle():MovieClip {
+        var d:Number = cl[0].getNextHighestDepth();
+        var c:MovieClip = cl[0].createEmptyMovieClip("r" + d, d);
+        var sp:Array = [[NAME_FS, true, 0xF7A22B, "left"], [ALERT_FS, true, 0xE8E2D6, "left"],
+                        [FS, false, 0xC8C0B0, "center"], [ALERT_FS, true, 0xE8E2D6, "left"],
+                        [FS, false, 0xC8C0B0, "left"]];
+        var s:Array;
+        var j:Number;
+        for (j = 0; j < TT.length; j++) {
+            s = sp[j];
+            makeTF(c, TT[j], PAD, AH - lh(s[0]), PW, lh(s[0]), s[0], s[1], s[2], s[3]);
+        }
         return c;
     }
 
@@ -623,13 +641,12 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
     // ending at PAD + PW (where the bars end), and the phase centred in the gap
     // between them, clipped to it. An empty field takes no room and no gap.
     private function title(c:MovieClip, lab:String, p:Array):Void {
-        var ids:Array = ["w", "c1", "n", "c2", "l"];
         var t:Array = [lab, p[0], p[1], p[2], (p[2] != "") ? "left" : ""];
         var f:TextField;
         var i:Number;
         var moved:Boolean = false;
-        for (i = 0; i < 5; i++) {
-            f = c[ids[i]];
+        for (i = 0; i < TT.length; i++) {
+            f = c[TT[i]];
             if (f.text != t[i]) {
                 f.text = t[i];
                 moved = true;
@@ -641,20 +658,25 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         var r:Number = PAD + PW;
         var tw:Number;
         for (i = 0; i < 2; i++) {
-            f = c[ids[i]];
+            f = c[TT[i]];
             if (f._x != x) f._x = x;
-            if (f.text != "") x += Math.round(f.textWidth) + 4 + g;
+            tw = fit(f);
+            if (tw > 0) x += tw + g;
         }
         for (i = 4; i > 2; i--) {
-            f = c[ids[i]];
-            tw = (f.text != "") ? Math.round(f.textWidth) + 4 : 0;
+            f = c[TT[i]];
+            tw = fit(f);
             if (f._x != r - tw) f._x = r - tw;
             if (tw > 0) r -= tw + g;
         }
         f = c.n;
+        tw = Math.max(0, r - x);
         if (f._x != x) f._x = x;
-        if (f._width != Math.max(0, r - x)) f._width = Math.max(0, r - x);
+        if (f._width != tw) f._width = tw;
     }
+
+    // The room a title field takes: its text with the gutters, none when empty.
+    private function fit(f:TextField):Number { return (f.text != "") ? Math.round(f.textWidth) + GUT : 0; }
 
     // A tier's header, hidden until the tier has a row: its name, Small and bold, in the tier's colour.
     private function mkHd(s:Object):MovieClip {
@@ -779,13 +801,13 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         if (s == 0) v = where(r) + "  " + r.pct + "%";
         else if (s == 1) v = "last " + where(r) + " - " + sec(now - r.seen) + " s ago";
         row(c, r.nm, (s == 0) ? TS[r.k].col : 0x7F786C, v, (s == 0) ? 0xC8C0B0 : ((s == 1) ? 0x7F786C : 0xE0503C));
-        fill(c.b, r.pct, (s == 0 && r.sh > 0) ? 0x8AC6FF : undefined, false);
+        fill(c.b, r.pct, (s == 0 && r.sh > 0) ? 0x8AC6FF : undefined);
         flash(c, s == 0 && now - r.drop < 3000);
         if (c.x._visible != x) c.x._visible = x;
     }
 
     // Where a mob is: the camp a skull stands on, else its distance.
-    private function where(r:Object):String { return (r.cp != "") ? r.cp : dm(r.d); }
+    private function where(r:Object):String { return r.cp ? r.cp : dm(r.d); }
     private function dm(d:Number):String { return (d >= 0) ? d + " m" : ""; }
     private function sec(ms:Number):Number { return Math.floor(ms / 1000); }
     private function short():String { return allyN.substr(allyN.lastIndexOf(" ") + 1); }
