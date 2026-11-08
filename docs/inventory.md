@@ -60,7 +60,7 @@
 | `src/kazbars/grid_settings_dialog.py` | 580 |
 | `src/kazbars/grid_templates.py` | 85 |
 | `src/kazbars/grids_generator.py` | 804 |
-| `src/kazbars/grids_panel.py` | 927 |
+| `src/kazbars/grids_panel.py` | 932 |
 | `src/kazbars/inspect.py` | 66 |
 | `src/kazbars/inspect_catalog.py` | 581 |
 | `src/kazbars/inspect_panel.py` | 278 |
@@ -146,7 +146,7 @@
 | `tests/test_overlay_rung.py` | 143 |
 | `tests/test_overlay_size.py` | 214 |
 | `tests/test_panel_ratios.py` | 162 |
-| `tests/test_panels_construct.py` | 2061 |
+| `tests/test_panels_construct.py` | 2074 |
 | `tests/test_prefs.py` | 95 |
 | `tests/test_prefs_schema_covers_all_proxy_keys.py` | 83 |
 | `tests/test_profile_document.py` | 249 |

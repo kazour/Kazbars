@@ -1945,8 +1945,21 @@ def test_the_tab_strip_ends_with_its_last_class(app):
     from tkinter import ttk
     gp = app.grids_panel
     row = next(iter(gp._tab_buttons.values()))[0].master
-    slaves = row.pack_slaves()
+    slaves = row.grid_slaves()
     assert all(isinstance(w, ttk.Radiobutton) for w in slaves), "no file buttons on the strip"
+    assert len(slaves) == 13 and not row.pack_slaves()
+
+
+def test_the_tab_strip_spans_the_window_at_its_minimum_width(app):
+    gp = app.grids_panel
+    first = gp._tab_buttons[0][0]
+    assert first.cget('text').startswith('All classes')
+    row = first.master
+    app.geometry('950x660')
+    app.update()
+    last = max((b for b, _ in gp._tab_buttons.values()), key=lambda b: b.winfo_x())
+    assert last.winfo_x() + last.winfo_width() == row.winfo_width()
+    assert row.winfo_width() >= gp.winfo_width() - 40
 
 
 def test_export_grid_writes_the_grid_without_its_class(app, monkeypatch, tmp_path):

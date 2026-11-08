@@ -268,13 +268,13 @@ SECTIONS: list[_Section] = [
         'title': 'Class Tabs',
         'body': [
             'A row of tabs under the Grids toolbar sorts your grids by '
-            'class: All, then the twelve classes in four groups — Guard '
+            'class: All classes, then the twelve classes in four groups — Guard '
             'Conq DT, PoM ToS BS, Barb Sin Ranger, Demo Necro HoX. Each tab '
             'shows how many grids it holds.',
             _sub('What a tab means', [
                 'A tab lists its own grids only. A new grid joins the tab '
                 'you add it on.',
-                'In game you get the All grids plus the grids of the class '
+                'In game you get the grids on All classes plus the grids of the class '
                 "you're playing. The set follows your character's class.",
             ]),
             _sub('Move… and Copy…', [
