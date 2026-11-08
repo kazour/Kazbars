@@ -175,6 +175,7 @@ class KazBars {
 //#end
 //#if ONS
         ppanel.addExtra(onslaught.previewLabel(), onslaught.previewKey(), onslaught.isActive());
+        ppanel.addExtra("Onslaught Alerts", "onsa", onslaught.alertsShown());
 //#end
 //#if CONSOLE
         ppanel.addExtra(console.previewLabel(), console.previewKey(), console.isActive());
@@ -202,8 +203,15 @@ class KazBars {
     }
 
     // Named dispatcher for the control panel's extra rows -- the checkbox knows
-    // a key, each stub has its own idea of what hiding means.
+    // a key, each stub has its own idea of what hiding means. The onslaught
+    // alerts' row is the one key no module owns: it hides that anchor alone.
     public function previewToggle(key:String, shown:Boolean):Void {
+//#if ONS
+        if (key == "onsa") {
+            onslaught.setAlerts(shown);
+            return;
+        }
+//#end
         var mi:Number = 0;
         while (mi < modules.length) {
             var m:KazBarsModule = modules[mi];

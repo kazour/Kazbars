@@ -1820,6 +1820,53 @@ def test_the_onslaught_dialog_refits_when_its_hint_comes_or_goes(app, monkeypatc
         app.profile_store.set_section('onslaught', before)
 
 
+def test_the_onslaught_display_is_one_form_with_its_own_alert_size(app):
+    from tkinter import ttk
+
+    from kazbars import overlay
+    from kazbars.overlay_size import panel_fs, panel_scale
+    before = app.profile_store.get_section('onslaught')
+    app.profile_store.set_section('onslaught', {**before, 'enabled': True, 'scale': 100, 'alertScale': 160,
+                                                'showAlerts': True, 'showAoe': True, 'showAlly': True})
+    base = overlay.validate_config(app.profile_store.get_section('overlay'))['size']
+    app._open_onslaught_settings()
+    dlg = app.onslaught_dialog
+    try:
+        heads = {str(w.cget('text')): w for w in _widgets(dlg, ttk.Label)}
+        names = ["Board:", "Board size:", "Alerts:", "Alert size:", "Alert time:"]
+        form = heads["Board:"].master
+        for i, name in enumerate(names):
+            info = heads[name].grid_info()
+            assert heads[name].master is form and int(info['row']) == i and info['sticky'] == 'e', name
+
+        def cell(name, cls):
+            row = int(heads[name].grid_info()['row'])
+            return [w for w in form.grid_slaves(row=row, column=1)[0].winfo_children() if isinstance(w, cls)]
+
+        size, = cell("Alert size:", ttk.Scale)
+        readout, = cell("Alert size:", ttk.Label)
+        assert str(readout.cget('text')) == f"{panel_fs(base, 160)} pt"
+        timer, = cell("Alert time:", ttk.Scale)
+        boxes = {str(w.cget('text')): w for w in _widgets(dlg, ttk.Checkbutton)}
+        for text in ("Spawn alerts", "AoE warnings", "Hylda HP"):
+            boxes[text].invoke()
+        assert 'disabled' in size.state() and 'disabled' in timer.state(), "nothing alerts"
+        boxes["AoE warnings"].invoke()
+        assert 'disabled' not in size.state(), "the AoE line has a size"
+        assert 'disabled' in timer.state(), "but no banner to time"
+        size.set(panel_fs(base, 160) + 1)  # as a drag: the slider's command
+        assert str(readout.cget('text')) == f"{panel_fs(base, 160) + 1} pt"
+        next(w for w in _widgets(dlg, ttk.Button) if str(w.cget('text')) == 'Apply').invoke()
+        saved = app.profile_store.get_section('onslaught')
+        assert saved['alertScale'] == panel_scale(base, panel_fs(base, 160) + 1)
+        assert saved['scale'] == 100, "the board keeps its size"
+    finally:
+        if dlg.winfo_exists():
+            _close_via_protocol(dlg)
+        app.update()
+        app.profile_store.set_section('onslaught', before)
+
+
 def _fire_binding(widget, sequence):
     """Run `widget`'s own `sequence` binding as Tk would on the event: a
     generated key event never reaches a window that is not mapped."""

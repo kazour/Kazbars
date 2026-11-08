@@ -480,7 +480,8 @@ SECTIONS: list[_Section] = [
             ]),
             _sub('Size sliders', [
                 'Each grid, and the Stopwatch, Inspect Target, Cast timer, '
-                'Console and Onslaught tracker, has its own Size slider. It '
+                'Console and Onslaught tracker, has its own Size slider (the '
+                'Onslaught tracker has two, Board size and Alert size). It '
                 'shows the real size in game: icon px for a grid, 32–92; '
                 'text pt for a panel, 8–28.',
                 'Each Size is kept relative to the Overlay size, so a new '
@@ -884,9 +885,10 @@ SECTIONS: list[_Section] = [
             _sub('Using it in-game', [
                 'A draggable panel shows h:mm:ss. − collapses it to the title '
                 'bar, which keeps showing the time; click to reopen.',
-                'Drag the title bar. The game remembers position and fold — '
-                "the dialog's X/Y only seed the first session — and keeps "
-                'the spot when the screen resizes.',
+                'Drag the title bar. It opens unfolded the first time; '
+                'after that the game remembers position and fold — the '
+                "dialog's X/Y only seed that first session — and keeps the "
+                'spot when the screen resizes.',
                 'Size is a slider in the dialog, in pt, and moves with the '
                 'Overlay size.',
             ]),
@@ -939,9 +941,10 @@ SECTIONS: list[_Section] = [
                 'too. Hover one to see its name.',
             ]),
             _sub('Positioning and size', [
-                'Drag by the name strip; − collapses to just the strip. The '
-                "game remembers position and fold — the dialog's X/Y only "
-                'seed a first-ever session. Start collapsed loads it folded.',
+                'Drag by the name strip; − collapses to just the strip. It '
+                'opens unfolded the first time; after that the game '
+                "remembers position and fold — the dialog's X/Y only seed "
+                'that first session.',
                 'No target? Preview mode (Shift+Ctrl+Alt) shows a '
                 'placeholder.',
                 'Size is a slider in this dialog, in pt, and the whole '
@@ -1045,12 +1048,12 @@ SECTIONS: list[_Section] = [
                 'lists them by name, one line per group. Include '
                 'Kuthchemes camps adds the camp beasts to the board — '
                 'listed, never alerted — and a line for them in that list.',
-                'Guards in their own group — ticked by default — lists '
+                'Guards in their own group lists '
                 'Gurnakhi Juggernaut (Skull Gate) and Ancient Kuthcheman '
-                'Guardian (Kuthchemes) under GUARDS at the very bottom of '
+                'Guardian (Kuthchemes) under GUARD at the very bottom of '
                 'the board, below CAMPS, and tags their spawn alert GUARD '
-                'instead of SKULL. Untick it and they stay skulls. It greys '
-                'out unless Mob list or Spawn alerts is on.',
+                'instead of SKULL. Leave it unticked and they stay skulls. '
+                'It greys out unless Mob list or Spawn alerts is on.',
                 'Your own names — up to 20, watched as minis. A name has to '
                 "match the game's exactly, capitals included; the dialog "
                 'says why it refuses one as you type. × deletes a name; '
@@ -1070,8 +1073,17 @@ SECTIONS: list[_Section] = [
                 'Place the board and the alerts in preview mode '
                 '(Shift+Ctrl+Alt): drag each where you want it, the game '
                 'remembers.',
-                'Size is a slider in the dialog, in pt, and moves with the '
-                'Overlay size. The alerts draw larger than the board.',
+                'Board size and Alert size are sliders in the dialog, in '
+                'pt, and move with the Overlay size. Board size sets the '
+                'board, wave clocks included. Alert size sets the spawn '
+                "alerts, Hylda's 50 % and 25 % alerts and the AoE line; "
+                'it starts at 19 pt on a 1080p overlay, against 12 for the '
+                'board, and greys out unless Spawn alerts, AoE warnings or '
+                'Hylda HP is on.',
+                'In the KazBars Preview panel (Shift+Ctrl+Alt), Onslaught '
+                'switches the whole tracker off and on. Onslaught Alerts, '
+                'under it, hides the alerts — banners and the AoE line — '
+                'while the board keeps running. The game remembers both.',
             ]),
             [('Tick ', None),
              ('Include the onslaught tracker in builds', _SUCCESS),

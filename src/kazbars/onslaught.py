@@ -14,7 +14,8 @@ the camp's name in place of its distance; a mob carrying a SHIELD_BUFFS buff dra
 its bar light blue.
 
 The section (`onslaught`, BUILD lane): `enabled`, `scale` (the board's text,
-`overlay_size.panel_fs`; the alerts draw 1.6 times as large), the five
+`overlay_size.panel_fs`), `alertScale` (the alert banners' text, the same way;
+160 by default, where the alerts drew at 1.6 times the board), the five
 displays (`showList` Mob list, `showWave` Wave timer, `showAlly` Hylda HP,
 `showAlerts` Spawn alerts, `showAoe` AoE warnings), `alertSeconds` (how long a
 banner stays), `camps`, `guards` and `custom`. It ships when enabled with at least one
@@ -193,6 +194,7 @@ def _validate_custom(value: Any) -> list[str]:
 _SCHEMA = Schema('', 1, {
     'enabled': Field(False, kind='bool'),
     'scale': Field(SCALE_DEFAULT, validate=scale_from),
+    'alertScale': Field(160, validate=scale_from),
     'showList': Field(True, kind='bool'),
     'showAlerts': Field(True, kind='bool'),
     'showWave': Field(True, kind='bool'),

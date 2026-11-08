@@ -41,7 +41,7 @@ def test_the_catalog_has_its_35_names_in_seven_groups_and_27_always_watched():
 def test_defaults_from_absent_or_non_object_section():
     for raw in (None, 5, [], "x"):
         c = _cfg(raw)
-        assert not c["enabled"] and c["scale"] == 100
+        assert not c["enabled"] and c["scale"] == 100 and c["alertScale"] == 160
         assert all(c[k] for k in SHOWS)
         assert c["alertSeconds"] == 6 and not c["camps"] and c["custom"] == []
         assert c["guards"] is True
@@ -59,6 +59,9 @@ def test_clamps_scale_and_alert_time_and_coerces_truthiness():
     ):
         c = _cfg(raw)
         assert (c["alertSeconds"], c["scale"]) == (alert, scale), raw
+    for raw, want in ((4, 40), (400, 300), ("120", 120), (120.7, 120), (float("nan"), 100), ("", 100),
+                      (None, 100)):
+        assert _cfg({"alertScale": raw})["alertScale"] == want, raw
     c = _cfg({"enabled": 1, "showList": "", "showAoe": []})
     assert c["enabled"] and not c["showList"] and not c["showAoe"] and c["showWave"]
 
@@ -70,7 +73,7 @@ def test_keys_an_older_build_wrote_are_dropped():
         assert key not in c, key
     assert c["custom"] == ["Pict Shaman"] and c["scale"] == 100
     assert "Taskmaster Mijoral" in ons.names_of(c, ons.BOSS), "a picked watch list narrows nothing"
-    assert list(c) == ["enabled", "scale", *SHOWS, "alertSeconds", "camps", "guards", "custom"]
+    assert list(c) == ["enabled", "scale", "alertScale", *SHOWS, "alertSeconds", "camps", "guards", "custom"]
 
 
 def test_the_catalog_is_watched_and_the_camps_only_when_asked():
@@ -175,7 +178,7 @@ def test_the_tracker_bakes_its_block_hooks_and_instances():
     assert "onslaught = new KazBarsOnslaught(rootClip);" in main
     assert "onslaught.configure(d.ONS, world, clock);" in main
     assert "modules.push(onslaught);" in main
-    assert ("        d.ONS = {x: 1560, y: 300, ax: 960, ay: 200, fontSize: 21, list: true, "
+    assert ("        d.ONS = {x: 1560, y: 300, ax: 960, ay: 200, fontSize: 21, alertFontSize: 19, list: true, "
             "alerts: true, wave: true, aoe: true, ally: true, alertMs: 6000};") in data
     assert '"Zug-Touched Scorpion"' not in data, "no camps without camps"
     assert ('        d.ONS.helpers = ["Thugra Khotan"];\n        d.ONS.heal = ["Healing Radiance"];\n'

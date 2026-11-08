@@ -19,7 +19,7 @@ STOPWATCH_DEFAULTS = PROFILE_SECTION.defaults()
 def test_defaults_disabled():
     cfg = PROFILE_SECTION.defaults()
     assert cfg["enabled"] is False
-    assert cfg["startCollapsed"] is False
+    assert "startCollapsed" not in cfg, "a first session opens; the game keeps the fold after"
     assert cfg["scale"] == 100
     # A fresh copy, not the shared module dict.
     cfg["enabled"] = True
@@ -70,12 +70,12 @@ def test_the_retired_font_size_is_dropped():
 
 def test_validate_bad_values_fall_back():
     out = validate_config({"fx": "garbage", "fy": None, "enabled": 1,
-                           "startCollapsed": "", "scale": "big"})
+                           "startCollapsed": True, "scale": "big"})
     assert out["fx"] == STOPWATCH_DEFAULTS["fx"]
     assert out["fy"] == STOPWATCH_DEFAULTS["fy"]
     assert out["scale"] == STOPWATCH_DEFAULTS["scale"]
     assert out["enabled"] is True
-    assert out["startCollapsed"] is False
+    assert "startCollapsed" not in out, "an older profile's flag is dropped"
 
 
 def test_nan_fraction_lands_on_the_min_bound():

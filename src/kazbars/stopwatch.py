@@ -15,8 +15,8 @@ pairing with the inspect panel's, which is built from the same ratios.
 Positioning mirrors the cast timer: `fx`/`fy` are fractions of the game
 resolution (pixels exist only at dialog display and AS2 emit via
 `grid_model.project_px`/`unproject_px`), baked into the generated SWF as the
-first-session seed; from then on the game persists drag position and collapsed
-state in the module config archive, for every user (`game_persistence`).
+first-session seed (it opens unfolded); from then on the game persists drag
+position and collapsed state in the module config archive, for every user (`game_persistence`).
 """
 
 import logging
@@ -29,14 +29,12 @@ from .settings_core import Field, Schema, validate_all
 logger = logging.getLogger(__name__)
 
 # Master on/off. Off by default — nothing compiles until the user turns it on,
-# so the SWF carries no stopwatch code when unused. startCollapsed starts the
-# panel as just the title-bar strip (expand with its + button).
+# so the SWF carries no stopwatch code when unused.
 _SCHEMA = Schema('', 1, {
     "enabled": Field(False, kind='bool'),
     "fx": Field(850 / 1920, kind='float', min=0.0, max=1.0),
     "fy": Field(300 / 1080, kind='float', min=0.0, max=1.0),
     "scale": Field(SCALE_DEFAULT, validate=scale_from),
-    "startCollapsed": Field(False, kind='bool'),
 })
 
 def validate_config(config):

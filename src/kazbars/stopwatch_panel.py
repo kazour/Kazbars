@@ -3,7 +3,7 @@ KazBars — In-game stopwatch dialog.
 
 Extras-menu settings for the in-game stopwatch panel (KazBarsStopwatch stub):
 the build gate, the baked default position, its Size (a percent of the
-profile's overlay size, hinted in pt) and the start-collapsed flag.
+profile's overlay size, hinted in pt).
 Reads/writes the profile document's `stopwatch` section (data layer:
 `stopwatch.py`; the store autosaves). Positions are stored as fractions of the
 game resolution; the X/Y fields display projected px at the current resolution
@@ -12,7 +12,6 @@ The shell is `extras_dialog.ExtrasShell`.
 Functions take the KazBarsApp instance as first arg.
 """
 
-import tkinter as tk
 from tkinter import ttk
 
 from .extras_dialog import ExtrasShell, raise_if_open
@@ -20,10 +19,10 @@ from .grid_model import get_game_resolution_or_default
 from .stopwatch import validate_config
 from .ui_forms import create_card, position_fields, size_slider
 from .ui_helpers import FONT_SMALL, PAD_ROW, PAD_XS, THEME_COLORS
-from .ui_widgets import add_tooltip, app_toast
+from .ui_widgets import app_toast
 
 _WIDTH = 470
-_HEIGHT = 380
+_HEIGHT = 320
 
 
 def open_stopwatch_dialog(app):
@@ -70,17 +69,6 @@ def open_stopwatch_dialog(app):
         label_sink=sink)
     shell.gate(size_scale)
 
-    behavior_card = create_card(content, "Behavior")
-    behavior_card.pack(fill='x', pady=(0, PAD_ROW))
-    collapsed_var = tk.BooleanVar(value=cfg['startCollapsed'])
-    collapsed_cb = ttk.Checkbutton(behavior_card, text="Start collapsed (title bar only)",
-                                   variable=collapsed_var)
-    collapsed_cb.pack(anchor='w')
-    add_tooltip(collapsed_cb,
-                "The panel loads as just its title bar — click its + button "
-                "in-game to expand.")
-    shell.gate(collapsed_cb)
-
     shell.dim(*sink)
     shell.sync()
 
@@ -91,7 +79,6 @@ def open_stopwatch_dialog(app):
             'fx': fx,
             'fy': fy,
             'scale': size_var.get(),
-            'startCollapsed': collapsed_var.get(),
         })
         app.profile_store.set_section('stopwatch', new_cfg)
         app.grids_panel.refresh_extras_shortcuts()

@@ -33,7 +33,7 @@
 //                              the collapsed-bar label, every button (bold),
 //                              the collapse glyph (bold), console log entries
 //   Title   1.25  NAME_FS     panel titles, the onslaught wave label and bosses
-//   Alert   1.6   ALERT_FS    the onslaught alert banner and wave clocks
+//   Alert   1.6   ALERT_FS    the onslaught wave clocks (its alerts have their own baked size)
 // roleFS() rounds each, and keeps Small from falling under 9 (or over Body).
 // One line-box rule: a text field is lh(size) tall, size x 1.4 rounded.
 class KazBarsPanel {

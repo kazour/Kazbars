@@ -2,11 +2,12 @@
 KazBars — Onslaught Tracker dialog.
 
 Extras-menu settings for the in-game Onslaught Tracker (KazBarsOnslaught
-stub): the build gate, then two columns. **Display**: Size (the board's text;
-the alerts draw 1.6 times as large), the five displays by the anchor they
-appear on — Board (Mob list, Wave timer, Hylda HP) and Alerts (Spawn alerts,
-AoE warnings) — and Alert time (how long a banner stays; greyed unless Spawn
-alerts or Hylda HP is on). **Watched mobs** (greyed unless Mob list or Spawn
+stub): the build gate, then two columns. **Display**, one form (labels
+right-aligned in one column, every control starting at one x): Board (Mob
+list, Wave timer, Hylda HP), Board size (the board's text), Alerts (Spawn
+alerts, AoE warnings), Alert size (the banners' text; greyed unless Spawn
+alerts, AoE warnings or Hylda HP is on) and Alert time (how long a banner
+stays; greyed unless Spawn alerts or Hylda HP is on). **Watched mobs** (greyed unless Mob list or Spawn
 alerts is on): the 27 catalog mobs watched in every run, named by group
 under their count, Include Kuthchemes camps (greyed unless Mob list is on;
 the camps' own line shows while it is ticked), Guards in their own group
@@ -26,10 +27,11 @@ from tkinter import ttk
 
 from . import onslaught
 from .extras_dialog import ExtrasShell, raise_if_open
-from .ui_forms import create_card, create_slider_row, size_slider
+from .ui_forms import create_card, size_slider
 from .ui_helpers import (
     BTN_SMALL,
     FONT_BODY,
+    FONT_FORM_LABEL,
     FONT_SMALL,
     PAD_INNER,
     PAD_MICRO,
@@ -84,48 +86,69 @@ def open_onslaught_dialog(app):
     watched = create_card(content, "Watched mobs")
     watched.pack(side='left', fill='both', expand=True, pady=(0, PAD_ROW))
 
-    size_row = ttk.Frame(display)
-    size_row.pack(anchor='w', pady=(0, PAD_XS))
-    size_sink: list = []
-    size_scale, size_var = size_slider(
-        size_row, shell.base, cfg['scale'],
-        tooltip="Board text size in game, 8-28 pt; the alerts draw 1.6 times as large. "
-                "Moves with the Overlay size on the Grids tab.",
-        label_sink=size_sink)
-    shell.gate(size_scale)
-    shell.dim(*size_sink)
-
+    # One form: the labels right-aligned in one column, every control at one x.
+    form = ttk.Frame(display)
+    form.pack(anchor='w')
     show_vars = {}
-    for title, items in (("Board:", _BOARD), ("Alerts:", _ALERTS)):
-        row = ttk.Frame(display)
-        row.pack(anchor='w', pady=PAD_MICRO)
-        lbl = ttk.Label(row, text=title, font=FONT_BODY, foreground=THEME_COLORS['body'], width=7)
-        lbl.pack(side='left')
-        shell.dim(lbl)
+
+    def _alerts_on():
+        return show_vars['showAlerts'].get() or show_vars['showAlly'].get()
+
+    def _alerts_any():
+        """Anything on the alerts anchor: the banners or the AoE line."""
+        return _alerts_on() or show_vars['showAoe'].get()
+
+    def _list_or_alerts():
+        return show_vars['showList'].get() or show_vars['showAlerts'].get()
+
+    def _row(label, rule=None):
+        r = form.grid_size()[1]
+        lbl = ttk.Label(form, text=label, font=FONT_FORM_LABEL)
+        lbl.grid(row=r, column=0, sticky='e', padx=(0, PAD_XS), pady=PAD_MICRO)
+        shell.dim(lbl, rule=rule)
+        cell = ttk.Frame(form)
+        cell.grid(row=r, column=1, sticky='w', pady=PAD_MICRO)
+        return cell
+
+    def _checks(label, items):
+        cell = _row(label)
         for key, text, tip in items:
             var = tk.BooleanVar(value=cfg[key])
-            cb = ttk.Checkbutton(row, text=text, variable=var, command=shell.sync)
+            cb = ttk.Checkbutton(cell, text=text, variable=var, command=shell.sync)
             cb.pack(side='left', padx=(0, PAD_SMALL))
             add_tooltip(cb, tip)
             show_vars[key] = var
             shell.gate(cb)
 
-    def _alerts_on():
-        return show_vars['showAlerts'].get() or show_vars['showAlly'].get()
+    def _size(label, initial, tooltip, rule=None):
+        sink: list = []
+        scale, var = size_slider(_row(label, rule), shell.base, initial, label=None,
+                                 tooltip=tooltip, label_sink=sink)
+        shell.gate(scale, rule=rule)
+        shell.dim(*sink, rule=rule)
+        return scale, var
 
-    def _list_or_alerts():
-        return show_vars['showList'].get() or show_vars['showAlerts'].get()
-
-    list_on = show_vars['showList'].get
-
-    alert_sink: list = []
-    alert_scale, alert_label = create_slider_row(
-        display, "Alert time:", *onslaught.ALERT_SECONDS, cfg['alertSeconds'], " s",
-        on_drag=lambda v: alert_label.configure(text=f"{round(float(v))} s"),
-        label_sink=alert_sink)
+    _checks("Board:", _BOARD)
+    _, size_var = _size("Board size:", cfg['scale'],
+                        "Board text size in game, 8-28 pt. Moves with the Overlay size on the Grids tab.")
+    _checks("Alerts:", _ALERTS)
+    _, alert_size_var = _size(
+        "Alert size:", cfg['alertScale'],
+        "Alert text size in game, 8-28 pt: spawn alerts, Hylda's 50 % and 25 %, the AoE line. "
+        "Moves with the Overlay size on the Grids tab.", rule=_alerts_any)
+    cell = _row("Alert time:", _alerts_on)
+    alert_scale = ttk.Scale(cell, from_=onslaught.ALERT_SECONDS[0], to=onslaught.ALERT_SECONDS[1],
+                            value=cfg['alertSeconds'], orient='horizontal', length=120,
+                            command=lambda v: alert_label.configure(text=f"{round(float(v))} s"))
+    alert_scale.pack(side='left', padx=(PAD_XS, 0))
+    alert_label = ttk.Label(cell, text=f"{cfg['alertSeconds']} s", font=FONT_SMALL,
+                            foreground=THEME_COLORS['muted'], width=6, anchor='e')
+    alert_label.pack(side='left')
     add_tooltip(alert_scale, "How long a banner stays: a spawn alert, or Hylda's 50 % and 25 % alerts")
     shell.gate(alert_scale, rule=_alerts_on)
-    shell.dim(*alert_sink, rule=_alerts_on)
+    shell.dim(alert_label, rule=_alerts_on)
+
+    list_on = show_vars['showList'].get
 
     # ---- Watched mobs --------------------------------------------------------
     always_n = sum(1 for r in onslaught.ROWS if r.kind != onslaught.CAMP)
@@ -287,6 +310,7 @@ def open_onslaught_dialog(app):
         new_cfg = onslaught.validate_config({
             'enabled': enabled_var.get(),
             'scale': size_var.get(),
+            'alertScale': alert_size_var.get(),
             **{key: var.get() for key, var in show_vars.items()},
             'alertSeconds': round(alert_scale.get()),
             'camps': camps_var.get(),
