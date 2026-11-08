@@ -64,7 +64,7 @@
 | `src/kazbars/inspect.py` | 67 |
 | `src/kazbars/inspect_catalog.py` | 581 |
 | `src/kazbars/inspect_panel.py` | 289 |
-| `src/kazbars/instructions_panel.py` | 1503 |
+| `src/kazbars/instructions_panel.py` | 1505 |
 | `src/kazbars/live_tracker_panel.py` | 521 |
 | `src/kazbars/live_tracker_settings.py` | 175 |
 | `src/kazbars/onslaught.py` | 236 |
@@ -101,7 +101,7 @@
 | `tests/test_app_contract.py` | 104 |
 | `tests/test_app_icon.py` | 43 |
 | `tests/test_as2_class_names.py` | 77 |
-| `tests/test_as2_stub_pins.py` | 131 |
+| `tests/test_as2_stub_pins.py` | 161 |
 | `tests/test_boss_timer.py` | 151 |
 | `tests/test_buff_db_layers.py` | 272 |
 | `tests/test_buff_xml.py` | 324 |
