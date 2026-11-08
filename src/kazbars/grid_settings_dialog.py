@@ -295,6 +295,7 @@ class GridSettingsDialog(tk.Toplevel):
         # key -> (auto var, pt var, spinbox, row label): Auto shows the size
         # rules' value and follows the slider; unticked, the grid's own pt.
         self._text_rows = {}
+        self._auto_boxes = {}
         for key, label, what in (('timerPt', "Timer text:", "timer digits"),
                                  ('stackPt', "Stack text:", "stack count")):
             cell, lbl = self._field(card, label)
@@ -313,6 +314,7 @@ class GridSettingsDialog(tk.Toplevel):
                                    on_change=self._changed)
             self._unit(cell, "pt")
             self._text_rows[key] = (auto_var, pt_var, spin, lbl)
+            self._auto_boxes[key] = auto_cb
         default, lo, hi = CLAMP_SPECS['gap']
         self.gap_var = tk.StringVar(value=str(max(lo, min(cfg.get('gap', default), hi))))
         cell, _ = self._field(card, "Gap:")
@@ -472,6 +474,7 @@ class GridSettingsDialog(tk.Toplevel):
                 pt_var.set(str(self._auto_pt(key)))
             live = key != 'timerPt' or digits
             spin.configure(state='normal' if live and not auto else 'disabled')
+            self._auto_boxes[key].configure(state='normal' if live else 'disabled')
             lbl.configure(foreground='' if live else TK_COLORS['dim_text'])
 
     def _on_text_size(self):

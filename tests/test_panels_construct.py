@@ -314,6 +314,8 @@ def test_grid_settings_text_sizes_round_trip(app):
         dlg.timer_style_var.set('bar')
         dlg._on_timers()
         assert 'disabled' in spin.state(), "timer text greys with Bar"
+        assert 'disabled' in dlg._auto_boxes['timerPt'].state(), "its Auto box too"
+        assert 'disabled' not in dlg._auto_boxes['stackPt'].state()
         dlg.timer_style_var.set('digits')
         dlg._on_timers()
         dlg.apply()
