@@ -4,7 +4,7 @@
 [![Latest release](https://img.shields.io/github/v/release/kazour/Kazbars?label=release)](https://github.com/kazour/Kazbars/releases/latest)
 [![License: GPL-2.0-or-later](https://img.shields.io/badge/license-GPL--2.0--or--later-blue.svg)](LICENSE)
 
-Buff/debuff overlay editor for **Age of Conan** — design icon grids and bars that show your active effects on top of the game, then compile and install them in one click. It also ships live combat HUDs and a handful of in-game extras: a cast timer, a stopwatch, a target inspect panel, a buff-ID and cast console, an Onslaught tracker, leaner damage numbers, a real-time deeps meter, and the Ethram-Fal seed timer.
+Buff/debuff overlay editor for **Age of Conan** — design icon grids and bars that show your active effects on top of the game, then compile and install them in one click. It also ships live combat HUDs and a handful of in-game extras: a cast timer, a stopwatch, Inspect Target (your target's combat sheet), a buff-ID and cast console, an Onslaught tracker, leaner damage numbers, a real-time deeps meter, and the Ethram-Fal seed timer.
 
 Most of what KazBars builds is set up once and runs on its own after you close the app. Only the two live combat overlays — the deeps meter and the Ethram-Fal seed timer — keep working while KazBars is open.
 
@@ -26,7 +26,7 @@ Most of what KazBars builds is set up once and runs on its own after you close t
 
 **Stopwatch** — a draggable Start / Pause / Reset count-up timer that works in fullscreen and never steals focus from the game. Off by default
 
-**Target Inspect Panel** — an in-game combat sheet for whatever you have targeted. Pick its rows from 112 stats in seven groups (armor, protections, crit, critigation, heal rating, bonus spell damage and more), or keep the default twelve. Player targets add a PvP tab; clear your target and the panel hides. Off by default
+**Inspect Target** — an in-game combat sheet for whatever you have targeted. Pick its rows from 112 stats in seven groups (armor, protections, crit, critigation, heal rating, bonus spell damage and more), or keep the default twelve. Player targets add a PvP tab; clear your target and it hides. Off by default
 
 **Console** — an in-game log of every buff and debuff on you and your target with its buff ID, plus a Casts tab for how casts ended: finished, interrupted or lost. Off by default
 
@@ -54,7 +54,7 @@ Most of what KazBars builds is set up once and runs on its own after you close t
 
 3. The first-run setup window opens. Point it at your Age of Conan folder.
 
-4. Choose **Use Defaults** — ready-made grids for common raid buffs and debuffs, sized to your screen. (Or **Start Empty** to build your own from scratch.)
+4. Check **Game resolution**, then pick how to start: **Use Defaults** (ready-made grids for common raid buffs and debuffs, sized to your screen), **Import Profile** (a profile file you or a friend saved), or **Start Empty** (build your own from scratch).
 
 5. Click `Build & Install`. Close the game and the patcher for your first build — it registers KazBars with the game permanently. After that, rebuild anytime and type `/reloadui` in-game.
 

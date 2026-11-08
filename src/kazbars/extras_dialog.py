@@ -1,7 +1,7 @@
 """
 KazBars — the shell every Extras dialog shares.
 
-Cast timer, Console, Inspect panel, Onslaught tracker and Stopwatch each open
+Cast timer, Console, Inspect Target, Onslaught tracker and Stopwatch each open
 one modal dialog from the Extras menu or their shortcut card: a header, a tip
 bar, the master gate row ("Include … in builds"), titled cards, Cancel /
 Apply (Enter applies, Esc cancels), centred on the app. `ExtrasShell` builds

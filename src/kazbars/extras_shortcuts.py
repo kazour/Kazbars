@@ -2,9 +2,9 @@
 KazBars — Extras shortcuts row.
 
 Toggle cards along the bottom of the Grids tab, beside Build & Install —
-one per SWF-build extra, in Extras-menu order (Cast timer, Console, Damage
-numbers, Inspect panel, Onslaught tracker, Stopwatch) so the row and the menu
-read as the same list. Each
+one per in-game extra, in Extras-menu order (Cast timer, Damage numbers,
+Inspect Target, Onslaught tracker) so the row and the menu read as the same
+list; Console and Stopwatch live in the menu alone. Each
 card carries two controls, not one: the **card body** opens that feature's
 Extras dialog (the same opener the menu item calls), and the **round switch**
 flips whether it ships in the next Build & Install, writing the same
@@ -23,7 +23,6 @@ import tkinter as tk
 from tkinter import ttk
 
 from .cast_timer import is_enabled as cast_ships
-from .console import ships as console_ships
 from .onslaught import ships as onslaught_ships
 from .ui_helpers import (
     FONT_SECTION,
@@ -42,8 +41,8 @@ from .ui_widgets import add_tooltip, app_toast, pointer_inside
 # ============================================================================
 def _ships(app, key, ships):
     """Whether the feature is in the next build: its section through its
-    own gate (`ships`), the one the generator reads — a console with no tab
-    or a tracker with no display shows off, as it is built."""
+    own gate (`ships`), the one the generator reads — a tracker with no
+    display shows off, as it is built."""
     # The row is built with GridsPanel, before startup_profile installs the
     # store; apply_document resyncs the cards right after, so rest off here.
     store = app.profile_store
@@ -79,22 +78,16 @@ _FEATURES = (
     ('cast_timer', 'Cast timer', 'next build removes it',
      'Cast-time readout for you and your target. Click to open Extras ▸ Cast timer…',
      '_open_cast_timer_settings', cast_ships, _cast_patch),
-    ('console', 'Console', 'next build removes it',
-     'Buff IDs and casts, logged in game. Click to open Extras ▸ Console…',
-     '_open_console_settings', console_ships, _patch),
     ('damage_numbers', 'Damage numbers', 'next build restores stock',
      "Re-tunes AoC's floating combat numbers. Click to open Extras ▸ Damage number mod…",
      '_open_damage_numbers', _enabled, _patch),
-    ('inspect', 'Inspect panel', 'next build removes it',
-     'Combat sheet for your current target. Click to open Extras ▸ Inspect panel…',
+    ('inspect', 'Inspect Target', 'next build removes it',
+     'Combat sheet for your current target. Click to open Extras ▸ Inspect Target…',
      '_open_inspect_settings', _enabled, _patch),
     ('onslaught', 'Onslaught tracker', 'next build removes it',
      'Bosses, waves and spawn alerts in Skull Gate and Kuthchemes. '
      'Click to open Extras ▸ Onslaught tracker…',
      '_open_onslaught_settings', onslaught_ships, _patch),
-    ('stopwatch', 'Stopwatch', 'next build removes it',
-     'In-game Start / Pause / Reset timer panel. Click to open Extras ▸ Stopwatch…',
-     '_open_stopwatch_settings', _enabled, _patch),
 )
 
 
@@ -206,7 +199,7 @@ class ExtrasShortcutsRow(ttk.Frame):
         store = self.app.profile_store
         on = bool(tile['var'].get())
         patch = tile['patch'](on)
-        # Switched on with nothing to build (a console with no tab): the card
+        # Switched on with nothing to build (a tracker with no display): the card
         # stays off, and so does the store.
         empty = on and not tile['ships']({**store.get_section(key), **patch})
         if empty:

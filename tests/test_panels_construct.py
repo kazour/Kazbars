@@ -380,13 +380,14 @@ def test_an_overlay_size_change_unticks_the_build_step(app):
 
 
 def test_extras_switch_on_with_nothing_to_build_stays_off(app):
+    from kazbars.onslaught import _DISPLAYS
     store = app.profile_store
-    store.update_section('console', {'enabled': False, 'tabs': []})
+    store.update_section('onslaught', {'enabled': False, **dict.fromkeys(_DISPLAYS, False)})
     app.grids_panel.refresh_extras_shortcuts()
-    tile = app.grids_panel.extras_row._tiles['console']
+    tile = app.grids_panel.extras_row._tiles['onslaught']
     tile['var'].set(True)
-    app.grids_panel.extras_row._on_toggle('console')
-    assert store.get_section('console')['enabled'] is False
+    app.grids_panel.extras_row._on_toggle('onslaught')
+    assert store.get_section('onslaught')['enabled'] is False
     assert tile['var'].get() is False
 
 
@@ -406,15 +407,16 @@ def _widgets(root, cls):
     return out
 
 
-def _open_first_launch(app, monkeypatch, paths):
+def _open_first_launch(app, monkeypatch, paths, template=True, **callbacks):
     from tkinter import ttk
 
     from kazbars import first_launch
     monkeypatch.setattr(first_launch, 'COMMON_INSTALL_PATHS', [str(p) for p in paths])
+    # on_game_set is the one callback the dialog calls unguarded.
+    callbacks.setdefault('on_game_set', lambda p: None)
     first_launch.show_first_launch_dialog(
-        app, 'KazBars', lambda p: None, lambda r: None,
-        on_resolution_set=lambda r: None, default_profile_exists=True,
-        on_start_empty=lambda: None)
+        app, 'KazBars', on_load_default=lambda r: None,
+        default_profile_exists=template, **callbacks)
     app.update()
     dialog = next(w for w in app.winfo_children()
                   if isinstance(w, tk.Toplevel) and w.title() == 'Welcome to KazBars')
@@ -453,6 +455,129 @@ def test_enter_can_reach_a_focused_button(app):
     import ttkbootstrap as ttkb
     assert isinstance(app, ttkb.Window)
     assert app.bind_class('TButton', '<Return>')
+
+
+@pytest.mark.parametrize('template', [True, False])
+def test_first_launch_offers_equal_cards_under_one_resolution_row(app, monkeypatch, template):
+    """Use Defaults (when a template ships), Import Profile, Start Empty: one
+    equal column each, every button gated on the folder, and the resolution
+    picker once, above the cards — it applies to every path."""
+    from tkinter import ttk
+    dialog, entry, buttons, _texts = _open_first_launch(app, monkeypatch, [], template)
+    try:
+        want = ['Load Defaults', 'Import Profile', 'Start Empty'][0 if template else 1:]
+        assert [b for b in buttons if b in want] == want
+        assert all(str(buttons[b].cget('state')) == 'disabled' for b in want)
+        cards = buttons['Start Empty'].master.master.master
+        assert [cards.grid_columnconfigure(c)['uniform'] for c in range(len(want))] == \
+            ['card'] * len(want)
+        combos = _widgets(dialog, ttk.Combobox)
+        assert len(combos) == 1 and combos[0] not in _widgets(cards, ttk.Combobox)
+        entry.insert(0, str(app.game_path))
+        app.update()
+        assert all(str(buttons[b].cget('state')) == 'normal' for b in want)
+    finally:
+        dialog.grab_release()
+        dialog.destroy()
+        app.update()
+
+
+def _first_launch_import(app, monkeypatch, lands):
+    saved, closed = [], []
+    dialog, _entry, buttons, _texts = _open_first_launch(
+        app, monkeypatch, [app.game_path], on_game_set=saved.append,
+        on_import_profile=lambda d: lands, on_dialog_closed=lambda: closed.append(1))
+    buttons['Import Profile'].invoke()
+    app.update()
+    return dialog, saved, closed
+
+
+def test_first_launch_import_cancel_keeps_the_dialog(app, monkeypatch):
+    dialog, saved, closed = _first_launch_import(app, monkeypatch, False)
+    try:
+        assert dialog.winfo_exists() and not closed
+        assert len(saved) == 1, "the folder the click confirmed is kept"
+    finally:
+        dialog.grab_release()
+        dialog.destroy()
+        app.update()
+
+
+def test_first_launch_import_lands_and_closes(app, monkeypatch):
+    dialog, saved, closed = _first_launch_import(app, monkeypatch, True)
+    assert not dialog.winfo_exists() and closed == [1]
+    assert len(saved) == 1
+
+
+def test_first_launch_import_installs_without_a_confirm(app, monkeypatch, tmp_path):
+    """run_first_launch's Import Profile: the picked file replaces the seed
+    with no "Replace your profile?" (the seed is nothing the user made), the
+    dialog closes, no toast, and the welcome popup gets the profile."""
+    import copy
+    import json
+
+    from kazbars import first_launch, game_folder, profile_io
+
+    store = app.profile_store
+    before = copy.deepcopy(store.document)
+    res_before = app.settings.get('game_resolution')
+    incoming = copy.deepcopy(before)
+    incoming['name'] = 'Shared'
+    path = tmp_path / 'shared.json'
+    path.write_text(json.dumps(incoming), encoding='utf-8')
+
+    def no_confirm(*a, **k):
+        raise AssertionError('first launch never confirms')
+    popups, toasts = [], []
+    monkeypatch.setattr(first_launch, 'COMMON_INSTALL_PATHS', [str(app.game_path)])
+    monkeypatch.setattr(profile_io.filedialog, 'askopenfilename', lambda **k: str(path))
+    monkeypatch.setattr(profile_io, 'confirm', no_confirm)
+    monkeypatch.setattr(profile_io, 'app_toast', lambda *a, **k: toasts.append(a))
+    monkeypatch.setattr(first_launch, 'show_welcome_popup', lambda *a, **k: popups.append(k))
+    monkeypatch.setattr(game_folder, 'check_install_health', lambda a: None)
+    monkeypatch.setattr(app, 'after', lambda ms, fn=None, *a: fn(*a) if fn else None)
+    try:
+        first_launch.run_first_launch(app, 'KazBars')
+        app.update()
+        dialog = next(w for w in app.winfo_children()
+                      if isinstance(w, tk.Toplevel) and w.title() == 'Welcome to KazBars')
+        from tkinter import ttk
+        buttons = {b.cget('text'): b for b in _widgets(dialog, ttk.Button)}
+        buttons['Import Profile'].invoke()
+        app.update()
+        assert not dialog.winfo_exists()
+        assert store.document['name'] == 'Shared' and store.document['id'] != before['id']
+        assert toasts == []
+        grids = incoming['modules']['grids']['grids']
+        on = sum(1 for g in grids if g.get('enabled', True))
+        assert popups == [{'grid_count': len(grids), 'enabled_count': on,
+                           'profile_name': 'Shared', 'imported': True, 'notes': []}]
+    finally:
+        store.replace_document(before)
+        profile_io.apply_document(app)
+        app.settings.set('game_resolution', res_before)
+
+
+def test_welcome_popup_elides_a_long_imported_name(app):
+    """The popup's height is fixed and names are never capped: the import
+    line shortens the name with an ellipsis to stay inside the canvas."""
+    import tkinter.font as tkfont
+
+    from kazbars.app_popups import WIDTH, show_welcome_popup
+    from kazbars.ui_helpers import FONT_BODY
+    show_welcome_popup(app, 3, 3, 'X' * 200, imported=True)
+    app.update()
+    popup = [w for w in app.winfo_children() if isinstance(w, tk.Toplevel)][-1]
+    try:
+        canvas = _widgets(popup, tk.Canvas)[0]
+        line = next(canvas.itemcget(i, 'text') for i in canvas.find_all()
+                    if canvas.type(i) == 'text' and 'imported from' in canvas.itemcget(i, 'text'))
+        assert line.endswith('…”')
+        assert tkfont.Font(font=FONT_BODY).measure(line) <= WIDTH - 80
+    finally:
+        popup.grab_release()
+        popup.destroy()
+        app.update()
 
 
 def test_first_launch_leaves_ambiguous_install_blank(app, monkeypatch, tmp_path):
@@ -831,11 +956,9 @@ def test_start_button_label_fits_its_button(app):
 
 EXTRAS_OPENERS = {
     'cast_timer': '_open_cast_timer_settings',
-    'console': '_open_console_settings',
     'damage_numbers': '_open_damage_numbers',
     'inspect': '_open_inspect_settings',
     'onslaught': '_open_onslaught_settings',
-    'stopwatch': '_open_stopwatch_settings',
 }
 
 
@@ -869,7 +992,7 @@ def test_extras_switch_toggles_without_opening_settings(app, monkeypatch):
     opened = []
     for opener in EXTRAS_OPENERS.values():
         monkeypatch.setattr(app, opener, lambda: opened.append(opener))
-    tile = app.grids_panel.extras_row._tiles['stopwatch']
+    tile = app.grids_panel.extras_row._tiles['inspect']
     switch = _widgets(tile['card'], ttk.Checkbutton)[0]
     before = bool(tile['var'].get())
 
@@ -878,7 +1001,7 @@ def test_extras_switch_toggles_without_opening_settings(app, monkeypatch):
     app.update()
 
     assert bool(tile['var'].get()) is not before
-    assert app.profile_store.get_section('stopwatch')['enabled'] is not before
+    assert app.profile_store.get_section('inspect')['enabled'] is not before
     assert opened == []
 
 

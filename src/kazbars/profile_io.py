@@ -419,24 +419,46 @@ def export_profile(app):
     app_toast(app, f"Exported “{doc['name']}”{custom_buffs_suffix(len(buffs))}", 'success')
 
 
-def import_profile(app):
-    """File ▸ Import profile… — read a profile file (YAML, a 3.1 `.kazbars.json`
-    export or a bare library document), run it through the gate, confirm,
-    mint a fresh id, merge its custom buffs, and put it in place of the open
-    profile (Revert to session start brings that back)."""
+def pick_profile_file(app, parent=None):
+    """Ask for a profile file (YAML, a 3.1 `.kazbars.json` export or a bare
+    library document) and run it through the gate: `(doc, embedded)`, or None
+    on a cancel or a refused file (its plain error shown). `parent` is the
+    window the picker sits over (the app by default)."""
+    parent = parent or app
     path = filedialog.askopenfilename(
         title="Import Profile",
         initialdir=str(userdata_root()),
         filetypes=[("KazBars profile", "*.kazbars.yml *.yml *.yaml *.kazbars.json *.json"),
                    ("All files", "*.*")],
+        parent=parent,
     )
     if not path:
-        return
+        return None
     try:
-        doc, embedded = read_profile_file(app.registry, path)
+        return read_profile_file(app.registry, path)
     except ValueError as e:  # user-presentable, incl. the gate's "older KazBars"
-        Messagebox.show_error(str(e), title="Import Failed")
+        Messagebox.show_error(str(e), title="Import Failed", parent=parent)
+        return None
+
+
+def install_imported(app, doc, embedded):
+    """Put a read profile in place of the open one: a fresh id, its custom
+    buffs merged, the app resynced. Returns the merge's phrases
+    (`merge_embedded_buffs`) for the caller's own confirmation."""
+    doc['id'] = mint_id()
+    app.profile_store.replace_document(doc)
+    merged = merge_embedded_buffs(app, embedded)
+    apply_document(app)
+    return merged
+
+
+def import_profile(app):
+    """File ▸ Import profile… — pick a profile file, confirm, and install it
+    in place of the open profile (Revert to session start brings that back)."""
+    picked = pick_profile_file(app)
+    if picked is None:
         return
+    doc, embedded = picked
     if not confirm(
         f"Replace your profile with “{doc['name']}”?\n\nEvery grid and extra is replaced "
         "by the imported ones. Revert to session start brings back your profile as it "
@@ -444,10 +466,7 @@ def import_profile(app):
         title="Import Profile", action="Import", parent=app, danger=True,
     ):
         return
-    doc['id'] = mint_id()
-    app.profile_store.replace_document(doc)
-    merged = merge_embedded_buffs(app, embedded)
-    apply_document(app)
+    merged = install_imported(app, doc, embedded)
     app_toast(app, " — ".join([f"Imported “{doc['name']}”", *merged]), 'success')
 
 

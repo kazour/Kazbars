@@ -67,10 +67,10 @@ def open_inspect_dialog(app):
     cfg = validate_config(app.profile_store.get_section('inspect'))
     game_w, game_h = get_game_resolution_or_default()
     shell = ExtrasShell(
-        app, 'inspect_dialog', title="Inspect Panel",
+        app, 'inspect_dialog', title="Inspect Target",
         tip="Your target's combat sheet, in-game. Apply, then Build & Install to see it.",
-        gate_text="Include the inspect panel in builds",
-        gate_tip="Adds a target inspect panel to the in-game overlay: target "
+        gate_text="Include the Inspect Target in builds",
+        gate_tip="Adds the Inspect Target to the in-game overlay: target "
                  "something and see its combat sheet — armor, protections, "
                  "crit, critigation and more, with a PvP tab on players.",
         enabled=cfg['enabled'], width=_WIDTH)
@@ -280,9 +280,9 @@ def open_inspect_dialog(app):
         if new_cfg == cfg:
             app_toast(app, "No changes to apply", 'info')
         elif new_cfg['enabled']:
-            app_toast(app, "Inspect panel saved — Build & Install to apply", 'success')
+            app_toast(app, "Inspect Target saved — Build & Install to apply", 'success')
         else:
-            app_toast(app, "Inspect panel off — next build removes it", 'info')
+            app_toast(app, "Inspect Target off — next build removes it", 'info')
         dialog.destroy()
 
     shell.finish(_apply, _HEIGHT, enter_except=search_entry)

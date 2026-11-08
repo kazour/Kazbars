@@ -220,14 +220,18 @@ def show_close_game_required_dialog(parent, process_name="the game"):
     parent.wait_window(popup)
 
 
-def show_welcome_popup(parent, grid_count, enabled_count,
-                       resolution_str=None, profile_name=None):
-    """Show a welcome popup after loading the default profile.
+def show_welcome_popup(parent, grid_count, enabled_count, profile_name, imported=False,
+                       notes=()):
+    """Show a welcome popup after the first-launch profile landed: the
+    default one saved as `profile_name`, or (`imported`) a file of that name,
+    with `notes` (what its custom-buff merge did) on a line of their own.
 
     Same visual style as the build summary — frameless dark canvas, CRT scanlines,
     glowing accent, styled close button.
     """
     disabled_count = grid_count - enabled_count
+    grids = f"{grid_count} grid{'' if grid_count == 1 else 's'}"
+    one = disabled_count == 1
 
     # Pre-compute height so we only draw once
     status_y = 68
@@ -237,9 +241,9 @@ def show_welcome_popup(parent, grid_count, enabled_count,
     y += line_spacing  # grid count line
     if disabled_count > 0:
         y += line_spacing
-    if resolution_str:
-        y += line_spacing
-    if profile_name:
+    if not imported:
+        y += line_spacing  # "Saved as" line
+    if notes:
         y += line_spacing
     y += line_spacing  # tip line
     btn_y = y + 12
@@ -265,21 +269,34 @@ def show_welcome_popup(parent, grid_count, enabled_count,
 
     # Info lines
     y = sep_y + 20
-    canvas.create_text(WIDTH // 2, y,
-                       text=f"{grid_count} grids loaded from default profile",
-                       font=FONT_BODY, fill=THEME_COLORS['heading'])
+    if imported:
+        # Names are never length-capped and the height is fixed: elide, not wrap.
+        body = tkfont.Font(font=FONT_BODY)
+        name = profile_name
+        while name and body.measure(f"{grids} imported from “{name}…”") > WIDTH - 80:
+            name = name[:-1]
+        if name != profile_name:
+            name += '…'
+        line = f"{grids} imported from “{name}”"
+    else:
+        line = f"{grids} loaded from default profile"
+    canvas.create_text(WIDTH // 2, y, text=line, font=FONT_BODY,
+                       fill=THEME_COLORS['heading'])
     y += line_spacing
     if disabled_count > 0:
         canvas.create_text(WIDTH // 2, y,
-                           text=f"{disabled_count} are disabled — enable them when you're ready",
+                           text=f"{disabled_count} {'is' if one else 'are'} disabled — "
+                                f"enable {'it' if one else 'them'} when you're ready",
                            font=FONT_SMALL, fill=THEME_COLORS['warning'])
         y += line_spacing
-    if resolution_str:
-        canvas.create_text(WIDTH // 2, y, text=f"Scaled to {resolution_str}",
+    if not imported:
+        # An import's grid line already names the profile.
+        canvas.create_text(WIDTH // 2, y, text=f"Saved as {profile_name}",
                            font=FONT_SMALL, fill=THEME_COLORS['muted'])
         y += line_spacing
-    if profile_name:
-        canvas.create_text(WIDTH // 2, y, text=f"Saved as {profile_name}",
+    if notes:
+        note = " — ".join(notes)
+        canvas.create_text(WIDTH // 2, y, text=note[:1].upper() + note[1:],
                            font=FONT_SMALL, fill=THEME_COLORS['muted'])
         y += line_spacing
     # Split into two text items so "Build & Install" can be green like in the help tab

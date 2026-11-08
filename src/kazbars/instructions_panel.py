@@ -117,7 +117,7 @@ SECTIONS: list[_Section] = [
             'KazBars makes two kinds of thing. The difference: whether the '
             'app must stay open.',
             _sub('Built into the game — then close the app', [
-                [('Grids, Damage Numbers, the Stopwatch, the Inspect Panel, '
+                [('Grids, Damage Numbers, the Stopwatch, the Inspect Target, '
                   'the Cast Timer, the Console and the Onslaught Tracker are '
                   'compiled in by ', None),
                  ('Build & Install', _SUCCESS),
@@ -193,7 +193,7 @@ SECTIONS: list[_Section] = [
                 'settings and your custom buffs.',
             ]),
             _sub('What travels with a profile', [
-                'Grids, the Overlay size and font, Stopwatch, Inspect panel, '
+                'Grids, the Overlay size and font, Stopwatch, Inspect Target, '
                 'Cast timer, Console, Onslaught tracker and Damage Numbers '
                 'all live inside it — and so do Deeps and the '
                 "Ethram-Fal Live Tracker's live settings. So do any Default "
@@ -460,12 +460,12 @@ SECTIONS: list[_Section] = [
             _sub('Overlay', [
                 'The base size, 10 to 24 — 12 suits 1080p, 16 suits 1440p, '
                 '24 suits 4K. First launch picks the one for your '
-                'resolution.',
+                'resolution; an imported profile keeps its own.',
                 'Change it and every grid and panel resizes together, each '
                 'in proportion.',
             ]),
             _sub('Size sliders', [
-                'Each grid, and the Stopwatch, Inspect panel, Cast timer, '
+                'Each grid, and the Stopwatch, Inspect Target, Cast timer, '
                 'Console and Onslaught tracker, has its own Size: a percent '
                 'of the Overlay size, 50–200 %. The hint beside it says '
                 'what that comes to — icon px for a grid, points of text '
@@ -746,19 +746,21 @@ SECTIONS: list[_Section] = [
                 'Nothing to build — /reloadui in-game shows the change.',
             ]),
             _sub('Build & Install to apply', [
-                [('Cast Timer, Console, Damage Numbers, Inspect Panel, '
+                [('Cast Timer, Console, Damage Numbers, Inspect Target, '
                   'Onslaught Tracker and Stopwatch are off by default — off '
                   'means zero code in the build. Tick the box, ', None),
                  ('Apply', _SUCCESS),
                  (', then ', None),
                  ('Build & Install', _SUCCESS),
                  ('. Cancel, Escape or the X discard.', None)],
-                [('The six cards at the bottom of the Grids tab, just '
+                [('The four cards at the bottom of the Grids tab, just '
                   'above ', None),
                  ('Build & Install', _SUCCESS),
                  (', are two controls: the switch flips whether the '
                   'feature ships, and clicking anywhere else on the card '
                   'opens its dialog.', None)],
+                'Console and Stopwatch have no card — open them from the '
+                'Extras menu.',
             ]),
             _sub('One size, set once', [
                 'The Overlay size on the Grids tab is the base for every '
@@ -878,9 +880,9 @@ SECTIONS: list[_Section] = [
     {
         'cat': 'Extras',
         'id': 'inspect',
-        'title': 'Inspect Panel',
+        'title': 'Inspect Target',
         'body': [
-            'Extras ▸ Inspect panel… shows the combat sheet of whatever you '
+            'Extras ▸ Inspect Target… shows the combat sheet of whatever you '
             "target — stats the game's own inspect window can't reveal. It "
             'appears moments after you target; clears when you do.',
             _sub('What it shows', [
@@ -927,7 +929,7 @@ SECTIONS: list[_Section] = [
                 'size. The whole panel scales with it.',
             ]),
             [('Tick ', None),
-             ('Include the inspect panel in builds', _SUCCESS),
+             ('Include the Inspect Target in builds', _SUCCESS),
              (' to ship it.', None)],
             _link('How Extras Ship', 'extras-shipping'),
         ],
