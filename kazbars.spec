@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 ROOT = Path(SPECPATH)
 ASSETS = ROOT / "src" / "kazbars" / "assets"
@@ -33,8 +33,21 @@ a = Analysis(
     hiddenimports=[],
     hookspath=[],
     runtime_hooks=[],
-    # Pillow codecs KazBars never decodes (no Image.open): 7.9 MB raw.
-    excludes=["PIL._avif", "PIL._webp", "PIL._imagingcms"],
+    excludes=[
+        # Pillow codecs and format plugins KazBars never decodes or saves
+        # (no Image.open / .save; Pillow imports plugins under try/except).
+        "PIL._avif", "PIL._webp", "PIL._imagingcms",
+        "PIL.ImageCms", "PIL.ImageQt", "PIL.ImageShow", "PIL.PdfParser",
+        *collect_submodules("PIL", filter=lambda name: name.endswith("ImagePlugin")),
+        # Stdlib nothing imports: no async, no worker processes.
+        "asyncio", "concurrent", "multiprocessing",
+        # logging.handlers' optional NT event-log handler (guarded import).
+        "win32evtlog", "win32evtlogutil", "winerror",
+        # Pure-Python fallbacks; the C _decimal and _datetime ship.
+        "_pydecimal", "_pydatetime",
+        # Only PIL._typing, guarded and skipped on Python 3.10+.
+        "typing_extensions",
+    ],
     noarchive=False,
 )
 
