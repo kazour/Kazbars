@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [3.2.0] — 2026-11-09
+
 ### Added
 
 - **Overhead grids — icons that float over characters' heads.** Add Grid now offers two kinds: Floating (Player, Target — a spot on screen, as before) and Overhead (Friendly, Hostile). An overhead grid draws over each character it applies to instead of at a screen position: Friendly over you (switch on **Over me**), your group and friendly players; Hostile over your target and anyone fighting you or your group. A static one is a plain box, up to 4 rows of 8 and 16 slots. A dynamic one is a band — icons centred over the head, a **Row cap** of 3, 5 or 7 to a row, growing upward, up to 16 icons. Each has a **Height** (px of room left for the game's nameplate) and a **Range** (hidden past that many metres). The game doesn't list who is around you, so a character gets its grid once something names it: your group, your target, someone you damage or heal, or whoever casts on a character already known. Preview mode shows an empty sample of each over your target, and each gets a checkbox under **Overhead Grids** in the KazBars Preview panel — unchecked, it's hidden over everyone.
