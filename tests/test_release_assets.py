@@ -20,7 +20,10 @@ def test_workflow_publishes_both_assets():
 
 
 def test_workflow_zips_the_root_self_update_expects():
-    assert f'Compress-Archive -Path "dist/{S.ZIP_ROOT}"' in WORKFLOW
+    # 7-Zip stores paths as given, so it must run from dist/ on the bare folder
+    lines = [ln.strip() for ln in WORKFLOW.splitlines()]
+    assert 'Push-Location dist' in ' '.join(lines)
+    assert any(ln.endswith(f'../{S.ZIP_ASSET} {S.ZIP_ROOT}') for ln in lines)
 
 
 def test_workflow_sha_line_parses():

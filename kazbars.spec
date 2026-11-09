@@ -33,7 +33,8 @@ a = Analysis(
     hiddenimports=[],
     hookspath=[],
     runtime_hooks=[],
-    excludes=[],
+    # Pillow codecs KazBars never decodes (no Image.open): 7.9 MB raw.
+    excludes=["PIL._avif", "PIL._webp", "PIL._imagingcms"],
     noarchive=False,
 )
 
