@@ -154,7 +154,7 @@
 | `tests/test_profile_share.py` | 225 |
 | `tests/test_profile_store.py` | 148 |
 | `tests/test_projection.py` | 89 |
-| `tests/test_release_assets.py` | 33 |
+| `tests/test_release_assets.py` | 36 |
 | `tests/test_self_update.py` | 505 |
 | `tests/test_settings_backup.py` | 287 |
 | `tests/test_settings_core.py` | 322 |

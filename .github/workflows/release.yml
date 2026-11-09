@@ -27,7 +27,10 @@ jobs:
         shell: pwsh
         run: |
           Copy-Item LICENSE, THIRD_PARTY.md -Destination "dist/KazBars"
-          Compress-Archive -Path "dist/KazBars" -DestinationPath "KazBars.zip" -Force
+          Push-Location dist   # 7-Zip stores paths as given: entries must start at KazBars/
+          & "C:\Program Files\7-Zip\7z.exe" a -tzip -mx9 -mfb=258 -mpass=15 ../KazBars.zip KazBars
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          Pop-Location
 
       - name: Compute SHA256
         shell: pwsh
