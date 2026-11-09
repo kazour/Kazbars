@@ -62,6 +62,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Settings dialogs confirm on Enter from anywhere, and open ready to use.** The Cast Timer, Damage Numbers, Damage Number Colors, Inspect Target and Stopwatch dialogs, plus the buff-edit dialog in the Database tab, confirm on Enter wherever your cursor is in the dialog, and open with something sensibly focused, so the keyboard works right away.
 - **The game folder path in the bottom bar no longer shortens too eagerly.** A normal install, up to a typical Steam-under-Program-Files depth, now shows in full; only a deep, unusual folder still shortens, and the shortened form no longer slips in a stray double backslash after the drive letter.
 - **Cast Timer's dialog header is blue like the others.**
+- **Import profile… asks before replacing your profile.** The question names the profile you're about to bring in and reminds you that Revert to session start brings your old one back. Cancel changes nothing.
+- **A profile file that's locked at startup is no longer set aside.** If `profile.yml` can't be opened because an antivirus scan or a sync tool has it, KazBars retries briefly; if it still can't be read, it shows an error and closes with the file untouched. The same goes for a profile saved by a newer KazBars. Only a genuinely damaged file is still kept as `profile.damaged.yml` with a toast.
+- **Your 3.1 text size carries over.** The panel text size you had set in 3.1 becomes the Stopwatch and Inspect Target size when your 3.1 profile is adopted on first launch.
+- **A backup made by this version is never taken for a 3.1 backup.** Restoring one can no longer replace your current profile with an old pre-upgrade one.
+- **Restoring a 3.1 backup lands on the profile that backup had active,** not the one this PC's settings last named.
 
 ## [3.1.1] — 2026-08-31
 
