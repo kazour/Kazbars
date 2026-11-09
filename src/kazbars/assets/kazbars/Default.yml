@@ -6,59 +6,6 @@ authored_at: [1920, 1080]
 modules:
   grids:
     grids:
-      - id: Wrack_Torment_Ruin
-        enabled: true
-        type: target
-        rows: 3
-        cols: 3
-        scale: 100
-        gap: -1
-        fx: 0.15625
-        fy: 0.3701388888888889
-        slotMode: static
-        timerStyle: "off"
-        timerFlashThreshold: 6
-        timerYOffset: -3
-        enableFlashing: true
-        fillDirection: BL-TR
-        sortOrder: longest
-        layout: debuffFirst
-        whitelist: []
-        slotAssignments:
-          "0": [3963058]
-          "1": [3963061]
-          "2": [3963068]
-          "3": [3963299]
-          "4": [3963193]
-          "5": [3963268]
-          "6": [3963059]
-          "7": [3963062]
-          "8": [3963070]
-      - id: Tank
-        enabled: true
-        type: target
-        rows: 2
-        cols: 3
-        scale: 100
-        gap: -1
-        fx: 0.15625
-        fy: 0.37037037037037035
-        slotMode: static
-        timerStyle: digits
-        timerFlashThreshold: 6
-        timerYOffset: -3
-        enableFlashing: true
-        fillDirection: BL-TR
-        sortOrder: longest
-        layout: debuffFirst
-        whitelist: []
-        slotAssignments:
-          "3": [4325954, 4487417]
-          "4": [4086624]
-          "5": [1126126, 4931433, 1126127, 792739, 4927248]
-          "0": [3076662, 974157]
-          "1": [4380771, 5014929, 4757285, 4857490, 4206340, 4857489, 5014930, 5052693, 5014931, 5052177, 4857536, 4857488]
-          "2": [974548, 4924367, 1126244, 4277186, 4350347]
       - id: Raid_Debuffs
         enabled: true
         type: player
@@ -102,6 +49,82 @@ modules:
         rowCap: 3
         maxSlots: 3
         showSelf: true
+      - id: Tank
+        enabled: true
+        type: target
+        rows: 2
+        cols: 3
+        scale: 100
+        gap: -1
+        fx: 0.15625
+        fy: 0.37037037037037035
+        slotMode: static
+        timerStyle: digits
+        timerFlashThreshold: 6
+        timerYOffset: -3
+        enableFlashing: true
+        fillDirection: BL-TR
+        sortOrder: longest
+        layout: debuffFirst
+        whitelist: []
+        slotAssignments:
+          "3": [4325954, 4487417]
+          "4": [4086624]
+          "5": [1126126, 4931433, 1126127, 792739, 4927248]
+          "0": [3076662, 974157]
+          "1": [4380771, 5014929, 4757285, 4857490, 4206340, 4857489, 5014930, 5052693, 5014931, 5052177, 4857536, 4857488]
+          "2": [974548, 4924367, 1126244, 4277186, 4350347]
+      - id: Wrack_Torment_Ruin
+        enabled: true
+        type: target
+        rows: 3
+        cols: 3
+        scale: 100
+        gap: -1
+        fx: 0.15625
+        fy: 0.3701388888888889
+        slotMode: static
+        timerStyle: "off"
+        timerFlashThreshold: 6
+        timerYOffset: -3
+        enableFlashing: true
+        fillDirection: BL-TR
+        sortOrder: longest
+        layout: debuffFirst
+        whitelist: []
+        slotAssignments:
+          "0": [3963058]
+          "1": [3963061]
+          "2": [3963068]
+          "3": [3963299]
+          "4": [3963193]
+          "5": [3963268]
+          "6": [3963059]
+          "7": [3963062]
+          "8": [3963070]
+      - id: CC
+        enabled: true
+        type: hostile
+        rows: 1
+        cols: 5
+        scale: 100
+        gap: -1
+        fx: 0.15625
+        fy: 0.37037037037037035
+        slotMode: dynamic
+        timerStyle: bar
+        timerFlashThreshold: 6
+        timerYOffset: -3
+        enableFlashing: true
+        fillDirection: C
+        sortOrder: longest
+        layout: debuffFirst
+        whitelist: [156681, 3075406, 5077953, 217104, 1148639, 3203611, 3675546, 710440, 3203620, 4349387, 1282531, 5077955, 4478385, 792741, 5077873, 3964868, 4351401, 3494035, 4050865, 3487056, 5077874, 198397, 198391, 872844, 3766764, 4486969, 3784874, 3663585, 4717943, 3499696, 5077889, 3763216, 5077888, 4646963, 1148380, 223235, 3766763, 1148638, 3499109, 3542742, 1092543, 223495, 3203789, 792742, 3078446, 196430, 5015832, 3130398, 4478650, 4268126, 792735, 1093979, 3055164, 4350334, 1148666, 3487052]
+        slotAssignments: {}
+        plateOffset: 75
+        maxDistance: 40
+        rowCap: 5
+        maxSlots: 5
   overlay:
     size: 11
     font: GG

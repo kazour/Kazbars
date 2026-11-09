@@ -291,7 +291,6 @@ class GridEditorPanel(ttk.Frame):
         self._names_label = ttk.Label(body, textvariable=self.names_var, font=FONT_SMALL,
                                       foreground=THEME_COLORS['muted'])
         self._names_label.pack(anchor='w', fill='x')
-        add_tooltip(self._names_label, self._names_tip)
         body.bind('<Configure>', lambda e: self._draw_names(), add='+')
 
     def base_size(self):
@@ -349,12 +348,6 @@ class GridEditorPanel(ttk.Frame):
     def _format_buff_preview(self, ids, max_show=4):
         """Up to *max_show* names, then ` + N more`."""
         return grid_preview.join_names([self._name_of(bid) for bid in ids], max_show)
-
-    def _names_tip(self):
-        if not self._names:
-            return grid_preview.empty_nudge(self.grid_config) or ""
-        n = len(self._names)
-        return f"{n} buff{'s' if n != 1 else ''}: " + ", ".join(self._names)
 
     def _preview_tip(self, slot):
         cfg = self.grid_config

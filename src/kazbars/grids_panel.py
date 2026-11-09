@@ -177,26 +177,31 @@ class GridsPanel(ttk.Frame):
                   foreground=THEME_COLORS['muted']).pack(side='right', padx=(0, PAD_XS))
 
     def _build_class_tabs(self):
-        """`All | Guard Conq DT | PoM ToS BS | Barb Sin Ranger | Demo Necro HoX`:
-        one group per archetype, each tab showing a count of its own grids. A tab
-        lists its own grids only — All the All grids, a class tab the grids with
-        its class (in game a class builds both). The tab is the `grids_tab`
-        pref, so the panel reopens where it was left."""
+        """`All classes | Guard Conq DT | PoM ToS BS | Barb Sin Ranger | Demo Necro
+        HoX`: one group per archetype, each tab showing a count of its own grids,
+        the tabs stretched to the row's width. A tab lists its own grids only —
+        All classes the classless grids, a class tab the grids with its class (in
+        game a class builds both). The tab is the `grids_tab` pref, so the panel
+        reopens where it was left."""
         row = ttk.Frame(self)
         row.pack(fill='x', padx=PAD_TAB, pady=(0, PAD_XS))
         self._tab_var = tk.IntVar(value=get_setting('grids_tab') or 0)
         self._tab_buttons: dict[int, tuple[ttk.Radiobutton, str]] = {}
-        groups = [[(0, "All", "Grids built for every class. In game each class gets "
+        groups = [[(0, "All classes", "Grids built for every class. In game each class gets "
                               "these as well as its own.")]]
         for archetype in range(4):
             groups.append([(c.id, c.short, f"{c.name}: its own grids.")
                            for c in CLASSES if c.archetype == archetype])
+        col = 0
         for gi, group in enumerate(groups):
             for k, (cid, short, tip) in enumerate(group):
                 rb = ttk.Radiobutton(row, text=short, value=cid, variable=self._tab_var,
                                      command=self._on_tab_changed,
                                      bootstyle='toolbutton')  # type: ignore[call-arg]
-                rb.pack(side='left', padx=(PAD_TAB if gi and k == 0 else 0, 0))
+                rb.grid(row=0, column=col, sticky='ew',
+                        padx=(PAD_TAB if gi and k == 0 else 0, 0))
+                row.columnconfigure(col, weight=1)
+                col += 1
                 add_tooltip(rb, tip)
                 self._tab_buttons[cid] = (rb, short)
 
@@ -275,9 +280,9 @@ class GridsPanel(ttk.Frame):
         return appended, renames
 
     def tab_name(self):
-        """The current tab's class name, or "All"."""
+        """The current tab's class name, or "All classes"."""
         tab = by_id(self._tab_var.get())
-        return tab.name if tab else "All"
+        return tab.name if tab else "All classes"
 
     def _join_current_tab(self, grid):
         """A new grid joins the tab it was made on."""
