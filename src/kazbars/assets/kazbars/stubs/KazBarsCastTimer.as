@@ -232,9 +232,16 @@ class KazBarsCastTimer implements KazBarsModule {
     // The footprint is the timer's own: the text box (TW x TH, anchored on its
     // centre) with the room the overlay's name needs above it and an edge
     // below, so the label clears the text and the box is the
-    // same width the text has — and the clamp below uses.
+    // same width the text has — and the clamp uses.
+    // makeClip centers the text on the clip's own x (a box from -TW/2 to +TW/2),
+    // top-anchors it on y, so the clamp floor/ceiling shift by that half-width
+    // instead of reusing KazBarsPanel.clampPos's top-left-anchored assumption.
+    // Entering preview is the one place the clip is pulled onto the stage.
     private function dressForDrag(s:KazBarsCastSide, col:Number, title:String):Void {
         if (s.mc == null) return;
+        var halfW:Number = TW / 2;
+        s.mc._x = halfW + KazBarsPanel.clampPos(s.mc._x - halfW, TW, true);
+        s.mc._y = KazBarsPanel.clampPos(s.mc._y, TH, false);
         draw(s);
         var above:Number = KazBarsPreview.roomAbove();
         KazBarsPreview.attach({mc: s.mc, x: -TW / 2, y: -above, w: TW,
@@ -254,16 +261,14 @@ class KazBarsCastTimer implements KazBarsModule {
         if (v !== undefined) setActive(v == 1);
     }
 
-    // makeClip centers the text on the clip's own x (a box from -TW/2 to +TW/2),
-    // top-anchors it on y, so the clamp floor/ceiling shift by that half-width
-    // instead of reusing KazBarsPanel.clampPos's top-left-anchored assumption.
-    // The same TW x TH the text box and the preview footprint have.
+    // As saved, never clamped: the stage can read short at load.
     private function applyPos(clip:MovieClip, x:Object, y:Object):Void {
         if (clip == null) return;
-        if (x !== undefined && y !== undefined) {
-            var halfW:Number = TW / 2;
-            clip._x = halfW + KazBarsPanel.clampPos(Number(x) - halfW, TW, true);
-            clip._y = KazBarsPanel.clampPos(Number(y), TH, false);
+        var nx:Number = Number(x);
+        var ny:Number = Number(y);
+        if (x !== undefined && y !== undefined && nx == nx && ny == ny) {
+            clip._x = nx;
+            clip._y = ny;
         }
     }
 

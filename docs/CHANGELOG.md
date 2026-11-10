@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Positions no longer jump inward after `/reloadui` or a relog on screens larger than 1080p.** Grids, the Cast timer's bars, and the Onslaught tracker's board and alerts placed low or far right could land further in after a `/reloadui` or relog, and that new spot was then saved — most noticeable after importing a 3.1 profile into 3.2. They now load exactly where you left them. Opening preview mode is the one time KazBars pulls them onto the screen, so anything left off-screen (after lowering the game resolution, say) comes back when you open preview. Needs a Build & Install to take effect. The Stopwatch, Console and Inspect Target panels weren't affected.
+
 ## [3.2.0] — 2026-11-09
 
 ### Added

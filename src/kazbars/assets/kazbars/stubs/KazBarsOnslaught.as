@@ -454,6 +454,14 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         previewMode = true;
         if (active) {
             unbuild();
+            // Entering preview is the one place the anchors are pulled onto the
+            // stage. The alerts anchor is its text's centre, so its footprint
+            // starts left of the origin (FX), as the cast timer's does.
+            var i:Number;
+            for (i = 0; i < 2; i++) {
+                P[i * 2] = KazBarsPanel.clampPos(P[i * 2] + FX[i], FW[i], true) - FX[i];
+                P[i * 2 + 1] = KazBarsPanel.clampPos(P[i * 2 + 1], FH[i], false);
+            }
             build(true);
         }
     }
@@ -968,15 +976,18 @@ class KazBarsOnslaught extends KazBarsPanel implements KazBarsModule {
         var k:String;
         var x:Object;
         var y:Object;
+        var nx:Number;
+        var ny:Number;
         for (i = 0; i < 2; i++) {
             k = "on" + "pa".charAt(i);
             x = config.FindEntry(k + "x");
             y = config.FindEntry(k + "y");
-            if (x !== undefined && y !== undefined) {
-                // The alerts anchor is its text's centre, so its footprint
-                // starts left of the origin (FX), as the cast timer's does.
-                P[i * 2] = KazBarsPanel.clampPos(Number(x) + FX[i], FW[i], true) - FX[i];
-                P[i * 2 + 1] = KazBarsPanel.clampPos(Number(y), FH[i], false);
+            nx = Number(x);
+            ny = Number(y);
+            // As saved, never clamped: the stage can read short at load.
+            if (x !== undefined && y !== undefined && nx == nx && ny == ny) {
+                P[i * 2] = nx;
+                P[i * 2 + 1] = ny;
                 if (cl[i] != null) {
                     cl[i]._x = P[i * 2];
                     cl[i]._y = P[i * 2 + 1];

@@ -448,8 +448,8 @@ class KazBarsPanel {
     // v, a footprint of size n's near edge along x (horiz) or y, kept on the
     // stage. A footprint larger than the stage pins to its near edge like the
     // drag floor in beginDrag, rather than seated partly off-screen. Static so
-    // every module (grids, cast timer, onslaught, panels) clamps archived
-    // positions with the same rule.
+    // every module clamps with the same rule: panels when they seat, grids,
+    // cast timer and onslaught on entering preview (never at load).
     public static function clampPos(v:Number, n:Number, horiz:Boolean):Number {
         var s:Object = stage();
         var lo:Number = horiz ? s.x : s.y;

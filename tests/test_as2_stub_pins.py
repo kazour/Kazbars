@@ -166,3 +166,22 @@ def test_overhead_and_screen_grids_share_one_archive_key():
         body = oh[oh.index(f"public function {fn}("):]
         body = body[:body.index("\n    }\n")]
         assert "all.length" in body and "d.CFG.grids" not in body, fn
+
+
+def _fn_body(src, fn):
+    start = src.index(f" function {fn}(")
+    return src[start:src.index("\n    }\n", start)]
+
+
+@pytest.mark.parametrize("cls, loads, seats", [
+    ("KazBarsGrids", ("loadState",), "previewOn"),
+    ("KazBarsCastTimer", ("loadState", "applyPos"), "dressForDrag"),
+    ("KazBarsOnslaught", ("loadState",), "previewOn"),
+])
+def test_loading_never_clamps_a_hud_position(cls, loads, seats):
+    """The stage can read short when the archive loads; a clamp there would pull
+    a spot inward and the next save would keep it. Entering preview seats it."""
+    src = _stub(cls)
+    for fn in loads:
+        assert "clampPos" not in _fn_body(src, fn), (cls, fn)
+    assert "clampPos" in _fn_body(src, seats), (cls, seats)
