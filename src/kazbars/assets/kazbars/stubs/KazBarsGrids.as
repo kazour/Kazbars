@@ -5,7 +5,8 @@
 // Per class: only your class's grids (cls) and the All ones are built, the All ones alone until the class reads
 // (KazBarsWorld.onClass); a class change hides the old set (each view stays on its cfg, _v, for reuse) and builds the
 // new one at its archived spots, after preview if it is on.
-// Archive: gk_<key>_x, gk_<key>_y, gk_<key>_v (shown); a grid not built keeps whatever the archive holds.
+// Archive: gk_<key>_x, gk_<key>_y, gk_<key>_v (shown); a grid not built keeps whatever the archive holds. A spot loads
+// as saved, never clamped (the stage can read short at load); entering preview pulls each grid onto the stage.
 class KazBarsGrids implements KazBarsModule {
     public var views:Array;       // for the control panel's rows
     private var root:MovieClip;
@@ -157,10 +158,14 @@ class KazBarsGrids implements KazBarsModule {
     public function previewOn():Void {
         pv = true;
         var i:Number;
+        var v:KazBarsGridView;
         for (i = 0; i < views.length; i++) {
-            views[i].fill();
-            views[i].mc._visible = views[i].shown;
-            KazBarsPreview.createOverlay(views[i]);
+            v = views[i];
+            v.mc._x = KazBarsPanel.clampPos(v.mc._x, v.W, true);
+            v.mc._y = KazBarsPanel.clampPos(v.mc._y, v.H, false);
+            v.fill();
+            v.mc._visible = v.shown;
+            KazBarsPreview.createOverlay(v);
         }
         clk.go(kD);
     }
@@ -187,14 +192,18 @@ class KazBarsGrids implements KazBarsModule {
         var k:String;
         var x:Object;
         var y:Object;
+        var nx:Number;
+        var ny:Number;
         for (i = 0; i < views.length; i++) {
             v = views[i];
             k = "gk_" + v.cfg.key;
             x = config.FindEntry(k + "_x");
             y = config.FindEntry(k + "_y");
-            if (x !== undefined && y !== undefined) {
-                v.mc._x = KazBarsPanel.clampPos(Number(x), v.W, true);
-                v.mc._y = KazBarsPanel.clampPos(Number(y), v.H, false);
+            nx = Number(x);
+            ny = Number(y);
+            if (x !== undefined && y !== undefined && nx == nx && ny == ny) {
+                v.mc._x = nx;
+                v.mc._y = ny;
             }
             // Hidden at once: a grid may already be up from before the archive arrived.
             x = config.FindEntry(k + "_v");

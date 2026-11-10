@@ -101,7 +101,7 @@
 | `tests/test_app_contract.py` | 104 |
 | `tests/test_app_icon.py` | 43 |
 | `tests/test_as2_class_names.py` | 77 |
-| `tests/test_as2_stub_pins.py` | 168 |
+| `tests/test_as2_stub_pins.py` | 187 |
 | `tests/test_boss_timer.py` | 151 |
 | `tests/test_buff_db_layers.py` | 272 |
 | `tests/test_buff_xml.py` | 324 |
