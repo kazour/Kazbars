@@ -51,7 +51,7 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "RUF", "N"]
 ignore = [
-    "E501",   # line too long — let formatter handle
+    "E501",   # line too long — not enforced
     "N812",   # lowercase imported as non-lowercase — 10 deliberate aliases (APP_VERSION, test module aliases)
     "E402",   # module-import-not-at-top — codebase convention: logger = getLogger() after imports
     "E741",   # ambiguous variable names (l, I, O) — used as AS2 loop counters in generators
@@ -68,17 +68,14 @@ ignore = [
 "tests/*" = ["B"]
 "src/as2c/**" = ["N818"]   # vendored compiler: exception names mirror MTASC's (Failure, Overflow, ...)
 
-[tool.ruff.format]
-quote-style = "double"
-
 [tool.mypy]
 python_version = "3.12"
 # Blocking gate = the Tk-free logic core (modules that import neither tkinter
 # nor ttkbootstrap). Bare `mypy` (CI's blocking step) checks exactly these and
 # must stay clean. The Tk/ttkbootstrap UI modules are checked advisory-only in
 # CI (`mypy src/kazbars`, continue-on-error) because ttkbootstrap's runtime
-# `bootstyle` kwargs + dynamic widget typing emit ~80 unfixable errors that
-# would otherwise drown out real regressions. Add a module here ONLY if it
+# `bootstyle` kwargs + dynamic widget typing emit errors mypy can't resolve,
+# which would otherwise drown out real regressions. Add a module here ONLY if it
 # imports neither tkinter nor ttkbootstrap (see docs/architecture.md).
 files = [
     "src/kazbars/__init__.py",
