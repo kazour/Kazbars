@@ -1,8 +1,10 @@
 name: Release train
 
-# Cuts a patch (or minor) release on its own, every second Monday, when main
-# carries code that has not shipped yet. Every gate must hold, otherwise the run
-# ends with a notice:
+# Runs only when dispatched by hand while releases are manual (the schedule
+# trigger was `cron: '1 0 * * 1'`; adding it back under `on:` re-arms the
+# fortnightly train). A run cuts a patch (or minor) release when main carries
+# code that has not shipped yet. Every gate must hold, otherwise the run ends
+# with a notice:
 #   1. it is a release Monday — the cron fires every Monday 00:01 UTC and the run
 #      skips itself unless a whole number of fortnights has passed since
 #      ANCHOR_MONDAY (a manual dispatch ignores this gate);
@@ -20,8 +22,6 @@ name: Release train
 # moved; a bad release is fixed forward by the next run.
 
 on:
-  schedule:
-    - cron: '1 0 * * 1'
   workflow_dispatch:
 
 permissions:

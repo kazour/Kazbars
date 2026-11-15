@@ -1,8 +1,8 @@
 repos:
   # Linter only. The formatter (ruff-format) is intentionally omitted: this
-  # codebase is single-quote style and was never `ruff format`-ed, and the
-  # configured quote-style="double" would rewrite nearly every file. Re-add
-  # `- id: ruff-format` deliberately if the team adopts a formatting standard.
+  # codebase was never `ruff format`-ed and its quotes are mixed, so the
+  # formatter would rewrite nearly every file. Re-add `- id: ruff-format`
+  # deliberately if the team adopts a formatting standard.
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.12
     hooks:

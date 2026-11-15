@@ -122,9 +122,9 @@ The project follows a `src/` layout — entry point is `python -m kazbars`, whic
 
 ## Releasing
 
-Patch and minor releases cut themselves. [`release-train.yml`](.github/workflows/release-train.yml) runs every second Monday at 00:01 UTC (first run 31 August 2026; a manual run ignores the schedule); when `main` carries code changes since the last tag (under `src/` or `kazbars.spec`) and [`docs/CHANGELOG.md`](docs/CHANGELOG.md) has entries under `[Unreleased]`, it runs [`scripts/cut_release.py`](scripts/cut_release.py), commits `Release vX.Y.Z`, tags it, and [`release.yml`](.github/workflows/release.yml) builds and publishes `KazBars.zip` + SHA256 checksum from the tag. The script reads `[Unreleased]`, picks the bump (`### Added` present means minor, otherwise patch), dates the changelog section, bumps `__version__` in [`src/kazbars/__init__.py`](src/kazbars/__init__.py), and writes the What's New block into [`.github/release-notes.md`](.github/release-notes.md). `--dry-run` prints the plan and writes nothing; setting the repository variable `RELEASE_HOLD` pauses the train.
+Releases are cut by hand with [`scripts/cut_release.py`](scripts/cut_release.py). It reads `[Unreleased]` in [`docs/CHANGELOG.md`](docs/CHANGELOG.md), picks the bump (`### Added` present means minor, otherwise patch; `--version` overrides it and is the only way to a major), dates the changelog section, bumps `__version__` in [`src/kazbars/__init__.py`](src/kazbars/__init__.py), and writes the What's New block into [`.github/release-notes.md`](.github/release-notes.md). `--dry-run` prints the plan and writes nothing.
 
-A major release, or one whose notes deserve a polish, is the same script by hand:
+Review the What's New block, then commit, tag and push. [`release.yml`](.github/workflows/release.yml) builds and publishes `KazBars.zip` + SHA256 checksum from the tag:
 
 ```bash
 python scripts/cut_release.py --version X.Y.Z
@@ -134,6 +134,8 @@ git tag -a vX.Y.Z -m "KazBars vX.Y.Z"
 git push origin main
 git push origin vX.Y.Z
 ```
+
+[`release-train.yml`](.github/workflows/release-train.yml) stays in the repo and runs only when dispatched manually. It applies the same gates: code changed since the last tag (under `src/` or `kazbars.spec`), entries under `[Unreleased]`, and the repository variable `RELEASE_HOLD` empty. While `RELEASE_HOLD` is set, it exits without releasing.
 
 ## License
 
